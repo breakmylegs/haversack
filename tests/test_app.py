@@ -19,7 +19,7 @@ def make_app(tmp_path, kill_calls):
         plugin_dir=str(tmp_path / "plugin"),
     )
     proc_root = str(tmp_path / "proc")
-    app = KeepsakeApp(paths, proc_root=proc_root)
+    app = KeepsakeApp(paths, proc_root=proc_root, auto_refresh_manifest=False)
     app.freezer._kill = lambda pid, sig: kill_calls.append((pid, sig))
     return app, proc_root
 
@@ -91,7 +91,14 @@ def make_update_app(tmp_path, version, emitted):
     def no_network(url, headers=None):
         raise AssertionError(f"unexpected network call to {url}")
 
-    return KeepsakeApp(paths, emit=emit, proc_root=str(tmp_path / "proc"), version=version, fetch=no_network)
+    return KeepsakeApp(
+        paths,
+        emit=emit,
+        proc_root=str(tmp_path / "proc"),
+        version=version,
+        fetch=no_network,
+        auto_refresh_manifest=False,
+    )
 
 
 def test_update_refused_while_simulated_sync_runs_then_idle_event(tmp_path):
@@ -140,7 +147,9 @@ def make_discovery_app(tmp_path):
         log_dir=str(tmp_path / "logs"),
         plugin_dir=str(tmp_path / "plugin"),
     )
-    app = KeepsakeApp(paths, proc_root=str(tmp_path / "proc"), version="0.3.0", home=str(home))
+    app = KeepsakeApp(
+        paths, proc_root=str(tmp_path / "proc"), version="0.3.0", home=str(home), auto_refresh_manifest=False
+    )
     return app, root
 
 

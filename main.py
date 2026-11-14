@@ -41,6 +41,30 @@ class Plugin:
     async def check_running_prefix(self, key: str) -> dict[str, Any]:
         return await self.app.check_running_prefix(key)
 
+    async def manifest_status(self) -> dict[str, Any]:
+        return await self.app.manifest_status()
+
+    async def refresh_manifest(self, force: bool = False) -> dict[str, Any]:
+        return await self.app.refresh_manifest(force)
+
+    async def match_games(self) -> list[dict[str, Any]]:
+        return await self.app.match_games()
+
+    async def search_titles(self, query: str) -> list[str]:
+        return await self.app.search_titles(query)
+
+    async def get_game(self, key: str) -> dict[str, Any]:
+        return await self.app.get_game(key)
+
+    async def update_game_config(self, key: str, changes: dict[str, Any]) -> dict[str, Any]:
+        return await self.app.update_game_config(key, changes)
+
+    async def add_custom_path(self, key: str, absolute_path: str) -> dict[str, Any]:
+        return await self.app.add_custom_path(key, absolute_path)
+
+    async def preview_game(self, key: str) -> dict[str, Any]:
+        return await self.app.preview_game(key)
+
     async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
         return await self.app.simulate_sync_job(seconds)
 

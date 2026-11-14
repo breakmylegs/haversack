@@ -61,6 +61,17 @@ Each entry is **verified** (read in source or type definitions, or measured on d
 | A40 | Shortcut `StartDir` and `Exe` are stored quoted; the `base` root is `StartDir`, else the exe's folder (build prompt section 8) | community-documented, unverified on device; quotes are stripped when present | |
 | A41 | Shortcut keys `shortcut:<id3>:<appid>` are stable on one device only; the cross-device identity is the `gameKey` from slice 4 | design | build prompt section 8 |
 
+## Manifest (slice 4)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A42 | The current manifest URL is on the `data` branch; `master` will stop being updated. **Differs from the build prompt**, same host | verified | manifest README |
+| A43 | The live manifest uses only block mappings and sequences, plain and double-quoted scalars and `{}`; no block scalars, anchors, aliases, tags or non-empty flow collections | verified 14 November 2026 by a survey of 886,474 lines | ADR-0006 |
+| A44 | The schema in `data/schema.yaml` (files, registry, installDir, steam, id.steamExtra, alias, cloud, notes) is what tools should implement | verified | manifest README |
+| A45 | Laptop measurements: 53,541 entries, 0 skipped, index build 22 s with tracing, 30 MB peak traced, 5.6 MB index. Device measurements pending (`parseSeconds`, `peakRssMb` in the index) | laptop verified, device unverified | ADR-0006 |
+| A46 | `FileSelectionType` in `@decky/api` is a type-only `const enum`; `FOLDER` is 1 | verified | `@decky/api` `types.d.ts` |
+| A47 | `<storeUserId>` folders under AppData are SteamID64-named, the same on both devices for the same account, so a `*` wildcard finds them and the relative path matches across devices | community-documented, unverified on device | Ludusavi behaviour |
+
 ## Template differences
 
 | # | Difference | Reason |

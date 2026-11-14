@@ -80,6 +80,45 @@ class _AllowlistRedirect(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
+def fetch_to_file(
+    url: str,
+    dest: str,
+    headers: Mapping[str, str] | None = None,
+    timeout: float = 60.0,
+    max_bytes: int = DEFAULT_MAX_BYTES,
+    allowed: frozenset[str] = ALLOWED_HOSTS,
+) -> HttpResponse:
+    """GET ``url`` and stream a 200 body into ``dest`` (body is not kept in memory).
+
+    Returns the status and headers; ``body`` is empty. Raises :class:`NetError`
+    on transport errors or when the body exceeds ``max_bytes``.
+    """
+    check_url(url, allowed)
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPSHandler(context=ssl_context()), _AllowlistRedirect(allowed)
+    )
+    try:
+        with opener.open(request, timeout=timeout) as response, open(dest, "wb") as out:
+            written = 0
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > max_bytes:
+                    raise NetError(f"response larger than {max_bytes} bytes")
+                out.write(chunk)
+            return HttpResponse(status=response.status, headers={k.lower(): v for k, v in response.headers.items()})
+    except urllib.error.HTTPError as exc:
+        return HttpResponse(status=exc.code, headers={k.lower(): v for k, v in (exc.headers or {}).items()})
+    except NetError:
+        raise
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        reason = getattr(exc, "reason", exc)
+        raise NetError(f"{type(exc).__name__}: {reason}") from exc
+
+
 def fetch(
     url: str,
     headers: Mapping[str, str] | None = None,

@@ -25,7 +25,7 @@ def make_repo(root, version="1.2.3", changelog=None, plugin_extra=None):
     (root / "py_modules" / "keepsake" / "__pycache__" / "a.pyc").write_text("")
     (root / "bin").mkdir()
     (root / "bin" / "keepsake-gate").write_text("#!/bin/sh\n")
-    for name in ("main.py", "LICENSE", "README.md"):
+    for name in ("main.py", "LICENSE", "README.md", "THIRD_PARTY_NOTICES.md"):
         (root / name).write_text(name)
     (root / "package.json").write_text(json.dumps({"version": version}))
     (root / "plugin.json").write_text(json.dumps({"name": "Keepsake", **(plugin_extra or {})}))
@@ -46,6 +46,7 @@ def test_package_layout_modes_and_determinism(tmp_path, monkeypatch):
         names = archive.namelist()
         assert "Keepsake/plugin.json" in names
         assert "Keepsake/dist/index.js" in names
+        assert "Keepsake/THIRD_PARTY_NOTICES.md" in names  # MIT notice for bundled qrcode-generator
         assert "Keepsake/py_modules/keepsake/__init__.py" in names
         assert not any("__pycache__" in n or n.endswith(".pyc") for n in names)
         assert all(n.startswith("Keepsake/") for n in names)
