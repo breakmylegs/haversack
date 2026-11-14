@@ -40,6 +40,8 @@ Releases can be signed with [minisign](https://jedisct1.github.io/minisign/). Wi
 
 Use `pnpm release publish --dry-run` to build the assets into `out/release/` without tagging or publishing.
 
+If you choose to publish without running the device tests, use `pnpm release publish --accept-untested` instead of `--device-tested`. The release notes then state that the device tests were not run.
+
 ## Pre-releases
 
 Use a version like `0.3.0-beta.1`. It is published as a GitHub pre-release and only offered to devices on the Pre-release channel.
