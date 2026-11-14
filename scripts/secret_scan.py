@@ -41,6 +41,8 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         ),
     ),
     ("email address", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
+    # A Windows profile path names the account (tooling output can paste these into files).
+    ("Windows user profile path", re.compile(r"(?i)\b[A-Z]:[\\/]+Users[\\/]+(?!(?:Public|Default)\b)[^\\/\s\"'<>]+")),
 ]
 
 EMAIL_ALLOW = re.compile(

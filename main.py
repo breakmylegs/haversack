@@ -65,6 +65,27 @@ class Plugin:
     async def preview_game(self, key: str) -> dict[str, Any]:
         return await self.app.preview_game(key)
 
+    async def snapshot_game(self, key: str) -> dict[str, Any]:
+        return await self.app.snapshot_game(key)
+
+    async def list_snapshots(self, key: str) -> dict[str, Any]:
+        return await self.app.list_snapshots(key)
+
+    async def restore_snapshot(self, key: str, snap_id: str) -> dict[str, Any]:
+        return await self.app.restore_snapshot(key, snap_id)
+
+    async def undo_restore(self, key: str, prerestore_id: str) -> dict[str, Any]:
+        return await self.app.undo_restore(key, prerestore_id)
+
+    async def pin_snapshot(self, key: str, snap_id: str) -> dict[str, Any]:
+        return await self.app.pin_snapshot(key, snap_id)
+
+    async def release_quarantine(self, key: str, snap_id: str, confirmed: bool) -> dict[str, Any]:
+        return await self.app.release_quarantine(key, snap_id, confirmed)
+
+    async def run_retention(self, key: str) -> dict[str, Any]:
+        return await self.app.run_retention(key)
+
     async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
         return await self.app.simulate_sync_job(seconds)
 

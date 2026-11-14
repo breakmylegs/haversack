@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import os
 import tempfile
+from collections.abc import Iterable, Iterator
 
 from ..safepath import ensure_within
 from .base import AlreadyExistsError, NotFoundError, ObjectInfo, Store, validate_key, validate_prefix
@@ -27,14 +28,30 @@ class LocalFolderStore(Store):
         return ensure_within(self._root, os.path.join(self._root, *key.split("/")))
 
     def put_new(self, key: str, data: bytes) -> ObjectInfo:
+        return self._put_stream(key, [data])
+
+    def put_new_file(self, key: str, path: str) -> ObjectInfo:
+        def chunks() -> Iterator[bytes]:
+            with open(path, "rb") as source:
+                while chunk := source.read(1024 * 1024):
+                    yield chunk
+
+        return self._put_stream(key, chunks())
+
+    def _put_stream(self, key: str, chunks: Iterable[bytes]) -> ObjectInfo:
         target = self._path(key)
         os.makedirs(os.path.dirname(target), exist_ok=True)
         tmp_dir = os.path.join(self._root, _TMP_DIR)
         os.makedirs(tmp_dir, exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=tmp_dir)
+        digest = hashlib.sha256()
+        size = 0
         try:
             with os.fdopen(fd, "wb") as handle:
-                handle.write(data)
+                for chunk in chunks:
+                    handle.write(chunk)
+                    digest.update(chunk)
+                    size += len(chunk)
                 handle.flush()
                 os.fsync(handle.fileno())
             try:
@@ -43,7 +60,22 @@ class LocalFolderStore(Store):
                 raise AlreadyExistsError(key) from exc
         finally:
             os.unlink(tmp)
-        return ObjectInfo(key=key, size=len(data), sha256=hashlib.sha256(data).hexdigest())
+        # The hash is of what was written, so callers can verify the upload.
+        return ObjectInfo(key=key, size=size, sha256=digest.hexdigest())
+
+    def get_to_file(self, key: str, dest: str) -> ObjectInfo:
+        try:
+            source = open(self._path(key), "rb")
+        except FileNotFoundError as exc:
+            raise NotFoundError(key) from exc
+        digest = hashlib.sha256()
+        size = 0
+        with source, open(dest, "wb") as out:
+            while chunk := source.read(1024 * 1024):
+                out.write(chunk)
+                digest.update(chunk)
+                size += len(chunk)
+        return ObjectInfo(key=key, size=size, sha256=digest.hexdigest())
 
     def get(self, key: str) -> bytes:
         try:
