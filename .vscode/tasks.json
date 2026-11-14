@@ -1,0 +1,45 @@
+{
+    // Cross-platform replacements for the decky-plugin-template tasks.
+    // The template tasks need bash, rsync and Docker; these need only Node,
+    // pnpm, Python and the OpenSSH client. See docs/dev-setup.md.
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "setup",
+            "type": "shell",
+            "detail": "Install frontend dependencies",
+            "command": "pnpm install --frozen-lockfile",
+            "problemMatcher": []
+        },
+        {
+            "label": "build",
+            "type": "shell",
+            "group": "build",
+            "detail": "Build the frontend and package the plugin zip",
+            "command": "pnpm run build && pnpm run package",
+            "problemMatcher": []
+        },
+        {
+            "label": "deploy",
+            "type": "shell",
+            "detail": "Copy the zip to the device in deploy.local.json and restart Decky",
+            "command": "pnpm run deploy:device",
+            "problemMatcher": []
+        },
+        {
+            "label": "builddeploy",
+            "detail": "Build, package and deploy",
+            "dependsOrder": "sequence",
+            "dependsOn": ["build", "deploy"],
+            "problemMatcher": []
+        },
+        {
+            "label": "test",
+            "type": "shell",
+            "group": "test",
+            "detail": "Backend tests",
+            "command": "python -m pytest -q",
+            "problemMatcher": []
+        }
+    ]
+}

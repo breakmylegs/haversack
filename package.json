@@ -1,0 +1,59 @@
+{
+  "name": "keepsake",
+  "version": "0.1.0",
+  "description": "Decky Loader plugin that syncs PC game saves between SteamOS and Bazzite handhelds through cloud storage, from Gaming Mode.",
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "build": "rollup -c",
+    "watch": "rollup -c -w",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "package": "python scripts/package.py",
+    "deploy:device": "python scripts/deploy.py",
+    "check-versions": "python scripts/check_versions.py",
+    "secret-scan": "python scripts/secret_scan.py"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/breakmylegs/keepsake.git"
+  },
+  "keywords": [
+    "decky",
+    "plugin",
+    "steam-deck",
+    "save-sync"
+  ],
+  "author": "breakmylegs",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/breakmylegs/keepsake/issues"
+  },
+  "homepage": "https://github.com/breakmylegs/keepsake#readme",
+  "devDependencies": {
+    "@decky/rollup": "^1.0.2",
+    "@decky/ui": "^4.16.5",
+    "@eslint/js": "^9.39.0",
+    "@types/react": "19.1.1",
+    "@types/react-dom": "19.1.1",
+    "@types/webpack": "^5.28.5",
+    "eslint": "^9.39.0",
+    "globals": "^16.5.0",
+    "rollup": "^4.53.3",
+    "typescript": "^5.6.2",
+    "typescript-eslint": "^8.46.0"
+  },
+  "dependencies": {
+    "@decky/api": "^1.1.3",
+    "react-icons": "^5.3.0",
+    "tslib": "^2.7.0"
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "ignoreMissing": [
+        "react",
+        "react-dom"
+      ]
+    }
+  }
+}
