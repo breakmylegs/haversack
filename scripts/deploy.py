@@ -15,7 +15,6 @@ Uses the OpenSSH client that ships with Windows 10 and later, macOS and Linux.
 
 from __future__ import annotations
 
-import json
 import os
 import shlex
 import subprocess
@@ -23,21 +22,14 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import device
 import package
 
 ROOT = package.ROOT
-CONFIG = os.path.join(ROOT, "deploy.local.json")
 
 
 def main() -> int:
-    try:
-        with open(CONFIG, encoding="utf-8") as handle:
-            config = json.load(handle)
-    except FileNotFoundError:
-        print(f"Create {os.path.basename(CONFIG)} first, see docs/dev-setup.md", file=sys.stderr)
-        return 1
-    host = f"{config.get('user', 'deck')}@{config['host']}"
-    port = str(config.get("port", 22))
+    host, port = device.load_target()
     name = package.plugin_name()
     zip_path = package.build(os.path.join(ROOT, "out"))
     # scp paths without a leading slash are relative to the remote home folder.

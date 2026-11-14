@@ -8,7 +8,7 @@ Thanks for your interest. Keepsake is developed in slices, described in [docs/bu
 - Never commit personal data: tokens, account names, device names, real save files or real game lists. Test fixtures are synthetic.
 - UK English in UI text, docs, comments and commit messages. No em dashes or en dashes.
 - Conventional commits, for example `feat(discovery): read shortcuts for all users`.
-- All backend logic has tests. Pull requests must pass lint, type checks, tests and the build.
+- All backend logic has tests. There is no CI: run `pnpm run check` and the tests for what you changed before opening a pull request, and say what you ran in the description.
 
 ## Setup
 

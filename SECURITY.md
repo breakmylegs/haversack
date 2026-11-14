@@ -22,4 +22,4 @@ The threat model is in [docs/threat-model.md](docs/threat-model.md).
 
 - The backend runs as the desktop user, never as root.
 - Tokens are stored one file per backend with mode 0600, never logged and never included in diagnostics exports.
-- Releases are built only by CI from protected tags and carry a `SHA256SUMS` file. The in-plugin updater checks it before handing the install to Decky Loader.
+- Releases carry a `SHA256SUMS` file signed with minisign. The release zip is built deterministically, so anyone can rebuild a tag and compare hashes. The in-plugin updater checks the hash before handing the install to Decky Loader.

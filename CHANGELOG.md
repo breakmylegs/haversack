@@ -16,4 +16,4 @@ Slice 1: skeleton, development loop and on-device diagnostics. Does not sync sav
 - Freeze test that pauses the running game for 5 seconds behind a 30 second watchdog.
 - Diagnostics export to the settings folder.
 - `LocalFolderStore` with create-only writes.
-- CI for pull requests: lint, type checks, backend tests on Python 3.11 and 3.14, build, packaging and a secret scan.
+- Local quality gate `pnpm run check` (lint, type checks, build, version consistency, packaging, ruff, mypy, secret scan) and `pnpm run test:device` to run Linux-only tests on a device over SSH. No GitHub Actions.

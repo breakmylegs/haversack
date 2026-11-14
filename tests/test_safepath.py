@@ -40,6 +40,7 @@ def test_join_within_rejects_traversal(tmp_path):
         join_within(str(tmp_path), "../escape")
 
 
+@pytest.mark.posix
 @pytest.mark.skipif(not hasattr(os, "symlink") or os.name == "nt", reason="symlinks need POSIX")
 def test_symlink_escape_rejected(tmp_path):
     root = tmp_path / "root"

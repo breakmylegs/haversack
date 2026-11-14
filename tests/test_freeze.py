@@ -138,7 +138,7 @@ def test_vanished_process_is_skipped(tmp_path):
     freezer.resume_all()
 
 
-@pytest.mark.linux
+@pytest.mark.posix
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="needs real /proc and signals")
 def test_real_process_is_stopped_and_released_by_watchdog(tmp_path):
     child = subprocess.Popen(["sleep", "30"])

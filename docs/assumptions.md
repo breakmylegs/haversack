@@ -53,5 +53,8 @@ Each entry is **verified** (read in source or type definitions, or measured on d
 
 | # | Fact | Status |
 |---|---|---|
-| A28 | WSL fails to start on the development laptop ("logon type not granted", policy) and Docker is not installed. CI on Ubuntu is the authoritative Linux test run | verified 14 November 2026 |
+| A28 | WSL fails to start on the development laptop ("logon type not granted", policy) and Docker is not installed | verified 14 November 2026 |
+| A30 | No GitHub Actions (owner decision, ADR-0004). Linux test runs happen on a device over SSH | decided 14 November 2026 |
+| A31 | SteamOS and Bazzite ship `python3` with the `venv` module and `ensurepip`, and the device can reach PyPI, so `scripts/test_on_device.py` can create its test venv | unverified, first device run confirms |
+| A32 | **Differs from the build prompt:** sections 1, 6, 13, 16 and 17 assume GitHub Actions for pull request checks and releases. Replaced by `pnpm run check`, device tests and a local `pnpm release` (ADR-0004) | owner decision |
 | A29 | `LocalFolderStore` create-only writes use hard links, which exFAT and FAT32 SD cards do not support | known gap; acceptable for tests and the simulator, revisit before offering it as a user backend |

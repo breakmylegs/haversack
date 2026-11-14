@@ -16,7 +16,7 @@ Outcomes:
 - Non-Steam shortcuts installed into their own Proton prefixes sync correctly, even though their compatdata IDs differ on each device.
 - No save version is ever silently overwritten or lost.
 - The plugin updates itself from its own menus in a few clicks.
-- Source lives in the owner's public GitHub repository and CI builds every release.
+- Source lives in the owner's public GitHub repository. Releases are built locally by `pnpm release` and published with `gh` (ADR-0004: no GitHub Actions).
 
 ## 2. Context
 
@@ -68,22 +68,23 @@ Stop and ask the owner before doing any of the following. Record each decision i
 - **Language:** UK English in UI strings, docs, comments and commit messages. Never use em dashes or en dashes anywhere.
 - **Verify before relying.** When unsure of a Decky or Steam client API, read the decky-loader source, the `@decky/ui` and `@decky/api` type definitions (in `node_modules`) or the template. Record it in `docs/assumptions.md` as verified or unverified. Never guess API names. Where the build prompt conflicts with the source, the source wins: record the difference in `docs/assumptions.md` and tell the owner.
 - **Quality bar:** all backend logic has tests. No slice is done with failing tests, type errors, lint errors or a broken build.
+- **No GitHub Actions (ADR-0004).** Never add `.github/workflows`. Before every pull request run `pnpm run check` (lint, types, build, versions, packaging, ruff, mypy, secret scan) and record the result. Run `posix`-marked tests on a device with `pnpm run test:device` at the end of every slice and before every release.
 
 ### Owner's standing rules (from the owner's global instructions)
 
-- **Testing:** run the new or changed tests plus the existing tests that cover the files and behaviour touched, named one by one, then prove new tests by breaking the code they guard. Do not run whole suites by habit; CI runs the full suite on every pull request. Run the full suite locally only when asked, or for shared foundations (dependencies, build config, a module nearly everything imports), and say why first.
+- **Testing:** run the new or changed tests plus the existing tests that cover the files and behaviour touched, named one by one, then prove new tests by breaking the code they guard. Do not run whole suites by habit. Run the full suite locally only when asked, or for shared foundations (dependencies, build config, a module nearly everything imports), and say why first.
 - **Never use gitleaks** in any form. Secret scanning uses the in-repo script `scripts/secret_scan.py` and the `.githooks/pre-commit` hook.
 
 ## 6. Repository, stack and constraints
 
 **Repository**
-- Public, `main` protected: pull requests only and CI must pass.
+- Public. Changes reach `main` by pull request only. There is no CI, so "CI must pass" protection does not apply; any branch protection is the owner's call (escalation item).
 - Licence BSD-3-Clause with the decky-plugin-template notice kept at the bottom of `LICENSE`. Attribute the Ludusavi manifest (MIT) wherever its data is used.
 
 **Stack**
 - decky-plugin-template base, pnpm 9, TypeScript, React, `@decky/ui`, `@decky/api`.
 - Python backend: `main.py` is a thin entry point; all logic is in `py_modules/keepsake`. `py_modules/keepsake/app.py` holds the testable core.
-- Python: Decky Loader 3.3.1 builds with Python 3.14 (verify on device; see `docs/assumptions.md`). Code stays compatible with 3.11 and CI tests both.
+- Python: Decky Loader 3.3.1 builds with Python 3.14 (verify on device; see `docs/assumptions.md`). Ruff targets 3.11 syntax; tests run on Windows Python 3.14 and the device's Python.
 - Stdlib first (`asyncio`, `sqlite3`, `hashlib`, `hmac`, `zipfile`, `json`, `urllib`, `ssl`), JSON fallback if `sqlite3` is missing. Vendored pure-Python libraries only, pinned with hashes.
 - HTTP via stdlib in worker threads unless slice 1 proves `aiohttp` is importable from plugin processes.
 
@@ -95,7 +96,7 @@ Stop and ask the owner before doing any of the following. Record each decision i
 - User-configured WebDAV and S3 endpoints
 
 **Development environment**
-- The owner develops on Windows. WSL does not start on this laptop (policy) and Docker is not installed, so backend tests run locally on Windows Python where possible; Linux-only tests are marked and skipped there. GitHub Actions on Ubuntu is the authoritative Linux run. See `docs/dev-setup.md`.
+- The owner develops on Windows. WSL does not start on this laptop (policy) and Docker is not installed, so backend tests run locally on Windows Python where possible; Linux-only tests are marked `posix`, skipped there, and run on a device over SSH with `pnpm run test:device`. See `docs/dev-setup.md`.
 - pnpm is run through `npx -y pnpm@9.15.9` when it is not installed globally.
 - Deploy to devices over SSH with `pnpm run deploy:device` (see `docs/dev-setup.md`).
 
@@ -103,12 +104,10 @@ Stop and ask the owner before doing any of the following. Record each decision i
 
 ```
 npx -y pnpm@9.15.9 install --frozen-lockfile
-npx -y pnpm@9.15.9 run typecheck
-npx -y pnpm@9.15.9 run lint
-npx -y pnpm@9.15.9 run build
-python scripts/package.py               # zip into out/
-python scripts/check_versions.py
-python scripts/secret_scan.py
+python scripts/check.py                 # full local quality gate, no tests
 .venv/Scripts/python -m pytest -q tests/test_x.py   # named tests only
-.venv/Scripts/ruff check . ; .venv/Scripts/mypy
+python scripts/test_on_device.py        # posix-marked tests on the device
+python scripts/test_on_device.py tests/test_x.py
+python scripts/package.py               # zip into out/
+python scripts/deploy.py                # install the build on the device
 ```

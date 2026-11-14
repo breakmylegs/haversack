@@ -9,9 +9,9 @@
 **Repository**
 - Public repository `breakmylegs/keepsake`, BSD-3-Clause with the template notice, `README.md`, `SECURITY.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `CLAUDE.md` (sections 1 to 6), `docs/build-prompt.md`.
 - `.gitignore` covers local settings, tokens, diagnostics exports, `deploy.local.json` and the secret scan denylist.
-- CI on every pull request: ESLint, `tsc`, Rollup build, version consistency, packaging (zip uploaded as an artifact), ruff, mypy (strict), pytest on Python 3.11 and 3.14, and the secret scan. Actions pinned to commit SHAs.
+- No GitHub Actions (your decision, ADR-0004). The first push included a workflow; it was removed in this branch. In its place: `pnpm run check` (`scripts/check.py`) runs ESLint, `tsc`, the Rollup build, version consistency, packaging, ruff, mypy (strict) and the secret scan; `pnpm run test:device` (`scripts/test_on_device.py`) runs the Linux-only tests on a handheld over SSH.
 - `scripts/secret_scan.py` with `.githooks/pre-commit` (no third-party scanner, per your standing rule).
-- `scripts/package.py` (deterministic Decky zip), `scripts/deploy.py` (SSH deploy), `scripts/check_versions.py`.
+- `scripts/package.py` (deterministic Decky zip), `scripts/deploy.py` (SSH deploy), `scripts/check_versions.py`, `scripts/device.py` (shared SSH settings).
 
 **Backend (`py_modules/keepsake`)**
 - `app.py`: testable core; `main.py` is a thin forwarder.
@@ -38,22 +38,22 @@
 1. **The Decky 3.3 "plugin update API" is not a plugin install route.** PR 992 is a store-side update check. The viable hand-off is the websocket route `utilities/install_plugin`, which Decky's "Install plugin from URL" uses. It shows Decky's own confirmation and checks a SHA-256. See ADR-0002 and assumptions A11 to A17.
 2. **Decky contacts its store server on install** when a version string other than `dev` is passed (threat model T18). Needs your view in slice 2.
 3. **Template build tasks replaced** by Python scripts, because they need bash, rsync and Docker (ADR-0003).
+4. **No CI** (your decision, ADR-0004). Pull request checks become `pnpm run check`, Linux tests run on a device, and slice 2 builds releases locally with `pnpm release` and `gh`. This changes the outcome "CI builds every release" and the T10 mitigation: the minisign signature becomes the main release control.
 
 ## Test results
 
 Local (Windows, Python 3.14.3):
 
-- pytest: 94 passed, 4 skipped (the skips need a real Linux `/proc`, signals, symlinks or file modes and run in CI).
-- ruff check, ruff format, mypy strict: clean.
-- ESLint, `tsc --noEmit`, Rollup build: clean.
-- `check_versions.py`: consistent. `package.py`: zip built.
+- pytest: 97 passed, 4 skipped (every test in the repository is new in this slice). The 4 skips are the `posix`-marked tests; they run on a device with `pnpm run test:device` (checklist step 1).
+- `pnpm run check`: all checks passed (ESLint, tsc, build, versions, packaging, ruff, ruff format, mypy, secret scan).
 
-Mutation checks (your testing standard): ten guards were broken one at a time and the guarding test failed each time: PID reuse check, fail-closed persistence, in-memory fallback, self and ancestor exclusion, UID filter, sibling-prefix path check, create-only store write, home-path redaction, resume on cancellation, library index. The cancellation test was tightened after its first mutation run showed a timing gap.
+Mutation checks (your testing standard): eleven guards were broken one at a time and the guarding test failed each time: PID reuse check, fail-closed persistence, in-memory fallback, self and ancestor exclusion, UID filter, sibling-prefix path check, create-only store write, home-path redaction, resume on cancellation, library index, device test argument quoting. The cancellation test was tightened after its first mutation run showed a timing gap.
 
-CI: see the pull request checks.
+No CI (ADR-0004).
 
 ## Known gaps
 
+- The 4 `posix` tests have not run anywhere yet; the device run in checklist step 1 is their first run. Whether the device's `python3` can create the test venv is unverified (A31).
 - Nothing has run on a device yet. Python version, `sqlite3`, `aiohttp`, TLS defaults and all Steam payloads are unverified until you run the checklist below.
 - ADR-0001 and ADR-0002 are drafts until the exports come back.
 - `LocalFolderStore` relies on hard links, which exFAT SD cards lack (A29).
@@ -64,16 +64,18 @@ CI: see the pull request checks.
 
 Do this on **both** devices. Use any one Steam game and any one non-Steam shortcut that lives in its own Proton prefix.
 
-1. Install the build from the pull request: download the `plugin-zip` artifact from the CI run (or run `pnpm run build` then `pnpm run deploy:device` with `deploy.local.json`), then in Decky, Settings, Developer, "Install Plugin from ZIP File", or deploy over SSH.
-2. Confirm Keepsake appears in the Quick Access Menu and shows "Device:".
-3. Open Keepsake, Settings, set a device name, Save. Reload plugins (Decky, Settings, General, or restart Decky). Confirm the name survived.
-4. Diagnostics: press **Environment**, **Steam shortcuts**, **Frontend facts** and **Test HTTPS**. Check nothing shows an error.
-5. Launch the **Steam game**. While it runs, open Keepsake, Diagnostics, press **Game processes**, then **Freeze test**, confirm. The game should pause for about 5 seconds and resume. Note anything odd (audio, controller, display). Quit the game.
-6. Repeat step 5 with the **non-Steam shortcut**.
-7. Suspend the device and wake it.
-8. Press **Export diagnostics**. Note the file path it shows.
-9. Copy the export off the device (`scp deck@<address>:homebrew/settings/Keepsake/diagnostics-*.json .`) or open it locally, and send me the relevant facts. Use generic names for games if you paste anything into the repository.
-10. Open Logs and confirm entries are listed, including `freeze.stopped` and `freeze.resumed`.
+0. Enable SSH on the device and create `deploy.local.json` (see `docs/dev-setup.md`).
+1. Run `pnpm run test:device` from the repository. Expect 4 passed. Send me the output if anything fails or the venv cannot be created.
+2. Install the build: `pnpm run build` then `pnpm run deploy:device`. Alternatively copy `out/Keepsake-v0.1.0.zip` to the device and use Decky, Settings, Developer, "Install Plugin from ZIP File".
+3. Confirm Keepsake appears in the Quick Access Menu and shows "Device:".
+4. Open Keepsake, Settings, set a device name, Save. Reload plugins (Decky, Settings, General, or restart Decky). Confirm the name survived.
+5. Diagnostics: press **Environment**, **Steam shortcuts**, **Frontend facts** and **Test HTTPS**. Check nothing shows an error.
+6. Launch the **Steam game**. While it runs, open Keepsake, Diagnostics, press **Game processes**, then **Freeze test**, confirm. The game should pause for about 5 seconds and resume. Note anything odd (audio, controller, display). Quit the game.
+7. Repeat step 6 with the **non-Steam shortcut**.
+8. Suspend the device and wake it.
+9. Press **Export diagnostics**. Note the file path it shows.
+10. Copy the export off the device (`scp deck@<address>:homebrew/settings/Keepsake/diagnostics-*.json .`) or open it locally, and send me the relevant facts. Use generic names for games if you paste anything into the repository.
+11. Open Logs and confirm entries are listed, including `freeze.stopped` and `freeze.resumed`.
 
 What I need back from each device to finish ADR-0001 and ADR-0002:
 

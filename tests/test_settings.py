@@ -42,6 +42,7 @@ def test_drops_unknown_stored_keys(tmp_path):
     assert data["deviceName"] == "A"
 
 
+@pytest.mark.posix
 @pytest.mark.skipif(os.name != "posix", reason="file modes need POSIX")
 def test_file_mode_is_private(tmp_path):
     SettingsStore(str(tmp_path))

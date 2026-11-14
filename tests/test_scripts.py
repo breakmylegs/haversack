@@ -1,7 +1,9 @@
 import hashlib
+import io
 import json
 import os
 import sys
+import tarfile
 import zipfile
 
 import pytest
@@ -9,8 +11,10 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 
 import check_versions
+import device
 import package
 import secret_scan
+import test_on_device
 
 
 def make_repo(root, version="1.2.3", changelog=None, plugin_extra=None):
@@ -104,6 +108,40 @@ def test_secret_scan_patterns():
         "f.txt:3: assigned secret",
         "f.txt:4: email address",
     ]
+
+
+def test_device_archive_contents(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    make_repo(repo)
+    (repo / "pyproject.toml").write_text("")
+    (repo / "requirements-test.txt").write_text("pytest\n")
+    (repo / "tests").mkdir()
+    (repo / "tests" / "test_x.py").write_text("")
+    (repo / "scripts").mkdir()
+    (repo / "scripts" / "package.py").write_text("")
+    with tarfile.open(fileobj=io.BytesIO(test_on_device.build_archive(str(repo))), mode="r:gz") as archive:
+        names = set(archive.getnames())
+    assert {"pyproject.toml", "requirements-test.txt", "tests/test_x.py", "scripts/package.py"} <= names
+    assert "py_modules/keepsake/__init__.py" in names
+    assert not any("__pycache__" in n or n.endswith(".pyc") for n in names)
+    assert not any(n.startswith(("dist/", "bin/")) or n == "main.py" for n in names)
+
+
+def test_device_remote_command_quotes_arguments():
+    default = test_on_device.remote_command([])
+    assert default.endswith("keepsake-test -m posix")
+    named = test_on_device.remote_command(["tests/test_freeze.py", "-k", "a b; rm -rf /"])
+    assert named.endswith("keepsake-test tests/test_freeze.py -k 'a b; rm -rf /'")
+    assert "trap 'rm -rf \"$run\"' EXIT" in test_on_device.REMOTE_SCRIPT
+
+
+def test_device_config_missing_exits(tmp_path):
+    with pytest.raises(SystemExit):
+        device.load_target(str(tmp_path / "missing.json"))
+    path = tmp_path / "d.json"
+    path.write_text(json.dumps({"host": "h", "port": 2222}))
+    assert device.load_target(str(path)) == ("deck@h", "2222")
 
 
 def test_secret_scan_denylist_and_exemption():

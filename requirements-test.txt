@@ -1,0 +1,4 @@
+# Test runner only. Installed locally and, by scripts/test_on_device.py, in a
+# throwaway venv on a device. Nothing here ships in the plugin zip.
+pytest==8.4.2
+hypothesis==6.140.3

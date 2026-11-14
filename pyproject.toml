@@ -5,7 +5,7 @@ testpaths = ["tests"]
 pythonpath = ["py_modules", "tests"]
 addopts = "-ra"
 markers = [
-    "linux: needs a real Linux /proc and POSIX signals",
+    "posix: needs Linux or POSIX behaviour (real /proc, signals, symlinks, file modes); run on a device with scripts/test_on_device.py",
 ]
 
 [tool.ruff]

@@ -11,6 +11,8 @@
     "lint": "eslint src",
     "package": "python scripts/package.py",
     "deploy:device": "python scripts/deploy.py",
+    "test:device": "python scripts/test_on_device.py",
+    "check": "python scripts/check.py",
     "check-versions": "python scripts/check_versions.py",
     "secret-scan": "python scripts/secret_scan.py"
   },

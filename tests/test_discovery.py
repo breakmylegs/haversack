@@ -76,6 +76,7 @@ def test_steam_user_ids_skip_zero_and_non_digits(tmp_path):
     assert sorted(discovery.steam_user_ids(str(root))) == ["111", "222"]
 
 
+@pytest.mark.posix
 @pytest.mark.skipif(os.name == "nt", reason="symlinks need POSIX")
 def test_var_home_symlink_resolves(tmp_path):
     real = tmp_path / "var" / "home" / "user"
