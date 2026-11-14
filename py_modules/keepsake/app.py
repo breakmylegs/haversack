@@ -137,8 +137,13 @@ class KeepsakeApp:
         result = discovery.cross_check(game["prefix"], observed)
         await asyncio.to_thread(discovery.record_cross_check, self.paths.runtime_dir, key, result, game["prefix"])
         if result["status"] == "mismatch":
-            log_event(logging.WARNING, "discovery.prefix_mismatch", "Running prefix differs; sync blocked",
-                      key=key, reason=result.get("reason"))
+            log_event(
+                logging.WARNING,
+                "discovery.prefix_mismatch",
+                "Running prefix differs; sync blocked",
+                key=key,
+                reason=result.get("reason"),
+            )
         return result
 
     async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:

@@ -54,10 +54,10 @@ function Content() {
         </PanelSectionRow>
       )}
       <PanelSectionRow>
-        <div style={{ fontSize: 12 }}>Sync is not available yet. This build collects diagnostics.</div>
+        <div style={{ fontSize: 12 }}>Sync is not available yet. This build finds your games and collects diagnostics.</div>
       </PanelSectionRow>
       <PanelSectionRow>
-        <ButtonItem layout="below" onClick={() => openRoute(`${ROUTE_PATH}/diagnostics`)}>
+        <ButtonItem layout="below" onClick={() => openRoute(`${ROUTE_PATH}/games`)}>
           Open Keepsake
         </ButtonItem>
       </PanelSectionRow>

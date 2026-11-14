@@ -2,6 +2,18 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [0.3.0]
+
+Slice 3: discovery. Still does not sync saves.
+
+### Added
+
+- Games page listing non-Steam shortcuts for every Steam user (the most recent user first) and installed Steam games, with filters and a rescan button.
+- Each shortcut's Proton prefix is found from its app ID in `shortcuts.vdf` (signed values converted to unsigned) across all Steam libraries, internal storage first, including SD cards.
+- Steam runtimes and tools (Proton, Steam Linux Runtime, redistributables) are left out.
+- "Check running prefix" compares a running game's actual prefix with the discovered one; a mismatch is remembered and will block sync for that game.
+- Supports Steam in `~/.local/share/Steam`, `~/.steam` and the Flatpak location, and `/var/home` home folders as on Bazzite.
+
 ## [0.2.0]
 
 Slice 2: release pipeline and in-plugin updater. Still does not sync saves.

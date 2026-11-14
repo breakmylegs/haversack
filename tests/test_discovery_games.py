@@ -17,7 +17,9 @@ def build(tmp_path):
         tmp_path,
         users={
             "111": [
-                shortcut_entry(SIGNED, "Example Quest", str(card / "steamapps/compatdata/4171510507/pfx/drive_c/Game/game.exe")),
+                shortcut_entry(
+                    SIGNED, "Example Quest", str(card / "steamapps/compatdata/4171510507/pfx/drive_c/Game/game.exe")
+                ),
                 shortcut_entry(123456, "No Prefix Game", "/opt/game/run.sh", start_dir="/opt/game"),
             ],
             "222": [shortcut_entry(OTHER, "Other User Game", "/x/y.exe")],
@@ -60,7 +62,11 @@ def test_default_user_ignores_users_without_userdata(tmp_path):
 
 
 def test_discover_shortcuts_all_users_default_first(tmp_path):
-    build(tmp_path)
+    root, _ = build(tmp_path)
+    # Make user 111 the newest by folder time, so only loginusers.vdf can put 222 first.
+    os.utime(root / "userdata" / "111" / "config", (2_000_000_000, 2_000_000_000))
+    os.utime(root / "userdata" / "222" / "config", (1_000_000_000, 1_000_000_000))
+    os.utime(root / "userdata" / "333" / "config", (1_000_000_000, 1_000_000_000))
     result = discovery.discover(str(tmp_path))
     shortcuts = [g for g in result["games"] if g["kind"] == "shortcut"]
     assert shortcuts[0]["name"] == "Other User Game"
@@ -97,7 +103,7 @@ def test_missing_prefix_is_flagged_and_start_dir_is_base(tmp_path):
 
 
 def test_steam_apps_classified_and_tools_skipped(tmp_path):
-    root, card = build(tmp_path)
+    root, _ = build(tmp_path)
     games = by_name(discovery.discover(str(tmp_path)))
     assert "Proton Experimental" not in games
     assert "Steamworks Common Redistributables" not in games

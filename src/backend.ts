@@ -81,6 +81,35 @@ export interface HttpsTestResult {
   error?: string;
 }
 
+export interface GameEntry {
+  key: string;
+  kind: "steam" | "shortcut";
+  appid: number;
+  name: string;
+  user_id: string | null;
+  is_default_user: boolean;
+  prefix: string | null;
+  prefix_library_index: number | null;
+  base_dir: string | null;
+  exe_inside_prefix: boolean;
+  last_played: number;
+  notes: string[];
+}
+
+export interface DiscoveryResult {
+  roots: { path: string; libraries: string[]; users: number; defaultUser: string | null }[];
+  games: GameEntry[];
+  mismatches: Record<string, unknown>;
+}
+
+export interface CrossCheck {
+  status: "match" | "mismatch" | "unknown";
+  observed?: string[];
+  reason?: string;
+}
+
+export const discoverGames = callable<[refresh: boolean], DiscoveryResult>("discover_games");
+export const checkRunningPrefix = callable<[key: string], CrossCheck>("check_running_prefix");
 export const getStatus = callable<[], Status>("get_status");
 export const takeStartupNotice = callable<[], StartupNotice | null>("take_startup_notice");
 export const checkForUpdates = callable<[force: boolean], UpdateStatus>("check_for_updates");

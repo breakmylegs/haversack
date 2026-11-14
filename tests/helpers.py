@@ -72,7 +72,9 @@ def make_fake_steam(home, users=None, apps=None, extra_libraries=(), most_recent
                 dumps_binary_vdf({"shortcuts": {str(i): s for i, s in enumerate(shortcuts)}})
             )
         flag = "1" if id3 == most_recent else "0"
-        login.append(f'"{int(id3) + STEAMID64_BASE}" {{ "AccountName" "acct{id3}" "MostRecent" "{flag}" "Timestamp" "1" }}')
+        login.append(
+            f'"{int(id3) + STEAMID64_BASE}" {{ "AccountName" "acct{id3}" "MostRecent" "{flag}" "Timestamp" "1" }}'
+        )
     login.append("}")
     (root / "config").mkdir(exist_ok=True)
     (root / "config" / "loginusers.vdf").write_text("\n".join(login))
