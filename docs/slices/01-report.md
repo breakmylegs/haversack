@@ -31,7 +31,7 @@
 - Background probes recording Steam lifetime notifications, game action starts, suspend and resume, running app details and visible Decky install routes.
 
 **Docs**
-- `docs/threat-model.md` (T1 to T15 seeded, T16 to T19 added), `docs/assumptions.md` (29 entries), `docs/dev-setup.md`, ADR-0001 and ADR-0002 drafts, ADR-0003 (tooling, accepted).
+- `docs/threat-model.md` (T1 to T15 seeded, T16 to T19 added), `docs/assumptions.md` (29 entries), `docs/dev-setup.md`, ADR-0001 and ADR-0002 drafts, ADR-0003 (tooling, accepted), ADR-0004 (no GitHub Actions), ADR-0005 (repository protection: Actions disabled, `main` requires a pull request, `v*` tags immutable).
 
 ## Differences from the build prompt (source wins)
 

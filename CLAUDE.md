@@ -78,7 +78,7 @@ Stop and ask the owner before doing any of the following. Record each decision i
 ## 6. Repository, stack and constraints
 
 **Repository**
-- Public. Changes reach `main` by pull request only. There is no CI, so "CI must pass" protection does not apply; any branch protection is the owner's call (escalation item).
+- Public. GitHub Actions is disabled. `main` is protected (pull request required, applies to admins, no force push) and `v*` tags cannot be moved or deleted (ADR-0005). Changing these is an escalation item.
 - Licence BSD-3-Clause with the decky-plugin-template notice kept at the bottom of `LICENSE`. Attribute the Ludusavi manifest (MIT) wherever its data is used.
 
 **Stack**

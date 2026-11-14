@@ -19,7 +19,8 @@ class Plugin:
             await self.app.stop()
 
     async def _uninstall(self) -> None:
-        # Settings, tokens and state are left in place so a reinstall keeps them.
+        # Decky calls this on every update as well as on uninstall (it uninstalls
+        # the old version first). It must never delete settings, tokens or state.
         pass
 
     async def get_settings(self) -> dict[str, Any]:

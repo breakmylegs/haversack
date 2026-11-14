@@ -27,6 +27,7 @@ Each entry is **verified** (read in source or type definitions, or measured on d
 | A14 | When `version` is not `dev`, Decky POSTs an install-count increment to the Decky store server (`plugins.deckbrew.xyz` by default). When `version` is `dev`, it instead reads the plugin name from the zip's `plugin.json` | verified | `browser.py` `_install` |
 | A15 | `window.DeckyBackend` (a `WSRouter`) is a global in the Steam UI context, so a plugin frontend can call `window.DeckyBackend.call("utilities/install_plugin", ...)`. It is not part of the typed `@decky/api` surface | verified in source, **unverified from a plugin** (Diagnostics "Frontend facts" reports it) | `frontend/src/index.ts` line 50 |
 | A16 | The "plugin update API" in Decky Loader 3.3.0 (PR 992) is a store-side update check in `store.tsx` to reduce server load. It is **not** a plugin-facing install API. **Differs from the build prompt**, which suggested it as a hand-off option | verified | PR 992 file list |
+| A17a | An update runs `uninstall_plugin` first, which calls the plugin's `_unload` and `_uninstall` hooks, then deletes only the plugin folder. Settings, runtime and log folders survive, provided `_uninstall` does not delete them | verified | `browser.py` v3.3.1 `uninstall_plugin` |
 | A17 | Decky extracts the zip with `ZipFile.extractall` into the plugins folder and expects one top-level folder containing `plugin.json` | verified | `browser.py` |
 
 ## Steam client APIs (input to ADR-0001)
