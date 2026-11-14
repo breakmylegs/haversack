@@ -15,7 +15,8 @@ steps:
         key, tags v<version>, pushes the tag and creates the GitHub Release
         with that version's CHANGELOG section as notes. -beta.N versions are
         marked as pre-releases. --device-tested confirms you ran
-        `pnpm run test:device` on this commit. --dry-run builds the assets into
+        `pnpm run test:device` on this commit; --accept-untested publishes
+        without them and says so in the release notes. --dry-run builds the assets into
         out/release/ and stops before any git or GitHub change.
 """
 
@@ -164,14 +165,34 @@ def prepare(version: str, runner: Runner = run) -> None:
     print(f"Opened the release pull request for v{version}. Merge it, then run publish on main.")
 
 
-def publish(device_tested: bool, dry_run: bool, runner: Runner = run, check: Callable[[], int] | None = None) -> str:
+UNTESTED_NOTE = (
+    "\n> Device tests (`pnpm run test:device`) were not run for this release. "
+    "The owner accepted publishing it untested.\n"
+)
+
+
+def publish(
+    device_tested: bool,
+    dry_run: bool,
+    runner: Runner = run,
+    check: Callable[[], int] | None = None,
+    accept_untested: bool = False,
+) -> str:
     version = read_version()
     version_key(version)
     tag = f"v{version}"
     notes = extract_notes(read_changelog(), version)
+    if device_tested and accept_untested:
+        raise ReleaseError("pass either --device-tested or --accept-untested, not both")
+    if accept_untested:
+        # Say so in the release notes rather than pretend the tests ran.
+        notes += UNTESTED_NOTE
     if not dry_run:
-        if not device_tested:
-            raise ReleaseError("run `pnpm run test:device` on this commit, then pass --device-tested")
+        if not (device_tested or accept_untested):
+            raise ReleaseError(
+                "run `pnpm run test:device` on this commit, then pass --device-tested "
+                "(or --accept-untested to publish without them, noted in the release)"
+            )
         ensure_clean_main(runner)
         if (
             runner(["git", "tag", "--list", tag]).strip()
@@ -219,7 +240,10 @@ def main(argv: list[str]) -> int:
     prep = sub.add_parser("prepare", help="open the version bump pull request")
     prep.add_argument("version")
     pub = sub.add_parser("publish", help="tag and publish the version on main")
-    pub.add_argument("--device-tested", action="store_true")
+    pub.add_argument("--device-tested", action="store_true", help="you ran pnpm run test:device on this commit")
+    pub.add_argument(
+        "--accept-untested", action="store_true", help="publish without device tests; stated in the release notes"
+    )
     pub.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     try:
@@ -228,7 +252,7 @@ def main(argv: list[str]) -> int:
                 raise ReleaseError(f"{args.version!r} is not X.Y.Z or X.Y.Z-beta.N")
             prepare(args.version)
         else:
-            publish(args.device_tested, args.dry_run, check=run_checks)
+            publish(args.device_tested, args.dry_run, check=run_checks, accept_untested=args.accept_untested)
     except ReleaseError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

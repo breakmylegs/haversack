@@ -95,6 +95,26 @@ def test_publish_dry_run_builds_assets_without_git_changes(repo):
     assert runner.calls == []
 
 
+def test_accept_untested_publishes_and_says_so_in_notes(repo):
+    runner = FakeRunner()
+    out_dir = release.publish(device_tested=False, dry_run=False, runner=runner, check=lambda: 0, accept_untested=True)
+    assert runner.commands(("gh", "release", "create"))
+    with open(os.path.join(out_dir, "notes.md"), encoding="utf-8") as handle:
+        notes = handle.read()
+    assert "Something." in notes and "were not run for this release" in notes
+
+
+def test_device_tested_notes_have_no_untested_line(repo):
+    out_dir = release.publish(device_tested=True, dry_run=False, runner=FakeRunner(), check=lambda: 0)
+    with open(os.path.join(out_dir, "notes.md"), encoding="utf-8") as handle:
+        assert "not run" not in handle.read()
+
+
+def test_both_test_flags_rejected(repo):
+    with pytest.raises(release.ReleaseError, match="not both"):
+        release.publish(device_tested=True, dry_run=False, runner=FakeRunner(), check=lambda: 0, accept_untested=True)
+
+
 def test_publish_requires_device_tests(repo):
     with pytest.raises(release.ReleaseError, match="test:device"):
         release.publish(device_tested=False, dry_run=False, runner=FakeRunner(), check=lambda: 0)
