@@ -1,4 +1,4 @@
-import { DialogButton, Field, Focusable, TextField, ToggleField } from "@decky/ui";
+import { DialogButton, Field, Focusable, SliderField, TextField, ToggleField } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { getSettings, setSetting, Settings } from "../backend";
@@ -51,6 +51,30 @@ export function SettingsPage() {
         checked={settings?.updateChannel === "prerelease"}
         disabled={locked}
         onChange={(on) => void save("updateChannel", on ? "prerelease" : "stable", on ? "Pre-release channel on." : "Stable channel on.")}
+      />
+      <Field
+        label="Safety gates"
+        description="Snapshots that remove or shrink too much are kept on this device instead of being uploaded. You can make these stricter, not looser."
+      />
+      <SliderField
+        label="Refuse if more than this share of files disappear"
+        value={settings?.gateMaxRemovedPercent ?? 50}
+        min={5}
+        max={50}
+        step={5}
+        showValue
+        disabled={locked}
+        onChange={(v) => void save("gateMaxRemovedPercent", v, `Limit set to ${v}%.`)}
+      />
+      <SliderField
+        label="Refuse if the total size falls by more than"
+        value={settings?.gateMaxSizeDropPercent ?? 70}
+        min={5}
+        max={70}
+        step={5}
+        showValue
+        disabled={locked}
+        onChange={(v) => void save("gateMaxSizeDropPercent", v, `Limit set to ${v}%.`)}
       />
       {settings && <Field label="Device ID" description={settings.deviceId} />}
     </div>

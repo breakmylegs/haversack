@@ -2,6 +2,22 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [0.5.0]
+
+Slice 5: snapshot engine and safety rails. Snapshots go to a local test store on the device; the cloud comes in slice 6.
+
+### Added
+
+- Snapshots of a game's save files: hashed, packed into a zip and recorded with a complete file list.
+- Restores are atomic: either all the new files are in place or none are, even if the device loses power mid-restore. The files present before every restore are saved first, verified, and can be put back with "Undo to this" (the last five per game).
+- Safety gates: a snapshot that empties the save, removes more than half the files or shrinks by more than 70% is kept on the device as quarantined and never uploaded unless you release it. The limits can be made stricter in Settings.
+- Pinning, and retention that keeps recent, daily and monthly snapshots and never removes pinned, current or manual ones.
+- Game page "Snapshots (local test store)" panel to try all of this on the device.
+
+### Security
+
+- Snapshot zips are fully checked before anything is extracted: no unexpected paths, symlinks, oversized or encrypted entries, and every file's hash must match.
+
 ## [0.4.0]
 
 Slice 4: manifest resolution and save preview. Still does not sync saves.

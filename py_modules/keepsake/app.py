@@ -12,14 +12,17 @@ import os
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from . import diagnostics, discovery, manifest, net, resolve
+from . import diagnostics, discovery, manifest, net, resolve, restore
+from .engine import SnapshotEngine
 from .freeze import Freezer
+from .fsutil import atomic_write_json, read_json
 from .gameconfig import GameConfigStore, custom_path_from_absolute
 from .jobs import JobTracker
 from .log import log_event, setup_logging, tail
 from .paths import PluginPaths
 from .procs import find_game_processes
 from .settings import SettingsStore
+from .store import LocalFolderStore
 from .update import Updater, startup_notice
 
 EmitFn = Callable[..., Coroutine[Any, Any, None]]
@@ -74,6 +77,12 @@ class KeepsakeApp:
         if self.freezer.recorded():
             resumed = await asyncio.to_thread(self.freezer.resume_all, "startup")
             log_event(logging.WARNING, "freeze.startup_release", "Released processes left frozen", count=len(resumed))
+        # Principle 3: finish or undo any restore a crash interrupted, before anything else touches saves.
+        try:
+            for outcome in await asyncio.to_thread(restore.recover, self.paths.runtime_dir):
+                log_event(logging.WARNING, "restore.recovered", "Recovered an interrupted restore", **outcome)
+        except restore.RestoreError as exc:
+            log_event(logging.ERROR, "restore.recover_failed", str(exc))
         self._notice = await asyncio.to_thread(startup_notice, self.paths.runtime_dir, self.version)
         if self._notice:
             log_event(logging.INFO, "update.applied", "Running a new version", **self._notice)
@@ -233,6 +242,162 @@ class KeepsakeApp:
         record = index["games"].get(title) if index and title else None
         result = await asyncio.to_thread(resolve.preview, game, title, record, config, self.home)
         return {**result, "match": match, "gameKey": match.get("gameKey")}
+
+    # Snapshots against the local test store (slice 5; slice 6 adds the cloud store)
+
+    def _engine(self) -> SnapshotEngine:
+        settings = self.settings.all()
+        return SnapshotEngine(
+            LocalFolderStore(os.path.join(self.paths.runtime_dir, "local-test-store")),
+            self.paths.runtime_dir,
+            self.paths.settings_dir,
+            device_id=str(settings["deviceId"]),
+            device_name=str(settings["deviceName"] or "Unnamed device"),
+            plugin_version=self.version,
+            settings=self.settings.all,
+        )
+
+    def _bases(self) -> dict[str, str]:
+        data = read_json(os.path.join(self.paths.runtime_dir, "snapshot-bases.json"), default={})
+        return data if isinstance(data, dict) else {}
+
+    def _set_base(self, game_key: str, snap_id: str) -> None:
+        bases = self._bases()
+        bases[game_key] = snap_id
+        atomic_write_json(os.path.join(self.paths.runtime_dir, "snapshot-bases.json"), bases)
+
+    async def _snapshot_context(self, key: str) -> dict[str, Any]:
+        """Everything needed to snapshot or restore a game, failing closed when anything is uncertain."""
+        if self.settings.read_only:
+            raise ValueError("settings are in read-only safe mode; update Keepsake first")
+        game = await self._game(key)
+        if discovery.sync_blocked(self.paths.runtime_dir, key):
+            raise ValueError("the running prefix did not match; snapshots are blocked for this game")
+        config = self.game_configs.get(key)
+        index = await asyncio.to_thread(self.manifest.load)
+        match = manifest.match_game(index, game, config)
+        if not match.get("gameKey") or not index:
+            raise ValueError("match the game to a manifest entry first")
+        record = index["games"].get(match["title"])
+        scan = await asyncio.to_thread(resolve.preview, game, match["title"], record, config, self.home, 0, True)
+        if scan.get("truncated"):
+            raise ValueError("too many files to snapshot safely; add exclusions")
+        roots = resolve.logical_roots(game, home=self.home)
+        procs = await asyncio.to_thread(find_game_processes, int(game["appid"]), game.get("prefix"), self.proc_root)
+        return {
+            "game": game,
+            "gameKey": match["gameKey"],
+            "files": scan.get("files", {}),
+            "roots": roots,
+            "running": bool(procs),
+        }
+
+    async def snapshot_game(self, key: str) -> dict[str, Any]:
+        ctx = await self._snapshot_context(key)
+        eng = self._engine()
+        with self.jobs.job("snapshot"):
+            base_id = self._bases().get(ctx["gameKey"])
+            base = await asyncio.to_thread(eng.get_meta, ctx["gameKey"], base_id) if base_id else None
+            result = await asyncio.to_thread(eng.take, ctx["gameKey"], ctx["files"], ctx["roots"], "manual", base)
+        if result["status"] == "published":
+            self._set_base(ctx["gameKey"], result["snapId"])
+        log_event(logging.INFO, "snapshot.take", "Snapshot taken", gameKey=ctx["gameKey"], status=result["status"])
+        result.pop("meta", None)
+        return result
+
+    async def list_snapshots(self, key: str) -> dict[str, Any]:
+        game = await self._game(key)
+        index = await asyncio.to_thread(self.manifest.load)
+        match = manifest.match_game(index, game, self.game_configs.get(key))
+        game_key = match.get("gameKey")
+        if not game_key:
+            return {"snapshots": [], "quarantine": [], "prerestore": []}
+        eng = self._engine()
+        metas = await asyncio.to_thread(eng.list_metas, game_key)
+        pruned = await asyncio.to_thread(eng.pruned, game_key)
+        pins = {p["snapId"] for p in await asyncio.to_thread(eng.pins, game_key)}
+        base = self._bases().get(game_key)
+
+        def summary(meta: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "snapId": meta["snapId"],
+                "created": meta["created"],
+                "kind": meta["kind"],
+                "device": meta.get("deviceName"),
+                "files": len(meta["files"]),
+                "bytes": sum(f["size"] for f in meta["files"]),
+            }
+
+        return {
+            "gameKey": game_key,
+            "snapshots": [
+                {
+                    **summary(m),
+                    "pinned": m["snapId"] in pins,
+                    "pruned": m["snapId"] in pruned,
+                    "base": m["snapId"] == base,
+                }
+                for m in reversed(metas)
+            ],
+            "quarantine": [
+                {**summary(r["meta"]), "reasons": r.get("reasons", [])} for r in eng.quarantine.list(game_key)
+            ],
+            "prerestore": [summary(r["meta"]) for r in eng.prerestore.list(game_key)],
+        }
+
+    async def restore_snapshot(self, key: str, snap_id: str) -> dict[str, Any]:
+        ctx = await self._snapshot_context(key)
+        eng = self._engine()
+        with self.jobs.job("restore"):
+            result = await asyncio.to_thread(
+                eng.restore, ctx["gameKey"], str(snap_id), ctx["files"], ctx["roots"], ctx["running"]
+            )
+        self._set_base(ctx["gameKey"], str(snap_id))
+        log_event(
+            logging.INFO, "snapshot.restore", "Snapshot restored", gameKey=ctx["gameKey"], status=result["status"]
+        )
+        return result
+
+    async def undo_restore(self, key: str, prerestore_id: str) -> dict[str, Any]:
+        ctx = await self._snapshot_context(key)
+        eng = self._engine()
+        with self.jobs.job("restore"):
+            result = await asyncio.to_thread(
+                eng.restore_prerestore, ctx["gameKey"], str(prerestore_id), ctx["files"], ctx["roots"], ctx["running"]
+            )
+        log_event(logging.INFO, "snapshot.undo", "Restore undone", gameKey=ctx["gameKey"], status=result["status"])
+        return result
+
+    async def pin_snapshot(self, key: str, snap_id: str) -> dict[str, Any]:
+        game_key = (await self._snapshot_context(key))["gameKey"]
+        await asyncio.to_thread(self._engine().pin, game_key, str(snap_id))
+        return {"ok": True}
+
+    async def release_quarantine(self, key: str, snap_id: str, confirmed: bool) -> dict[str, Any]:
+        game_key = (await self._snapshot_context(key))["gameKey"]
+        with self.jobs.job("snapshot"):
+            result = await asyncio.to_thread(
+                self._engine().release_quarantined, game_key, str(snap_id), bool(confirmed)
+            )
+        if result["status"] == "published":
+            self._set_base(game_key, str(snap_id))
+        log_event(
+            logging.WARNING,
+            "snapshot.release",
+            "Quarantined snapshot released",
+            gameKey=game_key,
+            status=result["status"],
+        )
+        return result
+
+    async def run_retention(self, key: str) -> dict[str, Any]:
+        game_key = (await self._snapshot_context(key))["gameKey"]
+        with self.jobs.job("retention"):
+            result = await asyncio.to_thread(self._engine().apply_retention, game_key, set(self._bases().values()))
+        log_event(
+            logging.INFO, "snapshot.retention", "Retention applied", gameKey=game_key, pruned=len(result["prune"])
+        )
+        return {"pruned": result["prune"], "kept": len(result["keep"]), "orphansDeleted": result["orphansDeleted"]}
 
     async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
         """Diagnostics only: hold a fake sync job so the update guard can be tested."""

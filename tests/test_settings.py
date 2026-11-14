@@ -57,6 +57,22 @@ def test_newer_schema_opens_read_only_and_never_writes(tmp_path):
     assert (tmp_path / SETTINGS_FILE).read_text() == original
 
 
+def test_gate_thresholds_can_only_be_tightened(tmp_path):
+    store = SettingsStore(str(tmp_path))
+    assert store.get("gateMaxRemovedPercent") == 50 and store.get("gateMaxSizeDropPercent") == 70
+    store.set("gateMaxRemovedPercent", 20)
+    assert SettingsStore(str(tmp_path)).get("gateMaxRemovedPercent") == 20
+    for key, bad in (
+        ("gateMaxRemovedPercent", 51),
+        ("gateMaxRemovedPercent", 4),
+        ("gateMaxSizeDropPercent", 71),
+        ("gateMaxSizeDropPercent", True),
+        ("gateMaxSizeDropPercent", "10"),
+    ):
+        with pytest.raises(SettingsError):
+            store.set(key, bad)
+
+
 def test_update_channel(tmp_path):
     store = SettingsStore(str(tmp_path))
     assert store.get("updateChannel") == "stable"

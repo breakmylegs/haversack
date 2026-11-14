@@ -286,6 +286,8 @@ def expand(root: str, rel_glob: str, insensitive: bool) -> list[str]:
 
 def _excluded(rel: str, user_patterns: list[str]) -> bool:
     parts = rel.lower().split("/")
+    if any(p.startswith(".keepsake-") for p in parts):
+        return True  # Keepsake's own restore staging and backup folders
     if any(p in DEFAULT_EXCLUDED_DIRS for p in parts[:-1]):
         return True
     if any(fnmatch.fnmatchcase(parts[-1], pattern) for pattern in DEFAULT_EXCLUDED_FILES):
@@ -363,8 +365,12 @@ def preview(
     config: Mapping[str, Any],
     home: str | None = None,
     sample_limit: int = 20,
+    include_files: bool = False,
 ) -> dict[str, Any]:
-    """Resolve and scan a game's save locations without writing anything."""
+    """Resolve and scan a game's save locations without writing anything.
+
+    With ``include_files`` the result also has ``files``: every scanned file per root.
+    """
     platform = platform_of(game)
     roots = logical_roots(game, home=home)
     include_config = bool(config.get("includeConfig"))
@@ -436,7 +442,7 @@ def preview(
         warnings.append("some paths point outside their folder and were ignored")
     if record is None:
         warnings.append("no manifest match")
-    return {
+    result: dict[str, Any] = {
         "title": title,
         "platform": platform,
         "roots": roots,
@@ -447,7 +453,11 @@ def preview(
         "totalFiles": total_files,
         "totalBytes": total_bytes,
         "warnings": warnings,
+        "truncated": any(r.truncated for r in per_root.values()),
     }
+    if include_files:
+        result["files"] = {name: sorted(r.files) for name, r in per_root.items() if r.files}
+    return result
 
 
 def _inside(path: str, prefix: Any) -> bool:

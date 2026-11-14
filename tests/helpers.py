@@ -43,6 +43,37 @@ def shortcut_entry(appid_signed: int, name: str, exe: str, start_dir: str = "", 
     }
 
 
+def files_in(roots):
+    """``{root: [rel, ...]}`` for every file under each root, skipping Keepsake's own folders."""
+    out = {}
+    for name, path in roots.items():
+        rels = []
+        for folder, dirs, files in os.walk(path):
+            dirs[:] = [d for d in dirs if not d.startswith(".keepsake-")]
+            for f in files:
+                rels.append(os.path.relpath(os.path.join(folder, f), path).replace(os.sep, "/"))
+        out[name] = sorted(rels)
+    return out
+
+
+def tree_state(roots):
+    """``{(root, rel): bytes}`` for comparing folder contents."""
+    state = {}
+    for name, rels in files_in(roots).items():
+        for rel in rels:
+            with open(os.path.join(roots[name], *rel.split("/")), "rb") as handle:
+                state[(name, rel)] = handle.read()
+    return state
+
+
+def write_tree(roots, state):
+    for (name, rel), data in state.items():
+        path = os.path.join(roots[name], *rel.split("/"))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as handle:
+            handle.write(data)
+
+
 STEAMID64_BASE = 76561197960265728
 
 

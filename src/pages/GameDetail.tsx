@@ -12,6 +12,7 @@ import {
   searchTitles,
   updateGameConfig,
 } from "../backend";
+import { SnapshotsPanel } from "./SnapshotsPanel";
 
 // FileSelectionType.FOLDER in @decky/api is a type-only const enum (value 1).
 const FOLDER = 1 as unknown as Parameters<typeof openFilePicker>[0];
@@ -169,6 +170,8 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
           Save exclusions
         </DialogButton>
       </Field>
+
+      {match.gameKey && <SnapshotsPanel gameKey={gameKey} />}
 
       {preview && (
         <>

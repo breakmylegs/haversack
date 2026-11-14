@@ -72,6 +72,15 @@ Each entry is **verified** (read in source or type definitions, or measured on d
 | A46 | `FileSelectionType` in `@decky/api` is a type-only `const enum`; `FOLDER` is 1 | verified | `@decky/api` `types.d.ts` |
 | A47 | `<storeUserId>` folders under AppData are SteamID64-named, the same on both devices for the same account, so a `*` wildcard finds them and the relative path matches across devices | community-documented, unverified on device | Ludusavi behaviour |
 
+## Snapshots (slice 5)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A48 | `os.replace` within one folder tree on the same filesystem is atomic on Linux (ext4, btrfs), so per-file moves inside a save root are atomic | verified (POSIX rename semantics) | |
+| A49 | Staging and backup folders inside the save root are on the same filesystem as the saves, including SD cards | design, follows from A48 | |
+| A50 | Python's `zipfile` writes ZIP64 when needed and reads entries' `external_attr` for symlink detection | verified | Python docs |
+| A51 | The build prompt's cloud layout gains `games/<gameKey>/pins/<snapId>.json` (ADR-0007), before the slice 6 freeze | owner delegation | |
+
 ## Template differences
 
 | # | Difference | Reason |
