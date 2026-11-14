@@ -42,6 +42,15 @@ Each entry is **verified** (read in source or type definitions, or measured on d
 | A23 | For non-Steam shortcuts, game processes carry `SteamGameId` equal to the 64-bit game ID `(appid << 32) | 0x02000000`, and `STEAM_COMPAT_DATA_PATH` ending in `compatdata/<unsigned appid>` | unverified, process matching accepts either and Diagnostics reports which matched | community knowledge |
 | A24 | `shortcuts.vdf` stores `appid` as a signed 32-bit integer; `appid & 0xFFFFFFFF` gives the compatdata folder name | unverified on device, Diagnostics reports both values and whether the folder exists | build prompt |
 
+## Updates (slice 2)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A33 | GitHub release `browser_download_url` links on `github.com` redirect to `release-assets.githubusercontent.com` (older: `objects.githubusercontent.com`). Both are allowlisted as "GitHub release asset downloads" | unverified on device; the Updates page reports `offline` or `disallowed-host` if this is wrong | GitHub behaviour |
+| A34 | With version `dev`, Decky's confirmation prompt shows "dev" and still checks the SHA-256 | verified in source (`browser.py`), unverified on screen | ADR-0002 |
+| A35 | `decky.emit` events from the backend reach `addEventListener` in the frontend (used for `keepsake_idle`) | verified in source and types | `sandboxed_plugin.py`, `@decky/api` |
+| A36 | The unauthenticated GitHub API limit (60 requests an hour per IP) is ample for one automatic check a day plus manual checks | verified | GitHub docs |
+
 ## Template differences
 
 | # | Difference | Reason |

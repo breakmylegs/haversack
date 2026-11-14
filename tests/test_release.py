@@ -1,0 +1,168 @@
+import hashlib
+import json
+import os
+import sys
+
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
+
+import package
+import release
+from test_scripts import make_repo
+
+CHANGELOG = """# Changelog
+
+## [0.2.1]
+
+### Fixed
+
+- Something.
+
+## [0.2.0]
+
+First release.
+"""
+
+
+class FakeRunner:
+    """Records commands and answers git queries like a clean, up-to-date main."""
+
+    def __init__(self, branch="main", dirty="", head="abc", origin="abc", tags=""):
+        self.calls = []
+        self.answers = {
+            ("git", "status", "--porcelain"): dirty,
+            ("git", "rev-parse", "--abbrev-ref", "HEAD"): branch + "\n",
+            ("git", "rev-parse", "HEAD"): head,
+            ("git", "rev-parse", "origin/main"): origin,
+        }
+        self.tags = tags
+
+    def __call__(self, command):
+        command = tuple(command)
+        self.calls.append(command)
+        if command[:3] == ("git", "tag", "--list") or command[:3] == ("git", "ls-remote", "--tags"):
+            return self.tags
+        return self.answers.get(command, "")
+
+    def commands(self, prefix):
+        return [c for c in self.calls if c[: len(prefix)] == prefix]
+
+
+@pytest.fixture
+def repo(tmp_path, monkeypatch):
+    root = tmp_path / "repo"
+    root.mkdir()
+    make_repo(root, version="0.2.1", changelog=CHANGELOG)
+    (root / "package.json").write_text('{\n  "name": "keepsake",\n  "version": "0.2.1",\n  "x": 1\n}\n')
+    monkeypatch.setattr(package, "ROOT", str(root))
+    monkeypatch.setattr(release, "ROOT", str(root))
+    monkeypatch.delenv("KEEPSAKE_MINISIGN_KEY", raising=False)
+    return root
+
+
+def test_extract_notes():
+    assert release.extract_notes(CHANGELOG, "0.2.1") == "### Fixed\n\n- Something.\n"
+    assert release.extract_notes(CHANGELOG, "0.2.0") == "First release.\n"
+    with pytest.raises(release.ReleaseError):
+        release.extract_notes(CHANGELOG, "9.9.9")
+    with pytest.raises(release.ReleaseError):
+        release.extract_notes("## [1.0.0]\n\n## [0.9.0]\nx\n", "1.0.0")
+
+
+def test_bump_package_json_keeps_formatting():
+    text = '{\n  "name": "k",\n  "version": "0.1.0",\n  "deps": {"version": "keep"}\n}\n'
+    assert release.bump_package_json(text, "0.2.0") == text.replace('"0.1.0"', '"0.2.0"')
+
+
+def test_version_order_and_prerelease():
+    assert release.version_key("0.2.1") > release.version_key("0.2.1-beta.3") > release.version_key("0.2.0")
+    assert release.is_prerelease("1.0.0-beta.1") and not release.is_prerelease("1.0.0")
+    with pytest.raises(release.ReleaseError):
+        release.version_key("1.0")
+
+
+def test_publish_dry_run_builds_assets_without_git_changes(repo):
+    runner = FakeRunner()
+    out_dir = release.publish(device_tested=False, dry_run=True, runner=runner, check=lambda: 0)
+    zip_path = os.path.join(out_dir, "Keepsake-v0.2.1.zip")
+    with open(zip_path, "rb") as handle:
+        digest = hashlib.sha256(handle.read()).hexdigest()
+    with open(os.path.join(out_dir, "SHA256SUMS"), encoding="utf-8") as handle:
+        assert handle.read() == f"{digest}  Keepsake-v0.2.1.zip\n"
+    with open(os.path.join(out_dir, "notes.md"), encoding="utf-8") as handle:
+        assert "Something." in handle.read()
+    assert runner.calls == []
+
+
+def test_publish_requires_device_tests(repo):
+    with pytest.raises(release.ReleaseError, match="test:device"):
+        release.publish(device_tested=False, dry_run=False, runner=FakeRunner(), check=lambda: 0)
+
+
+@pytest.mark.parametrize(
+    ("runner", "message"),
+    [
+        (FakeRunner(dirty=" M x"), "not clean"),
+        (FakeRunner(branch="slice/02"), "main"),
+        (FakeRunner(origin="def"), "origin/main"),
+        (FakeRunner(tags="v0.2.1\n"), "already exists"),
+    ],
+)
+def test_publish_guards(repo, runner, message):
+    with pytest.raises(release.ReleaseError, match=message):
+        release.publish(device_tested=True, dry_run=False, runner=runner, check=lambda: 0)
+    assert not runner.commands(("git", "tag", "-a"))
+
+
+def test_publish_stops_when_checks_fail(repo):
+    runner = FakeRunner()
+    with pytest.raises(release.ReleaseError, match=r"check\.py"):
+        release.publish(device_tested=True, dry_run=False, runner=runner, check=lambda: 1)
+    assert not runner.commands(("git", "tag", "-a"))
+
+
+def test_publish_tags_pushes_and_creates_release(repo):
+    runner = FakeRunner()
+    release.publish(device_tested=True, dry_run=False, runner=runner, check=lambda: 0)
+    assert runner.commands(("git", "tag", "-a", "v0.2.1"))
+    assert runner.commands(("git", "push", "origin", "v0.2.1"))
+    (create,) = runner.commands(("gh", "release", "create"))
+    assert "--prerelease" not in create
+    assert any(arg.endswith("Keepsake-v0.2.1.zip") for arg in create)
+    assert any(arg.endswith("SHA256SUMS") for arg in create)
+    # Tag before release, release last.
+    assert runner.calls.index(create) == len(runner.calls) - 1
+
+
+def test_beta_is_marked_prerelease(repo):
+    (repo / "package.json").write_text('{"version": "0.3.0-beta.1"}')
+    (repo / "CHANGELOG.md").write_text("## [0.3.0-beta.1]\n\nBeta.\n")
+    runner = FakeRunner()
+    release.publish(device_tested=True, dry_run=False, runner=runner, check=lambda: 0)
+    (create,) = runner.commands(("gh", "release", "create"))
+    assert "--prerelease" in create
+
+
+def test_signing_key_without_minisign_fails(repo, monkeypatch):
+    monkeypatch.setenv("KEEPSAKE_MINISIGN_KEY", str(repo / "missing.key"))
+    monkeypatch.setattr(release.shutil, "which", lambda _name: None)
+    with pytest.raises(release.ReleaseError, match="minisign"):
+        release.publish(device_tested=False, dry_run=True, runner=FakeRunner(), check=lambda: 0)
+
+
+def test_prepare_bumps_on_a_branch_and_opens_pr(repo):
+    (repo / "CHANGELOG.md").write_text("## [0.2.2]\n\nNext.\n" + CHANGELOG)
+    runner = FakeRunner()
+    release.prepare("0.2.2", runner=runner)
+    assert json.loads((repo / "package.json").read_text())["version"] == "0.2.2"
+    assert runner.commands(("git", "switch", "-c", "release/v0.2.2"))
+    assert runner.commands(("gh", "pr", "create"))
+
+
+@pytest.mark.parametrize(("version", "message"), [("0.2.1", "not newer"), ("0.3.0", "no notes")])
+def test_prepare_refusals(repo, version, message):
+    runner = FakeRunner()
+    with pytest.raises(release.ReleaseError, match=message):
+        release.prepare(version, runner=runner)
+    assert not runner.commands(("git", "switch"))

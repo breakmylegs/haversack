@@ -8,6 +8,7 @@ import {
   getGameProcesses,
   getSteamProbe,
   httpsTest,
+  simulateSyncJob,
 } from "../backend";
 import { deckyMechanisms, runningAppDetails } from "../probes";
 import { JsonBlock } from "./JsonBlock";
@@ -15,6 +16,8 @@ import { JsonBlock } from "./JsonBlock";
 type Section = "environment" | "steam" | "processes" | "frontend" | "https" | "export";
 
 const FREEZE_SECONDS = 5;
+// Long enough to open Updates and try to install while it runs.
+const SIMULATED_JOB_SECONDS = 60;
 
 export function DiagnosticsPage() {
   const [results, setResults] = useState<Partial<Record<Section, unknown>>>({});
@@ -99,6 +102,17 @@ export function DiagnosticsPage() {
         </DialogButton>
         <DialogButton style={{ width: "auto" }} disabled={!!busy} onClick={confirmFreeze}>
           Freeze test
+        </DialogButton>
+        <DialogButton
+          style={{ width: "auto" }}
+          onClick={() => {
+            toaster.toast({ title: "Keepsake", body: `Simulated sync job running for ${SIMULATED_JOB_SECONDS} seconds.` });
+            simulateSyncJob(SIMULATED_JOB_SECONDS)
+              .then(() => toaster.toast({ title: "Keepsake", body: "Simulated sync job finished." }))
+              .catch(() => undefined);
+          }}
+        >
+          Simulate sync job
         </DialogButton>
         <DialogButton
           style={{ width: "auto" }}

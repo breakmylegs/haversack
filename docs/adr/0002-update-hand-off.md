@@ -1,6 +1,6 @@
 # ADR-0002: Update hand-off to Decky's installer
 
-- Status: **draft**, waiting for slice 1 on-device results and slice 2 testing
+- Status: **accepted, pending on-device confirmation** (decided in slice 2 under the owner's delegation, 14 November 2026)
 - Date: 14 November 2026
 - Deciders: Peter (owner)
 
@@ -10,32 +10,44 @@ Keepsake must update itself from its own menus without the Decky store or Deskto
 
 ## What the source shows (Decky Loader v3.3.1)
 
-See `docs/assumptions.md` A11 to A17.
+See `docs/assumptions.md` A11 to A17a.
 
 - Decky's Developer page "Install plugin from URL" calls the websocket route `utilities/install_plugin(url, name)` with version `dev`.
 - That route only **requests** an install: Decky shows its own confirmation prompt and installs on confirm.
 - Passing a SHA-256 in `hash` makes Decky refuse a zip that does not match.
 - The 3.3.0 "plugin update API" is a store-side update check, not a plugin-facing install route. The build prompt's second option does not exist as described.
 - `window.DeckyBackend` is a global, so a plugin frontend can call `utilities/install_plugin` directly. This is not in the typed `@decky/api` surface, so it could change without notice.
+- An update uninstalls the old version first (calling `_unload` and `_uninstall`) and deletes only the plugin folder.
 
 ## Options
 
-- A. Call `window.DeckyBackend.call("utilities/install_plugin", zipUrl, "Keepsake", version, sha256, InstallType.UPDATE)`. Decky shows "Update Keepsake to vX.Y.Z", verifies the hash and reloads the plugin. Side effect: with a real version string Decky POSTs an install-count increment to the Decky store server (threat model T18).
-- B. Same call with version `dev`. No store POST, and Decky reads the name from `plugin.json`, but the confirmation shows "dev" instead of the version.
-- C. Fallback when `window.DeckyBackend` is missing: show the release zip URL as text and a QR code with short "Install plugin from URL" instructions.
+- A. `install_plugin(zipUrl, "Keepsake", "X.Y.Z", sha256, installType)`. Decky's prompt shows the version, but Decky also POSTs an install-count increment to the Decky store server, an endpoint outside Keepsake's allowlist (threat model T18).
+- B. The same call with version `dev`. No store POST; Decky reads the name from `plugin.json`. Decky's prompt shows "dev" instead of the version, but Keepsake's own Updates page has already shown the version and release notes, and the hash pins the exact zip.
+- C. Fallback when `window.DeckyBackend.call` is missing: show the release zip URL as text and a QR code with "Install plugin from URL" instructions.
+
+## Decision
+
+**B, with C as the fallback.**
+
+- The backend (`keepsake.update.Updater.prepare`) refuses while a sync job or session is active, requires a complete release (zip named `Keepsake-v<version>.zip` and `SHA256SUMS`), checks both URLs against the network allowlist, downloads `SHA256SUMS` and takes the zip's hash from it.
+- The frontend (`src/update.ts`) passes `(artifact, "Keepsake", "dev", sha256, installType)` to `utilities/install_plugin`, with install type `UPDATE`, `DOWNGRADE` (rollback) or `REINSTALL`. Decky shows its confirmation, downloads the zip, checks the hash and reloads the plugin.
+- If the route is missing, the Updates page shows the URL and a QR code.
+
+Not yet done (build prompt "Should"): verifying a minisign signature over `SHA256SUMS` inside the plugin. Release signing exists in `scripts/release.py`; in-plugin verification is planned for slice 12 hardening unless brought forward.
 
 ## Results
+
+To be confirmed on device in slice 2.
 
 | Check | Legion Go 2 | Legion Go |
 |---|---|---|
 | Decky version | | |
 | `window.DeckyBackend.call` visible to the plugin | | |
-| `DeckyPluginLoader` install methods visible | | |
-
-## Decision
-
-Pending. Provisional: A with C as fallback, subject to Peter's view on the store install-count POST (A) versus a less clear confirmation prompt (B). Slice 2 tests the chosen route on both devices, including rollback.
+| Decky confirmation shown, update installs, toast "Updated to v0.2.1" | | |
+| Rollback to v0.2.0 works the same way | | |
+| Update refused during "Simulate sync job" | | |
 
 ## Consequences
 
-To be written with the decision.
+- Decky's confirmation prompt names the version "dev". The Updates page explains what is being installed before the prompt appears.
+- Keepsake depends on an untyped Decky route. A Decky change that removes it degrades to the QR fallback rather than breaking.

@@ -2,10 +2,59 @@
 // backend owns behaviour, the frontend only displays and forwards.
 import { callable } from "@decky/api";
 
+export type UpdateChannel = "stable" | "prerelease";
+
 export interface Settings {
   schemaVersion: number;
   deviceId: string;
   deviceName: string;
+  updateChannel: UpdateChannel;
+  readOnly: boolean;
+}
+
+export interface Status {
+  version: string;
+  safeMode: boolean;
+  busy: string | null;
+}
+
+export interface ReleaseInfo {
+  tag: string;
+  version: string;
+  prerelease: boolean;
+  published: string;
+  notes: string;
+  zip_name: string;
+  zip_url: string | null;
+  complete: boolean;
+}
+
+export interface UpdateStatus {
+  current: string;
+  channel: UpdateChannel;
+  latest: ReleaseInfo | null;
+  updateAvailable: boolean;
+  notify: boolean;
+  releases: ReleaseInfo[];
+  lastCheck: number | null;
+  error: string | null;
+}
+
+export type PreparedUpdate =
+  | {
+      ok: true;
+      artifact: string;
+      name: string;
+      version: string;
+      displayVersion: string;
+      sha256: string;
+      installType: number;
+    }
+  | { ok: false; reason: string; detail?: string };
+
+export interface StartupNotice {
+  from: string;
+  to: string;
 }
 
 export interface LogRecord {
@@ -32,6 +81,11 @@ export interface HttpsTestResult {
   error?: string;
 }
 
+export const getStatus = callable<[], Status>("get_status");
+export const takeStartupNotice = callable<[], StartupNotice | null>("take_startup_notice");
+export const checkForUpdates = callable<[force: boolean], UpdateStatus>("check_for_updates");
+export const prepareUpdate = callable<[tag: string], PreparedUpdate>("prepare_update");
+export const simulateSyncJob = callable<[seconds: number], { ok: boolean; seconds: number }>("simulate_sync_job");
 export const getSettings = callable<[], Settings>("get_settings");
 export const setSetting = callable<[key: string, value: unknown], Settings>("set_setting");
 export const getLogs = callable<[limit: number], LogRecord[]>("get_logs");

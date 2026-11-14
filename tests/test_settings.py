@@ -35,11 +35,35 @@ def test_rejects_long_or_non_text_name(tmp_path):
         store.set("deviceName", 5)
 
 
-def test_drops_unknown_stored_keys(tmp_path):
-    (tmp_path / SETTINGS_FILE).write_text(json.dumps({"deviceName": "A", "junk": 1}))
-    data = SettingsStore(str(tmp_path)).all()
-    assert "junk" not in data
-    assert data["deviceName"] == "A"
+def test_unknown_stored_keys_hidden_but_preserved(tmp_path):
+    # A newer version may have written keys this build does not know (rollback).
+    (tmp_path / SETTINGS_FILE).write_text(json.dumps({"deviceName": "A", "futureKey": 1}))
+    store = SettingsStore(str(tmp_path))
+    assert "futureKey" not in store.all()
+    assert store.all()["deviceName"] == "A"
+    store.set("deviceName", "B")
+    on_disk = json.loads((tmp_path / SETTINGS_FILE).read_text())
+    assert on_disk["futureKey"] == 1 and on_disk["deviceName"] == "B"
+
+
+def test_newer_schema_opens_read_only_and_never_writes(tmp_path):
+    original = json.dumps({"schemaVersion": 99, "deviceId": "abc", "deviceName": "A", "newThing": [1]})
+    (tmp_path / SETTINGS_FILE).write_text(original)
+    store = SettingsStore(str(tmp_path))
+    assert store.read_only is True
+    assert store.all()["readOnly"] is True
+    with pytest.raises(SettingsError):
+        store.set("deviceName", "B")
+    assert (tmp_path / SETTINGS_FILE).read_text() == original
+
+
+def test_update_channel(tmp_path):
+    store = SettingsStore(str(tmp_path))
+    assert store.get("updateChannel") == "stable"
+    store.set("updateChannel", "prerelease")
+    assert SettingsStore(str(tmp_path)).get("updateChannel") == "prerelease"
+    with pytest.raises(SettingsError):
+        store.set("updateChannel", "nightly")
 
 
 @pytest.mark.posix
