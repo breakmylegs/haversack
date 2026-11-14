@@ -35,6 +35,12 @@ class Plugin:
     async def prepare_update(self, tag: str) -> dict[str, Any]:
         return await self.app.prepare_update(tag)
 
+    async def discover_games(self, refresh: bool = False) -> dict[str, Any]:
+        return await self.app.discover_games(refresh)
+
+    async def check_running_prefix(self, key: str) -> dict[str, Any]:
+        return await self.app.check_running_prefix(key)
+
     async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
         return await self.app.simulate_sync_job(seconds)
 
