@@ -1,0 +1,4 @@
+# Local development only. Nothing here ships in the plugin zip.
+-r requirements-test.txt
+ruff==0.14.3
+mypy==1.18.2

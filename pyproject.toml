@@ -1,0 +1,35 @@
+# Tooling configuration only. The plugin is packaged by scripts/package.py, not pip.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["py_modules", "tests"]
+addopts = "-ra"
+markers = [
+    "posix: needs Linux or POSIX behaviour (real /proc, signals, symlinks, file modes); run on a device with scripts/test_on_device.py",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["py_modules", "tests", "scripts"]
+# decky.pyi is copied verbatim from the plugin template.
+extend-exclude = ["node_modules", "dist", "out", ".venv", "decky.pyi"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "BLE", "S", "RUF"]
+ignore = [
+    "S101",   # assert is fine in tests
+    "S603",   # subprocess calls are explicit and reviewed
+    "S607",
+    "S310",   # urllib URLs are constants or allowlisted
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "BLE"]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = ["py_modules", "."]
+files = ["py_modules/keepsake", "main.py"]
+strict = true
+warn_unused_ignores = true

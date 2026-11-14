@@ -1,0 +1,11 @@
+{
+  "name": "Keepsake",
+  "author": "breakmylegs",
+  "flags": [],
+  "api_version": 1,
+  "publish": {
+    "tags": ["saves", "sync", "cloud"],
+    "description": "Syncs PC game saves between handhelds through cloud storage, from Gaming Mode.",
+    "image": "https://opengraph.githubassets.com/1/breakmylegs/keepsake"
+  }
+}
