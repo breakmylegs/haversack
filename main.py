@@ -23,6 +23,21 @@ class Plugin:
         # the old version first). It must never delete settings, tokens or state.
         pass
 
+    async def get_status(self) -> dict[str, Any]:
+        return await self.app.get_status()
+
+    async def take_startup_notice(self) -> dict[str, Any] | None:
+        return await self.app.take_startup_notice()
+
+    async def check_for_updates(self, force: bool = False) -> dict[str, Any]:
+        return await self.app.check_for_updates(force)
+
+    async def prepare_update(self, tag: str) -> dict[str, Any]:
+        return await self.app.prepare_update(tag)
+
+    async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
+        return await self.app.simulate_sync_job(seconds)
+
     async def get_settings(self) -> dict[str, Any]:
         return await self.app.get_settings()
 

@@ -1,4 +1,4 @@
-import { DialogButton, Field, Focusable, TextField } from "@decky/ui";
+import { DialogButton, Field, Focusable, TextField, ToggleField } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { getSettings, setSetting, Settings } from "../backend";
@@ -16,27 +16,42 @@ export function SettingsPage() {
       .catch((err) => toaster.toast({ title: "Keepsake", body: `Could not load settings: ${err}` }));
   }, []);
 
-  const save = async () => {
+  const save = async (key: string, value: unknown, done: string) => {
     try {
-      const updated = await setSetting("deviceName", name);
+      const updated = await setSetting(key, value);
       setSettings(updated);
       setName(updated.deviceName);
-      toaster.toast({ title: "Keepsake", body: "Device name saved." });
+      toaster.toast({ title: "Keepsake", body: done });
     } catch (err) {
       toaster.toast({ title: "Keepsake", body: `Could not save: ${err}` });
     }
   };
 
+  const locked = !settings || settings.readOnly;
+
   return (
     <div>
+      {settings?.readOnly && (
+        <Field
+          label="Read-only safe mode"
+          description="These settings were written by a newer Keepsake. Nothing can be changed until you update to that version or later."
+        />
+      )}
       <Field label="Device name" description="Shown on other devices next to snapshots from this one." childrenLayout="below">
-        <TextField value={name} onChange={(e) => setName(e.target.value)} />
+        <TextField value={name} disabled={locked} onChange={(e) => setName(e.target.value)} />
       </Field>
       <Focusable style={{ display: "flex", gap: 8, margin: "8px 0" }}>
-        <DialogButton style={{ width: "auto" }} disabled={!settings} onClick={() => void save()}>
+        <DialogButton style={{ width: "auto" }} disabled={locked} onClick={() => void save("deviceName", name, "Device name saved.")}>
           Save
         </DialogButton>
       </Focusable>
+      <ToggleField
+        label="Include pre-releases"
+        description="Offer beta versions as updates. Off means the Stable channel."
+        checked={settings?.updateChannel === "prerelease"}
+        disabled={locked}
+        onChange={(on) => void save("updateChannel", on ? "prerelease" : "stable", on ? "Pre-release channel on." : "Stable channel on.")}
+      />
       {settings && <Field label="Device ID" description={settings.deviceId} />}
     </div>
   );

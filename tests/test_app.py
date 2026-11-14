@@ -77,6 +77,55 @@ def test_start_releases_left_over_frozen(tmp_path):
     assert calls == [(600, SIGCONT)]
 
 
+def make_update_app(tmp_path, version, emitted):
+    paths = PluginPaths(
+        settings_dir=str(tmp_path / "settings"),
+        runtime_dir=str(tmp_path / "runtime"),
+        log_dir=str(tmp_path / "logs"),
+        plugin_dir=str(tmp_path / "plugin"),
+    )
+
+    async def emit(event, *args):
+        emitted.append(event)
+
+    def no_network(url, headers=None):
+        raise AssertionError(f"unexpected network call to {url}")
+
+    return KeepsakeApp(paths, emit=emit, proc_root=str(tmp_path / "proc"), version=version, fetch=no_network)
+
+
+def test_update_refused_while_simulated_sync_runs_then_idle_event(tmp_path):
+    emitted = []
+    app = make_update_app(tmp_path, "0.2.0", emitted)
+
+    async def run():
+        await app.start()
+        job = asyncio.create_task(app.simulate_sync_job(1))
+        await asyncio.sleep(0.1)
+        assert (await app.get_status())["busy"] == "sync"
+        refused = await app.prepare_update("v0.2.1")
+        await job
+        await asyncio.sleep(0.05)
+        return refused
+
+    refused = asyncio.run(run())
+    assert refused == {"ok": False, "reason": "busy", "detail": "sync"}
+    assert "keepsake_idle" in emitted
+
+
+def test_startup_notice_after_update_is_given_once(tmp_path):
+    asyncio.run(make_update_app(tmp_path, "0.2.0", []).start())
+    app = make_update_app(tmp_path, "0.2.1", [])
+
+    async def run():
+        await app.start()
+        return await app.take_startup_notice(), await app.take_startup_notice()
+
+    first, second = asyncio.run(run())
+    assert first == {"from": "0.2.0", "to": "0.2.1"}
+    assert second is None
+
+
 def test_settings_round_trip(tmp_path):
     app, _ = make_app(tmp_path, [])
     asyncio.run(app.set_setting("deviceName", "Handheld"))

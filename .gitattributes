@@ -1,0 +1,4 @@
+# LF everywhere, so builds and release zips are the same on Windows and Linux.
+* text=auto eol=lf
+*.png binary
+*.zip binary

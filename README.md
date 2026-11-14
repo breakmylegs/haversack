@@ -6,7 +6,7 @@ It is built for non-Steam shortcuts installed into their own Proton prefixes, wh
 
 ## Status
 
-Early development. The current build (slice 1) collects on-device diagnostics only. It does not sync saves yet. See [CHANGELOG.md](CHANGELOG.md).
+Early development. The current build collects on-device diagnostics and can update itself from GitHub Releases. It does not sync saves yet. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Principles
 

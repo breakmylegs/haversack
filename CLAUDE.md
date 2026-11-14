@@ -110,4 +110,6 @@ python scripts/test_on_device.py        # posix-marked tests on the device
 python scripts/test_on_device.py tests/test_x.py
 python scripts/package.py               # zip into out/
 python scripts/deploy.py                # install the build on the device
+python scripts/release.py prepare X.Y.Z # version bump pull request (see docs/releasing.md)
+python scripts/release.py publish --device-tested   # on main after merge; --dry-run to test
 ```
