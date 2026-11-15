@@ -47,22 +47,23 @@ def _age_text(seconds: float) -> str:
 
 def _cloud(cloud: Mapping[str, Any]) -> dict[str, Any]:
     label = "Cloud sign-in and reachability"
-    if cloud.get("store") != "onedrive":
+    name = str(cloud.get("name") or "OneDrive")
+    if cloud.get("store") in (None, "local"):
         return _check(
             "cloud",
             label,
             WARN,
-            "Snapshots go to a test store on this device only. Choose OneDrive in Settings to sync between devices.",
+            "Snapshots go to a test store on this device only. Choose a cloud in Settings to sync between devices.",
         )
     if not cloud.get("signedIn"):
-        return _check("cloud", label, FAIL, "Not signed in to OneDrive. Sign in from Settings.")
+        return _check("cloud", label, FAIL, f"{name} is not signed in or set up. Finish it in Settings.")
     if cloud.get("problem"):
-        return _check("cloud", label, FAIL, f"OneDrive sign-in needs attention: {cloud['problem']}.")
+        return _check("cloud", label, FAIL, f"{name} sign-in needs attention: {cloud['problem']}.")
     if cloud.get("reachable") is False:
-        return _check("cloud", label, WARN, f"Signed in, but OneDrive could not be reached: {cloud.get('error')}.")
+        return _check("cloud", label, WARN, f"Set up, but {name} could not be reached: {cloud.get('error')}.")
     if cloud.get("reachable") is True:
-        return _check("cloud", label, OK, "Signed in and OneDrive answered.")
-    return _check("cloud", label, OK, "Signed in. Run the checks to test the connection.")
+        return _check("cloud", label, OK, f"Set up and {name} answered.")
+    return _check("cloud", label, OK, f"{name} is set up. Run the checks to test the connection.")
 
 
 def _last_sync(games: Sequence[Mapping[str, Any]], now: float) -> dict[str, Any]:

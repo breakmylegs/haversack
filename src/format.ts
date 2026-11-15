@@ -1,5 +1,13 @@
 // Small display helpers shared by the pages. Timestamps are shown, never used to decide (principle 4).
-import { HealthStatus, PlanEntry, SyncWord } from "./backend";
+import { Backend, HealthStatus, PlanEntry, SyncWord } from "./backend";
+
+export const BACKEND_LABELS: Record<Backend, string> = {
+  local: "Test store",
+  onedrive: "OneDrive",
+  gdrive: "Google Drive",
+  webdav: "WebDAV",
+  s3: "S3",
+};
 
 export function sizeText(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;

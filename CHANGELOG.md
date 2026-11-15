@@ -2,6 +2,20 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [0.10.0]
+
+Slice 10: more cloud backends and the Ludusavi import.
+
+### Added
+
+- Google Drive, WebDAV (for example Nextcloud) and S3 or S3-compatible storage, chosen in Settings, Cloud. Google Drive signs in with your phone and Keepsake sees only its own hidden app folder; see `docs/setup-google.md`. WebDAV and S3 are set up with an HTTPS address and keys; see `docs/setup-backends.md`.
+- Every backend is checked before use: WebDAV and S3 must refuse to overwrite files, or Keepsake will not use them.
+- Import tab: bring in Ludusavi backups from a folder on this device. Each backup becomes a snapshot in History with its original date, checked against Ludusavi's records, and its paths are recognised inside any Proton prefix whatever the compatdata number. Imports never replace your current saves: restore one from History when you want it.
+
+### Security
+
+- Passwords, secret keys and the Google client secret are kept on the device with owner-only permissions and are never shown again.
+
 ## [0.9.0]
 
 Slice 9: the Gaming Mode interface is complete, plus cross-device game matching.

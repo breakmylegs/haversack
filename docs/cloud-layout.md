@@ -42,6 +42,8 @@ Objects are never empty (OneDrive upload sessions cannot create empty files).
 - `snapId` is `<deviceSeq zero-padded to 6>-<first 6 hex digits of deviceId>-<first 8 hex digits of contentHash>`.
 - `contentHash` is SHA-256 over one line per file, sorted by root then path: `root NUL rel NUL size NUL sha256 LF`.
 - `kind` is one of `auto-exit`, `auto-recovered`, `manual`, `merge`, `import`, `provisional`.
+- `import` snapshots (Ludusavi backups, flag `ludusavi`, `created` is the backup's own time) have no parents and are never heads: they are history to restore from by hand and never take part in the decision table (ADR-0021).
+- The same layout is used on every backend: OneDrive's app folder, Google Drive's hidden app data folder (objects named by their full key), a WebDAV folder, or an S3 bucket below the configured prefix.
 - `root` is one of `winAppData`, `winLocalAppData`, `winLocalAppDataLow`, `winDocuments`, `winSavedGames`, `winPublic`, `winProgramData`, `base`, `home`, `xdgData`, `xdgConfig`, `steamUserdata`, `registry`.
 - A plugin never writes to a game whose metadata uses a newer `schemaVersion` than it understands.
 - Cloud data never contains absolute device paths, device usernames, compatdata IDs or SD card labels (principle 10). The SteamID64 may appear in a relative path when a game names its save folder after it (assumption A47).

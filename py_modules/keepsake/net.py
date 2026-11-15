@@ -38,6 +38,8 @@ MICROSOFT_HOSTS = frozenset({"login.microsoftonline.com", "graph.microsoft.com"}
 # Upload-session and download URLs that Graph hands out for OneDrive personal (ADR-0008).
 # Only ever reached through URLs returned by Graph, and never sent the bearer token.
 MICROSOFT_CONTENT_SUFFIXES = (".1drv.com", ".microsoftpersonalcontent.com")
+# Google sign-in and the Drive API (build prompt section 6), used only by the Google Drive store.
+GOOGLE_HOSTS = frozenset({"oauth2.googleapis.com", "www.googleapis.com"})
 
 
 class NetError(Exception):
@@ -218,3 +220,27 @@ def request(
     if len(data) > max_bytes:
         raise NetError(f"response larger than {max_bytes} bytes")
     return HttpResponse(status=status, headers=response_headers, body=data)
+
+
+def google_request(
+    method: str, url: str, headers: Mapping[str, str] | None = None, body: bytes | None = None, **kw: Any
+) -> HttpResponse:
+    """:func:`request` limited to Google's sign-in and Drive API hosts."""
+    return request(method, url, headers, body, allowed=GOOGLE_HOSTS, suffixes=(), **kw)
+
+
+def endpoint_transport(base_url: str) -> Transport:
+    """A transport limited to the single HTTPS host of a user-configured WebDAV or S3 endpoint.
+
+    The build prompt allowlists user-configured WebDAV and S3 endpoints; only
+    HTTPS is accepted, so credentials never travel in clear text.
+    """
+    check_url(base_url, frozenset({(urlsplit(base_url).hostname or "").lower()}))
+    allowed = frozenset({(urlsplit(base_url).hostname or "").lower()})
+
+    def transport(
+        method: str, url: str, headers: Mapping[str, str] | None = None, body: bytes | None = None, **kw: Any
+    ) -> HttpResponse:
+        return request(method, url, headers, body, allowed=allowed, suffixes=(), **kw)
+
+    return transport

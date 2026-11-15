@@ -5,6 +5,7 @@ import {
   FaCloudDownloadAlt,
   FaCodeBranch,
   FaCog,
+  FaFileImport,
   FaGamepad,
   FaHistory,
   FaStethoscope,
@@ -14,6 +15,7 @@ import { ConflictsPage } from "./ConflictsPage";
 import { DiagnosticsPage } from "./DiagnosticsPage";
 import { GamesPage } from "./GamesPage";
 import { HistoryPage } from "./HistoryPage";
+import { ImportPage } from "./ImportPage";
 import { LogsPage } from "./LogsPage";
 import { SettingsPage } from "./SettingsPage";
 import { UpdatesPage } from "./UpdatesPage";
@@ -36,6 +38,7 @@ const TABS: Tab[] = [
   { module: "saves", title: "Games", icon: <FaGamepad />, content: <GamesPage />, path: "games" },
   { module: "saves", title: "Conflicts", icon: <FaCodeBranch />, content: <ConflictsPage />, path: "conflicts" },
   { module: "saves", title: "History", icon: <FaHistory />, content: <HistoryPage />, path: "history" },
+  { module: "saves", title: "Import", icon: <FaFileImport />, content: <ImportPage />, path: "import" },
   { module: "core", title: "Settings", icon: <FaCog />, content: <SettingsPage />, path: "settings" },
   { module: "core", title: "Updates", icon: <FaCloudDownloadAlt />, content: <UpdatesPage />, path: "updates" },
   { module: "core", title: "Logs", icon: <FaClipboardList />, content: <LogsPage />, path: "logs" },

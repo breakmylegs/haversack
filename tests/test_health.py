@@ -46,7 +46,9 @@ def test_cloud_states():
     down = {"store": "onedrive", "signedIn": True, "reachable": False, "error": "offline"}
     assert by_id(health.run(facts(cloud=down)))["cloud"]["status"] == "warn"
     up = {"store": "onedrive", "signedIn": True, "reachable": True}
-    assert by_id(health.run(facts(cloud=up)))["cloud"]["detail"] == "Signed in and OneDrive answered."
+    assert by_id(health.run(facts(cloud=up)))["cloud"]["detail"] == "Set up and OneDrive answered."
+    named = {"store": "webdav", "name": "WebDAV", "signedIn": False}
+    assert by_id(health.run(facts(cloud=named)))["cloud"]["detail"].startswith("WebDAV is not signed in or set up")
 
 
 def test_game_problems_are_reported_by_name():

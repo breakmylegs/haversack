@@ -132,6 +132,18 @@ Microsoft documentation read on 15 November 2026: device code flow (Entra, updat
 | A109 | decky-ludusavi's per-game auto-sync setting has no documented file format, so Keepsake cannot tell which games it syncs | unverified; the health check warns whenever it is active alongside synced games | |
 | A110 | `SidebarNavigation` pages can be built from a list at render time; route paths stay `/keepsake/<tab>` | verified in types | `components/SidebarNavigation.d.ts` |
 
+## Backends and Ludusavi import (slice 10)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A111 | Google's device flow allows only `drive.appdata` and `drive.file` among Drive scopes; polling needs `client_secret`; errors include `authorization_pending`, `slow_down`, `access_denied`, `invalid_grant` | verified 15 November 2026 | Google "OAuth 2.0 for TV and Limited-Input Device Applications" |
+| A112 | Drive returns `sha256Checksum` for files and serves `alt=media` downloads from `www.googleapis.com` without redirecting | `sha256Checksum` documented in Drive v3; the no-redirect behaviour is unverified on device (a redirect is refused, so a wrong guess fails closed) | Drive API v3 |
+| A113 | AWS S3 honours `If-None-Match: *` on PUT (412 when the key exists, 409 for a concurrent conditional write) | AWS documentation (conditional writes, 2024); compatible services vary, so Keepsake proves it per endpoint | AWS |
+| A114 | Nextcloud and ownCloud honour `If-None-Match: *` on WebDAV PUT | community-documented, unverified; proven per server by the probe | |
+| A115 | Ludusavi's `mapping.yaml` has `name`, `drives` (folder to drive), and `backups` with `name`, `when`, `files` (path to `hash` and `size`) and `children` whose `files` entries may be null for removed files; a name ending in `.zip` means the zip format; files are stored at `<drive folder>/<path without drive>`, `drive-0` being the empty Linux drive; hashes are SHA-1 | read in Ludusavi's source (`src/scan/layout.rs`, MIT) on 15 November 2026; SHA-1 assumed from the 40-hex hashes (SHA-256 also accepted, other lengths fall back to the size check) | Ludusavi |
+| A116 | A Google OAuth app in testing mode expires refresh tokens after 7 days; whether publishing needs verification for `drive.appdata` | expiry is Google's documented testing-mode rule; verification need unverified | Google |
+| A117 | Peter's Ludusavi backups are in a folder on the device (Ludusavi's default `~/ludusavi-backup`) as well as in OneDrive through rclone | unverified; the import reads a local folder only (ADR-0021 item 7) | |
+
 ## v2 verification items (slice C0)
 
 Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research.md` that Keepsake will rely on. "TA" means Peter's Tuning Advisor verification register (`decky-plugins/docs/VERIFICATION.md`), reused as evidence with its date and re-checked in the slice named. Types were read in `@decky/ui` 4.16.5 on 15 November 2026.
