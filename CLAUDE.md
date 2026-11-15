@@ -4,6 +4,8 @@ Decky Loader plugin that syncs PC game saves between SteamOS and Bazzite handhel
 
 This file holds the objective, principles, escalation rules and conventions from sections 1 to 6 of the build prompt. The full detail (architecture, canonical model, sync model, lifecycle, auth, updates, UX, slices) is in [docs/build-prompt.md](docs/build-prompt.md). Read the relevant section there before working on a slice.
 
+**v2 (slice C0).** Keepsake becomes one plugin with five modules: Saves (v1 save sync), Advisor, Replication, Installer and Desktop. [docs/build-prompt-v2.md](docs/build-prompt-v2.md) extends the v1 prompt: it is authoritative for everything after v1 slice 12 and amends the remaining v1 slices (its section 10). Where v1 and v2 conflict, v2 wins (ADR-0014). Module documents are in [docs/modules/](docs/modules/), the full queue in [docs/plan.md](docs/plan.md), the replication research (partly superseded, see spec section 11) in [docs/research/replication-research.md](docs/research/replication-research.md).
+
 ## Fixed names
 
 - Plugin name **Keepsake**. It is the plugin folder, the settings folder, the OneDrive app folder and the repository name. Do not rename it.
@@ -17,10 +19,11 @@ Outcomes:
 - No save version is ever silently overwritten or lost.
 - The plugin updates itself from its own menus in a few clicks.
 - Source lives in the owner's public GitHub repository. Releases are built locally by `pnpm release` and published with `gh` (ADR-0004: no GitHub Actions).
+- v2: a non-Steam game configured on one device appears on the other, playable, with the same compatibility tool, artwork and launch options; Advisor shows device-specific recommendations without changing anything; Desktop Mode offers every feature as an extra surface.
 
 ## 2. Context
 
-- Two Lenovo Legion Go handhelds running SteamOS, user `deck`. Bazzite must stay supported, including `/var/home` symlinked to `/home` and usernames other than `deck`.
+- Two handhelds running SteamOS, user `deck`: a Legion Go (2560x1600 144 Hz IPS, Z1 Extreme) and a Legion Go 2 (1920x1200 144 Hz OLED with VRR, Z2 Extreme), both with two USB4 ports and Wi-Fi 6E (v2 section 3). Bazzite must stay supported, including `/var/home` symlinked to `/home` and usernames other than `deck`.
 - SD card labels differ between devices. The two devices have different screens.
 - Many non-Steam games are installed from ISO into the shortcut's own Proton prefix, so the game folder usually sits inside the prefix.
 - Non-Steam shortcut app IDs, and therefore `compatdata/<appid>` folders, differ per device. Ludusavi, rclone plugins, decky-ludusavi and Spool all fail this case or need manual redirects.
@@ -35,12 +38,22 @@ Outcomes:
 4. **Hashes decide, timestamps inform.** Decisions about save data use content hashes and parent links. Timestamps are displayed but never pick a winner.
 5. **Fail closed.** If discovery, resolution, hashing, auth or network is uncertain, do nothing destructive, tell the user and keep the game playable.
 6. **Never write saves under a running game.** Restores happen only before launch, while the game is frozen, or after exit.
-7. **Gaming Mode only.** No feature may need Desktop Mode, a terminal or a separately installed app.
+7. **Gaming Mode first** (amended in v2, ADR-0014). Every feature is fully operable from Gaming Mode with the controller alone. Desktop Mode surfaces are additional and never required. No feature may need a terminal or a separately installed app.
 8. **No root.** The backend runs as the user. `plugin.json` carries no root flag.
-9. **No bundled binaries by default.** Python stdlib first, vendored pure-Python libraries second.
-10. **Canonical paths.** Cloud data never contains absolute device paths, device usernames, compatdata IDs or SD card labels.
+9. **No bundled binaries** (amended in v2, ADR-0018). Python stdlib first, vendored pure-Python libraries second. System binaries already on SteamOS and Bazzite only if listed in the System Binary Register, verified on both and handled when missing. Never bundle, download or install a binary.
+10. **Canonical paths.** Cloud data, Replication manifests and peer messages never contain absolute device paths, device usernames, compatdata IDs or SD card labels.
 11. **A frozen game is always released.** A watchdog resumes any process the plugin pauses, whatever errors occur.
 12. **Nothing personal in the public repository.** No tokens, account names, device names, real save files or the owner's game list. Test fixtures are synthetic. Use synthetic app IDs in tests, never the real ones quoted in the build prompt.
+
+v2 principles (summary; full text in build prompt v2 section 4):
+
+13. **Module isolation.** Modules depend on Core, never on each other's internals. Each has its own flag, settings, health checks, state tables and job queue. A failing module disables itself without affecting the others (ADR-0012).
+14. **Saves owns save data.** Only Saves writes save files after initial replication. Every Saves-resolved path and every manifest path tagged `save` is off-limits to the other modules.
+15. **Steam writes through the Steam client only.** Shortcut, launch option, compatibility tool and artwork changes go through `SteamClient` from the frontend, only after an explicit user action, originals stored first, every field read back. Never write `shortcuts.vdf`, `config.vdf` or `localconfig.vdf` (ADR-0015).
+16. **Advisor is read-only.** It displays recommendations and can copy text. Any "apply" capability is an escalation item (ADR-0019).
+17. **LAN exposure is opt-in.** The Replication listener is off by default and serves only paired peers over authenticated encryption. Only discovery and a rate-limited, time-boxed pairing handshake are unauthenticated (ADR-0016).
+18. **AI is opt-in and minimal.** User-supplied key and per-provider opt-in. Requests carry only game title, hardware profile, tool versions and the settings discussed (ADR-0019).
+19. **One lock per game.** A per-`gameKey` lock spans all modules. No module writes game files, prefixes or saves while another holds it or the game runs.
 
 ## 4. Escalation rules
 
@@ -58,9 +71,22 @@ Stop and ask the owner before doing any of the following. Record each decision i
 - Changing repository visibility, branch protection or release signing.
 - Installing updates by any route other than the hand-off to Decky's own installer (build prompt section 12).
 
+v2 additions (build prompt v2 section 5, ADR-0014):
+
+- Enabling the Replication listener by default, or binding it beyond the selected LAN interfaces.
+- Changing the Replication manifest format or peer protocol after slice 18 merges.
+- Any Steam write outside principle 15, or any direct VDF write.
+- Any Advisor capability that writes anything.
+- Adding a system binary to the register, or relying on one that failed verification.
+- Adding a network endpoint outside build prompt v2 section 6.2, or sending AI providers more than principle 18 allows.
+- Any write outside the amended write allowlist (build prompt v2 section 6.3), or any Replication write against a path Saves manages.
+- Network share mounting that needs root or a bundled binary.
+- Porting any code from the owner's `decky-plugins` repository before the licence audit (ADR-0013, `docs/advisor-port-audit.md`) is signed off. That repository and the v2 input folder are read-only: never modify them.
+- Copying code from CapyDeploy (AGPL-3.0) or any GPL project.
+
 ## 5. Working conventions
 
-- **One slice at a time** from build prompt section 16, each on branch `slice/NN-short-name`. Merge to `main` by pull request only, after the owner confirms the on-device checks.
+- **One slice at a time** in the order of [docs/plan.md](docs/plan.md) (v1 slices 9 to 12, then v2 slices 13 to 25), each on branch `slice/NN-short-name`. Merge to `main` by pull request only, after the owner confirms the on-device checks.
 - **End of slice:** open a pull request, write `docs/slices/NN-report.md`, and stop. Do not start the next slice until the owner confirms.
 - **Commits:** conventional commits.
 - **Docs every slice:** update `docs/threat-model.md` (new entries, or "no change" with a reason), `docs/assumptions.md`, `CHANGELOG.md`, and add an ADR for any design decision.
@@ -94,6 +120,8 @@ Stop and ask the owner before doing any of the following. Record each decision i
 - `raw.githubusercontent.com` (Ludusavi manifest)
 - `api.github.com` and GitHub release asset downloads (update checks)
 - User-configured WebDAV and S3 endpoints
+- OneDrive content hosts `*.1drv.com` and `*.microsoftpersonalcontent.com` (ADR-0008)
+- v2, each only while its module and feature are on (build prompt v2 section 6.2): LAN peer port (default TCP 47110) and mDNS for Replication; Advisor data sources (`deckverified.games`, Steam store hosts to verify, `www.pcgamingwiki.com`; `www.protondb.com` pending a decision); AI providers `api.anthropic.com`, `api.openai.com`, `generativelanguage.googleapis.com` when configured; `www.steamgriddb.com` with the user's key; `127.0.0.1` loopback for Desktop. Avoid ports 8080, 8384, 27040 and 1714 to 1764
 
 **Development environment**
 - The owner develops on Windows. WSL does not start on this laptop (policy) and Docker is not installed, so backend tests run locally on Windows Python where possible; Linux-only tests are marked `posix`, skipped there, and run on a device over SSH with `pnpm run test:device`. See `docs/dev-setup.md`.

@@ -121,6 +121,70 @@ Microsoft documentation read on 15 November 2026: device code flow (Entra, updat
 | A68 | The manifest's `launch` keys are executable paths such as `<base>/Binaries/Game.exe`, so their file names identify a game's executable | verified in the live manifest (slice 4 survey) | manifest |
 | A69 | A game installed from the same ISO keeps the same exe name and save folder names on both devices, whatever the prefix number or shortcut name | design assumption; the scoring needs two signals so one difference does not cause a wrong match | |
 
+## v2 verification items (slice C0)
+
+Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research.md` that Keepsake will rely on. "TA" means Peter's Tuning Advisor verification register (`decky-plugins/docs/VERIFICATION.md`), reused as evidence with its date and re-checked in the slice named. Types were read in `@decky/ui` 4.16.5 on 15 November 2026.
+
+### Steam client (Steam Operations Executor, ADR-0015)
+
+| # | Claim | Status | Source | Slice |
+|---|---|---|---|---|
+| A70 | `SteamClient.Apps.AddShortcut(appName, executablePath, directory, launchOptions): Promise<number>` returns the new app ID. **Differs from the research**, which says it takes no start dir or launch options and ignores them: the types take both. Whether they are honoured is unverified, so the executor always follows with the `Set*` calls | signature verified in types; behaviour unverified | `steam-client/App.d.ts` | 13 |
+| A71 | `SetShortcutName`, `SetShortcutExe`, `SetShortcutStartDir`, `SetAppLaunchOptions` (all `(appId: number, value: string): void`) silently fail if called within about 500 ms of `AddShortcut` | signatures verified; timing unverified | types; research 2.1 | 13 |
+| A72 | Pre-quoted exe paths are double quoted by Steam | unverified | research 2.1 | 13 |
+| A73 | `SpecifyCompatTool(appId, strToolName): void` and `GetAvailableCompatTools(appId): Promise<CompatibilityTool[]>` work for non-Steam shortcuts | signatures verified; shortcut behaviour unverified | types; TA item 8 | 13, 19 |
+| A74 | `SetCustomArtworkForApp(appId, base64, 'jpg' or 'png', assetType): Promise<void>` applies artwork in Gaming Mode | signature verified; behaviour unverified | types | 19 |
+| A75 | `RemoveShortcut(appId)` and `SetShortcutIcon(appId, path)` exist | verified in types | types | 21 |
+| A76 | `AppDetails` exposes `strShortcutExe`, `strShortcutStartDir`, `strShortcutLaunchOptions`, `strLaunchOptions` and `strCompatToolName` for read-back | verified in types (TA, 4.16.0); re-check in 4.16.5 | TA items 7, 8 | 13 |
+| A77 | Shortcut app IDs are random on current Steam clients, so the same game gets a different ID per device | community-documented, unverified | research 2.1 | 19 |
+| A78 | Steam has read `shortcuts.vdf` from different `userdata` folders in Desktop and Gaming Mode | reported upstream bug, unverified; only a reason never to write VDF | research 2.1 | |
+
+### Decky runtime and transport
+
+| # | Claim | Status | Source | Slice |
+|---|---|---|---|---|
+| A79 | The Decky backend keeps running in Desktop Mode on SteamOS and Bazzite | **unverified**; slice 23 stops and escalates if false | spec 8.4 | 23 |
+| A80 | The device's Python supports TLS-PSK through `SSLContext.set_psk_client_callback` and `set_psk_server_callback` (added in Python 3.13; needs OpenSSL PSK support in Decky's build) | unverified | Python docs; spec 8.2 | 16 |
+| A81 | Stdlib multicast sockets can do mDNS / DNS-SD from the plugin process | unverified | spec 8.2 | 16 |
+| A82 | Decky uses ports 1337 and 8080; TCP 47110 is otherwise free | 1337 and 8080 verified (TA item 12); 47110 unverified | TA item 12 | 17 |
+| A83 | Wi-Fi 6E device to device throughput is 40 to 120 MB/s with SHA-256 hashing affordable on Z1E and Z2E | unverified, measured in the spike | research 4.10 | 16 |
+| A84 | Bazzite ships an active firewall that blocks inbound ports by default; SteamOS does not | community-documented, unverified | research 2.1 | 17 |
+
+### System Binary Register (ADR-0018)
+
+| # | Claim | Status | Slice |
+|---|---|---|---|
+| A85 | `udisksctl loop-setup -r -f <iso>` and `mount` work as `deck` from the Gaming Mode session under default polkit rules on SteamOS and Bazzite, for ISO9660 and UDF | unverified | 21 |
+| A86 | `systemd-inhibit` is present and can hold a sleep inhibitor as the user | unverified | 18 |
+| A87 | `openssl` is present on SteamOS and Bazzite | unverified | 16 |
+| A88 | `firewall-cmd` is present on Bazzite and answers `--state` without root | unverified | 17 |
+| A89 | System `python3` is available in the Desktop Mode session on both | unverified | 24 |
+| A90 | `jeepney` is pure Python under a licence compatible with BSD-3-Clause, and KDE Plasma on both distributions hosts StatusNotifierItem | unverified | 24 |
+
+### Devices and Advisor
+
+| # | Claim | Status | Source | Slice |
+|---|---|---|---|---|
+| A91 | Legion Go: 2560x1600 144 Hz IPS, no VRR, Z1 Extreme. Legion Go 2: 1920x1200 144 Hz OLED with VRR, Z2 Extreme. Both have two USB4 ports and Wi-Fi 6E | Legion Go 2 Z2E and Legion Go spec values verified by TA from PSREF and hhd; USB4 and Wi-Fi unverified | TA items 19, 20 | 14 |
+| A92 | Lenovo puts the machine type in DMI `product_name` and the model in `product_version` | verified (TA) | TA item 19 | 14 |
+| A93 | The Ludusavi manifest's Steam ID is in Keepsake's compact index for Advisor lookups | verified in code: slice 4 matches games by Steam ID from the index | `manifest.py` | 14 |
+| A94 | Deck Verified is at `deckverified.games/deck-verified/api/v1/game_details`, 120 requests per 2 minutes per IP, report data GPL-3.0 | verified (TA, 25 October 2026); licence re-confirmed 15 November 2026 | TA item 16 | 14 |
+| A95 | The Steam store and Deck Verified hosts Advisor needs (spec 6.2 "verify exact hosts") | unverified | spec 6.2 | 14 |
+| A96 | The ProtonDB summaries endpoint has no published terms; the monthly dumps are ODbL | verified (TA, 30 October 2026) | TA `DATA-SOURCES.md` | 15 |
+| A97 | PCGamingWiki Cargo needs a bot password since August 2026, 60 requests a minute | verified (TA, 26 October 2026) | TA item 18 | 14 |
+| A98 | `decky-lsfg-vk` writes `~/.config/lsfg-vk/conf.toml` and needs `~/lsfg %command%` in launch options; lsfg-vk 2.0.0 shipped in September 2026 | unverified | research 2.1 | 15 |
+| A99 | There is no Steam client clipboard API for text; `navigator.clipboard` with an `execCommand` fallback is what plugins use | API absence verified (TA); device behaviour unverified | TA item 10 | 14 |
+| A100 | FSR 4 under Proton is unofficial on every target handheld | verified as of 25 October 2026 (TA); re-check before slice 15 | TA item 25 | 15 |
+| A101 | AI provider endpoints, headers and models lists as in the TA brief | verified from documentation (TA, October 2026); recheck, including Anthropic API version changes | TA item 24 | 15 |
+
+### Installer
+
+| # | Claim | Status | Source | Slice |
+|---|---|---|---|---|
+| A102 | `STEAM_COMPAT_MOUNTS` exposes extra paths to Proton | community-documented, unverified | research 2.1 | 21 |
+| A103 | Retargeting the same shortcut after installing keeps its prefix; recreating it makes a new prefix | community-documented, unverified | research 2.1 | 21 |
+| A104 | Both devices use the user `deck` and the same root layout, so prefix registry paths need no rewriting | owner's setup (spec section 3); `.reg` rewriting is backlog | spec 11 | 19 |
+
 ## Template differences
 
 | # | Difference | Reason |
