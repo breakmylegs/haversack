@@ -14,11 +14,12 @@ import time
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from . import diagnostics, discovery, identity, lifecycle, manifest, net, resolve, restore
+from . import configrev, diagnostics, discovery, health, identity, lifecycle, manifest, net, resolve, restore
 from .auth import AuthError, DeviceCodeFlow, TokenManager, TokenStore
 from .engine import SnapshotEngine
 from .freeze import Freezer
 from .fsutil import atomic_write_json, read_json
+from .gameconfig import DEFAULT as GAME_DEFAULTS
 from .gameconfig import GameConfigStore, custom_path_from_absolute
 from .jobs import JobTracker
 from .log import log_event, setup_logging, tail
@@ -32,8 +33,10 @@ from .sync import GameContext, SyncEngine
 from .update import Updater, startup_notice
 
 EmitFn = Callable[..., Coroutine[Any, Any, None]]
-IDLE_INTERVAL_SECONDS = 30 * 60
 IDENTITY_CACHE_SECONDS = 600
+HISTORY_MAX = 200
+CONFIG_STATE_FILE = "config-revisions.json"
+TOAST_SIGNIN = "OneDrive sign-in needs attention. Open Keepsake, Settings, to sign in again."
 UNRESOLVED_METHODS = ("none", "ambiguous", "no-save-data", "no-manifest")
 
 FREEZE_TEST_MIN = 1
@@ -91,6 +94,7 @@ class KeepsakeApp:
         self._update_lock = asyncio.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._notice: dict[str, Any] | None = None
+        self._signin_warned = False
 
     async def start(self) -> None:
         self._loop = asyncio.get_running_loop()
@@ -109,6 +113,9 @@ class KeepsakeApp:
             log_event(logging.INFO, "update.applied", "Running a new version", **self._notice)
         if self.settings.read_only:
             log_event(logging.WARNING, "settings.safe_mode", "Settings were written by a newer version; read-only")
+        elif not self.settings.get("setupComplete") and self.game_configs.any_enabled():
+            # Upgraded from a version without the setup wizard: games are already set up.
+            self.settings.set("setupComplete", True)
         log_event(logging.INFO, "app.start", "Keepsake backend started", version=self.version)
         if self._auto_refresh_manifest:
             # Weekly refresh in the background; never blocks start-up.
@@ -222,6 +229,7 @@ class KeepsakeApp:
         """Every discovered game with its match, applying strong cross-device matches (ADR-0011)."""
         games = (await self.discover_games())["games"]
         index = await asyncio.to_thread(self.manifest.load)
+        states = self._sync().state.games()
         out = []
         for game in games:
             config = self.game_configs.get(game["key"])
@@ -235,7 +243,19 @@ class KeepsakeApp:
                     proposal = self._proposals().get("open", {}).get(game["key"])
             elif game["key"] in self._proposals().get("open", {}):
                 self._clear_proposal(game["key"])  # resolved some other way
-            out.append({"key": game["key"], "name": game["name"], "kind": game["kind"], **match, "proposal": proposal})
+            config = self.game_configs.get(game["key"])
+            state = states.get(match.get("gameKey") or "") or {}
+            out.append(
+                {
+                    "key": game["key"],
+                    "name": game["name"],
+                    "kind": game["kind"],
+                    **match,
+                    "proposal": proposal,
+                    "enabled": bool(config.get("enabled")),
+                    "sync": status_word(state) if config.get("enabled") else "off",
+                }
+            )
         return out
 
     # Match proposals: likely but uncertain matches wait for the user's approval.
@@ -401,6 +421,14 @@ class KeepsakeApp:
                 raise ValueError("that title is not in the manifest")
         config = await asyncio.to_thread(self.game_configs.update, key, dict(changes))
         log_event(logging.INFO, "game.config", "Game settings changed", key=key, fields=sorted(changes))
+        if config.get("enabled") and (changes.get("enabled") or set(changes) & set(configrev.SHARED_FIELDS)):
+            game_key = await self._game_key_of(key)
+            if game_key:
+                if changes.get("enabled"):
+                    await self._sync_config(key, game_key)  # pick up settings another device shared
+                else:
+                    await self._publish_config(key, game_key)
+                config = self.game_configs.get(key)
         return config
 
     async def add_custom_path(self, key: str, absolute_path: str) -> dict[str, Any]:
@@ -586,18 +614,18 @@ class KeepsakeApp:
         pruned = await asyncio.to_thread(eng.pruned, game_key)
         pins = {p["snapId"] for p in await asyncio.to_thread(eng.pins, game_key)}
         base = self._bases().get(game_key)
-
-        def summary(meta: dict[str, Any]) -> dict[str, Any]:
-            return {
-                "snapId": meta["snapId"],
-                "created": meta["created"],
-                "kind": meta["kind"],
-                "device": meta.get("deviceName"),
-                "files": len(meta["files"]),
-                "bytes": sum(f["size"] for f in meta["files"]),
-            }
+        summary = snap_summary
+        latest: dict[str, dict[str, Any]] = {}
+        for meta in metas:
+            device = str(meta.get("deviceId") or meta.get("deviceName"))
+            if device not in latest or meta["created"] > latest[device]["created"]:
+                latest[device] = meta
 
         return {
+            "lastByDevice": [
+                {"device": m.get("deviceName"), "created": m["created"], "kind": m["kind"], "snapId": m["snapId"]}
+                for m in sorted(latest.values(), key=lambda m: m["created"], reverse=True)
+            ],
             "gameKey": game_key,
             "snapshots": [
                 {
@@ -650,6 +678,9 @@ class KeepsakeApp:
             )
         if result["status"] == "published":
             self._set_base(game_key, str(snap_id))
+        state = self._sync().state
+        if result["status"] == "published" and state.get(game_key).get("quarantined") == str(snap_id):
+            state.update(game_key, quarantined=None)
         log_event(
             logging.WARNING,
             "snapshot.release",
@@ -934,22 +965,302 @@ class KeepsakeApp:
                             "keepsake_toast", f"{game['name']} was played while Keepsake was not running. Saved now."
                         )
                     outcome = {**outcome, "playedWithoutKeepsake": True}
+                if outcome.get("status") == "conflict" or outcome.get("push") == "published-fork":
+                    await self.emit("keepsake_toast", f"Save conflict for {game['name']}. Open Keepsake to choose.")
+                elif outcome.get("push") == "quarantined":
+                    await self.emit(
+                        "keepsake_toast", f"{game['name']}: a suspicious save was kept on this device, not uploaded."
+                    )
+                try:
+                    outcome = {**outcome, "config": await self._sync_config(game["key"], ctx.game_key)}
+                except StoreError:
+                    pass  # shared settings wait for the next pass
                 outcomes.append({"key": game["key"], **outcome})
             except (ValueError, SnapshotError, StoreError) as exc:
                 outcomes.append({"key": game["key"], "status": "error", "error": str(exc)})
+        await self._warn_signin()
         log_event(logging.INFO, "sync.idle", "Idle pass finished", games=len(outcomes))
         return outcomes
+
+    async def _warn_signin(self) -> None:
+        """Toast once when OneDrive sign-in stops working; again only after it has recovered."""
+        problem = self.settings.get("snapshotStore") == "onedrive" and bool(self.tokens.last_error)
+        if problem and not self._signin_warned:
+            await self.emit("keepsake_toast", TOAST_SIGNIN)
+        self._signin_warned = problem
 
     async def _idle_loop(self) -> None:
         delay = 60.0
         while True:
             await asyncio.sleep(delay)
-            delay = IDLE_INTERVAL_SECONDS
+            delay = float(self.settings.get("idleSyncMinutes")) * 60
             if self.jobs.busy_reason() is None:
                 try:
                     await self.idle_pass()
                 except Exception:  # noqa: BLE001 - the loop must survive any single failure
                     log_event(logging.ERROR, "sync.idle_failed", "Idle pass failed")
+
+    # Gaming Mode UX (slice 9): views across games, setup wizard, health and shared game settings
+
+    async def _matched(self) -> list[tuple[dict[str, Any], dict[str, Any], str | None]]:
+        """``(game, config, gameKey)`` for every discovered game, from local data only."""
+        games = (await self.discover_games())["games"]
+        index = await asyncio.to_thread(self.manifest.load)
+        out = []
+        for game in games:
+            config = self.game_configs.get(game["key"])
+            out.append((game, config, manifest.match_game(index, game, config).get("gameKey")))
+        return out
+
+    async def _game_key_of(self, key: str) -> str | None:
+        game = await self._game(key)
+        index = await asyncio.to_thread(self.manifest.load)
+        found = manifest.match_game(index, game, self.game_configs.get(key)).get("gameKey")
+        return str(found) if found else None
+
+    async def qam_summary(self) -> dict[str, Any]:
+        """Everything the Quick Access Menu shows, without network calls."""
+        states = self._sync().state.games()
+        enabled = [(g, gk) for g, c, gk in await self._matched() if c.get("enabled") and gk]
+        last = max(
+            (
+                max(float(s.get("lastPush") or 0), float(s.get("lastPull") or 0))
+                for s in states.values()
+                if isinstance(s, dict)
+            ),
+            default=0.0,
+        )
+        current = None
+        for game, gk in enabled:
+            state = states.get(gk) or {}
+            if state.get("sessionOpen"):
+                current = {"key": game["key"], "name": game["name"], "status": status_word(state)}
+                break
+        cloud = await self.cloud_status()
+        checks = await self._health(probe=False)
+        return {
+            "store": cloud["store"],
+            "signedIn": cloud["signedIn"],
+            "deviceName": self.settings.get("deviceName"),
+            "lastSync": last or None,
+            "health": health.summary(checks),
+            "problems": [c["label"] for c in checks if c["status"] in (health.WARN, health.FAIL)],
+            "conflicts": sum(1 for _, gk in enabled if (states.get(gk) or {}).get("conflict")),
+            "enabledGames": len(enabled),
+            "currentGame": current,
+            "setupComplete": bool(self.settings.get("setupComplete")),
+            "busy": self.jobs.busy_reason(),
+        }
+
+    async def sync_now(self) -> dict[str, Any]:
+        """The "Sync now" button: run the idle pass at once."""
+        if self.jobs.busy_reason() is not None:
+            return {"ok": False, "reason": "busy"}
+        outcomes = await self.idle_pass()
+        counts: dict[str, int] = {}
+        for outcome in outcomes:
+            status = str(outcome.get("status"))
+            counts[status] = counts.get(status, 0) + 1
+        return {"ok": True, "games": len(outcomes), "counts": counts}
+
+    async def list_conflicts(self) -> list[dict[str, Any]]:
+        states = self._sync().state.games()
+        out = []
+        for game, _config, gk in await self._matched():
+            conflict = (states.get(gk) or {}).get("conflict") if gk else None
+            if conflict:
+                out.append({"key": game["key"], "name": game["name"], "gameKey": gk, "conflict": conflict})
+        return out
+
+    async def conflict_details(self, key: str) -> dict[str, Any]:
+        game = await self._game(key)
+        ctx = await self._sync_context(key)
+        details = await asyncio.to_thread(self._sync().conflict_details, ctx)
+        return {"key": key, "name": game["name"], "gameKey": ctx.game_key, **details}
+
+    async def recent_history(self, limit: int = 50) -> dict[str, Any]:
+        """Recent snapshots across synced games, newest first, including quarantined ones."""
+        states = self._sync().state.games()
+        bases = self._bases()
+        eng = self._engine()
+        items: list[dict[str, Any]] = []
+        errors: list[str] = []
+        seen: set[str] = set()
+        for game, config, gk in await self._matched():
+            if not gk or gk in seen or not (config.get("enabled") or gk in states or gk in bases):
+                continue
+            seen.add(gk)
+            try:
+                metas = await asyncio.to_thread(eng.list_metas, gk)
+                pins = {p["snapId"] for p in await asyncio.to_thread(eng.pins, gk)}
+                pruned = await asyncio.to_thread(eng.pruned, gk)
+            except StoreError as exc:
+                errors.append(f"{game['name']}: {exc}")
+                continue
+            base = (states.get(gk) or {}).get("base") or bases.get(gk)
+            owner = {"key": game["key"], "name": game["name"], "gameKey": gk}
+            for meta in metas:
+                items.append(
+                    {
+                        **snap_summary(meta),
+                        **owner,
+                        "pinned": meta["snapId"] in pins,
+                        "pruned": meta["snapId"] in pruned,
+                        "base": meta["snapId"] == base,
+                        "quarantined": False,
+                    }
+                )
+            for record in eng.quarantine.list(gk):
+                items.append(
+                    {**snap_summary(record["meta"]), **owner, "quarantined": True, "reasons": record.get("reasons", [])}
+                )
+        items.sort(key=lambda i: (i["created"], i["snapId"]), reverse=True)
+        return {"snapshots": items[: max(1, min(int(limit), HISTORY_MAX))], "errors": errors}
+
+    async def plan_sync(self, keys: list[str]) -> list[dict[str, Any]]:
+        """Setup wizard dry run: what the first sync would do for each game. Changes nothing."""
+        out = []
+        for key in [str(k) for k in keys][:HISTORY_MAX]:
+            name = key
+            try:
+                name = (await self._game(key))["name"]
+                ctx = await self._sync_context(key)
+                plan = await asyncio.to_thread(self._sync().plan, ctx)
+            except (ValueError, SnapshotError, StoreError, OSError) as exc:
+                plan = {"action": "error", "reason": str(exc)}
+            out.append({"key": key, "name": name, **plan})
+        return out
+
+    async def finish_setup(self, keys: list[str]) -> dict[str, Any]:
+        """Setup wizard confirm: enable the chosen games, mark setup done and start the first sync."""
+        enabled = 0
+        for key in [str(k) for k in keys][:HISTORY_MAX]:
+            await self.update_game_config(key, {"enabled": True})
+            enabled += 1
+        self.settings.set("setupComplete", True)
+        log_event(logging.INFO, "setup.finished", "Setup wizard finished", games=enabled)
+        if enabled:
+            self._background.append(asyncio.create_task(self.sync_now()))
+        return {"ok": True, "enabled": enabled}
+
+    async def health_checks(self, probe: bool = True) -> dict[str, Any]:
+        checks = await self._health(probe=bool(probe))
+        return {"checks": checks, "summary": health.summary(checks)}
+
+    async def _health(self, probe: bool) -> list[dict[str, Any]]:
+        cloud: dict[str, Any] = dict(await self.cloud_status())
+        if probe and cloud["store"] == "onedrive" and cloud["signedIn"]:
+            tested = await self.test_cloud()
+            cloud.update(reachable=tested["ok"], error=tested.get("error"))
+        states = self._sync().state.games()
+        sessions = self._sessions()
+        matched = await self._matched()
+        games = []
+        for game, config, gk in matched:
+            if not config.get("enabled") or not gk:
+                continue
+            state = states.get(gk) or {}
+            running = False
+            if state.get("sessionOpen"):
+                procs = await asyncio.to_thread(
+                    find_game_processes, int(game["appid"]), game.get("prefix"), self.proc_root
+                )
+                running = bool(procs)
+            games.append(
+                {
+                    "name": game["name"],
+                    "state": state,
+                    "running": running,
+                    "playedWithoutKeepsake": lifecycle.played_without_keepsake(
+                        int(game.get("last_played") or 0), sessions.get(gk, {}).get("lastStart")
+                    ),
+                }
+            )
+        names = {g["key"]: g["name"] for g, _c, _k in matched}
+        mismatches = await asyncio.to_thread(discovery.load_mismatches, self.paths.runtime_dir)
+        facts = {
+            "now": time.time(),
+            "cloud": cloud,
+            "games": games,
+            "mismatches": [names.get(k, "Unreadable mismatch record") for k in mismatches],
+            "manifest": await asyncio.to_thread(self.manifest.status),
+            "ludusavi": await asyncio.to_thread(health.detect_decky_plugin, os.environ.get("DECKY_HOME"), "ludusavi"),
+        }
+        return health.run(facts)
+
+    # Shared game settings (config revisions in the cloud)
+
+    def _config_state(self) -> dict[str, Any]:
+        data = read_json(os.path.join(self.paths.runtime_dir, CONFIG_STATE_FILE), default={})
+        return data if isinstance(data, dict) else {}
+
+    def _update_config_state(self, game_key: str, **changes: Any) -> dict[str, Any]:
+        data = self._config_state()
+        record = {**(data.get(game_key) or {}), **changes}
+        data[game_key] = record
+        atomic_write_json(os.path.join(self.paths.runtime_dir, CONFIG_STATE_FILE), data)
+        return record
+
+    async def _publish_config(self, key: str, game_key: str) -> bool:
+        """Share this device's settings for a game. Left pending and retried by the idle pass if offline."""
+        based_on = self._config_state().get(game_key, {}).get("applied")
+        self._update_config_state(game_key, pending=True)
+        device_name = str(self.settings.get("deviceName") or "Unnamed device")
+        try:
+            name = await asyncio.to_thread(
+                configrev.publish,
+                self._store(),
+                game_key,
+                str(self.settings.get("deviceId")),
+                device_name,
+                self.game_configs.get(key),
+                based_on,
+            )
+        except StoreError as exc:
+            log_event(logging.INFO, "config.publish_pending", "Game settings will be shared later", error=str(exc))
+            return False
+        self._update_config_state(
+            game_key, applied=name, pending=False, appliedFrom=device_name, appliedAt=time.time(), concurrent=[]
+        )
+        log_event(logging.INFO, "config.published", "Shared game settings", gameKey=game_key)
+        return True
+
+    async def _sync_config(self, key: str, game_key: str) -> dict[str, Any]:
+        """Publish a pending local change, then apply the newest revision from any device."""
+        if self._config_state().get(game_key, {}).get("pending") and not await self._publish_config(key, game_key):
+            return {"applied": False, "pending": True}
+        revisions = await asyncio.to_thread(configrev.list_revisions, self._store(), game_key)
+        chosen = configrev.newest(revisions)
+        local = configrev.shared_part(self.game_configs.get(key))
+        if chosen is None:
+            if local != configrev.shared_part(GAME_DEFAULTS):
+                await self._publish_config(key, game_key)
+            return {"applied": False}
+        applied = False
+        if chosen["name"] != self._config_state().get(game_key, {}).get("applied") and local != chosen["config"]:
+            await asyncio.to_thread(self.game_configs.update, key, dict(chosen["config"]))
+            applied = True
+            log_event(logging.INFO, "config.applied", "Applied game settings from another device", gameKey=game_key)
+        self._update_config_state(
+            game_key,
+            applied=chosen["name"],
+            appliedFrom=chosen["deviceName"],
+            appliedAt=chosen["createdTs"],
+            concurrent=sorted({r["deviceName"] or r["deviceId"] for r in configrev.concurrent_with(revisions, chosen)}),
+        )
+        return {"applied": applied}
+
+    async def game_config_sync(self, key: str) -> dict[str, Any]:
+        """Where this game's shared settings came from, for the game page. No network."""
+        game_key = await self._game_key_of(key)
+        record = self._config_state().get(game_key or "", {})
+        return {
+            "gameKey": game_key,
+            "appliedFrom": record.get("appliedFrom"),
+            "appliedAt": record.get("appliedAt"),
+            "pending": bool(record.get("pending")),
+            "concurrent": list(record.get("concurrent") or []),
+        }
 
     async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
         """Diagnostics only: hold a fake sync job so the update guard can be tested."""
@@ -1006,7 +1317,11 @@ class KeepsakeApp:
             self.paths.runtime_dir,
             self.paths.log_dir,
             frontend,
-            {"freezer": self.freezer.status(), "manifest": self.manifest.status()},
+            {
+                "freezer": self.freezer.status(),
+                "manifest": self.manifest.status(),
+                "health": await self._health(probe=False),
+            },
         )
         log_event(logging.INFO, "diagnostics.export", "Diagnostics exported", file=os.path.basename(path))
         return path
@@ -1026,3 +1341,27 @@ class KeepsakeApp:
             finally:
                 resumed = await asyncio.to_thread(self.freezer.resume_all, "normal")
             return {"ok": bool(stopped), "stopped": len(stopped), "resumed": len(resumed), "seconds": seconds}
+
+
+def status_word(state: dict[str, Any]) -> str:
+    """One word for a game's sync state, used for list icons and the current game card."""
+    if state.get("conflict"):
+        return "conflict"
+    if state.get("quarantined"):
+        return "quarantined"
+    if state.get("pending"):
+        return "pending"
+    if state.get("base"):
+        return "synced"
+    return "not-synced"
+
+
+def snap_summary(meta: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "snapId": meta["snapId"],
+        "created": meta["created"],
+        "kind": meta["kind"],
+        "device": meta.get("deviceName"),
+        "files": len(meta["files"]),
+        "bytes": sum(f["size"] for f in meta["files"]),
+    }

@@ -155,6 +155,11 @@ class GameConfigStore:
         except GameConfigError:
             return dict(DEFAULT)
 
+    def any_enabled(self) -> bool:
+        with self._lock:
+            data = self._all()
+        return any(isinstance(v, dict) and v.get("enabled") is True for v in data.values())
+
     def update(self, key: str, changes: dict[str, Any]) -> dict[str, Any]:
         if not key or len(key) > MAX_TEXT:
             raise GameConfigError("invalid game key")

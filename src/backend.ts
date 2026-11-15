@@ -15,8 +15,96 @@ export interface Settings {
   snapshotStore: "local" | "onedrive";
   launchPullTimeout: number;
   toastOnSync: boolean;
+  idleSyncMinutes: number;
+  showSteamApps: boolean;
+  setupComplete: boolean;
   readOnly: boolean;
 }
+
+export type SyncWord = "off" | "not-synced" | "synced" | "pending" | "conflict" | "quarantined";
+export type HealthStatus = "ok" | "info" | "warn" | "fail";
+
+export interface QamSummary {
+  store: "local" | "onedrive";
+  signedIn: boolean;
+  deviceName: string;
+  lastSync: number | null;
+  health: HealthStatus;
+  problems: string[];
+  conflicts: number;
+  enabledGames: number;
+  currentGame: { key: string; name: string; status: SyncWord } | null;
+  setupComplete: boolean;
+  busy: string | null;
+}
+
+export interface HealthCheck {
+  id: string;
+  label: string;
+  status: HealthStatus;
+  detail: string;
+  items: string[];
+}
+
+export interface ConflictEntry {
+  key: string;
+  name: string;
+  gameKey: string;
+  conflict: SyncConflict;
+}
+
+export interface ConflictSide {
+  side: "local" | "cloud";
+  snapId: string | null;
+  device: string | null;
+  created: string | null;
+  files: number;
+  bytes: number;
+  changedFiles: number;
+}
+
+export interface ConflictDetails {
+  key: string;
+  name: string;
+  gameKey: string;
+  conflict: SyncConflict | null;
+  hasBase?: boolean;
+  sides?: ConflictSide[];
+}
+
+export interface HistoryItem extends SnapshotSummary {
+  key: string;
+  name: string;
+  gameKey: string;
+  quarantined: boolean;
+}
+
+export interface PlanEntry {
+  key: string;
+  name: string;
+  action: "push" | "pull" | "adopt" | "conflict" | "up-to-date" | "nothing" | "offline" | "error";
+  reason?: string;
+}
+
+export interface ConfigSyncInfo {
+  gameKey: string | null;
+  appliedFrom: string | null;
+  appliedAt: number | null;
+  pending: boolean;
+  concurrent: string[];
+}
+
+export const qamSummary = callable<[], QamSummary>("qam_summary");
+export const syncNow = callable<[], { ok: boolean; reason?: string; games?: number; counts?: Record<string, number> }>(
+  "sync_now",
+);
+export const listConflicts = callable<[], ConflictEntry[]>("list_conflicts");
+export const conflictDetails = callable<[key: string], ConflictDetails>("conflict_details");
+export const recentHistory = callable<[limit: number], { snapshots: HistoryItem[]; errors: string[] }>("recent_history");
+export const planSync = callable<[keys: string[]], PlanEntry[]>("plan_sync");
+export const finishSetup = callable<[keys: string[]], { ok: boolean; enabled: number }>("finish_setup");
+export const healthChecks = callable<[probe: boolean], { checks: HealthCheck[]; summary: HealthStatus }>("health_checks");
+export const gameConfigSync = callable<[key: string], ConfigSyncInfo>("game_config_sync");
 
 export interface Status {
   version: string;
@@ -138,6 +226,8 @@ export interface GameMatch extends MatchInfo {
   name: string;
   kind: "steam" | "shortcut";
   proposal?: { candidate: { gameKey: string; title: string | null } } | null;
+  enabled: boolean;
+  sync: SyncWord;
 }
 
 export interface CustomPath {
@@ -220,6 +310,7 @@ export interface SnapshotSummary {
 
 export interface SnapshotListing {
   gameKey?: string;
+  lastByDevice?: { device: string | null; created: string; kind: string; snapId: string }[];
   snapshots: SnapshotSummary[];
   quarantine: SnapshotSummary[];
   prerestore: SnapshotSummary[];

@@ -1,27 +1,36 @@
-import { ConfirmModal, DialogButton, Field, Focusable, showModal, ToggleField } from "@decky/ui";
+import { DialogButton, Field, Focusable, ToggleField } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
-import { HeadSummary, resolveConflict, SyncStatus, syncPull, syncPush, syncStatus, updateGameConfig } from "../backend";
+import { ConfigSyncInfo, gameConfigSync, SyncStatus, syncPull, syncPush, syncStatus, updateGameConfig } from "../backend";
+import { agoText, CONFLICT_TEXT } from "../format";
+import { openConflictModal } from "./ConflictModal";
 
-function sizeText(bytes: number): string {
-  return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+function sharedText(info: ConfigSyncInfo | null): string {
+  if (!info) return "";
+  if (info.pending) return "Your latest changes will be shared with your other devices when the cloud is reachable.";
+  if (!info.appliedFrom) return "Not shared yet.";
+  return `Last changed on ${info.appliedFrom}, ${agoText(info.appliedAt)}.`;
 }
 
-function headText(h: HeadSummary): string {
-  return `${h.device ?? "Unknown device"}, ${(h.created ?? "").replace("T", " ").replace("Z", "")}, ${h.files} files, ${sizeText(h.bytes)}`;
-}
-
-const CONFLICT_TEXT = {
-  adoption: "This device has save files that differ from the cloud, and they have never been synced.",
-  fork: "Two devices saved different progress from the same starting point.",
-  "both-changed": "This device and the cloud both have new progress.",
-};
-
-export function SyncPanel({ gameKey, enabled, onEnabled }: { gameKey: string; enabled: boolean; onEnabled: (on: boolean) => void }) {
+export function SyncPanel({
+  gameKey,
+  enabled,
+  kind,
+  onEnabled,
+}: {
+  gameKey: string;
+  enabled: boolean;
+  kind: "steam" | "shortcut";
+  onEnabled: (on: boolean) => void;
+}) {
   const [status, setStatus] = useState<SyncStatus | null>(null);
+  const [shared, setShared] = useState<ConfigSyncInfo | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const refresh = async () => setStatus(await syncStatus(gameKey));
+  const refresh = async () => {
+    setStatus(await syncStatus(gameKey));
+    setShared(await gameConfigSync(gameKey).catch(() => null));
+  };
 
   useEffect(() => {
     void refresh();
@@ -39,17 +48,6 @@ export function SyncPanel({ gameKey, enabled, onEnabled }: { gameKey: string; en
     }
   };
 
-  const choose = (choice: string, head: string | null, title: string, description: string) =>
-    showModal(
-      <ConfirmModal
-        strTitle={title}
-        strDescription={description}
-        strOKButtonText="Continue"
-        strCancelButtonText="Decide later"
-        onOK={() => void act(async () => (await resolveConflict(gameKey, choice, head), "Conflict resolved."))}
-      />,
-    );
-
   if (status && !status.available) return <Field label="Sync" description={status.reason} />;
 
   const conflict = status?.conflict;
@@ -58,21 +56,41 @@ export function SyncPanel({ gameKey, enabled, onEnabled }: { gameKey: string; en
     <div>
       <ToggleField
         label="Sync this game"
-        description="Keep this game's saves in step between your devices."
+        description={
+          kind === "steam"
+            ? "Steam Cloud usually covers Steam games. Turn this on only if this game has no Steam Cloud saves."
+            : "Keep this game's saves in step between your devices."
+        }
         checked={enabled}
-        onChange={(on) => void updateGameConfig(gameKey, { enabled: on }).then(() => onEnabled(on))}
+        onChange={(on) =>
+          void updateGameConfig(gameKey, { enabled: on })
+            .then(() => onEnabled(on))
+            .then(refresh)
+        }
       />
       <Field
         label="Sync status"
         description={[
           status?.base ? `Based on ${status.base}` : "Not synced yet",
+          status?.lastPush ? `pushed ${agoText(status.lastPush)}` : "",
+          status?.lastPull ? `pulled ${agoText(status.lastPull)}` : "",
           status?.pending ? "waiting for the cloud" : "",
           status?.sessionOpen ? "game session open" : "",
-          status?.quarantined ? `a snapshot was quarantined (${status.quarantined})` : "",
+          status?.quarantined ? `a suspicious save was kept on this device (${status.quarantined})` : "",
         ]
           .filter(Boolean)
           .join(". ")}
       />
+      {enabled && (
+        <Field
+          label="Shared settings"
+          description={`Aliases, config files, custom paths and exclusions are shared with your other devices. ${sharedText(shared)}${
+            shared?.concurrent.length
+              ? ` Also changed at the same time on ${shared.concurrent.join(", ")}: the newest change was kept. Check the settings above.`
+              : ""
+          }`}
+        />
+      )}
       <Focusable style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <DialogButton
           style={{ width: "auto" }}
@@ -91,36 +109,15 @@ export function SyncPanel({ gameKey, enabled, onEnabled }: { gameKey: string; en
       </Focusable>
 
       {conflict && (
-        <>
-          <Field label="Conflict" description={`${CONFLICT_TEXT[conflict.kind]} This device has ${conflict.localFiles} files. Whichever you do not choose is kept.`} />
-          {conflict.heads.map((h) => (
-            <Field key={h.snapId} label={`Cloud: ${headText(h)}`} childrenLayout="below">
-              <DialogButton
-                style={{ width: "auto" }}
-                disabled={busy}
-                onClick={() =>
-                  choose("use-cloud", h.snapId, "Use this cloud save?", "This device's current files are uploaded and pinned first, then replaced with this save. Quit the game first.")
-                }
-              >
-                Use cloud save
-              </DialogButton>
-            </Field>
-          ))}
-          <Focusable style={{ display: "flex", gap: 8 }}>
-            <DialogButton
-              style={{ width: "auto" }}
-              disabled={busy}
-              onClick={() =>
-                choose("use-local", null, "Use this device's save?", "This device's files become the newest save everywhere. The cloud saves are pinned for at least 90 days.")
-              }
-            >
-              Use this device's save
-            </DialogButton>
-            <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void act(async () => "You can decide later. Automatic pulls stay off for this game.")}>
-              Decide later
-            </DialogButton>
-          </Focusable>
-        </>
+        <Field
+          label="Conflict"
+          description={`${CONFLICT_TEXT[conflict.kind]} Nothing is pulled for this game until you choose.`}
+          childrenLayout="inline"
+        >
+          <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => openConflictModal(gameKey, () => void refresh())}>
+            Choose
+          </DialogButton>
+        </Field>
       )}
     </div>
   );

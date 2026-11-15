@@ -137,6 +137,33 @@ class Plugin:
     async def run_retention(self, key: str) -> dict[str, Any]:
         return await self.app.run_retention(key)
 
+    async def qam_summary(self) -> dict[str, Any]:
+        return await self.app.qam_summary()
+
+    async def sync_now(self) -> dict[str, Any]:
+        return await self.app.sync_now()
+
+    async def list_conflicts(self) -> list[dict[str, Any]]:
+        return await self.app.list_conflicts()
+
+    async def conflict_details(self, key: str) -> dict[str, Any]:
+        return await self.app.conflict_details(key)
+
+    async def recent_history(self, limit: int = 50) -> dict[str, Any]:
+        return await self.app.recent_history(limit)
+
+    async def plan_sync(self, keys: list[str]) -> list[dict[str, Any]]:
+        return await self.app.plan_sync(keys)
+
+    async def finish_setup(self, keys: list[str]) -> dict[str, Any]:
+        return await self.app.finish_setup(keys)
+
+    async def health_checks(self, probe: bool = True) -> dict[str, Any]:
+        return await self.app.health_checks(probe)
+
+    async def game_config_sync(self, key: str) -> dict[str, Any]:
+        return await self.app.game_config_sync(key)
+
     async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
         return await self.app.simulate_sync_job(seconds)
 

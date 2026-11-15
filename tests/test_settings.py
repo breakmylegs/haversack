@@ -82,6 +82,26 @@ def test_update_channel(tmp_path):
         store.set("updateChannel", "nightly")
 
 
+def test_slice9_settings(tmp_path):
+    store = SettingsStore(str(tmp_path))
+    assert (store.get("idleSyncMinutes"), store.get("showSteamApps"), store.get("setupComplete")) == (30, False, False)
+    store.set("idleSyncMinutes", 10)
+    store.set("showSteamApps", True)
+    store.set("setupComplete", True)
+    reopened = SettingsStore(str(tmp_path))
+    assert (reopened.get("idleSyncMinutes"), reopened.get("showSteamApps"), reopened.get("setupComplete")) == (
+        10,
+        True,
+        True,
+    )
+    for bad in (9, 241, True, "30"):
+        with pytest.raises(SettingsError):
+            store.set("idleSyncMinutes", bad)
+    for key in ("showSteamApps", "setupComplete"):
+        with pytest.raises(SettingsError):
+            store.set(key, 1)
+
+
 @pytest.mark.posix
 @pytest.mark.skipif(os.name != "posix", reason="file modes need POSIX")
 def test_file_mode_is_private(tmp_path):
