@@ -1,8 +1,9 @@
 import { ButtonItem, Navigation, PanelSection, PanelSectionRow, staticClasses } from "@decky/ui";
-import { definePlugin, routerHook, toaster } from "@decky/api";
+import { addEventListener, definePlugin, removeEventListener, routerHook, toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { FaSave } from "react-icons/fa";
 import { checkForUpdates, getSettings, getStatus, takeStartupNotice, UpdateStatus } from "./backend";
+import { startLifecycle } from "./lifecycle";
 import { startProbes } from "./probes";
 import { KeepsakeRoute, ROUTE_PATH } from "./pages/KeepsakeRoute";
 
@@ -81,6 +82,11 @@ async function announce() {
 export default definePlugin(() => {
   routerHook.addRoute(ROUTE_PATH, KeepsakeRoute);
   const stopProbes = startProbes();
+  const stopLifecycle = startLifecycle();
+  // Messages from the backend, such as "Recovered missed exit backup for <game>".
+  const toastListener = addEventListener<[string]>("keepsake_toast", (body) =>
+    toaster.toast({ title: "Keepsake", body }),
+  );
   void announce();
 
   return {
@@ -90,6 +96,8 @@ export default definePlugin(() => {
     icon: <FaSave />,
     onDismount() {
       stopProbes();
+      stopLifecycle();
+      removeEventListener("keepsake_toast", toastListener);
       routerHook.removeRoute(ROUTE_PATH);
     },
   };

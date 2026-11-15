@@ -81,6 +81,39 @@ Each entry is **verified** (read in source or type definitions, or measured on d
 | A50 | Python's `zipfile` writes ZIP64 when needed and reads entries' `external_attr` for symlink detection | verified | Python docs |
 | A51 | The build prompt's cloud layout gains `games/<gameKey>/pins/<snapId>.json` (ADR-0007), before the slice 6 freeze | owner delegation | |
 
+## OneDrive (slice 6)
+
+Microsoft documentation read on 15 November 2026: device code flow (Entra, updated 2026-06-15), createUploadSession and simple upload (Graph v1.0, updated 2026-08-11), app folder (OneDrive dev centre).
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A52 | Device code endpoint `/{tenant}/oauth2/v2.0/devicecode` with `client_id` and `scope`; response has `device_code`, `user_code`, `verification_uri`, `expires_in`, `interval`, `message`; `verification_uri_complete` is not supported | verified | Entra docs |
+| A53 | Polling uses `grant_type=urn:ietf:params:oauth:grant-type:device_code`; documented errors are `authorization_pending`, `authorization_declined`, `bad_verification_code`, `expired_token`. `slow_down` is not listed by Microsoft but is handled per RFC 8628 | verified | Entra docs, RFC 8628 |
+| A54 | A refresh token is returned when `offline_access` is requested | verified | Entra docs |
+| A55 | Upload sessions default to `conflictBehavior: fail`; a name taken by the time the last range is uploaded returns 409 `nameAlreadyExists` | verified in docs; live behaviour checked by `tests/test_onedrive_live.py` on device | Graph docs |
+| A56 | Chunks must be multiples of 320 KiB and under 60 MiB; the `Authorization` header must not be sent to the upload URL; intermediate ranges return 202, the last 200 or 201 with the driveItem | verified | Graph docs |
+| A57 | The app folder is `/me/drive/special/approot`, created on first access and named after the app registration; items are addressed as `approot:/{path}:` | verified | OneDrive dev centre |
+| A58 | The simple upload page (PUT `/content`) documents no create-only option in v1.0, so it is not used | verified | Graph docs |
+| A59 | Upload URLs and download redirects for OneDrive personal are on `*.1drv.com` or `*.microsoftpersonalcontent.com` | partly verified (docs example `sn3302.up.1drv.com`); download host unverified, a wrong guess shows as a "refused" store error | Graph docs |
+| A60 | Creating an upload session by path creates missing parent folders; if Graph instead answers 404, Keepsake creates the folders and retries | unverified; both paths are handled and tested against the fake | |
+| A61 | OneDrive reports `quickXorHash` for every file (SHA-1 and SHA-256 may be absent for personal accounts) | community-documented; Keepsake falls back to re-download | |
+| A62 | `keepsake/quickxor.py` matches Microsoft's QuickXorHash. Verified only against its own reference implementation and the all-zero empty value | unverified against OneDrive until the live test runs (it prints whether the reported hash verified) | |
+
+## Sync (slice 7)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A63 | The build prompt's "Use cloud save" (keep local pinned, restore head) needs a closing merge, otherwise the kept copy and the losing head stay as heads and the conflict returns. **Differs from the build prompt** (an addition, not a change) | design, ADR-0009 | |
+| A64 | Game config revisions in the cloud layout are implemented with the per-game page in slice 9 | plan | ADR-0009 |
+
+## Lifecycle (slice 8)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A65 | The user's launch options are `AppDetails.strLaunchOptions` (via `appDetailsStore.GetAppDetails`) and are set with `SteamClient.Apps.SetAppLaunchOptions(appId, string)`; `GetLaunchOptionsForApp` returns the game's launch menu entries instead | verified in `@decky/ui` types; unverified on device | `App.d.ts`, `appdetailsstore.d.ts` |
+| A66 | Game processes run as the same user as the plugin with `HOME` set, so the gate script finds Decky's runtime folder at `~/homebrew/data/Keepsake` | unverified | |
+| A67 | Steam lifetime notifications report the app ID the backend can normalise for shortcuts | unverified (ADR-0001) | |
+
 ## Template differences
 
 | # | Difference | Reason |

@@ -7,12 +7,15 @@ it. Keeping the logic here means it can be tested without Decky.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
+import time
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from . import diagnostics, discovery, manifest, net, resolve, restore
+from . import diagnostics, discovery, lifecycle, manifest, net, resolve, restore
+from .auth import AuthError, DeviceCodeFlow, TokenManager, TokenStore
 from .engine import SnapshotEngine
 from .freeze import Freezer
 from .fsutil import atomic_write_json, read_json
@@ -22,10 +25,14 @@ from .log import log_event, setup_logging, tail
 from .paths import PluginPaths
 from .procs import find_game_processes
 from .settings import SettingsStore
-from .store import LocalFolderStore
+from .snapshot import SnapshotError
+from .store import AlreadyExistsError, LocalFolderStore, Store, StoreError
+from .store.graph import GraphStore
+from .sync import GameContext, SyncEngine
 from .update import Updater, startup_notice
 
 EmitFn = Callable[..., Coroutine[Any, Any, None]]
+IDLE_INTERVAL_SECONDS = 30 * 60
 
 FREEZE_TEST_MIN = 1
 FREEZE_TEST_MAX = 10
@@ -48,7 +55,10 @@ class KeepsakeApp:
         home: str | None = None,
         download: manifest.Downloader = net.fetch_to_file,
         auto_refresh_manifest: bool = True,
+        transport: net.Transport = net.request,
+        graph_base_url: str | None = None,
     ) -> None:
+        self._graph_base_url = graph_base_url
         self.paths = paths
         self.home = home
         self._games: dict[str, Any] | None = None
@@ -57,6 +67,14 @@ class KeepsakeApp:
         self._auto_refresh_manifest = auto_refresh_manifest
         self._manifest_lock = asyncio.Lock()
         self._background: list[asyncio.Task[Any]] = []
+        self.token_store = TokenStore(paths.settings_dir)
+        self.tokens = TokenManager(
+            self.token_store, lambda: str(self.settings.get("onedriveClientId")), transport=transport
+        )
+        self._transport = transport
+        self._signin: DeviceCodeFlow | None = None
+        self._launching: set[str] = set()
+        self._auth_lock = asyncio.Lock()
         self.emit = emit or _no_emit
         self.proc_root = proc_root
         self.version = version or os.environ.get("DECKY_PLUGIN_VERSION") or "0.0.0"
@@ -92,6 +110,8 @@ class KeepsakeApp:
         if self._auto_refresh_manifest:
             # Weekly refresh in the background; never blocks start-up.
             self._background.append(asyncio.create_task(self.refresh_manifest(False)))
+            # Idle sync, whose first pass (a minute after start) also recovers missed exit pushes.
+            self._background.append(asyncio.create_task(self._idle_loop()))
 
     def _on_idle(self) -> None:
         loop = self._loop
@@ -243,12 +263,102 @@ class KeepsakeApp:
         result = await asyncio.to_thread(resolve.preview, game, title, record, config, self.home)
         return {**result, "match": match, "gameKey": match.get("gameKey")}
 
-    # Snapshots against the local test store (slice 5; slice 6 adds the cloud store)
+    # OneDrive sign-in (slice 6)
+
+    async def cloud_status(self) -> dict[str, Any]:
+        return {
+            "clientIdSet": bool(self.settings.get("onedriveClientId")),
+            "signedIn": await asyncio.to_thread(self.tokens.signed_in),
+            "signingIn": self._signin is not None,
+            "problem": self.tokens.last_error,
+            "store": self.settings.get("snapshotStore"),
+        }
+
+    async def start_signin(self) -> dict[str, Any]:
+        """Begin the device code flow. Only ever called from a user action (threat model T2)."""
+        async with self._auth_lock:
+            if self._signin is not None:
+                self._signin.cancelled.set()
+            flow = DeviceCodeFlow(
+                str(self.settings.get("onedriveClientId")), self.token_store, transport=self._transport
+            )
+            shown = await asyncio.to_thread(flow.start)
+            self._signin = flow
+        log_event(logging.INFO, "auth.signin_started", "OneDrive sign-in started")
+        self._background.append(asyncio.create_task(self._finish_signin(flow)))
+        return shown
+
+    async def _finish_signin(self, flow: DeviceCodeFlow) -> None:
+        try:
+            await asyncio.to_thread(flow.poll)
+        except AuthError as exc:
+            if self._signin is flow:
+                self._signin = None
+            log_event(logging.WARNING, "auth.signin_failed", "OneDrive sign-in did not complete", reason=exc.reason)
+            await self.emit("keepsake_signin", {"status": "failed", "reason": exc.reason})
+            return
+        if self._signin is flow:
+            self._signin = None
+        self.tokens.last_error = None
+        log_event(logging.INFO, "auth.signed_in", "Signed in to OneDrive")
+        registered = await self.register_device()
+        await self.emit("keepsake_signin", {"status": "signed-in", "registered": registered})
+
+    async def cancel_signin(self) -> dict[str, Any]:
+        if self._signin is not None:
+            self._signin.cancelled.set()
+            self._signin = None
+        return {"ok": True}
+
+    async def sign_out(self) -> dict[str, Any]:
+        await self.cancel_signin()
+        await asyncio.to_thread(self.token_store.clear)
+        log_event(logging.INFO, "auth.signed_out", "Signed out of OneDrive")
+        return {"ok": True}
+
+    def _graph(self) -> GraphStore:
+        if self._graph_base_url:  # tests point this at a fake Graph
+            return GraphStore(self.tokens, transport=self._transport, base_url=self._graph_base_url)
+        return GraphStore(self.tokens, transport=self._transport)
+
+    async def test_cloud(self) -> dict[str, Any]:
+        try:
+            folder = await asyncio.to_thread(self._graph().check)
+        except StoreError as exc:
+            return {"ok": False, "error": str(exc)}
+        return {"ok": True, "folder": folder.get("name")}
+
+    async def register_device(self) -> bool:
+        """Write this device's registry entry once (``registry/devices/<deviceId>.json``)."""
+        settings = self.settings.all()
+        entry = {
+            "schemaVersion": 1,
+            "deviceId": settings["deviceId"],
+            "deviceName": settings["deviceName"],
+            "registered": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "pluginVersion": self.version,
+        }
+        key = f"registry/devices/{settings['deviceId']}.json"
+        try:
+            await asyncio.to_thread(self._graph().put_new, key, json.dumps(entry, sort_keys=True).encode())
+        except AlreadyExistsError:
+            return True
+        except StoreError as exc:
+            log_event(logging.WARNING, "registry.failed", "Could not register this device", error=str(exc))
+            return False
+        return True
+
+    # Snapshots against the local test store or OneDrive
+
+    def _store(self) -> Store:
+        if self.settings.get("snapshotStore") == "onedrive":
+            return self._graph()
+        return LocalFolderStore(os.path.join(self.paths.runtime_dir, "local-test-store"))
 
     def _engine(self) -> SnapshotEngine:
         settings = self.settings.all()
         return SnapshotEngine(
-            LocalFolderStore(os.path.join(self.paths.runtime_dir, "local-test-store")),
+            self._store(),
             self.paths.runtime_dir,
             self.paths.settings_dir,
             device_id=str(settings["deviceId"]),
@@ -398,6 +508,274 @@ class KeepsakeApp:
             logging.INFO, "snapshot.retention", "Retention applied", gameKey=game_key, pruned=len(result["prune"])
         )
         return {"pruned": result["prune"], "kept": len(result["keep"]), "orphansDeleted": result["orphansDeleted"]}
+
+    # Sync (slice 7). Slice 8 calls pull and push from the launch gate and the exit event.
+
+    def _sync(self) -> SyncEngine:
+        return SyncEngine(self._engine(), self.paths.runtime_dir)
+
+    async def _sync_context(self, key: str, running: Callable[[], bool] | None = None) -> GameContext:
+        ctx = await self._snapshot_context(key)  # fails closed on mismatch, safe mode, no match
+        game = ctx["game"]
+        config = self.game_configs.get(key)
+        index = self.manifest.load() or {}
+        match = manifest.match_game(index, game, config)
+        record = index.get("games", {}).get(match["title"])
+
+        def files() -> dict[str, list[str]]:
+            scan = resolve.preview(game, match["title"], record, config, self.home, 0, True)
+            if scan.get("truncated"):
+                raise SnapshotError("too many files to sync safely; add exclusions")
+            return dict(scan.get("files", {}))
+
+        def processes_running() -> bool:
+            return bool(find_game_processes(int(game["appid"]), game.get("prefix"), self.proc_root))
+
+        return GameContext(ctx["gameKey"], files=files, roots=ctx["roots"], running=running or processes_running)
+
+    # Lifecycle (slice 8): launch gate and exit push
+
+    def _sessions(self) -> dict[str, Any]:
+        data = read_json(os.path.join(self.paths.runtime_dir, "sessions.json"), default={})
+        return data if isinstance(data, dict) else {}
+
+    def _record_session(self, game_key: str, **changes: float) -> None:
+        sessions = self._sessions()
+        sessions[game_key] = {**sessions.get(game_key, {}), **changes}
+        atomic_write_json(os.path.join(self.paths.runtime_dir, "sessions.json"), sessions)
+
+    async def _games_for_appid(self, raw_id: Any) -> list[dict[str, Any]]:
+        appid = lifecycle.normalise_appid(raw_id)
+        games = (await self.discover_games())["games"]
+        return [g for g in games if g["appid"] == appid and self.game_configs.get(g["key"]).get("enabled")]
+
+    async def on_game_event(self, kind: str, raw_id: Any) -> dict[str, Any]:
+        """Frontend lifetime events. Returns at once; the work runs as a task."""
+        try:
+            games = await self._games_for_appid(raw_id)
+        except (ValueError, TypeError):
+            return {"handled": 0}
+        for game in games:
+            if kind == "start" and game["key"] not in self._launching:
+                self._launching.add(game["key"])
+                self._background.append(asyncio.create_task(self._launch(game)))
+            elif kind == "exit":
+                self._background.append(asyncio.create_task(self._exit(game)))
+        return {"handled": len(games)}
+
+    async def _launch(self, game: dict[str, Any]) -> dict[str, Any]:
+        key = game["key"]
+        mode = self.game_configs.get(key).get("launchGate", "freeze")
+        timeout = float(self.settings.get("launchPullTimeout"))
+        abort = lifecycle.Abort()
+        frozen = False
+        token: str | None = None
+        try:
+            ctx_probe = await self._sync_context(key)
+            self._record_session(ctx_probe.game_key, lastStart=time.time())
+            gate_files = lifecycle.GateFiles(self.paths.runtime_dir)
+            if mode == "strict":
+                await asyncio.to_thread(gate_files.write_timeout, int(timeout))
+                found = await asyncio.to_thread(
+                    lifecycle.wait_for,
+                    lambda: gate_files.waiting_token(game["appid"]) is not None,
+                    lifecycle.FIND_PROCESS_SECONDS,
+                )
+                token = gate_files.waiting_token(game["appid"]) if found else None
+            procs = []
+            if token is None and mode != "off":
+                procs = await asyncio.to_thread(self._wait_for_processes, game)
+                if procs:
+                    stopped = await asyncio.to_thread(self.freezer.freeze, procs)
+                    frozen = bool(stopped)
+            if token is not None or frozen:
+                # Blocked in the gate script or frozen: safe to restore until the pull is abandoned.
+                running: Callable[[], bool] = abort.is_set
+            else:
+                running = lambda: True  # noqa: E731 - could not hold the game: never restore under it
+            ctx = await self._sync_context(key, running=running)
+            with self.jobs.job("sync"):
+                try:
+                    result = await asyncio.wait_for(asyncio.to_thread(self._sync().pull, ctx), timeout)
+                except TimeoutError:
+                    abort.set()
+                    self._sync().state.update(ctx.game_key, pending=True)
+                    await self.emit("keepsake_toast", lifecycle.TOAST_TIMEOUT)
+                    result = {"action": "launch", "pending": True, "reason": "timeout"}
+            await self._announce_pull(game, result)
+            log_event(
+                logging.INFO,
+                "lifecycle.launch",
+                "Launch check finished",
+                gameKey=ctx.game_key,
+                mode=mode,
+                frozen=frozen,
+                strict=token is not None,
+                action=result.get("action"),
+                reason=result.get("reason"),
+            )
+            return result
+        except (ValueError, SnapshotError, StoreError) as exc:
+            log_event(logging.WARNING, "lifecycle.launch_skipped", "Launch check skipped", key=key, error=str(exc))
+            return {"action": "launch", "error": str(exc)}
+        finally:
+            if frozen:
+                await asyncio.to_thread(self.freezer.resume_all, "normal")
+            if token is not None:
+                await asyncio.to_thread(lifecycle.GateFiles(self.paths.runtime_dir).release, game["appid"], token)
+            self._launching.discard(key)
+
+    def _wait_for_processes(self, game: dict[str, Any]) -> list[Any]:
+        found: list[Any] = []
+
+        def check() -> bool:
+            nonlocal found
+            found = find_game_processes(int(game["appid"]), game.get("prefix"), self.proc_root)
+            return bool(found)
+
+        lifecycle.wait_for(check, lifecycle.FIND_PROCESS_SECONDS)
+        return found
+
+    async def _announce_pull(self, game: dict[str, Any], result: dict[str, Any]) -> None:
+        if result.get("action") == "conflict":
+            await self.emit("keepsake_toast", f"Save conflict for {game['name']}. Open Keepsake to choose.")
+        elif result.get("reason") == "cloud-newer-game-running":
+            await self.emit("keepsake_toast", lifecycle.TOAST_CLOUD_NEWER)
+
+    async def _exit(self, game: dict[str, Any]) -> dict[str, Any]:
+        key = game["key"]
+        try:
+            gone = await asyncio.to_thread(
+                lifecycle.wait_for,
+                lambda: not find_game_processes(int(game["appid"]), game.get("prefix"), self.proc_root),
+                lifecycle.EXIT_WAIT_SECONDS,
+            )
+            if not gone:
+                log_event(
+                    logging.WARNING, "lifecycle.exit_waiting", "Game still running; the idle pass will save it", key=key
+                )
+                return {"status": "deferred"}
+            ctx = await self._sync_context(key)
+            with self.jobs.job("sync"):
+                result = await asyncio.to_thread(self._sync().push, ctx)
+            self._record_session(ctx.game_key, lastEnd=time.time())
+        except (ValueError, SnapshotError, StoreError) as exc:
+            log_event(logging.WARNING, "lifecycle.exit_failed", "Exit save failed", key=key, error=str(exc))
+            return {"status": "error", "error": str(exc)}
+        status = result.get("status")
+        if status == "published" and self.settings.get("toastOnSync"):
+            await self.emit("keepsake_toast", f"Saved {game['name']} to the cloud.")
+        elif status == "published-fork":
+            await self.emit("keepsake_toast", f"Save conflict for {game['name']}. Open Keepsake to choose.")
+        elif status == "quarantined":
+            await self.emit(
+                "keepsake_toast", f"{game['name']}: a suspicious save was kept on this device, not uploaded."
+            )
+        log_event(logging.INFO, "lifecycle.exit", "Exit save finished", key=key, status=status)
+        return result
+
+    # Strict wrapper: the frontend reads and writes launch options; the backend keeps the originals.
+
+    async def strict_wrap(self, key: str, current_options: str) -> dict[str, Any]:
+        game = await self._game(key)
+        store = lifecycle.LaunchOptionsStore(self.paths.runtime_dir)
+        await asyncio.to_thread(store.save_original, game["appid"], str(current_options))
+        await self.update_game_config(key, {"launchGate": "strict"})
+        return {
+            "appid": game["appid"],
+            "options": lifecycle.wrap_launch_options(str(current_options), self.paths.plugin_dir),
+        }
+
+    async def strict_unwrap(self, key: str, mode: str = "freeze") -> dict[str, Any]:
+        game = await self._game(key)
+        store = lifecycle.LaunchOptionsStore(self.paths.runtime_dir)
+        original = await asyncio.to_thread(store.original, game["appid"])
+        if original is None:
+            raise ValueError("no saved launch options for this game")
+        await asyncio.to_thread(store.forget, game["appid"])
+        await self.update_game_config(key, {"launchGate": mode})
+        return {"appid": game["appid"], "options": original}
+
+    async def sync_pull(self, key: str) -> dict[str, Any]:
+        ctx = await self._sync_context(key)
+        with self.jobs.job("sync"):
+            result = await asyncio.to_thread(self._sync().pull, ctx)
+        log_event(
+            logging.INFO,
+            "sync.pull",
+            "Checked the cloud before play",
+            gameKey=ctx.game_key,
+            action=result.get("action"),
+            reason=result.get("reason"),
+        )
+        return result
+
+    async def sync_push(self, key: str) -> dict[str, Any]:
+        ctx = await self._sync_context(key)
+        with self.jobs.job("sync"):
+            result = await asyncio.to_thread(self._sync().push, ctx)
+        log_event(
+            logging.INFO,
+            "sync.push",
+            "Saved to the cloud after play",
+            gameKey=ctx.game_key,
+            status=result.get("status"),
+        )
+        return result
+
+    async def resolve_conflict(self, key: str, choice: str, head: str | None = None) -> dict[str, Any]:
+        ctx = await self._sync_context(key)
+        with self.jobs.job("sync"):
+            result = await asyncio.to_thread(self._sync().resolve, ctx, str(choice), head)
+        log_event(logging.WARNING, "sync.resolve", "Conflict resolved", gameKey=ctx.game_key, choice=choice)
+        return result
+
+    async def sync_status(self, key: str) -> dict[str, Any]:
+        try:
+            ctx = await self._sync_context(key)
+        except ValueError as exc:
+            return {"available": False, "reason": str(exc)}
+        return {"available": True, "gameKey": ctx.game_key, **self._sync().status(ctx.game_key)}
+
+    async def idle_pass(self) -> list[dict[str, Any]]:
+        """Prefetch and push for every enabled game with no open session (section 9)."""
+        outcomes = []
+        for game in (await self.discover_games())["games"]:
+            if not self.game_configs.get(game["key"]).get("enabled"):
+                continue
+            try:
+                ctx = await self._sync_context(game["key"])
+                with self.jobs.job("sync"):
+                    sync = self._sync()
+                    recovered = await asyncio.to_thread(sync.recover_session, ctx)
+                    outcome = await asyncio.to_thread(sync.idle, ctx)
+                if recovered:
+                    await self.emit("keepsake_toast", f"Recovered missed exit backup for {game['name']}")
+                session = self._sessions().get(ctx.game_key, {})
+                if lifecycle.played_without_keepsake(int(game.get("last_played") or 0), session.get("lastStart")):
+                    # Section 10: Steam saw a play Keepsake missed; the push above saved it. Warn once per play.
+                    if session.get("warnedFor") != game.get("last_played"):
+                        self._record_session(ctx.game_key, warnedFor=float(game.get("last_played") or 0))
+                        await self.emit(
+                            "keepsake_toast", f"{game['name']} was played while Keepsake was not running. Saved now."
+                        )
+                    outcome = {**outcome, "playedWithoutKeepsake": True}
+                outcomes.append({"key": game["key"], **outcome})
+            except (ValueError, SnapshotError, StoreError) as exc:
+                outcomes.append({"key": game["key"], "status": "error", "error": str(exc)})
+        log_event(logging.INFO, "sync.idle", "Idle pass finished", games=len(outcomes))
+        return outcomes
+
+    async def _idle_loop(self) -> None:
+        delay = 60.0
+        while True:
+            await asyncio.sleep(delay)
+            delay = IDLE_INTERVAL_SECONDS
+            if self.jobs.busy_reason() is None:
+                try:
+                    await self.idle_pass()
+                except Exception:  # noqa: BLE001 - the loop must survive any single failure
+                    log_event(logging.ERROR, "sync.idle_failed", "Idle pass failed")
 
     async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
         """Diagnostics only: hold a fake sync job so the update guard can be tested."""

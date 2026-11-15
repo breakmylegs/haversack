@@ -77,7 +77,11 @@ def build(out_dir: str) -> str:
             info.create_system = 3  # Unix, so external_attr carries the mode
             info.external_attr = (0o100000 | mode) << 16
             with open(src, "rb") as handle:
-                archive.writestr(info, handle.read())
+                data = handle.read()
+            if rel.startswith("bin/"):
+                # Shell scripts must have LF line endings or "#!/bin/sh" fails on the device.
+                data = data.replace(b"\r\n", b"\n")
+            archive.writestr(info, data)
     return target
 
 

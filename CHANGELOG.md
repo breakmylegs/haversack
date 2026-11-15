@@ -2,6 +2,46 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [0.8.0]
+
+Slice 8: lifecycle integration. Saves now sync on their own when you start and quit a game.
+
+### Added
+
+- When a synced game starts, Keepsake pauses it for a moment, loads a newer cloud save if there is one, and lets it continue. A watchdog always releases the game within 30 seconds.
+- When the game quits, its saves go to the cloud, with a message you can switch off in Settings.
+- If the cloud is slow, the game starts with the local save after the launch check timeout (Settings, 5 to 60 seconds) and the check is finished later.
+- Optional strict launch gate per game: the game waits for the check before it starts. Your own launch options are kept and restored exactly when you turn it off.
+- A warning when a game was played while Keepsake was not running; its saves are uploaded at the next idle pass.
+
+## [0.7.0]
+
+Slice 7: sync engine. Automatic sync on game launch and exit comes in slice 8; until then the game page has "Check before play" and "Save after play".
+
+### Added
+
+- "Sync this game" per game, and the sync rules: a newer cloud save is restored before play, new progress is saved after play, and a device that has never synced a game adopts the cloud save when it matches.
+- Conflicts when both sides changed, when two devices saved from the same point, or when a device's unsynced files differ from the cloud. Choices: "Use cloud save", "Use this device's save" or "Decide later". Whichever side is not chosen is kept and pinned for at least 90 days.
+- Offline play: the game always starts; checks and saves wait and are reconciled when the cloud is back.
+- Every 30 minutes, for synced games: newer cloud saves are downloaded ahead of time so a restore at launch is local, changes made while Keepsake was not running are saved, and a missed exit save (for example after Steam was closed) is recovered with the message "Recovered missed exit backup".
+
+## [0.6.0]
+
+Slice 6: OneDrive sign-in and cloud store. Syncing on game launch and exit comes in slices 7 and 8.
+
+### Added
+
+- Sign in to OneDrive from Gaming Mode with your phone: Keepsake shows a code and a QR code; you finish on microsoft.com. Keepsake can only see its own folder, `Apps/Keepsake`.
+- OneDrive client ID setting, with step-by-step setup in `docs/setup-entra.md`.
+- Tokens refresh automatically and are stored privately on the device.
+- Snapshots can go to OneDrive ("Use OneDrive for snapshots" in Settings). Uploads never overwrite anything, are checked against the hash OneDrive reports, and large files upload in resumable chunks.
+- Each device registers itself once in the cloud.
+- "Test connection" and "Sign out".
+
+### Changed
+
+- The cloud layout and snapshot format are now frozen (`docs/cloud-layout.md`).
+
 ## [0.5.0]
 
 Slice 5: snapshot engine and safety rails. Snapshots go to a local test store on the device; the cloud comes in slice 6.

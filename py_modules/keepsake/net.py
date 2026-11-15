@@ -33,8 +33,19 @@ ALLOWED_HOSTS = frozenset(
 )
 
 
+# Microsoft sign-in and Graph (build prompt section 6), used only by the OneDrive store.
+MICROSOFT_HOSTS = frozenset({"login.microsoftonline.com", "graph.microsoft.com"})
+# Upload-session and download URLs that Graph hands out for OneDrive personal (ADR-0008).
+# Only ever reached through URLs returned by Graph, and never sent the bearer token.
+MICROSOFT_CONTENT_SUFFIXES = (".1drv.com", ".microsoftpersonalcontent.com")
+
+
 class NetError(Exception):
     """Network failure, disallowed host or oversized response."""
+
+
+class DisallowedHost(NetError):
+    """The URL is not HTTPS to an allowlisted host. Never retried."""
 
 
 @dataclass
@@ -47,15 +58,16 @@ class HttpResponse:
 Fetcher = Callable[..., HttpResponse]
 
 
-def check_url(url: str, allowed: frozenset[str] = ALLOWED_HOSTS) -> str:
+def check_url(url: str, allowed: frozenset[str] = ALLOWED_HOSTS, suffixes: tuple[str, ...] = ()) -> str:
     parts = urlsplit(url)
     if parts.scheme != "https":
-        raise NetError(f"only https is allowed: {parts.scheme or 'none'}")
+        raise DisallowedHost(f"only https is allowed: {parts.scheme or 'none'}")
     host = (parts.hostname or "").lower()
-    if host not in allowed:
-        raise NetError(f"host not on the allowlist: {host or 'none'}")
+    # Suffixes start with a dot, so "evil1drv.com" never matches ".1drv.com".
+    if host not in allowed and not any(host.endswith(s) and len(host) > len(s) for s in suffixes):
+        raise DisallowedHost(f"host not on the allowlist: {host or 'none'}")
     if parts.username or parts.password:
-        raise NetError("credentials in URLs are not allowed")
+        raise DisallowedHost("credentials in URLs are not allowed")
     return url
 
 
@@ -149,3 +161,60 @@ def fetch(
     if len(body) > max_bytes:
         raise NetError(f"response larger than {max_bytes} bytes")
     return HttpResponse(status=status, headers=response_headers, body=body)
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(
+        self, req: urllib.request.Request, fp: Any, code: int, msg: str, headers: Any, newurl: str
+    ) -> urllib.request.Request | None:
+        return None  # the caller sees the 3xx and decides, so credentials never follow a redirect
+
+
+Transport = Callable[..., HttpResponse]
+
+
+def request(
+    method: str,
+    url: str,
+    headers: Mapping[str, str] | None = None,
+    body: bytes | None = None,
+    timeout: float = 60.0,
+    max_bytes: int = DEFAULT_MAX_BYTES,
+    dest: str | None = None,
+    allowed: frozenset[str] = MICROSOFT_HOSTS,
+    suffixes: tuple[str, ...] = MICROSOFT_CONTENT_SUFFIXES,
+) -> HttpResponse:
+    """One HTTPS request that never follows redirects.
+
+    With ``dest``, a 200 body is streamed to that file instead of memory.
+    HTTP error statuses (and 3xx) are returned, not raised.
+    """
+    check_url(url, allowed, suffixes)
+    req = urllib.request.Request(url, data=body, method=method, headers={"User-Agent": USER_AGENT, **(headers or {})})
+    opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl_context()), _NoRedirect())
+    try:
+        with opener.open(req, timeout=timeout) as response:
+            response_headers = {k.lower(): v for k, v in response.headers.items()}
+            if dest is not None and response.status == 200:
+                written = 0
+                with open(dest, "wb") as out:
+                    while chunk := response.read(1024 * 1024):
+                        written += len(chunk)
+                        if written > max_bytes:
+                            raise NetError(f"response larger than {max_bytes} bytes")
+                        out.write(chunk)
+                return HttpResponse(status=response.status, headers=response_headers)
+            data = response.read(max_bytes + 1)
+            status = response.status
+    except urllib.error.HTTPError as exc:
+        data = exc.read(max_bytes + 1) if exc.fp else b""
+        status = exc.code
+        response_headers = {k.lower(): v for k, v in (exc.headers or {}).items()}
+    except NetError:
+        raise
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        reason = getattr(exc, "reason", exc)
+        raise NetError(f"{type(exc).__name__}: {reason}") from exc
+    if len(data) > max_bytes:
+        raise NetError(f"response larger than {max_bytes} bytes")
+    return HttpResponse(status=status, headers=response_headers, body=data)

@@ -2,6 +2,7 @@ import { DialogButton, Field, Focusable, SliderField, TextField, ToggleField } f
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { getSettings, setSetting, Settings } from "../backend";
+import { CloudSection } from "./CloudSection";
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -76,6 +77,24 @@ export function SettingsPage() {
         disabled={locked}
         onChange={(v) => void save("gateMaxSizeDropPercent", v, `Limit set to ${v}%.`)}
       />
+      <SliderField
+        label="Launch check timeout (seconds)"
+        description="How long to wait for the cloud before starting the game with the local save."
+        value={settings?.launchPullTimeout ?? 20}
+        min={5}
+        max={60}
+        step={5}
+        showValue
+        disabled={locked}
+        onChange={(v) => void save("launchPullTimeout", v, `Timeout set to ${v} seconds.`)}
+      />
+      <ToggleField
+        label="Show a message after each save"
+        checked={settings?.toastOnSync ?? true}
+        disabled={locked}
+        onChange={(on) => void save("toastOnSync", on, on ? "Save messages on." : "Save messages off.")}
+      />
+      {settings && <CloudSection settings={settings} onSettings={setSettings} />}
       {settings && <Field label="Device ID" description={settings.deviceId} />}
     </div>
   );

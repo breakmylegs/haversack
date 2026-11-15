@@ -12,7 +12,9 @@ import {
   searchTitles,
   updateGameConfig,
 } from "../backend";
+import { LaunchGatePanel } from "./LaunchGatePanel";
 import { SnapshotsPanel } from "./SnapshotsPanel";
+import { SyncPanel } from "./SyncPanel";
 
 // FileSelectionType.FOLDER in @decky/api is a type-only const enum (value 1).
 const FOLDER = 1 as unknown as Parameters<typeof openFilePicker>[0];
@@ -171,6 +173,21 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
         </DialogButton>
       </Field>
 
+      {match.gameKey && (
+        <SyncPanel
+          gameKey={gameKey}
+          enabled={config.enabled}
+          onEnabled={(on) => setConfig({ ...config, enabled: on })}
+        />
+      )}
+      {match.gameKey && (
+        <LaunchGatePanel
+          gameKey={gameKey}
+          appid={game.appid}
+          mode={config.launchGate}
+          onMode={(m) => setConfig({ ...config, launchGate: m })}
+        />
+      )}
       {match.gameKey && <SnapshotsPanel gameKey={gameKey} />}
 
       {preview && (

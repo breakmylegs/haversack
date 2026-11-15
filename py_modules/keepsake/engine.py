@@ -200,15 +200,22 @@ class SnapshotEngine:
         kind: str,
         base: Mapping[str, Any] | None,
         parents: list[str] | None = None,
+        force: bool = False,
+        gate: bool = True,
+        flags: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Scan, gate and publish a snapshot. Refused snapshots are quarantined locally, never uploaded."""
+        """Scan, gate and publish a snapshot. Refused snapshots are quarantined locally, never uploaded.
+
+        ``force`` publishes even when nothing changed (merge snapshots); ``gate``
+        False skips the safety gates for a snapshot the user explicitly chose.
+        """
         self.list_metas(game_key)  # raises NewerSchemaError before anything is written
         entries = scan_entries(files_by_root, roots)
-        if base is not None and content_hash(entries) == base["contentHash"]:
+        if not force and base is not None and content_hash(entries) == base["contentHash"]:
             return {"status": "no-change", "snapId": base["snapId"]}
-        if not entries and base is None:
+        if not entries and (base is None or force):
             return {"status": "nothing-to-save"}
-        reasons = gates.check(entries_of(base) if base else None, entries, self.settings())
+        reasons = gates.check(entries_of(base) if base else None, entries, self.settings()) if gate else []
         blob_path = self._temp(".zip")
         try:
             blob_sha = pack(entries, roots, blob_path)
@@ -220,6 +227,7 @@ class SnapshotEngine:
                 device_name=self.device_name,
                 device_seq=self.seq.next(),
                 kind=kind,
+                flags=flags,
                 blob_sha256=blob_sha,
                 plugin_version=self.plugin_version,
                 created=self.clock(),
@@ -279,17 +287,25 @@ class SnapshotEngine:
         roots: Mapping[str, str | None],
         game_running: bool,
         hook: RestoreHook | None = None,
+        staged_blob: str | None = None,
     ) -> dict[str, Any]:
-        """Restore a cloud snapshot after taking and verifying a local pre-restore snapshot."""
+        """Restore a cloud snapshot after taking and verifying a local pre-restore snapshot.
+
+        ``staged_blob`` is a prefetched copy on local disk (section 10: restores
+        during the launch gate are local only); it is verified like a download.
+        """
         meta = self.get_meta(game_key, snap_id)
         if snap_id in self.pruned(game_key):
             raise SnapshotError("that snapshot's files were pruned by retention")
         blob_path = self._temp(".zip")
         try:
-            try:
-                self.store.get_to_file(blob_key(game_key, snap_id), blob_path)
-            except NotFoundError as exc:
-                raise SnapshotError("that snapshot's files are missing from the cloud") from exc
+            if staged_blob and os.path.exists(staged_blob):
+                shutil.copyfile(staged_blob, blob_path)
+            else:
+                try:
+                    self.store.get_to_file(blob_key(game_key, snap_id), blob_path)
+                except NotFoundError as exc:
+                    raise SnapshotError("that snapshot's files are missing from the cloud") from exc
             return self._restore_from(game_key, blob_path, meta, current_files, roots, game_running, hook)
         finally:
             os.unlink(blob_path)
@@ -369,7 +385,38 @@ class SnapshotEngine:
         except AlreadyExistsError:
             pass  # already pinned; pins are write-once (ADR-0007)
 
+    def cloud_bases(self, game_key: str) -> dict[str, str]:
+        """Each device's current base: the highest ``deviceSeq`` under ``bases/<deviceId>/``."""
+        newest: dict[str, tuple[int, str]] = {}
+        for info in self.store.list(f"games/{game_key}/bases/"):
+            parts = info.key.split("/")
+            if len(parts) != 5 or not parts[4].endswith(".json"):
+                continue
+            device, seq_text = parts[3], parts[4][:-5]
+            if not seq_text.isdigit():
+                continue
+            seq = int(seq_text)
+            if device not in newest or seq > newest[device][0]:
+                newest[device] = (seq, info.key)
+        out: dict[str, str] = {}
+        for device, (_seq, key) in newest.items():
+            try:
+                record = json.loads(self.store.get(key).decode("utf-8"))
+            except (ValueError, NotFoundError):
+                continue
+            if isinstance(record, dict) and isinstance(record.get("snapId"), str):
+                out[device] = record["snapId"]
+        return out
+
+    def publish_base(self, game_key: str, snap_id: str) -> None:
+        """Record this device's base in the cloud (write-once, ``bases/<deviceId>/<deviceSeq>.json``)."""
+        seq = self.seq.next()
+        body = {"snapId": snap_id, "deviceId": self.device_id, "deviceSeq": seq, "created": self.clock()}
+        key = f"games/{game_key}/bases/{self.device_id}/{seq:06d}.json"
+        self.store.put_new(key, json.dumps(body, sort_keys=True).encode())
+
     def apply_retention(self, game_key: str, bases: set[str]) -> dict[str, Any]:
+        bases = set(bases) | set(self.cloud_bases(game_key).values())
         metas = self.list_metas(game_key)
         now = self.clock()
         result = retention.plan(
@@ -378,7 +425,8 @@ class SnapshotEngine:
         for snap_id in result["prune"]:
             # Marker first: if interrupted, the next run still deletes the blob.
             try:
-                self.store.put_new(pruned_key(game_key, snap_id), b"")
+                marker = {"snapId": snap_id, "prunedAt": now, "deviceId": self.device_id}
+                self.store.put_new(pruned_key(game_key, snap_id), json.dumps(marker, sort_keys=True).encode())
             except AlreadyExistsError:
                 pass
             try:

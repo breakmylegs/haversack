@@ -65,6 +65,45 @@ class Plugin:
     async def preview_game(self, key: str) -> dict[str, Any]:
         return await self.app.preview_game(key)
 
+    async def cloud_status(self) -> dict[str, Any]:
+        return await self.app.cloud_status()
+
+    async def start_signin(self) -> dict[str, Any]:
+        return await self.app.start_signin()
+
+    async def cancel_signin(self) -> dict[str, Any]:
+        return await self.app.cancel_signin()
+
+    async def sign_out(self) -> dict[str, Any]:
+        return await self.app.sign_out()
+
+    async def test_cloud(self) -> dict[str, Any]:
+        return await self.app.test_cloud()
+
+    async def on_game_event(self, kind: str, raw_id: Any) -> dict[str, Any]:
+        return await self.app.on_game_event(kind, raw_id)
+
+    async def strict_wrap(self, key: str, current_options: str) -> dict[str, Any]:
+        return await self.app.strict_wrap(key, current_options)
+
+    async def strict_unwrap(self, key: str, mode: str = "freeze") -> dict[str, Any]:
+        return await self.app.strict_unwrap(key, mode)
+
+    async def sync_pull(self, key: str) -> dict[str, Any]:
+        return await self.app.sync_pull(key)
+
+    async def sync_push(self, key: str) -> dict[str, Any]:
+        return await self.app.sync_push(key)
+
+    async def resolve_conflict(self, key: str, choice: str, head: str | None = None) -> dict[str, Any]:
+        return await self.app.resolve_conflict(key, choice, head)
+
+    async def sync_status(self, key: str) -> dict[str, Any]:
+        return await self.app.sync_status(key)
+
+    async def idle_pass(self) -> list[dict[str, Any]]:
+        return await self.app.idle_pass()
+
     async def snapshot_game(self, key: str) -> dict[str, Any]:
         return await self.app.snapshot_game(key)
 
