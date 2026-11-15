@@ -24,8 +24,8 @@ def make_repo(root, version="1.2.3", changelog=None, plugin_extra=None):
     (root / "py_modules" / "keepsake" / "__init__.py").write_text("")
     (root / "py_modules" / "keepsake" / "__pycache__" / "a.pyc").write_text("")
     (root / "bin").mkdir()
-    (root / "bin" / "keepsake-gate").write_text("#!/bin/sh\n")
-    for name in ("main.py", "LICENSE", "README.md"):
+    (root / "bin" / "keepsake-gate").write_bytes(b'#!/bin/sh\r\nexec "$@"\r\n')  # CRLF as Windows might write it
+    for name in ("main.py", "LICENSE", "README.md", "THIRD_PARTY_NOTICES.md"):
         (root / name).write_text(name)
     (root / "package.json").write_text(json.dumps({"version": version}))
     (root / "plugin.json").write_text(json.dumps({"name": "Keepsake", **(plugin_extra or {})}))
@@ -46,6 +46,7 @@ def test_package_layout_modes_and_determinism(tmp_path, monkeypatch):
         names = archive.namelist()
         assert "Keepsake/plugin.json" in names
         assert "Keepsake/dist/index.js" in names
+        assert "Keepsake/THIRD_PARTY_NOTICES.md" in names  # MIT notice for bundled qrcode-generator
         assert "Keepsake/py_modules/keepsake/__init__.py" in names
         assert not any("__pycache__" in n or n.endswith(".pyc") for n in names)
         assert all(n.startswith("Keepsake/") for n in names)
@@ -53,6 +54,7 @@ def test_package_layout_modes_and_determinism(tmp_path, monkeypatch):
         assert [n for n in names if n.endswith("/plugin.json") and n.count("/") == 1] == ["Keepsake/plugin.json"]
         gate = archive.getinfo("Keepsake/bin/keepsake-gate")
         assert (gate.external_attr >> 16) & 0o777 == 0o755
+        assert archive.read("Keepsake/bin/keepsake-gate") == b'#!/bin/sh\nexec "$@"\n'
         assert (archive.getinfo("Keepsake/main.py").external_attr >> 16) & 0o777 == 0o644
 
 
@@ -136,12 +138,44 @@ def test_device_remote_command_quotes_arguments():
     assert "trap 'rm -rf \"$run\"' EXIT" in test_on_device.REMOTE_SCRIPT
 
 
+def test_device_archive_skips_git_ignored_files(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    make_repo(repo)
+    (repo / "pyproject.toml").write_text("")
+    (repo / "requirements-test.txt").write_text("")
+    (repo / "tests").mkdir()
+    (repo / "tests" / "test_ok.py").write_text("")
+    (repo / "tests" / "test_locked_generated.py").write_text("not python")
+    archive_bytes = test_on_device.build_archive(str(repo), ignored={"tests/test_locked_generated.py"})
+    with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode="r:gz") as archive:
+        names = set(archive.getnames())
+    assert "tests/test_ok.py" in names and "tests/test_locked_generated.py" not in names
+
+
+def test_device_onedrive_command():
+    command = test_on_device.remote_command([], onedrive=True)
+    assert command.startswith('KEEPSAKE_ONEDRIVE_TOKEN_FILE="$HOME/homebrew/settings/Keepsake/onedrive-token.json"')
+    assert command.endswith("keepsake-test -m onedrive -s")
+
+
 def test_device_config_missing_exits(tmp_path):
     with pytest.raises(SystemExit):
         device.load_target(str(tmp_path / "missing.json"))
     path = tmp_path / "d.json"
     path.write_text(json.dumps({"host": "h", "port": 2222}))
     assert device.load_target(str(path)) == ("deck@h", "2222")
+
+
+def test_secret_scan_flags_windows_profile_paths():
+    drive = "C" + ":"
+    assert secret_scan.scan_text("t.py", f"{drive}/Users/someone.name/AppData/x", []) == [
+        "t.py:1: Windows user profile path"
+    ]
+    assert secret_scan.scan_text("t.py", f"{drive}\\\\Users\\\\someone\\\\x", []) == [
+        "t.py:1: Windows user profile path"
+    ]
+    assert secret_scan.scan_text("t.py", f"{drive}/Users/Public/Documents", []) == []
 
 
 def test_secret_scan_denylist_and_exemption():

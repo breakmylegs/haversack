@@ -11,6 +11,7 @@ import {
   simulateSyncJob,
 } from "../backend";
 import { deckyMechanisms, runningAppDetails } from "../probes";
+import { HealthSection } from "./HealthSection";
 import { JsonBlock } from "./JsonBlock";
 
 type Section = "environment" | "steam" | "processes" | "frontend" | "https" | "export";
@@ -71,9 +72,10 @@ export function DiagnosticsPage() {
 
   return (
     <div>
+      <HealthSection />
       <Field
-        label="About this page"
-        description="Slice 1 diagnostics. Launch a Steam game and a non-Steam shortcut once each, then export. Events are recorded in the background."
+        label="Diagnostics"
+        description="Facts about this device for troubleshooting. The export is saved in Keepsake's settings folder on this device and includes the health checks."
       />
       <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "8px 0" }}>
         <DialogButton style={{ width: "auto" }} disabled={!!busy} onClick={() => run("environment", getEnvironment)}>

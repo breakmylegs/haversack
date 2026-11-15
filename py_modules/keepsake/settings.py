@@ -12,6 +12,7 @@ rollback), the store opens in read-only safe mode and never writes
 from __future__ import annotations
 
 import os
+import re
 import threading
 import uuid
 from typing import Any
@@ -29,10 +30,45 @@ DEFAULTS: dict[str, Any] = {
     "deviceId": "",
     "deviceName": "",
     "updateChannel": "stable",
+    "gateMaxRemovedPercent": 50,
+    "gateMaxSizeDropPercent": 70,
+    "onedriveClientId": "",
+    "snapshotStore": "local",
+    "launchPullTimeout": 20,
+    "toastOnSync": True,
+    "idleSyncMinutes": 30,
+    "showSteamApps": False,
+    "setupComplete": False,
+    # Slice 11 features, each behind its own setting.
+    "registrySync": True,  # available; each game still opts in (off by default per game)
+    "steamCloudDetection": True,
+    "suspendSnapshots": False,
 }
 
 # Keys the frontend may change. deviceId and schemaVersion are managed here.
-USER_KEYS = frozenset({"deviceName", "updateChannel"})
+USER_KEYS = frozenset(
+    {
+        "deviceName",
+        "updateChannel",
+        "gateMaxRemovedPercent",
+        "gateMaxSizeDropPercent",
+        "onedriveClientId",
+        "snapshotStore",
+        "launchPullTimeout",
+        "toastOnSync",
+        "idleSyncMinutes",
+        "showSteamApps",
+        "setupComplete",
+        "registrySync",
+        "steamCloudDetection",
+        "suspendSnapshots",
+    }
+)
+IDLE_MINUTES_RANGE = (10, 240)
+SNAPSHOT_STORES = ("local", "onedrive", "webdav", "s3", "gdrive")
+_GUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+# Safety gates may only be tightened (build prompt section 9): [floor, default].
+GATE_LIMITS = {"gateMaxRemovedPercent": (5, 50), "gateMaxSizeDropPercent": (5, 70)}
 
 
 class SettingsError(ValueError):
@@ -102,5 +138,38 @@ def _validate(key: str, value: Any) -> Any:
     if key == "updateChannel":
         if value not in UPDATE_CHANNELS:
             raise SettingsError("update channel must be stable or prerelease")
+        return value
+    if key == "onedriveClientId":
+        if not isinstance(value, str) or (value.strip() and not _GUID.match(value.strip())):
+            raise SettingsError("the client ID looks like 00001111-aaaa-2222-bbbb-3333cccc4444")
+        return value.strip().lower()
+    if key == "launchPullTimeout":
+        if not isinstance(value, int) or isinstance(value, bool) or not 5 <= value <= 60:
+            raise SettingsError("the launch check timeout is 5 to 60 seconds")
+        return value
+    if key == "idleSyncMinutes":
+        low, high = IDLE_MINUTES_RANGE
+        if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
+            raise SettingsError(f"the idle sync interval is {low} to {high} minutes")
+        return value
+    if key in (
+        "toastOnSync",
+        "showSteamApps",
+        "setupComplete",
+        "registrySync",
+        "steamCloudDetection",
+        "suspendSnapshots",
+    ):
+        if not isinstance(value, bool):
+            raise SettingsError("must be true or false")
+        return value
+    if key == "snapshotStore":
+        if value not in SNAPSHOT_STORES:
+            raise SettingsError("store must be local, onedrive, webdav, s3 or gdrive")
+        return value
+    if key in GATE_LIMITS:
+        low, high = GATE_LIMITS[key]
+        if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
+            raise SettingsError(f"must be a whole number from {low} to {high} (gates can only be tightened)")
         return value
     raise SettingsError(f"no validator for {key}")

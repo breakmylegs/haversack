@@ -27,7 +27,7 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
-FILES = ("main.py", "package.json", "plugin.json", "LICENSE", "README.md")
+FILES = ("main.py", "package.json", "plugin.json", "LICENSE", "README.md", "THIRD_PARTY_NOTICES.md")
 TREES = ("dist", "py_modules", "bin")
 EXECUTABLE_TREES = ("bin",)
 SKIP_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache"}
@@ -77,7 +77,11 @@ def build(out_dir: str) -> str:
             info.create_system = 3  # Unix, so external_attr carries the mode
             info.external_attr = (0o100000 | mode) << 16
             with open(src, "rb") as handle:
-                archive.writestr(info, handle.read())
+                data = handle.read()
+            if rel.startswith("bin/"):
+                # Shell scripts must have LF line endings or "#!/bin/sh" fails on the device.
+                data = data.replace(b"\r\n", b"\n")
+            archive.writestr(info, data)
     return target
 
 

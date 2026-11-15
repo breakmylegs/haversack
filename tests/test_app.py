@@ -19,7 +19,7 @@ def make_app(tmp_path, kill_calls):
         plugin_dir=str(tmp_path / "plugin"),
     )
     proc_root = str(tmp_path / "proc")
-    app = KeepsakeApp(paths, proc_root=proc_root)
+    app = KeepsakeApp(paths, proc_root=proc_root, auto_refresh_manifest=False)
     app.freezer._kill = lambda pid, sig: kill_calls.append((pid, sig))
     return app, proc_root
 
@@ -91,7 +91,14 @@ def make_update_app(tmp_path, version, emitted):
     def no_network(url, headers=None):
         raise AssertionError(f"unexpected network call to {url}")
 
-    return KeepsakeApp(paths, emit=emit, proc_root=str(tmp_path / "proc"), version=version, fetch=no_network)
+    return KeepsakeApp(
+        paths,
+        emit=emit,
+        proc_root=str(tmp_path / "proc"),
+        version=version,
+        fetch=no_network,
+        auto_refresh_manifest=False,
+    )
 
 
 def test_update_refused_while_simulated_sync_runs_then_idle_event(tmp_path):
@@ -124,6 +131,69 @@ def test_startup_notice_after_update_is_given_once(tmp_path):
     first, second = asyncio.run(run())
     assert first == {"from": "0.2.0", "to": "0.2.1"}
     assert second is None
+
+
+def make_discovery_app(tmp_path):
+    from helpers import make_fake_steam, shortcut_entry
+
+    home = tmp_path / "home"
+    home.mkdir()
+    root = make_fake_steam(
+        home, users={"7": [shortcut_entry(-123456789, "Example Quest", "/g.exe")]}, prefixes=[(None, APPID)]
+    )
+    paths = PluginPaths(
+        settings_dir=str(tmp_path / "settings"),
+        runtime_dir=str(tmp_path / "runtime"),
+        log_dir=str(tmp_path / "logs"),
+        plugin_dir=str(tmp_path / "plugin"),
+    )
+    app = KeepsakeApp(
+        paths, proc_root=str(tmp_path / "proc"), version="0.3.0", home=str(home), auto_refresh_manifest=False
+    )
+    return app, root
+
+
+def test_discover_games_caches_until_refresh(tmp_path):
+    app, root = make_discovery_app(tmp_path)
+    first = asyncio.run(app.discover_games())
+    assert [g["name"] for g in first["games"]] == ["Example Quest"]
+    (root / "userdata" / "7" / "config" / "shortcuts.vdf").unlink()
+    assert len(asyncio.run(app.discover_games())["games"]) == 1
+    assert asyncio.run(app.discover_games(True))["games"] == []
+
+
+@pytest.mark.parametrize(
+    ("observed", "status", "blocked"),
+    [("same", "match", False), ("/elsewhere/steamapps/compatdata/999", "mismatch", True), (None, "unknown", False)],
+)
+def test_check_running_prefix_records_result(tmp_path, observed, status, blocked):
+    import os
+
+    from keepsake import discovery
+    from keepsake.procs import SHORTCUT_GAMEID_FLAG
+
+    app, root = make_discovery_app(tmp_path)
+    uid = os.getuid() if hasattr(os, "getuid") else -1
+    if observed is not None:
+        compat = str(root / "steamapps" / "compatdata" / str(APPID)) if observed == "same" else observed
+        write_fake_proc(
+            str(tmp_path / "proc"),
+            900,
+            1,
+            "game.exe",
+            uid=uid,
+            env={"SteamGameId": str((APPID << 32) | SHORTCUT_GAMEID_FLAG), "STEAM_COMPAT_DATA_PATH": compat},
+        )
+    key = f"shortcut:7:{APPID}"
+    result = asyncio.run(app.check_running_prefix(key))
+    assert result["status"] == status
+    assert discovery.sync_blocked(app.paths.runtime_dir, key) is blocked
+    assert (key in asyncio.run(app.discover_games())["mismatches"]) is blocked
+
+
+def test_check_running_prefix_unknown_game(tmp_path):
+    app, _ = make_discovery_app(tmp_path)
+    assert asyncio.run(app.check_running_prefix("shortcut:7:1"))["reason"] == "unknown-game"
 
 
 def test_settings_round_trip(tmp_path):

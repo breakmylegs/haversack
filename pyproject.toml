@@ -6,6 +6,7 @@ pythonpath = ["py_modules", "tests"]
 addopts = "-ra"
 markers = [
     "posix: needs Linux or POSIX behaviour (real /proc, signals, symlinks, file modes); run on a device with scripts/test_on_device.py",
+    "onedrive: talks to the real OneDrive app folder; run with scripts/test_on_device.py --onedrive",
 ]
 
 [tool.ruff]
@@ -13,7 +14,16 @@ line-length = 120
 target-version = "py311"
 src = ["py_modules", "tests", "scripts"]
 # decky.pyi is copied verbatim from the plugin template.
-extend-exclude = ["node_modules", "dist", "out", ".venv", "decky.pyi"]
+# The Codehouse-pinned regression file is locked (change only with the owner) and is not valid
+# Python as generated; the same counterexample is pinned in tests/test_restore.py. See the slice 5 report.
+extend-exclude = [
+    "node_modules",
+    "dist",
+    "out",
+    ".venv",
+    "decky.pyi",
+    "tests/test_restore_regression_tmp_path_factory_temppathfactory.py",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "BLE", "S", "RUF"]

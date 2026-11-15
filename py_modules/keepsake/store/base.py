@@ -30,6 +30,10 @@ class NotFoundError(StoreError):
     pass
 
 
+class StoreUnavailable(StoreError):
+    """Network, sign-in or service trouble. Nothing was changed by the failed call."""
+
+
 def validate_key(key: str) -> str:
     if not key or len(key) > MAX_KEY_LENGTH or key.startswith("/") or key.endswith("/"):
         raise StoreError(f"invalid store key: {key!r}")
@@ -61,8 +65,16 @@ class Store(ABC):
         """Create ``key``. Raises :class:`AlreadyExistsError` if it exists."""
 
     @abstractmethod
+    def put_new_file(self, key: str, path: str) -> ObjectInfo:
+        """Create ``key`` from a local file without loading it into memory."""
+
+    @abstractmethod
     def get(self, key: str) -> bytes:
         """Return the object's bytes. Raises :class:`NotFoundError`."""
+
+    @abstractmethod
+    def get_to_file(self, key: str, dest: str) -> ObjectInfo:
+        """Download ``key`` to ``dest``; ``sha256`` is of the bytes received."""
 
     @abstractmethod
     def list(self, prefix: str = "") -> list[ObjectInfo]:

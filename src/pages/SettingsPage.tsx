@@ -1,7 +1,18 @@
-import { DialogButton, Field, Focusable, TextField, ToggleField } from "@decky/ui";
+import { DialogButton, Field, Focusable, Navigation, SliderField, TextField, ToggleField } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { getSettings, setSetting, Settings } from "../backend";
+import { ROUTE_PATH, SETUP_PATH } from "../routes";
+import { CloudSection } from "./CloudSection";
+
+// Build prompt v2 section 10: a placeholder until the module registry arrives in slice 13.
+const MODULES = [
+  { name: "Saves", state: "On", writes: "Save files of the games you choose, and its own settings." },
+  { name: "Advisor", state: "Coming later", writes: "Nothing. It only recommends settings." },
+  { name: "Replication", state: "Coming later", writes: "Games you send between your devices." },
+  { name: "Installer", state: "Coming later", writes: "Games you install with it." },
+  { name: "Desktop", state: "Coming later", writes: "Desktop Mode shortcuts for Keepsake." },
+];
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -52,6 +63,101 @@ export function SettingsPage() {
         disabled={locked}
         onChange={(on) => void save("updateChannel", on ? "prerelease" : "stable", on ? "Pre-release channel on." : "Stable channel on.")}
       />
+      <Field
+        label="Safety gates"
+        description="Snapshots that remove or shrink too much are kept on this device instead of being uploaded. You can make these stricter, not looser."
+      />
+      <SliderField
+        label="Refuse if more than this share of files disappear"
+        value={settings?.gateMaxRemovedPercent ?? 50}
+        min={5}
+        max={50}
+        step={5}
+        showValue
+        disabled={locked}
+        onChange={(v) => void save("gateMaxRemovedPercent", v, `Limit set to ${v}%.`)}
+      />
+      <SliderField
+        label="Refuse if the total size falls by more than"
+        value={settings?.gateMaxSizeDropPercent ?? 70}
+        min={5}
+        max={70}
+        step={5}
+        showValue
+        disabled={locked}
+        onChange={(v) => void save("gateMaxSizeDropPercent", v, `Limit set to ${v}%.`)}
+      />
+      <SliderField
+        label="Launch check timeout (seconds)"
+        description="How long to wait for the cloud before starting the game with the local save."
+        value={settings?.launchPullTimeout ?? 20}
+        min={5}
+        max={60}
+        step={5}
+        showValue
+        disabled={locked}
+        onChange={(v) => void save("launchPullTimeout", v, `Timeout set to ${v} seconds.`)}
+      />
+      <SliderField
+        label="Background sync every (minutes)"
+        description="How often Keepsake downloads newer cloud saves ahead of time and saves changes made outside a game session."
+        value={settings?.idleSyncMinutes ?? 30}
+        min={10}
+        max={240}
+        step={10}
+        showValue
+        disabled={locked}
+        onChange={(v) => void save("idleSyncMinutes", v, `Background sync every ${v} minutes.`)}
+      />
+      <ToggleField
+        label="Show a message after each save"
+        checked={settings?.toastOnSync ?? true}
+        disabled={locked}
+        onChange={(on) => void save("toastOnSync", on, on ? "Save messages on." : "Save messages off.")}
+      />
+      <ToggleField
+        label="Show Steam games"
+        description="Off by default because Steam Cloud usually covers them. When on, Steam games are listed and can be synced one by one. Non-Steam shortcuts are always listed."
+        checked={settings?.showSteamApps ?? false}
+        disabled={locked}
+        onChange={(on) => void save("showSteamApps", on, on ? "Steam games shown." : "Steam games hidden.")}
+      />
+      <ToggleField
+        label="Registry keys"
+        description="Allow games to sync the Proton registry keys their manifest entry lists. Each game still has to turn it on."
+        checked={settings?.registrySync ?? true}
+        disabled={locked}
+        onChange={(on) => void save("registrySync", on, on ? "Registry sync available." : "Registry sync off for all games.")}
+      />
+      <ToggleField
+        label="Detect Steam Cloud"
+        description="Label Steam games that use Steam Cloud, and offer to sync the ones that do not."
+        checked={settings?.steamCloudDetection ?? true}
+        disabled={locked}
+        onChange={(on) => void save("steamCloudDetection", on, on ? "Steam Cloud detection on." : "Steam Cloud detection off.")}
+      />
+      <ToggleField
+        label="Snapshot when the device sleeps"
+        description="Save a snapshot of a running game when the device goes to sleep. Your other device is told about it but never uses it unless you restore it from History."
+        checked={settings?.suspendSnapshots ?? false}
+        disabled={locked}
+        onChange={(on) => void save("suspendSnapshots", on, on ? "Sleep snapshots on." : "Sleep snapshots off.")}
+      />
+      {settings && <CloudSection settings={settings} onSettings={setSettings} />}
+      <Field label="Updates" description="Check for updates, read release notes or go back to an earlier version." childrenLayout="inline">
+        <DialogButton style={{ width: "auto" }} onClick={() => Navigation.Navigate(`${ROUTE_PATH}/updates`)}>
+          Open Updates
+        </DialogButton>
+      </Field>
+      <Field label="Setup" description="Walk through device name, sign-in, scanning and choosing games again." childrenLayout="inline">
+        <DialogButton style={{ width: "auto" }} disabled={locked} onClick={() => Navigation.Navigate(SETUP_PATH)}>
+          Run setup again
+        </DialogButton>
+      </Field>
+      <Field label="Modules" description="Keepsake is growing into several modules. Each says here what it writes." />
+      {MODULES.map((m) => (
+        <Field key={m.name} focusable label={`${m.name}: ${m.state}`} description={`Writes: ${m.writes}`} />
+      ))}
       {settings && <Field label="Device ID" description={settings.deviceId} />}
     </div>
   );

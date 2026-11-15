@@ -35,6 +35,153 @@ class Plugin:
     async def prepare_update(self, tag: str) -> dict[str, Any]:
         return await self.app.prepare_update(tag)
 
+    async def discover_games(self, refresh: bool = False) -> dict[str, Any]:
+        return await self.app.discover_games(refresh)
+
+    async def check_running_prefix(self, key: str) -> dict[str, Any]:
+        return await self.app.check_running_prefix(key)
+
+    async def manifest_status(self) -> dict[str, Any]:
+        return await self.app.manifest_status()
+
+    async def refresh_manifest(self, force: bool = False) -> dict[str, Any]:
+        return await self.app.refresh_manifest(force)
+
+    async def match_games(self) -> list[dict[str, Any]]:
+        return await self.app.match_games()
+
+    async def search_titles(self, query: str) -> list[str]:
+        return await self.app.search_titles(query)
+
+    async def get_game(self, key: str) -> dict[str, Any]:
+        return await self.app.get_game(key)
+
+    async def update_game_config(self, key: str, changes: dict[str, Any]) -> dict[str, Any]:
+        return await self.app.update_game_config(key, changes)
+
+    async def add_custom_path(self, key: str, absolute_path: str) -> dict[str, Any]:
+        return await self.app.add_custom_path(key, absolute_path)
+
+    async def preview_game(self, key: str) -> dict[str, Any]:
+        return await self.app.preview_game(key)
+
+    async def cloud_status(self) -> dict[str, Any]:
+        return await self.app.cloud_status()
+
+    async def start_signin(self, backend: str = "onedrive") -> dict[str, Any]:
+        return await self.app.start_signin(backend)
+
+    async def cancel_signin(self) -> dict[str, Any]:
+        return await self.app.cancel_signin()
+
+    async def sign_out(self, backend: str = "onedrive") -> dict[str, Any]:
+        return await self.app.sign_out(backend)
+
+    async def test_cloud(self, backend: str | None = None) -> dict[str, Any]:
+        return await self.app.test_cloud(backend)
+
+    async def backend_config(self, backend: str) -> dict[str, Any]:
+        return await self.app.backend_config(backend)
+
+    async def set_backend_config(self, backend: str, values: dict[str, Any]) -> dict[str, Any]:
+        return await self.app.set_backend_config(backend, values)
+
+    async def enable_steam_without_cloud(self) -> dict[str, Any]:
+        return await self.app.enable_steam_without_cloud()
+
+    async def on_suspend(self) -> dict[str, Any]:
+        return await self.app.on_suspend()
+
+    async def ludusavi_scan(self, root: str) -> dict[str, Any]:
+        return await self.app.ludusavi_scan(root)
+
+    async def ludusavi_import(self, root: str, folder: str, backup_ids: list[str], game_key: str) -> dict[str, Any]:
+        return await self.app.ludusavi_import(root, folder, backup_ids, game_key)
+
+    async def set_game_key(self, key: str, game_key: str | None, title: str | None = None) -> dict[str, Any]:
+        return await self.app.set_game_key(key, game_key, title)
+
+    async def approve_match(self, key: str) -> dict[str, Any]:
+        return await self.app.approve_match(key)
+
+    async def reject_match(self, key: str) -> dict[str, Any]:
+        return await self.app.reject_match(key)
+
+    async def new_game_key(self, key: str) -> dict[str, Any]:
+        return await self.app.new_game_key(key)
+
+    async def on_game_event(self, kind: str, raw_id: Any) -> dict[str, Any]:
+        return await self.app.on_game_event(kind, raw_id)
+
+    async def strict_wrap(self, key: str, current_options: str) -> dict[str, Any]:
+        return await self.app.strict_wrap(key, current_options)
+
+    async def strict_unwrap(self, key: str, mode: str = "freeze") -> dict[str, Any]:
+        return await self.app.strict_unwrap(key, mode)
+
+    async def sync_pull(self, key: str) -> dict[str, Any]:
+        return await self.app.sync_pull(key)
+
+    async def sync_push(self, key: str) -> dict[str, Any]:
+        return await self.app.sync_push(key)
+
+    async def resolve_conflict(self, key: str, choice: str, head: str | None = None) -> dict[str, Any]:
+        return await self.app.resolve_conflict(key, choice, head)
+
+    async def sync_status(self, key: str) -> dict[str, Any]:
+        return await self.app.sync_status(key)
+
+    async def idle_pass(self) -> list[dict[str, Any]]:
+        return await self.app.idle_pass()
+
+    async def snapshot_game(self, key: str) -> dict[str, Any]:
+        return await self.app.snapshot_game(key)
+
+    async def list_snapshots(self, key: str) -> dict[str, Any]:
+        return await self.app.list_snapshots(key)
+
+    async def restore_snapshot(self, key: str, snap_id: str) -> dict[str, Any]:
+        return await self.app.restore_snapshot(key, snap_id)
+
+    async def undo_restore(self, key: str, prerestore_id: str) -> dict[str, Any]:
+        return await self.app.undo_restore(key, prerestore_id)
+
+    async def pin_snapshot(self, key: str, snap_id: str) -> dict[str, Any]:
+        return await self.app.pin_snapshot(key, snap_id)
+
+    async def release_quarantine(self, key: str, snap_id: str, confirmed: bool) -> dict[str, Any]:
+        return await self.app.release_quarantine(key, snap_id, confirmed)
+
+    async def run_retention(self, key: str) -> dict[str, Any]:
+        return await self.app.run_retention(key)
+
+    async def qam_summary(self) -> dict[str, Any]:
+        return await self.app.qam_summary()
+
+    async def sync_now(self) -> dict[str, Any]:
+        return await self.app.sync_now()
+
+    async def list_conflicts(self) -> list[dict[str, Any]]:
+        return await self.app.list_conflicts()
+
+    async def conflict_details(self, key: str) -> dict[str, Any]:
+        return await self.app.conflict_details(key)
+
+    async def recent_history(self, limit: int = 50) -> dict[str, Any]:
+        return await self.app.recent_history(limit)
+
+    async def plan_sync(self, keys: list[str]) -> list[dict[str, Any]]:
+        return await self.app.plan_sync(keys)
+
+    async def finish_setup(self, keys: list[str]) -> dict[str, Any]:
+        return await self.app.finish_setup(keys)
+
+    async def health_checks(self, probe: bool = True) -> dict[str, Any]:
+        return await self.app.health_checks(probe)
+
+    async def game_config_sync(self, key: str) -> dict[str, Any]:
+        return await self.app.game_config_sync(key)
+
     async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
         return await self.app.simulate_sync_job(seconds)
 

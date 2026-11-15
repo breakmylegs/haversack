@@ -43,6 +43,85 @@ def shortcut_entry(appid_signed: int, name: str, exe: str, start_dir: str = "", 
     }
 
 
+def files_in(roots):
+    """``{root: [rel, ...]}`` for every file under each root, skipping Keepsake's own folders."""
+    out = {}
+    for name, path in roots.items():
+        rels = []
+        for folder, dirs, files in os.walk(path):
+            dirs[:] = [d for d in dirs if not d.startswith(".keepsake-")]
+            for f in files:
+                rels.append(os.path.relpath(os.path.join(folder, f), path).replace(os.sep, "/"))
+        out[name] = sorted(rels)
+    return out
+
+
+def tree_state(roots):
+    """``{(root, rel): bytes}`` for comparing folder contents."""
+    state = {}
+    for name, rels in files_in(roots).items():
+        for rel in rels:
+            with open(os.path.join(roots[name], *rel.split("/")), "rb") as handle:
+                state[(name, rel)] = handle.read()
+    return state
+
+
+def write_tree(roots, state):
+    for (name, rel), data in state.items():
+        path = os.path.join(roots[name], *rel.split("/"))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as handle:
+            handle.write(data)
+
+
+STEAMID64_BASE = 76561197960265728
+
+
+def make_fake_steam(home, users=None, apps=None, extra_libraries=(), most_recent=None, prefixes=()):
+    """Build a synthetic Steam install under ``home`` and return its root.
+
+    ``users`` maps id3 to a list of shortcut entries (see ``shortcut_entry``).
+    ``apps`` is a list of ``(library_or_None, appid, name, installdir)``; None
+    means the base library. ``prefixes`` is a list of ``(library_or_None, id)``
+    that get a ``compatdata/<id>/pfx`` folder.
+    """
+    root = home / ".local" / "share" / "Steam"
+    (root / "steamapps").mkdir(parents=True)
+    lines = ['"libraryfolders"', "{", f'"0" {{ "path" "{root.as_posix()}" }}']
+    for i, lib in enumerate(extra_libraries, start=1):
+        (lib / "steamapps").mkdir(parents=True, exist_ok=True)
+        lines.append(f'"{i}" {{ "path" "{lib.as_posix()}" }}')
+    lines.append("}")
+    (root / "steamapps" / "libraryfolders.vdf").write_text("\n".join(lines))
+
+    login = ['"users"', "{"]
+    for id3, shortcuts in (users or {}).items():
+        config = root / "userdata" / id3 / "config"
+        config.mkdir(parents=True)
+        if shortcuts is not None:
+            (config / "shortcuts.vdf").write_bytes(
+                dumps_binary_vdf({"shortcuts": {str(i): s for i, s in enumerate(shortcuts)}})
+            )
+        flag = "1" if id3 == most_recent else "0"
+        login.append(
+            f'"{int(id3) + STEAMID64_BASE}" {{ "AccountName" "acct{id3}" "MostRecent" "{flag}" "Timestamp" "1" }}'
+        )
+    login.append("}")
+    (root / "config").mkdir(exist_ok=True)
+    (root / "config" / "loginusers.vdf").write_text("\n".join(login))
+
+    for library, appid, name, installdir in apps or []:
+        lib = library or root
+        (lib / "steamapps" / "common" / installdir).mkdir(parents=True, exist_ok=True)
+        (lib / "steamapps" / f"appmanifest_{appid}.acf").write_text(
+            f'"AppState" {{ "appid" "{appid}" "name" "{name}" "installdir" "{installdir}" "LastPlayed" "1700000000" }}'
+        )
+    for library, appid in prefixes:
+        lib = library or root
+        (lib / "steamapps" / "compatdata" / str(appid) / "pfx").mkdir(parents=True)
+    return root
+
+
 def write_fake_proc(
     root: str,
     pid: int,

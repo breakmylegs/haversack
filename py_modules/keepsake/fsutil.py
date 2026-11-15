@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
 from typing import Any
 
 PRIVATE_FILE_MODE = 0o600
@@ -25,7 +26,7 @@ def atomic_write_bytes(path: str, data: bytes, mode: int = PRIVATE_FILE_MODE) ->
             handle.flush()
             os.fsync(handle.fileno())
         os.chmod(tmp, mode)
-        os.replace(tmp, path)
+        _replace(tmp, path)
     except BaseException:
         try:
             os.unlink(tmp)
@@ -33,6 +34,24 @@ def atomic_write_bytes(path: str, data: bytes, mode: int = PRIVATE_FILE_MODE) ->
             pass
         raise
     _fsync_dir(folder)
+
+
+def _replace(src: str, dst: str) -> None:
+    """``os.replace``, retried briefly on Windows where scanners can hold a file open.
+
+    On Linux (the devices) this is a single atomic rename.
+    """
+    if os.name != "nt":
+        os.replace(src, dst)
+        return
+    for attempt in range(10):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if attempt == 9:
+                raise
+            time.sleep(0.05)
 
 
 def atomic_write_json(path: str, value: Any, mode: int = PRIVATE_FILE_MODE) -> None:
