@@ -18,8 +18,16 @@ export interface Settings {
   idleSyncMinutes: number;
   showSteamApps: boolean;
   setupComplete: boolean;
+  registrySync: boolean;
+  steamCloudDetection: boolean;
+  suspendSnapshots: boolean;
   readOnly: boolean;
 }
+
+export type SteamCloud = "cloud" | "no-cloud" | "unknown" | null;
+
+export const onSuspend = callable<[], { started: number }>("on_suspend");
+export const enableSteamWithoutCloud = callable<[], { enabled: string[] }>("enable_steam_without_cloud");
 
 export type Backend = "local" | "onedrive" | "gdrive" | "webdav" | "s3";
 
@@ -272,6 +280,8 @@ export interface GameMatch extends MatchInfo {
   proposal?: { candidate: { gameKey: string; title: string | null } } | null;
   enabled: boolean;
   sync: SyncWord;
+  steamCloud: SteamCloud;
+  hasRegistry: boolean;
 }
 
 export interface CustomPath {
@@ -289,6 +299,7 @@ export interface GameConfig {
   launchGate: "freeze" | "strict" | "off";
   gameKey: string | null;
   gameKeySource: "user" | "auto" | null;
+  syncRegistry: boolean;
 }
 
 export interface IdentitySuggestion {
@@ -461,6 +472,8 @@ export const getGame = callable<
     match: MatchInfo;
     suggestions: IdentitySuggestion[];
     proposal: MatchProposal | null;
+    hasRegistry: boolean;
+    steamCloud: SteamCloud;
   }
 >("get_game");
 export const updateGameConfig = callable<[key: string, changes: Partial<GameConfig>], GameConfig>(

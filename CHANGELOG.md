@@ -2,6 +2,16 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [0.11.0]
+
+Slice 11: registry saves, Steam Cloud detection and sleep snapshots. Each has its own setting.
+
+### Added
+
+- Games that keep save data in the Proton registry can sync those keys ("Sync registry keys" on the game page, off by default). Only the keys the save-location manifest lists are touched, only while the game is closed, with a backup, and the file is checked before and after so it cannot be left damaged.
+- Steam games are labelled when they use Steam Cloud, and "Sync them all" turns on Keepsake for played Steam games that have no Steam Cloud saves.
+- Optional sleep snapshots: when the device goes to sleep during a game, its progress is saved. Your other device tells you about it but only uses it if you restore it from History.
+
 ## [0.10.0]
 
 Slice 10: more cloud backends and the Ludusavi import.

@@ -122,6 +122,27 @@ export function SettingsPage() {
         disabled={locked}
         onChange={(on) => void save("showSteamApps", on, on ? "Steam games shown." : "Steam games hidden.")}
       />
+      <ToggleField
+        label="Registry keys"
+        description="Allow games to sync the Proton registry keys their manifest entry lists. Each game still has to turn it on."
+        checked={settings?.registrySync ?? true}
+        disabled={locked}
+        onChange={(on) => void save("registrySync", on, on ? "Registry sync available." : "Registry sync off for all games.")}
+      />
+      <ToggleField
+        label="Detect Steam Cloud"
+        description="Label Steam games that use Steam Cloud, and offer to sync the ones that do not."
+        checked={settings?.steamCloudDetection ?? true}
+        disabled={locked}
+        onChange={(on) => void save("steamCloudDetection", on, on ? "Steam Cloud detection on." : "Steam Cloud detection off.")}
+      />
+      <ToggleField
+        label="Snapshot when the device sleeps"
+        description="Save a snapshot of a running game when the device goes to sleep. Your other device is told about it but never uses it unless you restore it from History."
+        checked={settings?.suspendSnapshots ?? false}
+        disabled={locked}
+        onChange={(on) => void save("suspendSnapshots", on, on ? "Sleep snapshots on." : "Sleep snapshots off.")}
+      />
       {settings && <CloudSection settings={settings} onSettings={setSettings} />}
       <Field label="Updates" description="Check for updates, read release notes or go back to an earlier version." childrenLayout="inline">
         <DialogButton style={{ width: "auto" }} onClick={() => Navigation.Navigate(`${ROUTE_PATH}/updates`)}>

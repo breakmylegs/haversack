@@ -2,7 +2,7 @@ import { ConfirmModal, DialogButton, Field, Focusable, showModal } from "@decky/
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { HistoryItem, pinSnapshot, recentHistory, releaseQuarantine, restoreSnapshot } from "../backend";
-import { isoText, sizeText } from "../format";
+import { isoText, kindText, sizeText } from "../format";
 
 function describe(s: HistoryItem): string {
   const flags = [
@@ -11,7 +11,7 @@ function describe(s: HistoryItem): string {
     s.pinned ? "pinned" : "",
     s.pruned ? "files pruned" : "",
   ].filter(Boolean);
-  return `${isoText(s.created)}, ${s.kind}, ${s.device ?? "unknown device"}, ${s.files} files, ${sizeText(s.bytes)}${flags.length ? `. ${flags.join(", ")}` : ""}`;
+  return `${isoText(s.created)}, ${kindText(s.kind)}, ${s.device ?? "unknown device"}, ${s.files} files, ${sizeText(s.bytes)}${flags.length ? `. ${flags.join(", ")}` : ""}`;
 }
 
 export function HistoryPage() {

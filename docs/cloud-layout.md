@@ -43,6 +43,8 @@ Objects are never empty (OneDrive upload sessions cannot create empty files).
 - `contentHash` is SHA-256 over one line per file, sorted by root then path: `root NUL rel NUL size NUL sha256 LF`.
 - `kind` is one of `auto-exit`, `auto-recovered`, `manual`, `merge`, `import`, `provisional`.
 - `import` snapshots (Ludusavi backups, flag `ludusavi`, `created` is the backup's own time) have no parents and are never heads: they are history to restore from by hand and never take part in the decision table (ADR-0021).
+- `provisional` snapshots (flag `suspend`) are taken when a device sleeps mid-session. They are never heads, and their parents do not stop the head they were taken on from being a head (ADR-0022).
+- Root `registry` holds one file, `user.reg`: the canonical fragment of the game's manifest-listed registry keys, in Wine format without timestamps (ADR-0022).
 - The same layout is used on every backend: OneDrive's app folder, Google Drive's hidden app data folder (objects named by their full key), a WebDAV folder, or an S3 bucket below the configured prefix.
 - `root` is one of `winAppData`, `winLocalAppData`, `winLocalAppDataLow`, `winDocuments`, `winSavedGames`, `winPublic`, `winProgramData`, `base`, `home`, `xdgData`, `xdgConfig`, `steamUserdata`, `registry`.
 - A plugin never writes to a game whose metadata uses a newer `schemaVersion` than it understands.

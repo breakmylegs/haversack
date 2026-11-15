@@ -12,6 +12,7 @@ import {
   SnapshotSummary,
   undoRestore,
 } from "../backend";
+import { kindText } from "../format";
 
 function sizeText(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -20,7 +21,7 @@ function sizeText(bytes: number): string {
 
 function describe(s: SnapshotSummary): string {
   const flags = [s.base ? "current base" : "", s.pinned ? "pinned" : "", s.pruned ? "files pruned" : ""].filter(Boolean);
-  return `${s.created.replace("T", " ").replace("Z", "")}, ${s.kind}, ${s.device ?? "unknown device"}, ${s.files} files, ${sizeText(s.bytes)}${flags.length ? `. ${flags.join(", ")}` : ""}`;
+  return `${s.created.replace("T", " ").replace("Z", "")}, ${kindText(s.kind)}, ${s.device ?? "unknown device"}, ${s.files} files, ${sizeText(s.bytes)}${flags.length ? `. ${flags.join(", ")}` : ""}`;
 }
 
 // History for one game: restore, pin, release quarantine and undo, plus the last sync per device.

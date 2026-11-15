@@ -36,6 +36,9 @@ WIN_ROOTS = (
 )
 NATIVE_ROOTS = ("home", "xdgData", "xdgConfig")
 ALL_ROOTS = (*WIN_ROOTS, "base", *NATIVE_ROOTS, "steamUserdata")
+# Snapshots may also hold the registry fragment (registry/user.reg, ADR-0022). It is not a folder
+# the user can point custom paths at, so it is not in ALL_ROOTS.
+SNAPSHOT_ROOTS = (*ALL_ROOTS, "registry")
 
 _STEAMUSER = ("drive_c", "users", "steamuser")
 _WIN_PATHS = {

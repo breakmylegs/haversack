@@ -18,7 +18,20 @@ import zipfile
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from . import configrev, diagnostics, discovery, health, identity, lifecycle, manifest, net, resolve, restore
+from . import (
+    configrev,
+    diagnostics,
+    discovery,
+    health,
+    identity,
+    lifecycle,
+    manifest,
+    net,
+    registry,
+    resolve,
+    restore,
+    steamcloud,
+)
 from .auth import GOOGLE, AuthError, DeviceCodeFlow, TokenManager, TokenStore
 from .backends import BackendConfigError, CredentialStore
 from .engine import SnapshotEngine
@@ -285,9 +298,60 @@ class KeepsakeApp:
                     "proposal": proposal,
                     "enabled": bool(config.get("enabled")),
                     "sync": status_word(state) if config.get("enabled") else "off",
+                    "steamCloud": self._steam_cloud(game),
+                    "hasRegistry": bool(
+                        index and match.get("title") and index["games"].get(match["title"], {}).get("r")
+                    ),
                 }
             )
         return out
+
+    def _steam_cloud(self, game: dict[str, Any]) -> str | None:
+        """Steam Cloud state for Steam apps when detection is on (slice 11), else None."""
+        if game["kind"] != "steam" or not self.settings.get("steamCloudDetection"):
+            return None
+        return steamcloud.cloud_state(
+            game.get("steam_root"), game.get("default_user"), int(game["appid"]), int(game.get("last_played") or 0)
+        )
+
+    async def enable_steam_without_cloud(self) -> dict[str, Any]:
+        """Turn on sync for every matched Steam app that has been played and has no Steam Cloud saves."""
+        if not self.settings.get("steamCloudDetection"):
+            raise ValueError("Steam Cloud detection is off in Settings")
+        enabled = []
+        for game, config, gk in await self._matched():
+            if gk and not config.get("enabled") and self._steam_cloud(game) == steamcloud.NO_CLOUD:
+                await self.update_game_config(game["key"], {"enabled": True})
+                enabled.append(game["name"])
+        log_event(logging.INFO, "steamcloud.bulk_enable", "Enabled Steam games without Steam Cloud", count=len(enabled))
+        return {"enabled": enabled}
+
+    # Suspend snapshots (slice 11, ADR-0022)
+
+    async def on_suspend(self) -> dict[str, Any]:
+        """The device is about to sleep: snapshot running synced games as provisional snapshots."""
+        if not self.settings.get("suspendSnapshots"):
+            return {"started": 0}
+        states = self._sync().state.games()
+        started = 0
+        for game, config, gk in await self._matched():
+            if config.get("enabled") and gk and (states.get(gk) or {}).get("sessionOpen"):
+                self._background.append(asyncio.create_task(self._suspend_snapshot(game)))
+                started += 1
+        return {"started": started}
+
+    async def _suspend_snapshot(self, game: dict[str, Any]) -> dict[str, Any]:
+        try:
+            ctx = await self._sync_context(game["key"], running=lambda: True)  # never restore here
+            with self.jobs.job("sync"):
+                result = await asyncio.to_thread(self._sync().provisional, ctx)
+        except (ValueError, SnapshotError, StoreError) as exc:
+            log_event(
+                logging.WARNING, "suspend.snapshot_failed", "Suspend snapshot skipped", key=game["key"], error=str(exc)
+            )
+            return {"status": "error", "error": str(exc)}
+        log_event(logging.INFO, "suspend.snapshot", "Suspend snapshot", key=game["key"], status=result.get("status"))
+        return result
 
     # Match proposals: likely but uncertain matches wait for the user's approval.
 
@@ -442,7 +506,16 @@ class KeepsakeApp:
         ):
             suggestions = [c for c in await self.identity_candidates(game, index) if c["score"] >= 3][:5]
         proposal = self._proposals().get("open", {}).get(key)
-        return {"game": game, "config": config, "match": match, "suggestions": suggestions, "proposal": proposal}
+        record = index["games"].get(match["title"]) if index and match.get("title") else None
+        return {
+            "game": game,
+            "config": config,
+            "match": match,
+            "suggestions": suggestions,
+            "proposal": proposal,
+            "hasRegistry": bool(record and record.get("r") and game.get("prefix")),
+            "steamCloud": self._steam_cloud(game),
+        }
 
     async def update_game_config(self, key: str, changes: dict[str, Any]) -> dict[str, Any]:
         await self._game(key)
@@ -702,15 +775,100 @@ class KeepsakeApp:
         scan = await asyncio.to_thread(resolve.preview, game, match["title"], record, config, self.home, 0, True)
         if scan.get("truncated"):
             raise ValueError("too many files to snapshot safely; add exclusions")
-        roots = resolve.logical_roots(game, home=self.home)
+        roots: dict[str, str | None] = dict(resolve.logical_roots(game, home=self.home))
+        files = dict(scan.get("files", {}))
+        reg_keys = self._registry_keys(game, record, config)
+        if reg_keys:
+            roots["registry"] = self._registry_dir(match["gameKey"])
+            exported = await asyncio.to_thread(self._export_registry, game, reg_keys, match["gameKey"])
+            if exported:
+                files["registry"] = exported
         procs = await asyncio.to_thread(find_game_processes, int(game["appid"]), game.get("prefix"), self.proc_root)
         return {
             "game": game,
             "gameKey": match["gameKey"],
-            "files": scan.get("files", {}),
+            "files": files,
             "roots": roots,
             "running": bool(procs),
+            "registryKeys": reg_keys,
         }
+
+    # Registry keys (slice 11, ADR-0022): exported into a fragment for snapshots, merged back after restores
+
+    def _registry_keys(self, game: dict[str, Any], record: dict[str, Any] | None, config: dict[str, Any]) -> list[str]:
+        if (
+            not self.settings.get("registrySync")
+            or not config.get("syncRegistry")
+            or not record
+            or not game.get("prefix")
+        ):
+            return []
+        keys = []
+        for entry in record.get("r", []):
+            path, tags = str(entry[0]), str(entry[1])
+            if "s" in tags or (config.get("includeConfig") and "c" in tags):
+                mapped = registry.hive_and_key(path)
+                if mapped and mapped[0] == "user.reg":
+                    keys.append(mapped[1])
+        return sorted(set(keys))
+
+    def _registry_dir(self, game_key: str) -> str:
+        path = os.path.join(self.paths.runtime_dir, "registry", game_key)
+        os.makedirs(path, exist_ok=True)
+        return path
+
+    @staticmethod
+    def _user_reg(game: dict[str, Any]) -> str:
+        return os.path.join(str(game["prefix"]), "pfx", "user.reg")
+
+    def _export_registry(self, game: dict[str, Any], keys: list[str], game_key: str) -> list[str]:
+        """Write the managed keys' fragment to Keepsake's staging folder. Fails closed on an unreadable file."""
+        target = os.path.join(self._registry_dir(game_key), "user.reg")
+        source = self._user_reg(game)
+        fragment = None
+        if os.path.isfile(source):
+            try:
+                fragment = registry.export(registry.read_text(source), keys)
+            except registry.RegistryError as exc:
+                raise SnapshotError(f"user.reg could not be read safely: {exc}") from exc
+        if fragment is None:
+            if os.path.exists(target):
+                os.unlink(target)
+            return []
+        current = None
+        if os.path.exists(target):
+            with open(target, encoding="utf-8") as handle:
+                current = handle.read()
+        if current != fragment:
+            with open(target, "w", encoding="utf-8", newline="") as handle:
+                handle.write(fragment)
+        return ["user.reg"]
+
+    def _merge_registry(self, game: dict[str, Any], keys: list[str], game_key: str) -> dict[str, str]:
+        """Apply a restored fragment to user.reg. A snapshot without registry keys changes nothing."""
+        fragment_path = os.path.join(self._registry_dir(game_key), "user.reg")
+        target = self._user_reg(game)
+        if not keys or not os.path.isfile(fragment_path) or not os.path.isfile(target):
+            return {"status": "skipped"}
+        if find_game_processes(int(game["appid"]), game.get("prefix"), self.proc_root):
+            raise SnapshotError("the game is running; registry keys are only written while it is closed")
+        with open(fragment_path, encoding="utf-8") as handle:
+            fragment = handle.read()
+        backups = os.path.join(self.paths.runtime_dir, "registry-backups", game_key)
+        result = registry.merge_file(target, fragment, keys, backups)
+        log_event(logging.INFO, "registry.merge", "Registry keys restored", gameKey=game_key, status=result["status"])
+        return result
+
+    async def _after_restore(self, ctx: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
+        if not ctx.get("registryKeys"):
+            return result
+        try:
+            merged = await asyncio.to_thread(self._merge_registry, ctx["game"], ctx["registryKeys"], ctx["gameKey"])
+        except (registry.RegistryError, SnapshotError, OSError) as exc:
+            log_event(logging.WARNING, "registry.merge_failed", "Registry keys not restored", error=str(exc))
+            await self.emit("keepsake_toast", f"Save files restored, but registry keys were left unchanged: {exc}")
+            return {**result, "registry": "failed"}
+        return {**result, "registry": merged["status"]}
 
     async def snapshot_game(self, key: str) -> dict[str, Any]:
         ctx = await self._snapshot_context(key)
@@ -772,6 +930,7 @@ class KeepsakeApp:
             result = await asyncio.to_thread(
                 eng.restore, ctx["gameKey"], str(snap_id), ctx["files"], ctx["roots"], ctx["running"]
             )
+            result = await self._after_restore(ctx, result)
         self._set_base(ctx["gameKey"], str(snap_id))
         log_event(
             logging.INFO, "snapshot.restore", "Snapshot restored", gameKey=ctx["gameKey"], status=result["status"]
@@ -785,6 +944,7 @@ class KeepsakeApp:
             result = await asyncio.to_thread(
                 eng.restore_prerestore, ctx["gameKey"], str(prerestore_id), ctx["files"], ctx["roots"], ctx["running"]
             )
+            result = await self._after_restore(ctx, result)
         log_event(logging.INFO, "snapshot.undo", "Restore undone", gameKey=ctx["gameKey"], status=result["status"])
         return result
 
@@ -835,11 +995,22 @@ class KeepsakeApp:
         match = manifest.match_game(index, game, config)
         record = index.get("games", {}).get(match["title"]) if match.get("title") else None
 
+        reg_keys = ctx["registryKeys"]
+
         def files() -> dict[str, list[str]]:
             scan = resolve.preview(game, match["title"], record, config, self.home, 0, True)
             if scan.get("truncated"):
                 raise SnapshotError("too many files to sync safely; add exclusions")
-            return dict(scan.get("files", {}))
+            found = dict(scan.get("files", {}))
+            if reg_keys:
+                exported = self._export_registry(game, reg_keys, ctx["gameKey"])
+                if exported:
+                    found["registry"] = exported
+            return found
+
+        def after_restore() -> None:
+            if reg_keys:
+                self._merge_registry(game, reg_keys, ctx["gameKey"])
 
         def processes_running() -> bool:
             return bool(find_game_processes(int(game["appid"]), game.get("prefix"), self.proc_root))
@@ -850,7 +1021,7 @@ class KeepsakeApp:
                 str(self.settings.get("deviceId")),
                 match.get("title"),
                 identity.local_hints(game),
-                identity.save_dirs(files()),
+                identity.save_dirs({root: rels for root, rels in files().items() if root != "registry"}),
             )
 
         return GameContext(
@@ -859,6 +1030,7 @@ class KeepsakeApp:
             roots=ctx["roots"],
             running=running or processes_running,
             identity=identity_record,
+            after_restore=after_restore,
         )
 
     # Lifecycle (slice 8): launch gate and exit push
@@ -965,6 +1137,14 @@ class KeepsakeApp:
         return found
 
     async def _announce_pull(self, game: dict[str, Any], result: dict[str, Any]) -> None:
+        suspended = result.get("suspended")
+        if suspended:
+            # Never adopted without the user: they choose to restore it from History.
+            await self.emit(
+                "keepsake_toast",
+                f"{suspended.get('device') or 'Another device'} went to sleep while playing {game['name']}. "
+                "Its unsaved progress is in History as a suspend snapshot.",
+            )
         if result.get("action") == "conflict":
             await self.emit("keepsake_toast", f"Save conflict for {game['name']}. Open Keepsake to choose.")
         elif result.get("reason") == "cloud-newer-game-running":

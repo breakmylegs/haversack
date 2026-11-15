@@ -1,7 +1,7 @@
 // Forward Steam game start and exit to the backend, which runs the launch gate and the exit save.
 // The backend normalises any ID shape (32-bit, signed, or 64-bit shortcut game ID) and ignores
 // games that are not synced, so every event can be forwarded as is (ADR-0001).
-import { onGameEvent } from "./backend";
+import { onGameEvent, onSuspend } from "./backend";
 
 type Unregister = () => void;
 
@@ -21,6 +21,12 @@ export function startLifecycle(): Unregister {
   try {
     // Fires before the game's processes exist, so the gate can start polling early.
     handles.push(SteamClient.Apps.RegisterForGameActionStart((_actionId, appId) => forward("start", appId)));
+  } catch {
+    // Missing in this Steam client.
+  }
+  try {
+    // Slice 11: provisional snapshots of running games when the device sleeps (if enabled in Settings).
+    handles.push(SteamClient.System.RegisterForOnSuspendRequest(() => onSuspend().catch(() => undefined)));
   } catch {
     // Missing in this Steam client.
   }

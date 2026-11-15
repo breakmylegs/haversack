@@ -12,6 +12,7 @@ import {
   Preview,
   previewGame,
   searchTitles,
+  SteamCloud,
   updateGameConfig,
 } from "../backend";
 import { IdentityPanel } from "./IdentityPanel";
@@ -51,6 +52,8 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
   const [results, setResults] = useState<string[]>([]);
   const [exclusions, setExclusions] = useState("");
   const [busy, setBusy] = useState(false);
+  const [hasRegistry, setHasRegistry] = useState(false);
+  const [steamCloud, setSteamCloud] = useState<SteamCloud>(null);
 
   const load = async () => {
     const data = await getGame(gameKey);
@@ -59,6 +62,8 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
     setMatch(data.match);
     setSuggestions(data.suggestions ?? []);
     setProposal(data.proposal ?? null);
+    setHasRegistry(Boolean(data.hasRegistry));
+    setSteamCloud(data.steamCloud ?? null);
     setExclusions(data.config.exclusions.join(", "));
     setQuery(data.game.name);
   };
@@ -162,6 +167,26 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
         checked={config.includeConfig}
         onChange={(on) => void change({ includeConfig: on }, on ? "Config files included." : "Config files excluded.")}
       />
+      {hasRegistry && (
+        <ToggleField
+          label="Sync registry keys"
+          description="This game keeps some of its data in the Proton registry. When on, those keys are saved with the game and put back when a save is restored, only while the game is closed, with a backup. Other registry keys are never touched. Shared with your other devices."
+          checked={config.syncRegistry}
+          onChange={(on) => void change({ syncRegistry: on }, on ? "Registry keys will be synced." : "Registry keys will not be synced.")}
+        />
+      )}
+      {steamCloud && (
+        <Field
+          label="Steam Cloud"
+          description={
+            steamCloud === "cloud"
+              ? "This game uses Steam Cloud, which already keeps its saves in step. Keepsake is not needed for it."
+              : steamCloud === "no-cloud"
+                ? "No Steam Cloud saves found for this game. Keepsake can sync it."
+                : "Not played yet, so Steam Cloud use is unknown."
+          }
+        />
+      )}
 
       <Field label="Custom paths" description="Extra folders to sync, inside this game's save folders." childrenLayout="below">
         {config.customPaths.map((p, i) => (

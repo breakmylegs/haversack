@@ -35,6 +35,7 @@ DEFAULT: dict[str, Any] = {
     "launchGate": "freeze",
     "gameKey": None,
     "gameKeySource": None,
+    "syncRegistry": False,  # slice 11: off by default per game
 }
 
 
@@ -109,6 +110,9 @@ def validate(config: dict[str, Any]) -> dict[str, Any]:
     if source not in (None, "user", "auto"):
         raise GameConfigError("invalid game key source")
     out["gameKeySource"] = source if key else None
+    if not isinstance(config.get("syncRegistry", False), bool):
+        raise GameConfigError("syncRegistry must be true or false")
+    out["syncRegistry"] = config.get("syncRegistry", False)
     return out
 
 

@@ -39,6 +39,10 @@ DEFAULTS: dict[str, Any] = {
     "idleSyncMinutes": 30,
     "showSteamApps": False,
     "setupComplete": False,
+    # Slice 11 features, each behind its own setting.
+    "registrySync": True,  # available; each game still opts in (off by default per game)
+    "steamCloudDetection": True,
+    "suspendSnapshots": False,
 }
 
 # Keys the frontend may change. deviceId and schemaVersion are managed here.
@@ -55,6 +59,9 @@ USER_KEYS = frozenset(
         "idleSyncMinutes",
         "showSteamApps",
         "setupComplete",
+        "registrySync",
+        "steamCloudDetection",
+        "suspendSnapshots",
     }
 )
 IDLE_MINUTES_RANGE = (10, 240)
@@ -145,7 +152,14 @@ def _validate(key: str, value: Any) -> Any:
         if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
             raise SettingsError(f"the idle sync interval is {low} to {high} minutes")
         return value
-    if key in ("toastOnSync", "showSteamApps", "setupComplete"):
+    if key in (
+        "toastOnSync",
+        "showSteamApps",
+        "setupComplete",
+        "registrySync",
+        "steamCloudDetection",
+        "suspendSnapshots",
+    ):
         if not isinstance(value, bool):
             raise SettingsError("must be true or false")
         return value

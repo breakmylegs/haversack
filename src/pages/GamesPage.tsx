@@ -6,6 +6,7 @@ import {
   checkRunningPrefix,
   discoverGames,
   DiscoveryResult,
+  enableSteamWithoutCloud,
   GameEntry,
   GameMatch,
   getSettings,
@@ -76,6 +77,7 @@ export function GamesPage() {
   const [status, setStatus] = useState<ManifestStatus | null>(null);
   const [filter, setFilter] = useState<Filter>("shortcuts");
   const [showSteam, setShowSteam] = useState(false);
+  const [cloudDetection, setCloudDetection] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +100,10 @@ export function GamesPage() {
 
   useEffect(() => {
     getSettings()
-      .then((s) => setShowSteam(s.showSteamApps))
+      .then((s) => {
+        setShowSteam(s.showSteamApps);
+        setCloudDetection(s.steamCloudDetection);
+      })
       .catch(() => undefined);
     void scan(false);
   }, []);
@@ -179,6 +184,25 @@ export function GamesPage() {
           {refreshing ? "Updating manifest" : "Update manifest"}
         </DialogButton>
       </Focusable>
+      {showSteam && cloudDetection && Object.values(matches).some((m) => m.steamCloud === "no-cloud" && !m.enabled) && (
+        <Field
+          label={`${Object.values(matches).filter((m) => m.steamCloud === "no-cloud" && !m.enabled).length} Steam games have no Steam Cloud saves`}
+          description="Keepsake can sync them like your non-Steam games."
+          childrenLayout="inline"
+        >
+          <DialogButton
+            style={{ width: "auto" }}
+            disabled={scanning}
+            onClick={() =>
+              void enableSteamWithoutCloud()
+                .then((r) => toaster.toast({ title: "Keepsake", body: `Sync turned on for ${r.enabled.length} Steam games.` }))
+                .then(() => scan(false))
+            }
+          >
+            Sync them all
+          </DialogButton>
+        </Field>
+      )}
       {error && <Field label="Scan failed" description={error} />}
       {result && result.roots.length === 0 && <Field label="No Steam installation found" />}
       {Object.values(matches).some((m) => m.proposal) && (
@@ -200,6 +224,8 @@ export function GamesPage() {
           game.kind === "shortcut" && !game.is_default_user ? "other Steam user" : "",
           mismatch ? "PREFIX MISMATCH, sync blocked" : "",
           running ? "running" : "",
+          matches[game.key]?.steamCloud === "cloud" ? "uses Steam Cloud" : "",
+          matches[game.key]?.steamCloud === "no-cloud" ? "no Steam Cloud" : "",
           ...game.notes,
         ].filter(Boolean);
         return (
