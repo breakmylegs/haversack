@@ -10,6 +10,12 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 - When a match is likely but not certain, Keepsake asks: approve it, choose another, or say it is not this game (that answer is remembered).
 - Games the save-location manifest does not know can be given their own game key and synced through custom folders.
 
+## [Unreleased]
+
+### Documentation
+
+- Slice C0: plan for Keepsake v2, one plugin with five modules (Saves, Advisor, Replication, Installer, Desktop). No change to the plugin itself. See `docs/plan.md`.
+
 ## [0.8.0]
 
 Slice 8: lifecycle integration. Saves now sync on their own when you start and quit a game.

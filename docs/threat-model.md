@@ -52,3 +52,24 @@ Status values: **planned** (mitigation designed, not built yet), **partial** (so
 | T40 | A wrong automatic cross-device match links two different games | Automatic only with a high score, two strong signals, a clear lead and an unused key; shown with its evidence and changeable; a wrong match still cannot overwrite saves silently (adoption conflict, pre-restore snapshots) | in place, ADR-0011, `tests/test_identity.py` |
 | T41 | Identity records leak device details | Only file and folder names, normalised names and relative save folders; no absolute paths, usernames or compatdata IDs | in place, ADR-0011 |
 | T19 | Decky's installer extracts the zip with `ZipFile.extractall` | Decky's own responsibility; our release zips are built deterministically by `scripts/package.py` with safe entry names | accepted, noted |
+
+## v2 additions (slice C0)
+
+From `docs/build-prompt-v2.md` section 13. The spec numbers these T16 to T29, but v1 already uses T16 to T41, so they are renumbered T42 to T55 (ADR-0014, conflict C6). All are **planned**: C0 adds no code.
+
+| ID | Spec ID | Threat | Mitigation | Status | Slice |
+|---|---|---|---|---|---|
+| T42 | T16 | Rogue LAN device or pairing interception | Listener off by default and bound to selected interfaces; user-started, time-boxed, rate-limited pairing with a 6-digit code; pinned peers; authenticated encryption with stdlib `ssl` only (ADR-0016) | planned | 16, 17 |
+| T43 | T17 | Malicious manifest paths from a peer | Central path validator, canonical relative paths, rejection of absolute paths, `..`, case-only collisions and symlinks resolving outside the root; symlinks never followed | planned | 18 |
+| T44 | T18 | A partially transferred game is promoted | Staging, verification against the manifest root hash before an atomic promote, replaced files held until the job completes, rollback | planned | 18 |
+| T45 | T19 | Replication overwrites saves | P14 exclusions enforced in the path validator, per-game lock (P19), Saves source checkpoint before send, cross-module invariant test | planned | 13, 18 to 20 |
+| T46 | T20 | A Steam shortcut corrupted by API calls | Only `SteamClient` APIs after a user action, originals stored first, every field read back, retries, restore originals on failure (ADR-0015) | planned | 13, 19, 21 |
+| T47 | T21 | The loopback web UI attacked by a malicious web page (DNS rebinding, CSRF) | `127.0.0.1` binding, `Host` validation, CSRF tokens, no CORS (ADR-0017) | planned | 23 |
+| T48 | T22 | Login token leakage | One-time, short-lived login URLs exchanged for a session cookie; never logged | planned | 23, 24 |
+| T49 | T23 | Personal data sent to AI providers | P18 payload rules and a payload-inspecting test (ADR-0019) | planned | 15 |
+| T50 | T24 | AI or SteamGridDB key theft | Mode `0600` storage, never sent to the frontend, logs, events or diagnostics; redaction tests | planned | 15, 22 |
+| T51 | T25 | A malicious installer executable | **Accepted risk**, to be signed off by the owner: a Wine prefix is not a sandbox. Documented in the README | planned (accepted) | 21 |
+| T52 | T26 | The tray persists after the module is disabled or the plugin is uninstalled | Removal on disable and in `_uninstall`, plus a health check for a stale autostart entry | planned | 24 |
+| T53 | T27 | Licence contamination from ported code | C0 audit (`docs/advisor-port-audit.md`), escalation before porting, no fixture with third-party content, no CapyDeploy or GPL code (ADR-0013) | partial: audit done, awaiting sign-off | C0, 14 |
+| T54 | T28 | Suspend or battery exhaustion mid-transfer | Persistent journal, staging, verification before promote, sleep inhibitor only while transferring, pause below 30 percent battery | planned | 18 |
+| T55 | T29 | Firewall guidance misused | Detection only; Keepsake shows a narrow, port-specific command and never runs it | planned | 17 |
