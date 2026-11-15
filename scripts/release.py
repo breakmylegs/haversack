@@ -102,8 +102,19 @@ def ensure_clean_main(runner: Runner) -> None:
         raise ReleaseError("main is not the same as origin/main; pull first")
 
 
+def stable_zip_name() -> str:
+    """The unversioned asset behind the fixed URL .../releases/latest/download/Keepsake.zip."""
+    return f"{package.plugin_name()}.zip"
+
+
 def build_assets(out_dir: str, version: str, notes: str) -> list[str]:
-    """Build the zip, SHA256SUMS and notes; return the files to upload."""
+    """Build the zips, SHA256SUMS and notes; return the files to upload, SHA256SUMS last.
+
+    Two zips with the same bytes are published: ``Keepsake-v<version>.zip``,
+    which the in-plugin updater and the reproducible-build check use, and
+    ``Keepsake.zip``, so a first install can always use the same URL.
+    ``SHA256SUMS`` lists both, so its signature covers both names.
+    """
     if os.path.isdir(out_dir):
         shutil.rmtree(out_dir)
     os.makedirs(out_dir)
@@ -111,14 +122,16 @@ def build_assets(out_dir: str, version: str, notes: str) -> list[str]:
     expected = f"{package.plugin_name()}-v{version}.zip"
     if os.path.basename(zip_path) != expected:
         raise ReleaseError(f"zip is {os.path.basename(zip_path)}, expected {expected}")
+    stable_path = os.path.join(out_dir, stable_zip_name())
+    shutil.copyfile(zip_path, stable_path)
     with open(zip_path, "rb") as handle:
         digest = hashlib.sha256(handle.read()).hexdigest()
     sums_path = os.path.join(out_dir, SUMS_NAME)
     with open(sums_path, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(f"{digest}  {expected}\n")
+        handle.write(f"{digest}  {expected}\n{digest}  {stable_zip_name()}\n")
     with open(os.path.join(out_dir, "notes.md"), "w", encoding="utf-8", newline="\n") as handle:
         handle.write(notes)
-    return [zip_path, sums_path]
+    return [zip_path, stable_path, sums_path]
 
 
 def sign(sums_path: str, version: str, runner: Runner) -> str | None:
@@ -203,7 +216,7 @@ def publish(
         raise ReleaseError("scripts/check.py failed")
     out_dir = os.path.join(ROOT, "out", "release", tag)
     files = build_assets(out_dir, version, notes)
-    signature = sign(files[1], version, runner)
+    signature = sign(os.path.join(out_dir, SUMS_NAME), version, runner)
     if signature:
         files.append(signature)
     if dry_run:

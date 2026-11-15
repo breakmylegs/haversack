@@ -174,6 +174,20 @@ def make_ready(tmp_path, current="0.2.0", sums_text=None):
     return updater, gh
 
 
+def test_stable_keepsake_zip_asset_does_not_confuse_the_updater(tmp_path):
+    # Releases also carry Keepsake.zip (same bytes) for the fixed "latest" URL, listed first here on purpose.
+    payload = release("v0.2.1")
+    payload["assets"].insert(0, {"name": "Keepsake.zip", "browser_download_url": "https://github.com/r/v0.2.1/stable"})
+    sums = f"{'cd' * 32}  Keepsake.zip\n{DIGEST}  Keepsake-v0.2.1.zip\n"
+    gh = FakeGitHub([payload], sums={"https://github.com/r/v0.2.1/sums": sums})
+    updater = Updater(str(tmp_path), "0.2.0", gh, clock=Clock())
+    status = updater.check("stable")
+    assert status["latest"]["zip_url"] == "https://github.com/r/v0.2.1/zip"
+    result = updater.prepare("v0.2.1", busy_reason=None)
+    assert result["artifact"] == "https://github.com/r/v0.2.1/zip"
+    assert result["sha256"] == DIGEST  # the versioned zip's line, not Keepsake.zip's
+
+
 def test_prepare_returns_decky_arguments(tmp_path):
     updater, _ = make_ready(tmp_path)
     result = updater.prepare("v0.2.1", busy_reason=None)

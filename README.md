@@ -18,11 +18,17 @@ Early development. The current build collects on-device diagnostics and can upda
 
 ## Install
 
-Once releases exist (slice 2 onwards):
+First install on a new device uses one URL that never changes:
 
-1. In Decky Loader, open Settings, General, and enable Developer mode.
-2. Open Developer, Install plugin from URL, and paste the latest release zip URL from the [Releases](https://github.com/breakmylegs/keepsake/releases) page.
-3. Every update after that happens inside Keepsake.
+```
+https://github.com/breakmylegs/keepsake/releases/latest/download/Keepsake.zip
+```
+
+1. In Decky Loader, open Settings, General, and enable Developer mode (once per device).
+2. Open Decky, Settings, Developer, Install Plugin from URL, and paste the URL above.
+3. After that, updates come through Keepsake's Updates page.
+
+The URL always gives the newest stable release; pre-releases are only offered through the Updates page on the Pre-release channel. Each release also has a versioned copy, `Keepsake-v<version>.zip`, with the same bytes, and `SHA256SUMS` lists both names.
 
 ## Development
 

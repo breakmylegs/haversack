@@ -2,6 +2,12 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [Unreleased]
+
+### Added
+
+- Every release also carries `Keepsake.zip`, a byte-identical copy of `Keepsake-v<version>.zip`, so a first install always uses the same URL: `https://github.com/breakmylegs/keepsake/releases/latest/download/Keepsake.zip`. `SHA256SUMS` lists both names. The in-plugin updater still uses the versioned zip.
+
 ## [0.2.0]
 
 Slice 2: release pipeline and in-plugin updater. Still does not sync saves.
