@@ -23,7 +23,7 @@ function describe(s: SnapshotSummary): string {
   return `${s.created.replace("T", " ").replace("Z", "")}, ${s.kind}, ${s.device ?? "unknown device"}, ${s.files} files, ${sizeText(s.bytes)}${flags.length ? `. ${flags.join(", ")}` : ""}`;
 }
 
-// Slice 5 test panel: snapshots go to a local test store on this device, not the cloud.
+// History for one game: restore, pin, release quarantine and undo, plus the last sync per device.
 export function SnapshotsPanel({ gameKey }: { gameKey: string }) {
   const [listing, setListing] = useState<SnapshotListing | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,9 +66,18 @@ export function SnapshotsPanel({ gameKey }: { gameKey: string }) {
   return (
     <div>
       <Field
-        label="Snapshots (local test store)"
-        description="Slice 5 test: snapshots are kept in a test store on this device, not in the cloud. Every restore first saves the current files so it can be undone."
+        label="History"
+        description="Snapshots of this game's saves, newest first. Every restore first saves the current files so it can be undone."
       />
+      {(listing?.lastByDevice ?? []).length > 0 && (
+        <Field
+          focusable
+          label="Last sync per device"
+          description={(listing?.lastByDevice ?? [])
+            .map((d) => `${d.device ?? "Unknown device"}: ${d.created.replace("T", " ").replace("Z", "")} (${d.kind})`)
+            .join("; ")}
+        />
+      )}
       <Focusable style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <DialogButton
           style={{ width: "auto" }}

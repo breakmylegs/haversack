@@ -11,7 +11,7 @@ All paths are inside the backend's app folder (OneDrive: `Apps/Keepsake`). Every
 | `games/<gameKey>/blobs/<snapId>.zip` | snapshot publish, first | zip of `<root>/<rel>` entries |
 | `games/<gameKey>/pruned/<snapId>` | retention, before deleting the blob | `{snapId, prunedAt, deviceId}` |
 | `games/<gameKey>/pins/<snapId>.json` | pinning (ADR-0007) | `{snapId, until, deviceId, created}`; `until` null means forever |
-| `games/<gameKey>/config/<deviceSeq>-<deviceId>.json` | game config revisions (slice 7) | aliases, custom paths, exclusions, tag choices; newest applies |
+| `games/<gameKey>/config/<deviceSeq>-<deviceId>.json` | game config revisions (implemented in slice 9, ADR-0020) | `{schemaVersion: 1, gameKey, deviceId, deviceName, seq, created, createdTs, basedOn, config: {aliases, includeConfig, customPaths, exclusions}}`; `deviceSeq` counts this device's revisions for the game; the newest `createdTs` applies |
 | `games/<gameKey>/bases/<deviceId>/<deviceSeq>.json` | each device when its base changes (slice 7, ADR-0008) | `{snapId, deviceId, deviceSeq, created}`; the highest `deviceSeq` per device is that device's base |
 | `games/<gameKey>/identity/<deviceId>.json` | each device, once, after its first push of the game (ADR-0011) | `{schemaVersion, gameKey, deviceId, title, exe, folders, name, saveDirs, created}`: exe file name, normalised install folder names, normalised shortcut name and `root/folder/folder` save folders, for cross-device matching |
 | `games/<gameKey>/prerestore/<snapId>.json` and `.zip` | only if uploading pre-restore snapshots is enabled | as snapshots |

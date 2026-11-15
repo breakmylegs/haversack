@@ -201,7 +201,8 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
         <SyncPanel
           gameKey={gameKey}
           enabled={config.enabled}
-          onEnabled={(on) => setConfig({ ...config, enabled: on })}
+          kind={game.kind}
+          onEnabled={() => void load().then(runPreview)}
         />
       )}
       {match.gameKey && (

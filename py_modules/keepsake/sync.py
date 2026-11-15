@@ -26,7 +26,7 @@ from .engine import SnapshotEngine
 from .fsutil import atomic_write_json, read_json
 from .identity import publish_identity
 from .retention import heads as dag_heads
-from .snapshot import NewerSchemaError, SnapshotError, content_hash, scan_entries, verify_blob
+from .snapshot import FileEntry, NewerSchemaError, SnapshotError, content_hash, entries_of, scan_entries, verify_blob
 from .store import StoreError, StoreUnavailable
 
 STATE_FILE = "sync-state.json"
@@ -236,7 +236,8 @@ class SyncEngine:
             return result
         new_id = result["snapId"]
         self._set_base(gk, new_id)
-        self.state.update(gk, pending=False, lastPush=self.clock())
+        # A good save after a quarantined one supersedes it (the quarantined copy stays on this device).
+        self.state.update(gk, pending=False, lastPush=self.clock(), quarantined=None)
         self._publish_identity(ctx)
         # Re-fetch heads: if the cloud moved during play, the upload above made a fork.
         by_id, heads = self._cloud(gk)
@@ -373,3 +374,84 @@ class SyncEngine:
 
     def status(self, game_key: str) -> dict[str, Any]:
         return self.state.get(game_key)
+
+    # Read-only views for the setup wizard and the conflict modal (slice 9)
+
+    def plan(self, ctx: GameContext) -> dict[str, Any]:
+        """What the next sync would do, using the same decision table, without changing anything.
+
+        ``action`` is one of ``push``, ``pull``, ``adopt``, ``conflict``, ``up-to-date``,
+        ``nothing`` or ``offline``.
+        """
+        gk = ctx.game_key
+        record = self.state.get(gk)
+        if record.get("conflict"):
+            return {"action": "conflict", "reason": "open-conflict"}
+        try:
+            by_id, heads = self._cloud(gk)
+        except StoreUnavailable:
+            return {"action": "offline"}
+        local_hash, local_files = self._local_hash(ctx)
+        base = record.get("base")
+        if not heads:
+            return {"action": "push", "reason": "first-upload"} if local_files else {"action": "nothing"}
+        matching = [h for h in heads if by_id[h]["contentHash"] == local_hash]
+        if base is None or base not in by_id:
+            if len(heads) > 1:
+                return {"action": "conflict", "reason": "fork"}
+            if matching:
+                return {"action": "adopt", "reason": "same-files"}
+            if local_files == 0:
+                return {"action": "pull", "reason": "no-local-files"}
+            return {"action": "conflict", "reason": "adoption"}
+        if len(heads) > 1:
+            return {"action": "conflict", "reason": "fork"}
+        head = heads[0]
+        local_changed = local_hash != by_id[base]["contentHash"]
+        if head == base:
+            return {"action": "push"} if local_changed else {"action": "up-to-date"}
+        if not local_changed:
+            return {"action": "pull"}
+        if local_hash == by_id[head]["contentHash"]:
+            return {"action": "adopt", "reason": "converged"}
+        return {"action": "conflict", "reason": "both-changed"}
+
+    def conflict_details(self, ctx: GameContext) -> dict[str, Any]:
+        """Each side of an open conflict: device, time, files, size and files changed since the base."""
+        gk = ctx.game_key
+        record = self.state.get(gk)
+        conflict = record.get("conflict")
+        if not conflict:
+            return {"conflict": None}
+        by_id, heads = self._cloud(gk)
+        base_meta = by_id.get(record.get("base") or "")
+        base_entries = entries_of(base_meta) if base_meta else []
+        local = scan_entries(ctx.files(), ctx.roots)
+        sides = [
+            {
+                "side": "local",
+                "snapId": None,
+                "device": None,
+                "created": None,
+                "files": len(local),
+                "bytes": sum(e.size for e in local),
+                "changedFiles": changed_files(base_entries, local),
+            }
+        ]
+        for head in heads:
+            meta = by_id[head]
+            sides.append(
+                {
+                    "side": "cloud",
+                    **self._summary(meta),
+                    "changedFiles": changed_files(base_entries, entries_of(meta)),
+                }
+            )
+        return {"conflict": conflict, "hasBase": base_meta is not None, "sides": sides}
+
+
+def changed_files(before: list[FileEntry], after: list[FileEntry]) -> int:
+    """Files added, removed or changed between two file lists, compared by root, path and hash."""
+    old = {(e.root, e.rel): e.sha256 for e in before}
+    new = {(e.root, e.rel): e.sha256 for e in after}
+    return sum(1 for path in old.keys() | new.keys() if old.get(path) != new.get(path))

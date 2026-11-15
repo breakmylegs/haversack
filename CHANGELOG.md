@@ -2,15 +2,24 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
-## [Unreleased]
+## [0.9.0]
+
+Slice 9: the Gaming Mode interface is complete, plus cross-device game matching.
 
 ### Added
 
+- First-run setup: name the device, sign in, scan games, review matches, choose games, see a dry run of what the first sync will do, then confirm. Run it again from Settings.
+- Quick Access Menu: health badge, cloud and last sync, the game you are playing with its sync state, open conflicts, "Sync now" and "Open Keepsake".
+- Conflicts tab and a conflict window that shows each side's device, time, files, size and files changed. "Decide later" has the focus and is what the B button does; replacing a save needs two presses.
+- History tab: recent snapshots across games with restore, pin and release quarantine. Each game's page shows the last sync from each device.
+- Games list: sync status icons and a "Synced games" filter. Steam games are hidden unless Settings, "Show Steam games" is on, because Steam Cloud usually covers them.
+- A game's aliases, config files choice, custom paths and exclusions are shared with your other devices. If both devices change them at the same time, the newest change is kept and the game page says so.
+- Health checks on the Diagnostics page (sign-in, last sync, open sessions, quarantine, conflicts, prefixes, games played without Keepsake, manifest age, decky-ludusavi), included in the diagnostics export.
+- Messages when a background sync finds a conflict or a suspicious save, and when OneDrive sign-in needs attention.
+- Background sync interval in Settings (10 to 240 minutes) and a Modules overview.
 - Keepsake recognises the same game on your other device even when the shortcut has a different name and the game sits in a differently numbered compatdata folder. It compares the program file name, install folder names and, most strongly, the save folders the other device syncs. Clear matches are applied automatically and shown with the evidence; weaker ones are offered as suggestions.
 - When a match is likely but not certain, Keepsake asks: approve it, choose another, or say it is not this game (that answer is remembered).
 - Games the save-location manifest does not know can be given their own game key and synced through custom folders.
-
-## [Unreleased]
 
 ### Documentation
 

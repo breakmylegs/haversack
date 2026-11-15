@@ -1,8 +1,18 @@
-import { DialogButton, Field, Focusable, SliderField, TextField, ToggleField } from "@decky/ui";
+import { DialogButton, Field, Focusable, Navigation, SliderField, TextField, ToggleField } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { getSettings, setSetting, Settings } from "../backend";
+import { ROUTE_PATH, SETUP_PATH } from "../routes";
 import { CloudSection } from "./CloudSection";
+
+// Build prompt v2 section 10: a placeholder until the module registry arrives in slice 13.
+const MODULES = [
+  { name: "Saves", state: "On", writes: "Save files of the games you choose, and its own settings." },
+  { name: "Advisor", state: "Coming later", writes: "Nothing. It only recommends settings." },
+  { name: "Replication", state: "Coming later", writes: "Games you send between your devices." },
+  { name: "Installer", state: "Coming later", writes: "Games you install with it." },
+  { name: "Desktop", state: "Coming later", writes: "Desktop Mode shortcuts for Keepsake." },
+];
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -88,13 +98,45 @@ export function SettingsPage() {
         disabled={locked}
         onChange={(v) => void save("launchPullTimeout", v, `Timeout set to ${v} seconds.`)}
       />
+      <SliderField
+        label="Background sync every (minutes)"
+        description="How often Keepsake downloads newer cloud saves ahead of time and saves changes made outside a game session."
+        value={settings?.idleSyncMinutes ?? 30}
+        min={10}
+        max={240}
+        step={10}
+        showValue
+        disabled={locked}
+        onChange={(v) => void save("idleSyncMinutes", v, `Background sync every ${v} minutes.`)}
+      />
       <ToggleField
         label="Show a message after each save"
         checked={settings?.toastOnSync ?? true}
         disabled={locked}
         onChange={(on) => void save("toastOnSync", on, on ? "Save messages on." : "Save messages off.")}
       />
+      <ToggleField
+        label="Show Steam games"
+        description="Off by default because Steam Cloud usually covers them. When on, Steam games are listed and can be synced one by one. Non-Steam shortcuts are always listed."
+        checked={settings?.showSteamApps ?? false}
+        disabled={locked}
+        onChange={(on) => void save("showSteamApps", on, on ? "Steam games shown." : "Steam games hidden.")}
+      />
       {settings && <CloudSection settings={settings} onSettings={setSettings} />}
+      <Field label="Updates" description="Check for updates, read release notes or go back to an earlier version." childrenLayout="inline">
+        <DialogButton style={{ width: "auto" }} onClick={() => Navigation.Navigate(`${ROUTE_PATH}/updates`)}>
+          Open Updates
+        </DialogButton>
+      </Field>
+      <Field label="Setup" description="Walk through device name, sign-in, scanning and choosing games again." childrenLayout="inline">
+        <DialogButton style={{ width: "auto" }} disabled={locked} onClick={() => Navigation.Navigate(SETUP_PATH)}>
+          Run setup again
+        </DialogButton>
+      </Field>
+      <Field label="Modules" description="Keepsake is growing into several modules. Each says here what it writes." />
+      {MODULES.map((m) => (
+        <Field key={m.name} focusable label={`${m.name}: ${m.state}`} description={`Writes: ${m.writes}`} />
+      ))}
       {settings && <Field label="Device ID" description={settings.deviceId} />}
     </div>
   );

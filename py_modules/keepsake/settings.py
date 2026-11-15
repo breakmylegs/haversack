@@ -36,6 +36,9 @@ DEFAULTS: dict[str, Any] = {
     "snapshotStore": "local",
     "launchPullTimeout": 20,
     "toastOnSync": True,
+    "idleSyncMinutes": 30,
+    "showSteamApps": False,
+    "setupComplete": False,
 }
 
 # Keys the frontend may change. deviceId and schemaVersion are managed here.
@@ -49,8 +52,12 @@ USER_KEYS = frozenset(
         "snapshotStore",
         "launchPullTimeout",
         "toastOnSync",
+        "idleSyncMinutes",
+        "showSteamApps",
+        "setupComplete",
     }
 )
+IDLE_MINUTES_RANGE = (10, 240)
 SNAPSHOT_STORES = ("local", "onedrive")
 _GUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 # Safety gates may only be tightened (build prompt section 9): [floor, default].
@@ -133,7 +140,12 @@ def _validate(key: str, value: Any) -> Any:
         if not isinstance(value, int) or isinstance(value, bool) or not 5 <= value <= 60:
             raise SettingsError("the launch check timeout is 5 to 60 seconds")
         return value
-    if key == "toastOnSync":
+    if key == "idleSyncMinutes":
+        low, high = IDLE_MINUTES_RANGE
+        if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
+            raise SettingsError(f"the idle sync interval is {low} to {high} minutes")
+        return value
+    if key in ("toastOnSync", "showSteamApps", "setupComplete"):
         if not isinstance(value, bool):
             raise SettingsError("must be true or false")
         return value

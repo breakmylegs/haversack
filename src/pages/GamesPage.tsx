@@ -1,25 +1,39 @@
 import { DialogButton, Field, Focusable } from "@decky/ui";
 import { toaster } from "@decky/api";
-import { useEffect, useState } from "react";
+import { ReactElement, useEffect, useState } from "react";
+import { FaCheckCircle, FaClock, FaCodeBranch, FaExclamationTriangle, FaMinusCircle, FaRegCircle } from "react-icons/fa";
 import {
   checkRunningPrefix,
   discoverGames,
   DiscoveryResult,
   GameEntry,
   GameMatch,
+  getSettings,
   manifestStatus,
   ManifestStatus,
   matchGames,
   refreshManifest,
+  SyncWord,
 } from "../backend";
+import { SYNC_LABELS } from "../format";
 import { GameDetail } from "./GameDetail";
 
-type Filter = "shortcuts" | "steam" | "all";
+type Filter = "enabled" | "shortcuts" | "steam" | "all";
 
 const FILTER_LABELS: Record<Filter, string> = {
+  enabled: "Synced games",
   shortcuts: "Non-Steam shortcuts",
   steam: "Steam games",
   all: "All",
+};
+
+const STATUS_ICONS: Record<SyncWord, ReactElement> = {
+  off: <FaMinusCircle style={{ opacity: 0.5 }} />,
+  "not-synced": <FaRegCircle />,
+  synced: <FaCheckCircle style={{ color: "#59bf40" }} />,
+  pending: <FaClock style={{ color: "#e5b33a" }} />,
+  conflict: <FaCodeBranch style={{ color: "#e04f4f" }} />,
+  quarantined: <FaExclamationTriangle style={{ color: "#e5b33a" }} />,
 };
 
 function prefixText(game: GameEntry): string {
@@ -61,6 +75,7 @@ export function GamesPage() {
   const [matches, setMatches] = useState<Record<string, GameMatch>>({});
   const [status, setStatus] = useState<ManifestStatus | null>(null);
   const [filter, setFilter] = useState<Filter>("shortcuts");
+  const [showSteam, setShowSteam] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +97,9 @@ export function GamesPage() {
   };
 
   useEffect(() => {
+    getSettings()
+      .then((s) => setShowSteam(s.showSteamApps))
+      .catch(() => undefined);
     void scan(false);
   }, []);
 
@@ -112,9 +130,15 @@ export function GamesPage() {
   }
 
   const runningAppId = SteamUIStore?.MainRunningAppID;
-  const games = (result?.games ?? []).filter(
-    (g) => filter === "all" || (filter === "shortcuts" ? g.kind === "shortcut" : g.kind === "steam"),
-  );
+  // Steam apps are off by default because Steam Cloud covers them (build prompt section 14).
+  const filters = (Object.keys(FILTER_LABELS) as Filter[]).filter((f) => showSteam || f !== "steam");
+  const visible = (result?.games ?? []).filter((g) => showSteam || g.kind === "shortcut");
+  const games = visible.filter((g) => {
+    if (filter === "enabled") return matches[g.key]?.enabled;
+    if (filter === "shortcuts") return g.kind === "shortcut";
+    if (filter === "steam") return g.kind === "steam";
+    return true;
+  });
 
   const crossCheck = async (game: GameEntry) => {
     const outcome = await checkRunningPrefix(game.key);
@@ -139,7 +163,7 @@ export function GamesPage() {
         description={status?.attribution}
       />
       <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-        {(Object.keys(FILTER_LABELS) as Filter[]).map((f) => (
+        {filters.map((f) => (
           <DialogButton
             key={f}
             style={{ width: "auto", opacity: f === filter ? 1 : 0.6 }}
@@ -163,7 +187,12 @@ export function GamesPage() {
           description="Keepsake found likely matches it is not certain about. Open each game marked Confirm match to approve or choose another."
         />
       )}
-      {result && <Field label={`${games.length} shown`} description={`${result.games.length} found on this device.`} />}
+      {result && (
+        <Field
+          label={`${games.length} shown`}
+          description={`${result.games.length} found on this device.${showSteam ? "" : " Steam games are hidden (Settings, Show Steam games)."}`}
+        />
+      )}
       {games.map((game) => {
         const mismatch = game.key in (result?.mismatches ?? {}) || "_unreadable" in (result?.mismatches ?? {});
         const running = runningAppId !== undefined && runningAppId === game.appid;
@@ -176,8 +205,12 @@ export function GamesPage() {
         return (
           <Field
             key={game.key}
-            label={game.name}
-            description={`${matchText(matches[game.key])}. ${prefixText(game)}.${flags.length ? `  ${flags.join(", ")}` : ""}`}
+            label={
+              <span>
+                {STATUS_ICONS[matches[game.key]?.sync ?? "off"]} {game.name}
+              </span>
+            }
+            description={`${SYNC_LABELS[matches[game.key]?.sync ?? "off"]}. ${matchText(matches[game.key])}. ${prefixText(game)}.${flags.length ? `  ${flags.join(", ")}` : ""}`}
             childrenLayout="inline"
           >
             <Focusable style={{ display: "flex", gap: 8 }}>

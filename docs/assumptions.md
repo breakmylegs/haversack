@@ -104,7 +104,7 @@ Microsoft documentation read on 15 November 2026: device code flow (Entra, updat
 | # | Fact | Status | Source |
 |---|---|---|---|
 | A63 | The build prompt's "Use cloud save" (keep local pinned, restore head) needs a closing merge, otherwise the kept copy and the losing head stay as heads and the conflict returns. **Differs from the build prompt** (an addition, not a change) | design, ADR-0009 | |
-| A64 | Game config revisions in the cloud layout are implemented with the per-game page in slice 9 | plan | ADR-0009 |
+| A64 | Game config revisions in the cloud layout are implemented with the per-game page in slice 9 | done in slice 9 (ADR-0020); `<deviceSeq>` in the frozen key pattern counts this device's revisions for that game | ADR-0009, ADR-0020 |
 
 ## Lifecycle (slice 8)
 
@@ -120,6 +120,17 @@ Microsoft documentation read on 15 November 2026: device code flow (Entra, updat
 |---|---|---|---|
 | A68 | The manifest's `launch` keys are executable paths such as `<base>/Binaries/Game.exe`, so their file names identify a game's executable | verified in the live manifest (slice 4 survey) | manifest |
 | A69 | A game installed from the same ISO keeps the same exe name and save folder names on both devices, whatever the prefix number or shortcut name | design assumption; the scoring needs two signals so one difference does not cause a wrong match | |
+
+## Gaming Mode UX (slice 9)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A105 | `ModalRoot` (typed `any`) takes `onCancel`, `closeModal`, `bCancelDisabled` and the other `ModalRootProps`; `showModal` injects `closeModal` | verified in types (`components/Modal.d.ts`); that B and a background tap call `onCancel` is unverified on device | `@decky/ui` 4.16.5 |
+| A106 | `DialogButton` accepts `preferredFocus` (from `FooterLegendProps`), which gives it the initial focus in the modal | prop verified in types; focus behaviour unverified on device | `components/Dialog.d.ts`, `FooterLegend.d.ts` |
+| A107 | `TextField` opens the Steam on-screen keyboard when activated with the controller | unverified on device (already used for the device name since slice 1) | |
+| A108 | Decky lists disabled plugins by `plugin.json` name under `disabled_plugins` in `~/homebrew/settings/loader.json`, and `DECKY_HOME` points at `~/homebrew` | verified in the Tuning Advisor register (item 11) and A4 | decky-loader `loader.py` |
+| A109 | decky-ludusavi's per-game auto-sync setting has no documented file format, so Keepsake cannot tell which games it syncs | unverified; the health check warns whenever it is active alongside synced games | |
+| A110 | `SidebarNavigation` pages can be built from a list at render time; route paths stay `/keepsake/<tab>` | verified in types | `components/SidebarNavigation.d.ts` |
 
 ## v2 verification items (slice C0)
 
