@@ -2,6 +2,22 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [0.4.0]
+
+Slice 4: manifest resolution and save preview. Still does not sync saves.
+
+### Added
+
+- Downloads the Ludusavi manifest of save locations, checks for changes weekly (using its ETag) and keeps a compact index on the device. "Update manifest" on the Games page refreshes it on demand.
+- Each game is matched to a manifest entry by Steam ID or by title, ignoring case, punctuation, edition names such as "Game of the Year Edition" and roman numerals. Several matches are shown as a choice rather than guessed.
+- Game page: matched title and game key, "Change match" with search, include config files (off by default), custom folders through the file picker, exclusions, and a preview of the files that would be synced with counts and sizes.
+- Logs, crash dumps, shader and web caches and temporary files are excluded by default.
+- Paths that cannot be resolved safely are skipped and listed with the reason.
+
+### Security
+
+- Every resolved path must stay inside its root; escaping symlinks are ignored; a game folder that is too broad (such as `/` or the home folder) is refused.
+
 ## [0.3.0]
 
 Slice 3: discovery. Still does not sync saves.

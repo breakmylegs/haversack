@@ -1,7 +1,18 @@
 import { DialogButton, Field, Focusable } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
-import { checkRunningPrefix, discoverGames, DiscoveryResult, GameEntry } from "../backend";
+import {
+  checkRunningPrefix,
+  discoverGames,
+  DiscoveryResult,
+  GameEntry,
+  GameMatch,
+  manifestStatus,
+  ManifestStatus,
+  matchGames,
+  refreshManifest,
+} from "../backend";
+import { GameDetail } from "./GameDetail";
 
 type Filter = "shortcuts" | "steam" | "all";
 
@@ -18,20 +29,45 @@ function prefixText(game: GameEntry): string {
   return `compatdata/${id} on the ${where}${game.exe_inside_prefix ? ", game installed inside the prefix" : ""}`;
 }
 
-function lastPlayedText(seconds: number): string {
-  return seconds > 0 ? new Date(seconds * 1000).toISOString().slice(0, 10) : "never";
+function matchText(match: GameMatch | undefined): string {
+  if (!match) return "";
+  switch (match.method) {
+    case "manual":
+    case "steam-id":
+    case "title":
+      return `Manifest: ${match.title}`;
+    case "ambiguous":
+      return "Manifest: several matches, choose one";
+    case "no-save-data":
+      return "Manifest: no save locations known";
+    case "no-manifest":
+      return "Manifest not downloaded yet";
+    default:
+      return "Manifest: no match";
+  }
+}
+
+function dateText(seconds: number | undefined): string {
+  return seconds ? new Date(seconds * 1000).toISOString().slice(0, 10) : "never";
 }
 
 export function GamesPage() {
   const [result, setResult] = useState<DiscoveryResult | null>(null);
+  const [matches, setMatches] = useState<Record<string, GameMatch>>({});
+  const [status, setStatus] = useState<ManifestStatus | null>(null);
   const [filter, setFilter] = useState<Filter>("shortcuts");
   const [scanning, setScanning] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
 
   const scan = async (refresh: boolean) => {
     setScanning(true);
     try {
       setResult(await discoverGames(refresh));
+      const list = await matchGames();
+      setMatches(Object.fromEntries(list.map((m) => [m.key, m])));
+      setStatus(await manifestStatus());
       setError(null);
     } catch (err) {
       setError(String(err));
@@ -43,6 +79,32 @@ export function GamesPage() {
   useEffect(() => {
     void scan(false);
   }, []);
+
+  const updateManifest = async () => {
+    setRefreshing(true);
+    try {
+      const outcome = await refreshManifest(true);
+      toaster.toast({
+        title: "Keepsake",
+        body: outcome.ok ? "Manifest is up to date." : `Manifest not updated: ${outcome.reason}`,
+      });
+      await scan(false);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  if (selected) {
+    return (
+      <GameDetail
+        gameKey={selected}
+        onBack={() => {
+          setSelected(null);
+          void scan(false);
+        }}
+      />
+    );
+  }
 
   const runningAppId = SteamUIStore?.MainRunningAppID;
   const games = (result?.games ?? []).filter(
@@ -63,6 +125,14 @@ export function GamesPage() {
 
   return (
     <div>
+      <Field
+        label={
+          status?.available
+            ? `Manifest: ${status.games} games with save data, updated ${dateText(status.fetched)}`
+            : "Manifest: not downloaded yet"
+        }
+        description={status?.attribution}
+      />
       <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         {(Object.keys(FILTER_LABELS) as Filter[]).map((f) => (
           <DialogButton
@@ -75,6 +145,9 @@ export function GamesPage() {
         ))}
         <DialogButton style={{ width: "auto" }} disabled={scanning} onClick={() => void scan(true)}>
           {scanning ? "Scanning" : "Rescan"}
+        </DialogButton>
+        <DialogButton style={{ width: "auto" }} disabled={refreshing} onClick={() => void updateManifest()}>
+          {refreshing ? "Updating manifest" : "Update manifest"}
         </DialogButton>
       </Focusable>
       {error && <Field label="Scan failed" description={error} />}
@@ -92,16 +165,20 @@ export function GamesPage() {
         return (
           <Field
             key={game.key}
-            focusable={!running}
             label={game.name}
-            description={`${prefixText(game)}. Last played ${lastPlayedText(game.last_played)}. ID ${game.appid}.${flags.length ? `  ${flags.join(", ")}` : ""}`}
-            childrenLayout={running ? "below" : undefined}
+            description={`${matchText(matches[game.key])}. ${prefixText(game)}.${flags.length ? `  ${flags.join(", ")}` : ""}`}
+            childrenLayout="inline"
           >
-            {running && (
-              <DialogButton style={{ width: "auto" }} onClick={() => void crossCheck(game)}>
-                Check running prefix
+            <Focusable style={{ display: "flex", gap: 8 }}>
+              <DialogButton style={{ width: "auto" }} onClick={() => setSelected(game.key)}>
+                Open
               </DialogButton>
-            )}
+              {running && (
+                <DialogButton style={{ width: "auto" }} onClick={() => void crossCheck(game)}>
+                  Check prefix
+                </DialogButton>
+              )}
+            </Focusable>
           </Field>
         );
       })}

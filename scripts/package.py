@@ -27,7 +27,7 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
-FILES = ("main.py", "package.json", "plugin.json", "LICENSE", "README.md")
+FILES = ("main.py", "package.json", "plugin.json", "LICENSE", "README.md", "THIRD_PARTY_NOTICES.md")
 TREES = ("dist", "py_modules", "bin")
 EXECUTABLE_TREES = ("bin",)
 SKIP_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache"}

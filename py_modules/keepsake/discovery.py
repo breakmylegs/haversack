@@ -257,6 +257,8 @@ class GameEntry:
     exe_inside_prefix: bool
     last_played: int
     notes: list[str] = field(default_factory=list)
+    steam_root: str | None = None
+    default_user: str | None = None
 
     def public(self) -> dict[str, Any]:
         return asdict(self)
@@ -328,6 +330,8 @@ def discover(home: str | None = None) -> dict[str, Any]:
                         exe_inside_prefix=bool(prefix and exe and os.path.realpath(exe).startswith(prefix + os.sep)),
                         last_played=sc.last_play_time,
                         notes=notes,
+                        steam_root=root,
+                        default_user=default,
                     )
                 )
 
@@ -352,6 +356,8 @@ def discover(home: str | None = None) -> dict[str, Any]:
                         exe_inside_prefix=False,
                         last_played=app.last_played,
                         notes=[] if install and os.path.isdir(install) else ["install-folder-missing"],
+                        steam_root=root,
+                        default_user=default,
                     )
                 )
     return {"roots": roots_info, "games": [g.public() for g in games]}

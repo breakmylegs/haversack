@@ -12,8 +12,9 @@ import os
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from . import diagnostics, discovery, net
+from . import diagnostics, discovery, manifest, net, resolve
 from .freeze import Freezer
+from .gameconfig import GameConfigStore, custom_path_from_absolute
 from .jobs import JobTracker
 from .log import log_event, setup_logging, tail
 from .paths import PluginPaths
@@ -42,10 +43,17 @@ class KeepsakeApp:
         version: str | None = None,
         fetch: net.Fetcher = net.fetch,
         home: str | None = None,
+        download: manifest.Downloader = net.fetch_to_file,
+        auto_refresh_manifest: bool = True,
     ) -> None:
         self.paths = paths
         self.home = home
         self._games: dict[str, Any] | None = None
+        self.manifest = manifest.ManifestStore(paths.runtime_dir, download=download)
+        self.game_configs = GameConfigStore(paths.settings_dir)
+        self._auto_refresh_manifest = auto_refresh_manifest
+        self._manifest_lock = asyncio.Lock()
+        self._background: list[asyncio.Task[Any]] = []
         self.emit = emit or _no_emit
         self.proc_root = proc_root
         self.version = version or os.environ.get("DECKY_PLUGIN_VERSION") or "0.0.0"
@@ -72,6 +80,9 @@ class KeepsakeApp:
         if self.settings.read_only:
             log_event(logging.WARNING, "settings.safe_mode", "Settings were written by a newer version; read-only")
         log_event(logging.INFO, "app.start", "Keepsake backend started", version=self.version)
+        if self._auto_refresh_manifest:
+            # Weekly refresh in the background; never blocks start-up.
+            self._background.append(asyncio.create_task(self.refresh_manifest(False)))
 
     def _on_idle(self) -> None:
         loop = self._loop
@@ -146,6 +157,83 @@ class KeepsakeApp:
             )
         return result
 
+    # Manifest, matching and preview
+
+    async def manifest_status(self) -> dict[str, Any]:
+        return await asyncio.to_thread(self.manifest.status)
+
+    async def refresh_manifest(self, force: bool = False) -> dict[str, Any]:
+        if self._manifest_lock.locked():
+            return {"ok": False, "reason": "busy"}
+        async with self._manifest_lock:
+            result = await asyncio.to_thread(self.manifest.refresh, bool(force))
+        log_event(
+            logging.INFO,
+            "manifest.refresh",
+            "Manifest refresh finished",
+            **{
+                k: v
+                for k, v in result.items()
+                if k in ("ok", "changed", "reason", "games", "parseSeconds", "peakRssMb")
+            },
+        )
+        return result
+
+    async def _game(self, key: str) -> dict[str, Any]:
+        games = (await self.discover_games())["games"]
+        game = next((g for g in games if g["key"] == key), None)
+        if game is None:
+            raise ValueError("unknown game; rescan the games list")
+        return dict(game)
+
+    async def match_games(self) -> list[dict[str, Any]]:
+        """Every discovered game with its manifest match."""
+        games = (await self.discover_games())["games"]
+        index = await asyncio.to_thread(self.manifest.load)
+        out = []
+        for game in games:
+            config = self.game_configs.get(game["key"])
+            match = manifest.match_game(index, game, config)
+            out.append({"key": game["key"], "name": game["name"], "kind": game["kind"], **match})
+        return out
+
+    async def search_titles(self, query: str) -> list[str]:
+        index = await asyncio.to_thread(self.manifest.load)
+        return manifest.search_titles(index, str(query)[:200]) if index else []
+
+    async def get_game(self, key: str) -> dict[str, Any]:
+        game = await self._game(key)
+        config = self.game_configs.get(key)
+        index = await asyncio.to_thread(self.manifest.load)
+        return {"game": game, "config": config, "match": manifest.match_game(index, game, config)}
+
+    async def update_game_config(self, key: str, changes: dict[str, Any]) -> dict[str, Any]:
+        await self._game(key)
+        if "matchTitle" in changes and changes["matchTitle"] is not None:
+            index = await asyncio.to_thread(self.manifest.load)
+            if not index or changes["matchTitle"] not in index.get("games", {}):
+                raise ValueError("that title is not in the manifest")
+        config = await asyncio.to_thread(self.game_configs.update, key, dict(changes))
+        log_event(logging.INFO, "game.config", "Game settings changed", key=key, fields=sorted(changes))
+        return config
+
+    async def add_custom_path(self, key: str, absolute_path: str) -> dict[str, Any]:
+        """Add a folder chosen in the file picker, as a path relative to one of the game's roots."""
+        game = await self._game(key)
+        entry = custom_path_from_absolute(str(absolute_path), resolve.logical_roots(game, home=self.home))
+        config = self.game_configs.get(key)
+        return await self.update_game_config(key, {"customPaths": [*config["customPaths"], entry]})
+
+    async def preview_game(self, key: str) -> dict[str, Any]:
+        game = await self._game(key)
+        config = self.game_configs.get(key)
+        index = await asyncio.to_thread(self.manifest.load)
+        match = manifest.match_game(index, game, config)
+        title = match.get("title")
+        record = index["games"].get(title) if index and title else None
+        result = await asyncio.to_thread(resolve.preview, game, title, record, config, self.home)
+        return {**result, "match": match, "gameKey": match.get("gameKey")}
+
     async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
         """Diagnostics only: hold a fake sync job so the update guard can be tested."""
         seconds = max(1, min(int(seconds), SIMULATED_JOB_MAX))
@@ -155,6 +243,8 @@ class KeepsakeApp:
         return {"ok": True, "seconds": seconds}
 
     async def stop(self) -> None:
+        for task in self._background:
+            task.cancel()
         await asyncio.to_thread(self.freezer.resume_all, "unload")
         log_event(logging.INFO, "app.stop", "Keepsake backend stopped")
 
@@ -199,7 +289,7 @@ class KeepsakeApp:
             self.paths.runtime_dir,
             self.paths.log_dir,
             frontend,
-            {"freezer": self.freezer.status()},
+            {"freezer": self.freezer.status(), "manifest": self.manifest.status()},
         )
         log_event(logging.INFO, "diagnostics.export", "Diagnostics exported", file=os.path.basename(path))
         return path

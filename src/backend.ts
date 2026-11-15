@@ -108,6 +108,82 @@ export interface CrossCheck {
   reason?: string;
 }
 
+export interface ManifestStatus {
+  available: boolean;
+  fetched?: number;
+  games?: number;
+  entries?: number;
+  skipped?: number;
+  parseSeconds?: number;
+  peakRssMb?: number | null;
+  stale?: boolean;
+  attribution: string;
+}
+
+export interface MatchInfo {
+  method: "manual" | "steam-id" | "title" | "ambiguous" | "none" | "no-save-data" | "no-manifest";
+  title: string | null;
+  gameKey: string | null;
+  candidates: string[];
+}
+
+export interface GameMatch extends MatchInfo {
+  key: string;
+  name: string;
+  kind: "steam" | "shortcut";
+}
+
+export interface CustomPath {
+  root: string;
+  rel: string;
+}
+
+export interface GameConfig {
+  matchTitle: string | null;
+  aliases: string[];
+  includeConfig: boolean;
+  customPaths: CustomPath[];
+  exclusions: string[];
+}
+
+export interface PreviewEntry {
+  source: "manifest" | "custom";
+  path: string;
+  root: string;
+  pattern: string;
+  tags: string;
+  files: number;
+  bytes: number;
+  samples: string[];
+}
+
+export interface Preview {
+  title: string | null;
+  gameKey: string | null;
+  platform: "proton" | "native";
+  roots: Record<string, string | null>;
+  entries: PreviewEntry[];
+  skipped: { path: string; reason: string }[];
+  escaped: string[];
+  excluded: number;
+  totalFiles: number;
+  totalBytes: number;
+  warnings: string[];
+  match: MatchInfo;
+}
+
+export const manifestStatus = callable<[], ManifestStatus>("manifest_status");
+export const refreshManifest = callable<[force: boolean], { ok: boolean; reason?: string; games?: number }>(
+  "refresh_manifest",
+);
+export const matchGames = callable<[], GameMatch[]>("match_games");
+export const searchTitles = callable<[query: string], string[]>("search_titles");
+export const getGame = callable<[key: string], { game: GameEntry; config: GameConfig; match: MatchInfo }>("get_game");
+export const updateGameConfig = callable<[key: string, changes: Partial<GameConfig>], GameConfig>(
+  "update_game_config",
+);
+export const addCustomPath = callable<[key: string, absolutePath: string], GameConfig>("add_custom_path");
+export const previewGame = callable<[key: string], Preview>("preview_game");
 export const discoverGames = callable<[refresh: boolean], DiscoveryResult>("discover_games");
 export const checkRunningPrefix = callable<[key: string], CrossCheck>("check_running_prefix");
 export const getStatus = callable<[], Status>("get_status");
