@@ -51,6 +51,16 @@ Each entry is **verified** (read in source or type definitions, or measured on d
 | A35 | `decky.emit` events from the backend reach `addEventListener` in the frontend (used for `keepsake_idle`) | verified in source and types | `sandboxed_plugin.py`, `@decky/api` |
 | A36 | The unauthenticated GitHub API limit (60 requests an hour per IP) is ample for one automatic check a day plus manual checks | verified | GitHub docs |
 
+## Discovery (slice 3)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A37 | `config/loginusers.vdf` maps SteamID64 to a block with `MostRecent` and `Timestamp`; id3 = SteamID64 minus 76561197960265728, matching `userdata/<id3>` | community-documented, unverified on device; falls back to the newest `userdata` folder | |
+| A38 | `appmanifest_*.acf` has `AppState` with `appid`, `name`, `installdir` and `LastPlayed` | community-documented, unverified on device | |
+| A39 | Tool app IDs (Proton, Steam Linux Runtime, redistributables) are as listed in `discovery.TOOL_APPIDS`; name prefixes catch other Proton versions | unverified; a missed tool only adds a harmless entry to the list | |
+| A40 | Shortcut `StartDir` and `Exe` are stored quoted; the `base` root is `StartDir`, else the exe's folder (build prompt section 8) | community-documented, unverified on device; quotes are stripped when present | |
+| A41 | Shortcut keys `shortcut:<id3>:<appid>` are stable on one device only; the cross-device identity is the `gameKey` from slice 4 | design | build prompt section 8 |
+
 ## Template differences
 
 | # | Difference | Reason |

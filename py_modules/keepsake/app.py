@@ -12,7 +12,7 @@ import os
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from . import diagnostics, net
+from . import diagnostics, discovery, net
 from .freeze import Freezer
 from .jobs import JobTracker
 from .log import log_event, setup_logging, tail
@@ -41,8 +41,11 @@ class KeepsakeApp:
         proc_root: str = "/proc",
         version: str | None = None,
         fetch: net.Fetcher = net.fetch,
+        home: str | None = None,
     ) -> None:
         self.paths = paths
+        self.home = home
+        self._games: dict[str, Any] | None = None
         self.emit = emit or _no_emit
         self.proc_root = proc_root
         self.version = version or os.environ.get("DECKY_PLUGIN_VERSION") or "0.0.0"
@@ -108,6 +111,39 @@ class KeepsakeApp:
             ok=result.get("ok"),
             reason=result.get("reason"),
         )
+        return result
+
+    # Discovery
+
+    async def discover_games(self, refresh: bool = False) -> dict[str, Any]:
+        """Scan Steam on this device. Cached until ``refresh``."""
+        if self._games is None or refresh:
+            self._games = await asyncio.to_thread(discovery.discover, self.home)
+            counts: dict[str, int] = {}
+            for game in self._games["games"]:
+                counts[game["kind"]] = counts.get(game["kind"], 0) + 1
+            log_event(logging.INFO, "discovery.scan", "Scanned games", roots=len(self._games["roots"]), **counts)
+        mismatches = await asyncio.to_thread(discovery.load_mismatches, self.paths.runtime_dir)
+        return {**self._games, "mismatches": mismatches}
+
+    async def check_running_prefix(self, key: str) -> dict[str, Any]:
+        """Cross-check a running game's ``STEAM_COMPAT_DATA_PATH`` with its discovered prefix."""
+        games = (await self.discover_games())["games"]
+        game = next((g for g in games if g["key"] == key), None)
+        if game is None:
+            return {"status": "unknown", "reason": "unknown-game"}
+        procs = await asyncio.to_thread(find_game_processes, int(game["appid"]), game["prefix"], self.proc_root)
+        observed = [p.env["STEAM_COMPAT_DATA_PATH"] for p in procs if p.env.get("STEAM_COMPAT_DATA_PATH")]
+        result = discovery.cross_check(game["prefix"], observed)
+        await asyncio.to_thread(discovery.record_cross_check, self.paths.runtime_dir, key, result, game["prefix"])
+        if result["status"] == "mismatch":
+            log_event(
+                logging.WARNING,
+                "discovery.prefix_mismatch",
+                "Running prefix differs; sync blocked",
+                key=key,
+                reason=result.get("reason"),
+            )
         return result
 
     async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:

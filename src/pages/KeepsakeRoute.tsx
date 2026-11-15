@@ -1,6 +1,7 @@
 import { SidebarNavigation } from "@decky/ui";
-import { FaClipboardList, FaCloudDownloadAlt, FaCog, FaStethoscope } from "react-icons/fa";
+import { FaClipboardList, FaCloudDownloadAlt, FaCog, FaGamepad, FaStethoscope } from "react-icons/fa";
 import { DiagnosticsPage } from "./DiagnosticsPage";
+import { GamesPage } from "./GamesPage";
 import { LogsPage } from "./LogsPage";
 import { SettingsPage } from "./SettingsPage";
 import { UpdatesPage } from "./UpdatesPage";
@@ -14,6 +15,7 @@ export function KeepsakeRoute() {
         title="Keepsake"
         showTitle
         pages={[
+          { title: "Games", icon: <FaGamepad />, content: <GamesPage />, route: `${ROUTE_PATH}/games` },
           { title: "Diagnostics", icon: <FaStethoscope />, content: <DiagnosticsPage />, route: `${ROUTE_PATH}/diagnostics` },
           { title: "Updates", icon: <FaCloudDownloadAlt />, content: <UpdatesPage />, route: `${ROUTE_PATH}/updates` },
           { title: "Logs", icon: <FaClipboardList />, content: <LogsPage />, route: `${ROUTE_PATH}/logs` },
