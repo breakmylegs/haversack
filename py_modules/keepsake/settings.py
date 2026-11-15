@@ -29,10 +29,14 @@ DEFAULTS: dict[str, Any] = {
     "deviceId": "",
     "deviceName": "",
     "updateChannel": "stable",
+    "gateMaxRemovedPercent": 50,
+    "gateMaxSizeDropPercent": 70,
 }
 
 # Keys the frontend may change. deviceId and schemaVersion are managed here.
-USER_KEYS = frozenset({"deviceName", "updateChannel"})
+USER_KEYS = frozenset({"deviceName", "updateChannel", "gateMaxRemovedPercent", "gateMaxSizeDropPercent"})
+# Safety gates may only be tightened (build prompt section 9): [floor, default].
+GATE_LIMITS = {"gateMaxRemovedPercent": (5, 50), "gateMaxSizeDropPercent": (5, 70)}
 
 
 class SettingsError(ValueError):
@@ -102,5 +106,10 @@ def _validate(key: str, value: Any) -> Any:
     if key == "updateChannel":
         if value not in UPDATE_CHANNELS:
             raise SettingsError("update channel must be stable or prerelease")
+        return value
+    if key in GATE_LIMITS:
+        low, high = GATE_LIMITS[key]
+        if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
+            raise SettingsError(f"must be a whole number from {low} to {high} (gates can only be tightened)")
         return value
     raise SettingsError(f"no validator for {key}")

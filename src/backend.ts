@@ -9,6 +9,8 @@ export interface Settings {
   deviceId: string;
   deviceName: string;
   updateChannel: UpdateChannel;
+  gateMaxRemovedPercent: number;
+  gateMaxSizeDropPercent: number;
   readOnly: boolean;
 }
 
@@ -172,6 +174,47 @@ export interface Preview {
   match: MatchInfo;
 }
 
+export interface SnapshotSummary {
+  snapId: string;
+  created: string;
+  kind: string;
+  device: string | null;
+  files: number;
+  bytes: number;
+  pinned?: boolean;
+  pruned?: boolean;
+  base?: boolean;
+  reasons?: string[];
+}
+
+export interface SnapshotListing {
+  gameKey?: string;
+  snapshots: SnapshotSummary[];
+  quarantine: SnapshotSummary[];
+  prerestore: SnapshotSummary[];
+}
+
+export interface SnapshotResult {
+  status: string;
+  snapId?: string;
+  reasons?: string[];
+  prerestore?: string;
+  created?: number;
+  replaced?: number;
+  deleted?: number;
+}
+
+export const snapshotGame = callable<[key: string], SnapshotResult>("snapshot_game");
+export const listSnapshots = callable<[key: string], SnapshotListing>("list_snapshots");
+export const restoreSnapshot = callable<[key: string, snapId: string], SnapshotResult>("restore_snapshot");
+export const undoRestore = callable<[key: string, prerestoreId: string], SnapshotResult>("undo_restore");
+export const pinSnapshot = callable<[key: string, snapId: string], { ok: boolean }>("pin_snapshot");
+export const releaseQuarantine = callable<[key: string, snapId: string, confirmed: boolean], SnapshotResult>(
+  "release_quarantine",
+);
+export const runRetention = callable<[key: string], { pruned: string[]; kept: number; orphansDeleted: string[] }>(
+  "run_retention",
+);
 export const manifestStatus = callable<[], ManifestStatus>("manifest_status");
 export const refreshManifest = callable<[force: boolean], { ok: boolean; reason?: string; games?: number }>(
   "refresh_manifest",
