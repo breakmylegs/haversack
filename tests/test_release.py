@@ -89,10 +89,28 @@ def test_publish_dry_run_builds_assets_without_git_changes(repo):
     with open(zip_path, "rb") as handle:
         digest = hashlib.sha256(handle.read()).hexdigest()
     with open(os.path.join(out_dir, "SHA256SUMS"), encoding="utf-8") as handle:
-        assert handle.read() == f"{digest}  Keepsake-v0.2.1.zip\n"
+        assert handle.read() == f"{digest}  Keepsake-v0.2.1.zip\n{digest}  Keepsake.zip\n"
     with open(os.path.join(out_dir, "notes.md"), encoding="utf-8") as handle:
         assert "Something." in handle.read()
     assert runner.calls == []
+
+
+def test_stable_zip_is_a_byte_identical_copy(repo):
+    out_dir = release.publish(device_tested=False, dry_run=True, runner=FakeRunner(), check=lambda: 0)
+    with (
+        open(os.path.join(out_dir, "Keepsake-v0.2.1.zip"), "rb") as versioned,
+        open(os.path.join(out_dir, "Keepsake.zip"), "rb") as stable,
+    ):
+        assert versioned.read() == stable.read()
+
+
+def test_signature_covers_both_names(repo, monkeypatch):
+    monkeypatch.setenv("KEEPSAKE_MINISIGN_KEY", str(repo / "secret.key"))
+    monkeypatch.setattr(release.shutil, "which", lambda name: "/usr/bin/minisign")
+    runner = FakeRunner()
+    out_dir = release.publish(device_tested=False, dry_run=True, runner=runner, check=lambda: 0)
+    (signed,) = runner.commands(("minisign",))
+    assert signed[signed.index("-m") + 1] == os.path.join(out_dir, "SHA256SUMS")
 
 
 def test_accept_untested_publishes_and_says_so_in_notes(repo):
@@ -150,6 +168,7 @@ def test_publish_tags_pushes_and_creates_release(repo):
     (create,) = runner.commands(("gh", "release", "create"))
     assert "--prerelease" not in create
     assert any(arg.endswith("Keepsake-v0.2.1.zip") for arg in create)
+    assert any(os.path.basename(arg) == "Keepsake.zip" for arg in create)  # the stable "latest" asset
     assert any(arg.endswith("SHA256SUMS") for arg in create)
     # Tag before release, release last.
     assert runner.calls.index(create) == len(runner.calls) - 1

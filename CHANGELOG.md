@@ -6,7 +6,11 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 Slice 11: registry saves, Steam Cloud detection and sleep snapshots. Each has its own setting.
 
+This is the first release since 0.2.0. It also contains everything listed under 0.3.0 to 0.10.0 below, which were not published on their own: game discovery, save locations, snapshots, OneDrive sync before launch and after exit, cross-device game matching, the full Gaming Mode interface and setup wizard, Google Drive, WebDAV and S3, and the Ludusavi import.
+
 ### Added
+
+- Every release also carries `Keepsake.zip`, a byte-identical copy of `Keepsake-v<version>.zip`, so a first install always uses the same URL: `https://github.com/breakmylegs/keepsake/releases/latest/download/Keepsake.zip`. `SHA256SUMS` lists both names. The in-plugin updater still uses the versioned zip.
 
 - Games that keep save data in the Proton registry can sync those keys ("Sync registry keys" on the game page, off by default). Only the keys the save-location manifest lists are touched, only while the game is closed, with a backup, and the file is checked before and after so it cannot be left damaged.
 - Steam games are labelled when they use Steam Cloud, and "Sync them all" turns on Keepsake for played Steam games that have no Steam Cloud saves.

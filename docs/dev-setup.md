@@ -73,6 +73,16 @@ This builds the zip, copies it to the device home folder, replaces `~/homebrew/p
 
 Alternative without SSH: copy the zip to the device and use Decky, Settings, Developer, "Install Plugin from ZIP File".
 
+## Install a released build
+
+To put a published release on a device (no SSH or development build needed): Decky, Settings, Developer, Install Plugin from URL, then paste
+
+```
+https://github.com/breakmylegs/keepsake/releases/latest/download/Keepsake.zip
+```
+
+After that, updates come through Keepsake's Updates page. A development build deployed over SSH replaces a released one, and the next release offered on the Updates page replaces it again.
+
 ## Where things live on the device
 
 | What | Path |

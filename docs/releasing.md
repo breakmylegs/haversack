@@ -36,7 +36,19 @@ Releases can be signed with [minisign](https://jedisct1.github.io/minisign/). Wi
    pnpm release publish --device-tested
    ```
 
-   This runs `pnpm run check`, builds `Keepsake-v0.2.1.zip` deterministically, writes `SHA256SUMS`, signs it when `KEEPSAKE_MINISIGN_KEY` is set, creates and pushes the tag `v0.2.1`, and creates the GitHub Release with the zip, `SHA256SUMS`, the signature and the changelog notes.
+   This runs `pnpm run check`, builds `Keepsake-v0.2.1.zip` deterministically, copies it byte for byte to `Keepsake.zip`, writes `SHA256SUMS` with a line for each name, signs it when `KEEPSAKE_MINISIGN_KEY` is set, creates and pushes the tag `v0.2.1`, and creates the GitHub Release with both zips, `SHA256SUMS`, the signature and the changelog notes.
+
+## Release assets and the install URL
+
+| Asset | Used by |
+|---|---|
+| `Keepsake-v<version>.zip` | The in-plugin updater and the rebuild check below |
+| `Keepsake.zip` | First install: `https://github.com/breakmylegs/keepsake/releases/latest/download/Keepsake.zip` |
+| `SHA256SUMS` | Both zips, one line each, so one signature covers both names |
+
+First install on a new device: Decky, Settings, Developer, Install Plugin from URL, then paste the URL above. After that, updates come through Keepsake's Updates page.
+
+GitHub's `/releases/latest/` redirect skips drafts and pre-releases, so that URL always gives the newest stable release. Do not rename or drop either zip: the updater only looks for the versioned name, and the install URL only works while every stable release has `Keepsake.zip`.
 
 Use `pnpm release publish --dry-run` to build the assets into `out/release/` without tagging or publishing.
 
