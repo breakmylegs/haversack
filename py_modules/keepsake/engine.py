@@ -203,11 +203,13 @@ class SnapshotEngine:
         force: bool = False,
         gate: bool = True,
         flags: list[str] | None = None,
+        created: float | None = None,
     ) -> dict[str, Any]:
         """Scan, gate and publish a snapshot. Refused snapshots are quarantined locally, never uploaded.
 
         ``force`` publishes even when nothing changed (merge snapshots); ``gate``
         False skips the safety gates for a snapshot the user explicitly chose.
+        ``created`` keeps an imported backup's own time (display only, principle 4).
         """
         self.list_metas(game_key)  # raises NewerSchemaError before anything is written
         entries = scan_entries(files_by_root, roots)
@@ -230,7 +232,7 @@ class SnapshotEngine:
                 flags=flags,
                 blob_sha256=blob_sha,
                 plugin_version=self.plugin_version,
-                created=self.clock(),
+                created=created if created is not None else self.clock(),
             )
             if reasons:
                 self.quarantine.save(game_key, meta, blob_path, {"reasons": reasons})

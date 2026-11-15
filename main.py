@@ -68,17 +68,29 @@ class Plugin:
     async def cloud_status(self) -> dict[str, Any]:
         return await self.app.cloud_status()
 
-    async def start_signin(self) -> dict[str, Any]:
-        return await self.app.start_signin()
+    async def start_signin(self, backend: str = "onedrive") -> dict[str, Any]:
+        return await self.app.start_signin(backend)
 
     async def cancel_signin(self) -> dict[str, Any]:
         return await self.app.cancel_signin()
 
-    async def sign_out(self) -> dict[str, Any]:
-        return await self.app.sign_out()
+    async def sign_out(self, backend: str = "onedrive") -> dict[str, Any]:
+        return await self.app.sign_out(backend)
 
-    async def test_cloud(self) -> dict[str, Any]:
-        return await self.app.test_cloud()
+    async def test_cloud(self, backend: str | None = None) -> dict[str, Any]:
+        return await self.app.test_cloud(backend)
+
+    async def backend_config(self, backend: str) -> dict[str, Any]:
+        return await self.app.backend_config(backend)
+
+    async def set_backend_config(self, backend: str, values: dict[str, Any]) -> dict[str, Any]:
+        return await self.app.set_backend_config(backend, values)
+
+    async def ludusavi_scan(self, root: str) -> dict[str, Any]:
+        return await self.app.ludusavi_scan(root)
+
+    async def ludusavi_import(self, root: str, folder: str, backup_ids: list[str], game_key: str) -> dict[str, Any]:
+        return await self.app.ludusavi_import(root, folder, backup_ids, game_key)
 
     async def set_game_key(self, key: str, game_key: str | None, title: str | None = None) -> dict[str, Any]:
         return await self.app.set_game_key(key, game_key, title)

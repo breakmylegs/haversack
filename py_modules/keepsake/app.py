@@ -10,25 +10,34 @@ import asyncio
 import json
 import logging
 import os
+import re
+import shutil
 import time
+import uuid
+import zipfile
 from collections.abc import Callable, Coroutine
 from typing import Any
 
 from . import configrev, diagnostics, discovery, health, identity, lifecycle, manifest, net, resolve, restore
-from .auth import AuthError, DeviceCodeFlow, TokenManager, TokenStore
+from .auth import GOOGLE, AuthError, DeviceCodeFlow, TokenManager, TokenStore
+from .backends import BackendConfigError, CredentialStore
 from .engine import SnapshotEngine
 from .freeze import Freezer
 from .fsutil import atomic_write_json, read_json
 from .gameconfig import DEFAULT as GAME_DEFAULTS
 from .gameconfig import GameConfigStore, custom_path_from_absolute
+from .importers import ludusavi
 from .jobs import JobTracker
 from .log import log_event, setup_logging, tail
 from .paths import PluginPaths
 from .procs import find_game_processes
 from .settings import SettingsStore
-from .snapshot import SnapshotError
+from .snapshot import SnapshotError, content_hash, scan_entries
 from .store import AlreadyExistsError, LocalFolderStore, Store, StoreError
+from .store.gdrive import GoogleDriveStore
 from .store.graph import GraphStore
+from .store.s3 import S3Store
+from .store.webdav import WebDavStore
 from .sync import GameContext, SyncEngine
 from .update import Updater, startup_notice
 
@@ -36,7 +45,15 @@ EmitFn = Callable[..., Coroutine[Any, Any, None]]
 IDENTITY_CACHE_SECONDS = 600
 HISTORY_MAX = 200
 CONFIG_STATE_FILE = "config-revisions.json"
-TOAST_SIGNIN = "OneDrive sign-in needs attention. Open Keepsake, Settings, to sign in again."
+TOAST_SIGNIN = "{name} sign-in needs attention. Open Keepsake, Settings, to sign in again."
+BACKEND_NAMES = {
+    "local": "Test store on this device",
+    "onedrive": "OneDrive",
+    "gdrive": "Google Drive",
+    "webdav": "WebDAV",
+    "s3": "S3",
+}
+IMPORT_STAGING = "import-staging"
 UNRESOLVED_METHODS = ("none", "ambiguous", "no-save-data", "no-manifest")
 
 FREEZE_TEST_MIN = 1
@@ -62,8 +79,22 @@ class KeepsakeApp:
         auto_refresh_manifest: bool = True,
         transport: net.Transport = net.request,
         graph_base_url: str | None = None,
+        google_transport: net.Transport = net.google_request,
+        google_api: tuple[str, str] | None = None,
+        endpoint_transport: Callable[[str], net.Transport] = net.endpoint_transport,
     ) -> None:
         self._graph_base_url = graph_base_url
+        self._google_transport = google_transport
+        self._google_api = google_api  # tests point this at a fake Drive
+        self._endpoint_transport = endpoint_transport
+        self.credentials = CredentialStore(paths.settings_dir)
+        self.google_tokens = TokenManager(
+            TokenStore(paths.settings_dir, GOOGLE.token_file),
+            lambda: str(self.credentials.load("gdrive")["clientId"]),
+            transport=google_transport,
+            provider=GOOGLE,
+            client_secret=lambda: str(self.credentials.load("gdrive")["clientSecret"]),
+        )
         self.paths = paths
         self.home = home
         self._games: dict[str, Any] | None = None
@@ -448,45 +479,73 @@ class KeepsakeApp:
         result = await asyncio.to_thread(resolve.preview, game, title, record, config, self.home)
         return {**result, "match": match, "gameKey": match.get("gameKey")}
 
-    # OneDrive sign-in (slice 6)
+    # Cloud sign-in: OneDrive (slice 6) and Google Drive (slice 10); WebDAV and S3 use saved settings
+
+    def _token_manager(self, backend: str) -> TokenManager:
+        return self.google_tokens if backend == "gdrive" else self.tokens
 
     async def cloud_status(self) -> dict[str, Any]:
+        store = str(self.settings.get("snapshotStore"))
+        if store in ("webdav", "s3"):
+            configured = self.credentials.configured(store)
+            client_set, signed_in, problem = configured, configured, None
+        else:
+            manager = self._token_manager(store)
+            client_set = bool(
+                self.credentials.configured("gdrive") if store == "gdrive" else self.settings.get("onedriveClientId")
+            )
+            signed_in = await asyncio.to_thread(manager.signed_in)
+            problem = manager.last_error
         return {
-            "clientIdSet": bool(self.settings.get("onedriveClientId")),
-            "signedIn": await asyncio.to_thread(self.tokens.signed_in),
+            "clientIdSet": client_set,
+            "signedIn": signed_in,
             "signingIn": self._signin is not None,
-            "problem": self.tokens.last_error,
-            "store": self.settings.get("snapshotStore"),
+            "problem": problem,
+            "store": store,
+            "name": BACKEND_NAMES.get(store, store),
+            "onedriveSignedIn": await asyncio.to_thread(self.tokens.signed_in),
+            "googleSignedIn": await asyncio.to_thread(self.google_tokens.signed_in),
         }
 
-    async def start_signin(self) -> dict[str, Any]:
-        """Begin the device code flow. Only ever called from a user action (threat model T2)."""
+    async def start_signin(self, backend: str = "onedrive") -> dict[str, Any]:
+        """Begin a device code flow. Only ever called from a user action (threat model T2)."""
+        backend = "gdrive" if backend == "gdrive" else "onedrive"
         async with self._auth_lock:
             if self._signin is not None:
                 self._signin.cancelled.set()
-            flow = DeviceCodeFlow(
-                str(self.settings.get("onedriveClientId")), self.token_store, transport=self._transport
-            )
+            if backend == "gdrive":
+                client = self.credentials.load("gdrive")
+                flow = DeviceCodeFlow(
+                    str(client["clientId"]),
+                    self.google_tokens.store,
+                    transport=self._google_transport,
+                    provider=GOOGLE,
+                    client_secret=str(client["clientSecret"]),
+                )
+            else:
+                flow = DeviceCodeFlow(
+                    str(self.settings.get("onedriveClientId")), self.token_store, transport=self._transport
+                )
             shown = await asyncio.to_thread(flow.start)
             self._signin = flow
-        log_event(logging.INFO, "auth.signin_started", "OneDrive sign-in started")
-        self._background.append(asyncio.create_task(self._finish_signin(flow)))
+        log_event(logging.INFO, "auth.signin_started", "Sign-in started", backend=backend)
+        self._background.append(asyncio.create_task(self._finish_signin(flow, backend)))
         return shown
 
-    async def _finish_signin(self, flow: DeviceCodeFlow) -> None:
+    async def _finish_signin(self, flow: DeviceCodeFlow, backend: str = "onedrive") -> None:
         try:
             await asyncio.to_thread(flow.poll)
         except AuthError as exc:
             if self._signin is flow:
                 self._signin = None
-            log_event(logging.WARNING, "auth.signin_failed", "OneDrive sign-in did not complete", reason=exc.reason)
+            log_event(logging.WARNING, "auth.signin_failed", "Sign-in did not complete", reason=exc.reason)
             await self.emit("keepsake_signin", {"status": "failed", "reason": exc.reason})
             return
         if self._signin is flow:
             self._signin = None
-        self.tokens.last_error = None
-        log_event(logging.INFO, "auth.signed_in", "Signed in to OneDrive")
-        registered = await self.register_device()
+        self._token_manager(backend).last_error = None
+        log_event(logging.INFO, "auth.signed_in", "Signed in", backend=backend)
+        registered = await self.register_device(self._gdrive() if backend == "gdrive" else self._graph())
         await self.emit("keepsake_signin", {"status": "signed-in", "registered": registered})
 
     async def cancel_signin(self) -> dict[str, Any]:
@@ -495,10 +554,11 @@ class KeepsakeApp:
             self._signin = None
         return {"ok": True}
 
-    async def sign_out(self) -> dict[str, Any]:
+    async def sign_out(self, backend: str = "onedrive") -> dict[str, Any]:
         await self.cancel_signin()
-        await asyncio.to_thread(self.token_store.clear)
-        log_event(logging.INFO, "auth.signed_out", "Signed out of OneDrive")
+        manager = self._token_manager(backend)
+        await asyncio.to_thread(manager.store.clear)
+        log_event(logging.INFO, "auth.signed_out", "Signed out", backend=backend)
         return {"ok": True}
 
     def _graph(self) -> GraphStore:
@@ -506,14 +566,69 @@ class KeepsakeApp:
             return GraphStore(self.tokens, transport=self._transport, base_url=self._graph_base_url)
         return GraphStore(self.tokens, transport=self._transport)
 
-    async def test_cloud(self) -> dict[str, Any]:
+    def _gdrive(self) -> GoogleDriveStore:
+        if self._google_api:  # tests point this at a fake Drive
+            api, upload = self._google_api
+            return GoogleDriveStore(self.google_tokens, transport=self._google_transport, api=api, upload=upload)
+        return GoogleDriveStore(self.google_tokens, transport=self._google_transport)
+
+    def _webdav(self) -> WebDavStore:
+        c = self.credentials.load("webdav")
+        if not self.credentials.configured("webdav"):
+            raise StoreError("enter the WebDAV address, user name and password first")
+        return WebDavStore(c["url"], c["username"], c["password"], transport=self._endpoint_transport(c["url"]))
+
+    def _s3(self) -> S3Store:
+        c = self.credentials.load("s3")
+        if not self.credentials.configured("s3"):
+            raise StoreError("enter the S3 endpoint, bucket and access key first")
+        path_style = bool(c["pathStyle"])
+        return S3Store(
+            c["endpoint"],
+            c["region"],
+            c["bucket"],
+            c["accessKey"],
+            c["secretKey"],
+            prefix=c["prefix"],
+            path_style=path_style,
+            transport=self._endpoint_transport(S3Store.origin_for(c["endpoint"], c["bucket"], path_style)),
+        )
+
+    async def test_cloud(self, backend: str | None = None) -> dict[str, Any]:
+        """Check the chosen backend. WebDAV and S3 must prove create-only writes (fail closed)."""
+        backend = backend or str(self.settings.get("snapshotStore"))
+        device_id = str(self.settings.get("deviceId"))
         try:
-            folder = await asyncio.to_thread(self._graph().check)
+            store: Store
+            if backend == "webdav":
+                webdav = store = self._webdav()
+                await asyncio.to_thread(webdav.check, device_id)
+            elif backend == "s3":
+                s3 = store = self._s3()
+                await asyncio.to_thread(s3.check, device_id)
+            elif backend == "gdrive":
+                gdrive = store = self._gdrive()
+                await asyncio.to_thread(gdrive.check)
+            else:
+                folder = await asyncio.to_thread(self._graph().check)
+                return {"ok": True, "folder": folder.get("name")}
         except StoreError as exc:
             return {"ok": False, "error": str(exc)}
-        return {"ok": True, "folder": folder.get("name")}
+        registered = await self.register_device(store)
+        return {"ok": True, "registered": registered}
 
-    async def register_device(self) -> bool:
+    async def backend_config(self, backend: str) -> dict[str, Any]:
+        return self.credentials.public(str(backend))
+
+    async def set_backend_config(self, backend: str, values: dict[str, Any]) -> dict[str, Any]:
+        try:
+            result = await asyncio.to_thread(self.credentials.save, str(backend), dict(values))
+        except BackendConfigError as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(logging.INFO, "backend.config", "Backend settings saved", backend=backend)
+        return result
+
+    async def register_device(self, store: Store | None = None) -> bool:
         """Write this device's registry entry once (``registry/devices/<deviceId>.json``)."""
         settings = self.settings.all()
         entry = {
@@ -524,8 +639,9 @@ class KeepsakeApp:
             "pluginVersion": self.version,
         }
         key = f"registry/devices/{settings['deviceId']}.json"
+        target = store if store is not None else self._graph()
         try:
-            await asyncio.to_thread(self._graph().put_new, key, json.dumps(entry, sort_keys=True).encode())
+            await asyncio.to_thread(target.put_new, key, json.dumps(entry, sort_keys=True).encode())
         except AlreadyExistsError:
             return True
         except StoreError as exc:
@@ -533,11 +649,18 @@ class KeepsakeApp:
             return False
         return True
 
-    # Snapshots against the local test store or OneDrive
+    # Snapshots against the local test store or the chosen cloud backend
 
     def _store(self) -> Store:
-        if self.settings.get("snapshotStore") == "onedrive":
+        backend = self.settings.get("snapshotStore")
+        if backend == "onedrive":
             return self._graph()
+        if backend == "gdrive":
+            return self._gdrive()
+        if backend == "webdav":
+            return self._webdav()
+        if backend == "s3":
+            return self._s3()
         return LocalFolderStore(os.path.join(self.paths.runtime_dir, "local-test-store"))
 
     def _engine(self) -> SnapshotEngine:
@@ -984,9 +1107,10 @@ class KeepsakeApp:
 
     async def _warn_signin(self) -> None:
         """Toast once when OneDrive sign-in stops working; again only after it has recovered."""
-        problem = self.settings.get("snapshotStore") == "onedrive" and bool(self.tokens.last_error)
+        store = str(self.settings.get("snapshotStore"))
+        problem = store in ("onedrive", "gdrive") and bool(self._token_manager(store).last_error)
         if problem and not self._signin_warned:
-            await self.emit("keepsake_toast", TOAST_SIGNIN)
+            await self.emit("keepsake_toast", TOAST_SIGNIN.format(name=BACKEND_NAMES[store]))
         self._signin_warned = problem
 
     async def _idle_loop(self) -> None:
@@ -1149,7 +1273,7 @@ class KeepsakeApp:
 
     async def _health(self, probe: bool) -> list[dict[str, Any]]:
         cloud: dict[str, Any] = dict(await self.cloud_status())
-        if probe and cloud["store"] == "onedrive" and cloud["signedIn"]:
+        if probe and cloud["store"] != "local" and cloud["signedIn"]:
             tested = await self.test_cloud()
             cloud.update(reachable=tested["ok"], error=tested.get("error"))
         states = self._sync().state.games()
@@ -1262,6 +1386,94 @@ class KeepsakeApp:
             "concurrent": list(record.get("concurrent") or []),
         }
 
+    # Ludusavi import (slice 10, ADR-0021)
+
+    async def ludusavi_scan(self, root: str) -> dict[str, Any]:
+        """Games in a Ludusavi backup folder on this device, each with a suggested game key."""
+        root = str(root).strip()
+        if root == "~" or root.startswith("~/"):
+            root = os.path.join(self.home or os.path.expanduser("~"), root[2:])
+        try:
+            games = await asyncio.to_thread(ludusavi.scan, root)
+        except ludusavi.LudusaviError as exc:
+            raise ValueError(str(exc)) from exc
+        index = await asyncio.to_thread(self.manifest.load)
+        local = {gk: game for game, _c, gk in await self._matched() if gk}
+        for entry in games:
+            name = entry["name"]
+            known = bool(index and name in index.get("games", {}))
+            suggested = manifest.game_key(name)
+            entry["gameKey"] = suggested
+            entry["inManifest"] = known
+            entry["localGame"] = local[suggested]["name"] if suggested in local else None
+        return {"root": root, "games": games}
+
+    async def ludusavi_import(self, root: str, folder: str, backup_ids: list[str], game_key: str) -> dict[str, Any]:
+        """Import chosen Ludusavi backups of one game as ``import`` snapshots. Never touches local saves."""
+        if not isinstance(game_key, str) or not re.match(r"^[a-z0-9][a-z0-9-]{0,99}$", game_key):
+            raise ValueError("choose a game key: lower-case letters, digits and hyphens")
+        game_folder = os.path.join(str(root), str(folder))
+        if os.sep in str(folder) or "/" in str(folder) or str(folder) in ("", ".", ".."):
+            raise ValueError("invalid game folder")
+        eng = self._engine()
+        results = []
+        with self.jobs.job("import"):
+            existing = {
+                (m["contentHash"], m["created"])
+                for m in await asyncio.to_thread(eng.list_metas, game_key)
+                if m.get("kind") == "import"
+            }
+            for backup_id in [str(b) for b in backup_ids][:HISTORY_MAX]:
+                staging = os.path.join(self.paths.runtime_dir, IMPORT_STAGING, uuid.uuid4().hex)
+                try:
+                    extracted = await asyncio.to_thread(ludusavi.extract, game_folder, backup_id, staging)
+                    if not extracted["files"]:
+                        results.append({"backup": backup_id, "status": "nothing-to-import", **_skips(extracted)})
+                        continue
+                    created = extracted["created"]
+                    entries = await asyncio.to_thread(scan_entries, extracted["files"], extracted["roots"])
+                    stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(created if created else time.time()))
+                    if (content_hash(entries), stamp) in existing:
+                        results.append({"backup": backup_id, "status": "already-imported", **_skips(extracted)})
+                        continue
+                    outcome = await asyncio.to_thread(
+                        eng.take,
+                        game_key,
+                        extracted["files"],
+                        extracted["roots"],
+                        "import",
+                        None,
+                        parents=[],
+                        force=True,
+                        gate=False,
+                        flags=["ludusavi"],
+                        created=created,
+                    )
+                    results.append(
+                        {
+                            "backup": backup_id,
+                            "status": outcome["status"],
+                            "snapId": outcome.get("snapId"),
+                            **_skips(extracted),
+                        }
+                    )
+                except (ludusavi.LudusaviError, SnapshotError, OSError, zipfile.BadZipFile) as exc:
+                    results.append({"backup": backup_id, "status": "error", "error": str(exc), "skipped": []})
+                except StoreError as exc:
+                    results.append({"backup": backup_id, "status": "error", "error": str(exc), "skipped": []})
+                    break  # the cloud is unreachable: stop rather than fail every backup
+                finally:
+                    await asyncio.to_thread(shutil.rmtree, staging, True)
+        log_event(
+            logging.INFO,
+            "import.ludusavi",
+            "Ludusavi import finished",
+            gameKey=game_key,
+            imported=sum(1 for r in results if r["status"] == "published"),
+            failed=sum(1 for r in results if r["status"] == "error"),
+        )
+        return {"gameKey": game_key, "results": results}
+
     async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
         """Diagnostics only: hold a fake sync job so the update guard can be tested."""
         seconds = max(1, min(int(seconds), SIMULATED_JOB_MAX))
@@ -1354,6 +1566,10 @@ def status_word(state: dict[str, Any]) -> str:
     if state.get("base"):
         return "synced"
     return "not-synced"
+
+
+def _skips(extracted: dict[str, Any]) -> dict[str, Any]:
+    return {"skipped": extracted.get("skipped", [])[:50], "skippedCount": len(extracted.get("skipped", []))}
 
 
 def snap_summary(meta: dict[str, Any]) -> dict[str, Any]:

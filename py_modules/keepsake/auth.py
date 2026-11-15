@@ -1,12 +1,21 @@
-"""Microsoft sign-in for OneDrive personal: device code flow and token refresh (build prompt section 11).
+"""Device code sign-in and token refresh (build prompt section 11).
+
+Microsoft (OneDrive personal):
 
 * Tenant ``consumers`` (personal Microsoft accounts only).
 * Scopes ``Files.ReadWrite.AppFolder offline_access``; adding any other is an
   escalation item.
-* Tokens live in one file in the settings folder with mode 0600, are never
-  logged (``keepsake.redact``) and are only ever sent to the token endpoint
-  and Graph.
-* Sign-in starts only from a user action (threat model T2).
+
+Google (Google Drive, slice 10):
+
+* The device flow for TVs and limited-input devices, scope ``drive.appdata``
+  only (the narrowest Drive scope the flow allows; verified in slice 10).
+* The client ID and secret are entered by the user, never committed.
+
+For both, tokens live in one file per provider in the settings folder with
+mode 0600, are never logged (``keepsake.redact``) and are only ever sent to the
+token endpoint and the provider's API. Sign-in starts only from a user action
+(threat model T2).
 """
 
 from __future__ import annotations
@@ -17,6 +26,7 @@ import threading
 import time
 import urllib.parse
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -32,6 +42,31 @@ TOKEN_FILE = "onedrive-token.json"  # noqa: S105 - a file name, not a secret
 REFRESH_MARGIN_SECONDS = 300
 # The page the user is sent to must be Microsoft's (threat model T2).
 VERIFICATION_DOMAINS = ("microsoft.com", "live.com")
+
+
+@dataclass(frozen=True)
+class Provider:
+    name: str
+    devicecode_url: str
+    token_url: str
+    scope: str
+    verification_domains: tuple[str, ...]
+    token_file: str
+    refresh_with_scope: bool
+    issuer: str
+
+
+MICROSOFT = Provider("OneDrive", DEVICECODE_URL, TOKEN_URL, SCOPE, VERIFICATION_DOMAINS, TOKEN_FILE, True, "Microsoft")
+GOOGLE = Provider(
+    "Google Drive",
+    "https://oauth2.googleapis.com/device/code",
+    "https://oauth2.googleapis.com/token",
+    "https://www.googleapis.com/auth/drive.appdata",
+    ("google.com",),
+    "google-token.json",
+    False,
+    "Google",
+)
 
 
 class AuthError(Exception):
@@ -55,17 +90,18 @@ def _form(transport: net.Transport, url: str, fields: dict[str, str]) -> tuple[i
     return response.status, data if isinstance(data, dict) else {}
 
 
-def _check_verification_uri(uri: str) -> str:
+def _check_verification_uri(uri: str, provider: Provider = MICROSOFT) -> str:
     parts = urlsplit(uri)
     host = (parts.hostname or "").lower()
-    if parts.scheme != "https" or not any(host == d or host.endswith("." + d) for d in VERIFICATION_DOMAINS):
-        raise AuthError("bad-verification-uri", "the sign-in page is not a Microsoft address")
+    domains = provider.verification_domains
+    if parts.scheme != "https" or not any(host == d or host.endswith("." + d) for d in domains):
+        raise AuthError("bad-verification-uri", f"the sign-in page is not a {provider.issuer} address")
     return uri
 
 
 class TokenStore:
-    def __init__(self, settings_dir: str) -> None:
-        self.path = os.path.join(settings_dir, TOKEN_FILE)
+    def __init__(self, settings_dir: str, file_name: str = TOKEN_FILE) -> None:
+        self.path = os.path.join(settings_dir, file_name)
 
     def load(self) -> dict[str, Any] | None:
         try:
@@ -117,10 +153,14 @@ class DeviceCodeFlow:
         transport: net.Transport = net.request,
         clock: Callable[[], float] = time.time,
         sleep: Callable[[float], None] = time.sleep,
+        provider: Provider = MICROSOFT,
+        client_secret: str = "",
     ) -> None:
         if not client_id:
-            raise AuthError("no-client-id", "set the OneDrive client ID first (docs/setup-entra.md)")
+            raise AuthError("no-client-id", f"set the {provider.name} client ID first")
         self.client_id = client_id
+        self.client_secret = client_secret
+        self.provider = provider
         self.store = store
         self.transport = transport
         self.clock = clock
@@ -128,11 +168,22 @@ class DeviceCodeFlow:
         self.cancelled = threading.Event()
         self.device: dict[str, Any] | None = None
 
+    def _client(self) -> dict[str, str]:
+        fields = {"client_id": self.client_id}
+        if self.client_secret:
+            fields["client_secret"] = self.client_secret
+        return fields
+
     def start(self) -> dict[str, Any]:
-        status, data = _form(self.transport, DEVICECODE_URL, {"client_id": self.client_id, "scope": SCOPE})
+        status, data = _form(
+            self.transport, self.provider.devicecode_url, {"client_id": self.client_id, "scope": self.provider.scope}
+        )
         if status != 200 or not data.get("device_code") or not data.get("user_code"):
             raise AuthError("devicecode-failed", str(data.get("error", status)))
-        uri = _check_verification_uri(str(data.get("verification_uri", "")))
+        # Microsoft says verification_uri, Google says verification_url.
+        uri = _check_verification_uri(
+            str(data.get("verification_uri") or data.get("verification_url") or ""), self.provider
+        )
         self.device = {
             "device_code": str(data["device_code"]),
             "user_code": str(data["user_code"]),
@@ -161,8 +212,8 @@ class DeviceCodeFlow:
                 raise AuthError("cancelled")
             status, data = _form(
                 self.transport,
-                TOKEN_URL,
-                {"grant_type": DEVICE_GRANT, "client_id": self.client_id, "device_code": self.device["device_code"]},
+                self.provider.token_url,
+                {"grant_type": DEVICE_GRANT, **self._client(), "device_code": self.device["device_code"]},
             )
             if status == 200:
                 return _store_tokens(self.store, self.client_id, data, self.clock())
@@ -184,9 +235,13 @@ class TokenManager:
         client_id: Callable[[], str],
         transport: net.Transport = net.request,
         clock: Callable[[], float] = time.time,
+        provider: Provider = MICROSOFT,
+        client_secret: Callable[[], str] = lambda: "",
     ) -> None:
         self.store = store
         self.client_id = client_id
+        self.client_secret = client_secret
+        self.provider = provider
         self.transport = transport
         self.clock = clock
         self._lock = threading.Lock()
@@ -199,23 +254,20 @@ class TokenManager:
         with self._lock:
             tokens = self.store.load()
             if tokens is None:
-                raise AuthError("signed-out", "sign in to OneDrive first")
+                raise AuthError("signed-out", f"sign in to {self.provider.name} first")
             if not force_refresh and float(tokens.get("expires_at", 0)) - self.clock() > REFRESH_MARGIN_SECONDS:
                 return str(tokens["access_token"])
             return str(self._refresh(tokens)["access_token"])
 
     def _refresh(self, tokens: dict[str, Any]) -> dict[str, Any]:
         client_id = str(tokens.get("client_id") or self.client_id())
-        status, data = _form(
-            self.transport,
-            TOKEN_URL,
-            {
-                "grant_type": "refresh_token",
-                "client_id": client_id,
-                "refresh_token": str(tokens["refresh_token"]),
-                "scope": SCOPE,
-            },
-        )
+        fields = {"grant_type": "refresh_token", "client_id": client_id, "refresh_token": str(tokens["refresh_token"])}
+        if self.provider.refresh_with_scope:
+            fields["scope"] = self.provider.scope
+        secret = self.client_secret()
+        if secret:
+            fields["client_secret"] = secret
+        status, data = _form(self.transport, self.provider.token_url, fields)
         if status != 200:
             error = str(data.get("error", f"http-{status}"))
             # invalid_grant means the refresh token is no longer accepted: sign in again.

@@ -12,7 +12,7 @@ export interface Settings {
   gateMaxRemovedPercent: number;
   gateMaxSizeDropPercent: number;
   onedriveClientId: string;
-  snapshotStore: "local" | "onedrive";
+  snapshotStore: Backend;
   launchPullTimeout: number;
   toastOnSync: boolean;
   idleSyncMinutes: number;
@@ -21,11 +21,55 @@ export interface Settings {
   readOnly: boolean;
 }
 
-export type SyncWord = "off" | "not-synced" | "synced" | "pending" | "conflict" | "quarantined";
+export type Backend = "local" | "onedrive" | "gdrive" | "webdav" | "s3";
+
+export interface BackendConfig {
+  configured: boolean;
+  [field: string]: string | boolean;
+}
+
+export interface LudusaviBackup {
+  id: string;
+  kind: "full" | "differential";
+  when: string | null;
+  created: number | null;
+  files: number;
+}
+
+export interface LudusaviGame {
+  folder: string;
+  name: string;
+  backups: LudusaviBackup[];
+  error: string | null;
+  gameKey: string;
+  inManifest: boolean;
+  localGame: string | null;
+}
+
+export interface ImportResult {
+  backup: string;
+  status: "published" | "already-imported" | "nothing-to-import" | "error";
+  snapId?: string;
+  error?: string;
+  skipped: { path: string; reason: string }[];
+  skippedCount?: number;
+}
+
+export const backendConfig = callable<[backend: Backend], BackendConfig>("backend_config");
+export const setBackendConfig = callable<[backend: Backend, values: Record<string, string | boolean>], BackendConfig>(
+  "set_backend_config",
+);
+export const ludusaviScan = callable<[root: string], { root: string; games: LudusaviGame[] }>("ludusavi_scan");
+export const ludusaviImport = callable<
+  [root: string, folder: string, backupIds: string[], gameKey: string],
+  { gameKey: string; results: ImportResult[] }
+>("ludusavi_import");
+
+export type SyncWord ="off" | "not-synced" | "synced" | "pending" | "conflict" | "quarantined";
 export type HealthStatus = "ok" | "info" | "warn" | "fail";
 
 export interface QamSummary {
-  store: "local" | "onedrive";
+  store: Backend;
   signedIn: boolean;
   deviceName: string;
   lastSync: number | null;
@@ -331,7 +375,10 @@ export interface CloudStatus {
   signedIn: boolean;
   signingIn: boolean;
   problem: string | null;
-  store: "local" | "onedrive";
+  store: Backend;
+  name: string;
+  onedriveSignedIn: boolean;
+  googleSignedIn: boolean;
 }
 
 export interface SignInCode {
@@ -341,10 +388,12 @@ export interface SignInCode {
 }
 
 export const cloudStatus = callable<[], CloudStatus>("cloud_status");
-export const startSignin = callable<[], SignInCode>("start_signin");
+export const startSignin = callable<[backend?: "onedrive" | "gdrive"], SignInCode>("start_signin");
 export const cancelSignin = callable<[], { ok: boolean }>("cancel_signin");
-export const signOut = callable<[], { ok: boolean }>("sign_out");
-export const testCloud = callable<[], { ok: boolean; folder?: string; error?: string }>("test_cloud");
+export const signOut = callable<[backend?: "onedrive" | "gdrive"], { ok: boolean }>("sign_out");
+export const testCloud = callable<[backend?: Backend], { ok: boolean; folder?: string; error?: string; registered?: boolean }>(
+  "test_cloud",
+);
 export interface HeadSummary {
   snapId: string;
   device: string | null;

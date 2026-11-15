@@ -3,7 +3,7 @@ import { addEventListener, definePlugin, removeEventListener, routerHook, toaste
 import { useEffect, useState } from "react";
 import { FaSave } from "react-icons/fa";
 import { checkForUpdates, getStatus, qamSummary, QamSummary, syncNow, takeStartupNotice, UpdateStatus } from "./backend";
-import { agoText, HEALTH_COLOURS, HEALTH_LABELS, SYNC_LABELS } from "./format";
+import { agoText, BACKEND_LABELS, HEALTH_COLOURS, HEALTH_LABELS, SYNC_LABELS } from "./format";
 import { startLifecycle } from "./lifecycle";
 import { startProbes } from "./probes";
 import { KeepsakeRoute } from "./pages/KeepsakeRoute";
@@ -16,8 +16,8 @@ function openRoute(path: string) {
 }
 
 function storeText(s: QamSummary): string {
-  if (s.store !== "onedrive") return "Test store on this device";
-  return s.signedIn ? "OneDrive" : "OneDrive, signed out";
+  if (s.store === "local") return "Test store on this device";
+  return s.signedIn ? BACKEND_LABELS[s.store] : `${BACKEND_LABELS[s.store]}, not set up`;
 }
 
 function Content() {

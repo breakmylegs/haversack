@@ -5,22 +5,47 @@ import threading
 
 import pytest
 
+from fake_clouds import FakeDrive, FakeGoogleTokens, FakeS3, FakeWebDav
 from fake_graph import FakeGraph, FakeTokens, http_transport
 from keepsake.store import AlreadyExistsError, LocalFolderStore, NotFoundError, StoreError
+from keepsake.store.gdrive import GoogleDriveStore
 from keepsake.store.graph import GraphStore
+from keepsake.store.s3 import S3Store
+from keepsake.store.webdav import WebDavStore
 
 SMALL_CHUNK = 320 * 1024
+NO_SLEEP = {"sleep": lambda s: None}
 
 
-@pytest.fixture(params=["local", "graph"])
+@pytest.fixture(params=["local", "graph", "webdav", "s3", "gdrive"])
 def store(request, tmp_path):
     if request.param == "local":
         yield LocalFolderStore(str(tmp_path / "store"))
         return
-    fake = FakeGraph()
-    yield GraphStore(
-        FakeTokens(fake), transport=http_transport, base_url=fake.base_url, sleep=lambda s: None, chunk_size=SMALL_CHUNK
-    )
+    if request.param == "graph":
+        fake = FakeGraph()
+        yield GraphStore(
+            FakeTokens(fake), transport=http_transport, base_url=fake.base_url, chunk_size=SMALL_CHUNK, **NO_SLEEP
+        )
+    elif request.param == "webdav":
+        fake = FakeWebDav()
+        yield WebDavStore(fake.base_url, "user", "secret", transport=http_transport, **NO_SLEEP)
+    elif request.param == "s3":
+        fake = FakeS3()
+        yield S3Store(
+            fake.endpoint,
+            "eu-west-2",
+            FakeS3.BUCKET,
+            "AKIDEXAMPLE",
+            "not-a-real-key",
+            transport=http_transport,
+            **NO_SLEEP,
+        )
+    else:
+        fake = FakeDrive()
+        yield GoogleDriveStore(
+            FakeGoogleTokens(), transport=http_transport, api=fake.api, upload=fake.upload, **NO_SLEEP
+        )
     fake.close()
 
 
@@ -77,10 +102,13 @@ def test_large_file_round_trip_with_verified_hash(store, tmp_path):
     info = store.put_new_file("games/g/blobs/big.zip", str(source))
     import hashlib
 
-    assert info.sha256 == hashlib.sha256(data).hexdigest()
+    expected = hashlib.sha256(data).hexdigest()
+    # A store that cannot verify an upload (WebDAV reports no hash) returns None, and the
+    # snapshot engine then verifies by downloading. A store must never report a wrong hash.
+    assert info.sha256 in (expected, None)
     dest = tmp_path / "down.bin"
     got = store.get_to_file("games/g/blobs/big.zip", str(dest))
-    assert dest.read_bytes() == data and got.sha256 == info.sha256
+    assert dest.read_bytes() == data and got.sha256 == expected
 
 
 def test_get_missing(store, tmp_path):

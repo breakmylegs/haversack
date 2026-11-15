@@ -37,10 +37,15 @@ def created_epoch(meta: Mapping[str, Any]) -> float:
 
 
 def heads(metas: Iterable[Mapping[str, Any]]) -> set[str]:
-    """Snapshots no other snapshot names as a parent."""
+    """Snapshots no other snapshot names as a parent.
+
+    ``import`` snapshots (old backups brought in from Ludusavi, ADR-0021) are
+    history to restore from by hand, never heads, so importing never raises a
+    conflict or replaces anyone's current save. Retention keeps them anyway.
+    """
     items = list(metas)
     parents = {p for m in items for p in m.get("parents", [])}
-    return {m["snapId"] for m in items if m["snapId"] not in parents}
+    return {m["snapId"] for m in items if m["snapId"] not in parents and m.get("kind") != "import"}
 
 
 def active_pins(pins: Iterable[Mapping[str, Any]], now: float) -> set[str]:
