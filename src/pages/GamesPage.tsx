@@ -31,7 +31,12 @@ function prefixText(game: GameEntry): string {
 
 function matchText(match: GameMatch | undefined): string {
   if (!match) return "";
+  if (match.proposal) {
+    return `Confirm match: looks like ${match.proposal.candidate.title ?? match.proposal.candidate.gameKey}`;
+  }
   switch (match.method) {
+    case "manual-key":
+      return `Synced by its own game key: ${match.gameKey}`;
     case "manual":
     case "steam-id":
     case "title":
@@ -152,6 +157,12 @@ export function GamesPage() {
       </Focusable>
       {error && <Field label="Scan failed" description={error} />}
       {result && result.roots.length === 0 && <Field label="No Steam installation found" />}
+      {Object.values(matches).some((m) => m.proposal) && (
+        <Field
+          label={`${Object.values(matches).filter((m) => m.proposal).length} matches need your approval`}
+          description="Keepsake found likely matches it is not certain about. Open each game marked Confirm match to approve or choose another."
+        />
+      )}
       {result && <Field label={`${games.length} shown`} description={`${result.games.length} found on this device.`} />}
       {games.map((game) => {
         const mismatch = game.key in (result?.mismatches ?? {}) || "_unreadable" in (result?.mismatches ?? {});

@@ -6,12 +6,16 @@ import {
   GameConfig,
   GameEntry,
   getGame,
+  IdentitySuggestion,
   MatchInfo,
+  MatchProposal,
   Preview,
   previewGame,
   searchTitles,
   updateGameConfig,
 } from "../backend";
+import { IdentityPanel } from "./IdentityPanel";
+import { ProposalCard } from "./ProposalCard";
 import { LaunchGatePanel } from "./LaunchGatePanel";
 import { SnapshotsPanel } from "./SnapshotsPanel";
 import { SyncPanel } from "./SyncPanel";
@@ -27,6 +31,7 @@ const METHOD_TEXT: Record<MatchInfo["method"], string> = {
   none: "No match found. Choose one.",
   "no-save-data": "Known game with no save locations in the manifest",
   "no-manifest": "The manifest has not been downloaded yet",
+  "manual-key": "Synced by its own game key (no manifest entry)",
 };
 
 function sizeText(bytes: number): string {
@@ -39,6 +44,8 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
   const [game, setGame] = useState<GameEntry | null>(null);
   const [config, setConfig] = useState<GameConfig | null>(null);
   const [match, setMatch] = useState<MatchInfo | null>(null);
+  const [suggestions, setSuggestions] = useState<IdentitySuggestion[]>([]);
+  const [proposal, setProposal] = useState<MatchProposal | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<string[]>([]);
@@ -50,6 +57,8 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
     setGame(data.game);
     setConfig(data.config);
     setMatch(data.match);
+    setSuggestions(data.suggestions ?? []);
+    setProposal(data.proposal ?? null);
     setExclusions(data.config.exclusions.join(", "));
     setQuery(data.game.name);
   };
@@ -109,6 +118,21 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
         </DialogButton>
       </Focusable>
       <Field label={game.name} description={`${METHOD_TEXT[match.method]}${match.title ? `: ${match.title}` : ""}`} />
+      {proposal && (
+        <ProposalCard
+          gameKey={gameKey}
+          gameName={game.name}
+          proposal={proposal}
+          onChanged={() => void load().then(runPreview)}
+        />
+      )}
+      <IdentityPanel
+        gameKey={gameKey}
+        config={config}
+        match={match}
+        suggestions={proposal ? [] : suggestions}
+        onChanged={() => void load().then(runPreview)}
+      />
       {match.gameKey && <Field label="Game key" description={`${match.gameKey}. The same on every device.`} />}
 
       <Field label="Change match" description="Search the manifest and choose the right game." childrenLayout="below">

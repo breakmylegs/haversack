@@ -114,6 +114,13 @@ Microsoft documentation read on 15 November 2026: device code flow (Entra, updat
 | A66 | Game processes run as the same user as the plugin with `HOME` set, so the gate script finds Decky's runtime folder at `~/homebrew/data/Keepsake` | unverified | |
 | A67 | Steam lifetime notifications report the app ID the backend can normalise for shortcuts | unverified (ADR-0001) | |
 
+## Cross-device matching
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A68 | The manifest's `launch` keys are executable paths such as `<base>/Binaries/Game.exe`, so their file names identify a game's executable | verified in the live manifest (slice 4 survey) | manifest |
+| A69 | A game installed from the same ISO keeps the same exe name and save folder names on both devices, whatever the prefix number or shortcut name | design assumption; the scoring needs two signals so one difference does not cause a wrong match | |
+
 ## Template differences
 
 | # | Difference | Reason |

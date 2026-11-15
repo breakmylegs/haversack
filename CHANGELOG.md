@@ -2,6 +2,14 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [Unreleased]
+
+### Added
+
+- Keepsake recognises the same game on your other device even when the shortcut has a different name and the game sits in a differently numbered compatdata folder. It compares the program file name, install folder names and, most strongly, the save folders the other device syncs. Clear matches are applied automatically and shown with the evidence; weaker ones are offered as suggestions.
+- When a match is likely but not certain, Keepsake asks: approve it, choose another, or say it is not this game (that answer is remembered).
+- Games the save-location manifest does not know can be given their own game key and synced through custom folders.
+
 ## [0.8.0]
 
 Slice 8: lifecycle integration. Saves now sync on their own when you start and quit a game.
