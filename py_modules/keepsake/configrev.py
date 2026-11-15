@@ -27,7 +27,9 @@ from .gameconfig import DEFAULT, GameConfigError, validate
 from .store import AlreadyExistsError, NotFoundError, Store, StoreError
 
 SCHEMA_VERSION = 1
-SHARED_FIELDS = ("aliases", "includeConfig", "customPaths", "exclusions")
+# syncRegistry is shared because both devices must agree on what a snapshot holds (slice 11).
+# Revisions written before slice 11 lack it and read as off.
+SHARED_FIELDS = ("aliases", "includeConfig", "customPaths", "exclusions", "syncRegistry")
 MAX_REVISIONS = 200
 PUBLISH_ATTEMPTS = 5
 _NAME = re.compile(r"^(\d{6})-([0-9A-Za-z-]{1,64})\.json$")

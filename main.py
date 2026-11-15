@@ -86,6 +86,12 @@ class Plugin:
     async def set_backend_config(self, backend: str, values: dict[str, Any]) -> dict[str, Any]:
         return await self.app.set_backend_config(backend, values)
 
+    async def enable_steam_without_cloud(self) -> dict[str, Any]:
+        return await self.app.enable_steam_without_cloud()
+
+    async def on_suspend(self) -> dict[str, Any]:
+        return await self.app.on_suspend()
+
     async def ludusavi_scan(self, root: str) -> dict[str, Any]:
         return await self.app.ludusavi_scan(root)
 

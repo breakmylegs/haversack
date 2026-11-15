@@ -61,6 +61,18 @@ export const PLAN_LABELS: Record<PlanEntry["action"], string> = {
   error: "Cannot sync yet",
 };
 
+const KIND_LABELS: Record<string, string> = {
+  provisional: "sleep snapshot (never used automatically)",
+  import: "Ludusavi import",
+  "auto-exit": "after play",
+  "auto-recovered": "recovered",
+  merge: "conflict resolved",
+};
+
+export function kindText(kind: string): string {
+  return KIND_LABELS[kind] ?? kind;
+}
+
 export const CONFLICT_TEXT = {
   adoption: "This device has save files that differ from the cloud, and they have never been synced.",
   fork: "Two devices saved different progress from the same starting point.",

@@ -20,7 +20,7 @@ Status values: **planned** (mitigation designed, not built yet), **partial** (so
 | T12 | GitHub API rate limits | Caching and quiet failure | in place: at most one automatic check a day, ETag `If-None-Match`, 403 and 429 keep the cache and report quietly, unauthenticated requests only (`keepsake.update`, tests in `tests/test_update.py`) | 1 |
 | T13 | Two devices racing | Create-only writes and fork detection | in place: create-only on both stores, tested with racing writers in the shared store contract; OneDrive uses upload sessions with `conflictBehavior: fail`; slice 7 detects forks after every push and at every launch, and a push racing a pull is a simulator scenario | 1 |
 | T14 | Clock skew | Hashes and parents decide | in place (slice 7): the decision table compares content hashes and parent links only; the two-device simulator runs one device three days behind | 1 |
-| T15 | A registry merge corrupting a prefix | Backup, key-level scope, re-parse validation | planned (slice 11) | 1 |
+| T15 | A registry merge corrupting a prefix | Backup, key-level scope, re-parse validation | in place (slice 11, ADR-0022): only manifest-listed keys of opted-in games; the merged text must re-parse, keep every other key byte for byte and match the snapshot exactly; foreign keys in a fragment refused; original copied first; written beside and atomically renamed, then read back; nothing written if Wine changed the file meanwhile; never while the game runs. Fault-injection tests at every write step in `tests/test_registry.py` | 1 |
 
 ## Slice 1 additions
 
@@ -63,6 +63,8 @@ Status values: **planned** (mitigation designed, not built yet), **partial** (so
 | T65 | Google client secret or tokens leak | Entered by the user, never committed, stored mode 0600, sent only to Google's token endpoint; `drive.appdata` scope only | in place (slice 10) |
 | T66 | A crafted Ludusavi backup writes outside the save roots or slips in unchecked files | Only files named in `mapping.yaml` are read; paths mapped to logical roots or skipped; `..` and absolute segments refused; symlinks refused; size and SHA-1 checked; any mismatch refuses the backup; extraction only into Keepsake's staging folder; restores still go through the normal confined, journalled path | in place (slice 10), `tests/test_ludusavi.py` |
 | T67 | An imported old backup replaces current saves or raises conflicts everywhere | Imports are never heads; they are history restored by hand with a pre-restore snapshot (ADR-0021) | in place (slice 10) |
+| T68 | A suspend snapshot (mid-session state) is adopted by the other device as the current save | Provisional snapshots are never heads or bases and do not hide the head they sit on; the other device only shows a message and the user restores from History if wanted (ADR-0022) | in place (slice 11), `tests/test_slice11.py` |
+| T69 | A wrong Steam Cloud label leads to a game synced twice (Steam Cloud and Keepsake) or not at all | Detection is read-only and only labels or offers; bulk enable covers played games with no cloud files; both tools syncing the same files is still guarded by conflicts and pre-restore snapshots | in place (slice 11); detection rule unverified on device (A118) |
 | T60 | Health checks or the diagnostics export reveal the game list | Results stay on the device; the export is written to the settings folder only (as T16) | accepted, as T16 |
 
 ## v2 additions (slice C0)

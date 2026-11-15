@@ -44,6 +44,8 @@ class GameContext:
     running: Callable[[], bool]
     # Builds this device's identity record for cross-device matching (ADR-0011), if known.
     identity: Callable[[], dict[str, Any]] | None = None
+    # Runs right after any restore, before files are scanned again: merges registry keys (ADR-0022).
+    after_restore: Callable[[], None] | None = None
 
 
 class SyncState:
@@ -137,6 +139,12 @@ class SyncEngine:
         record = self.state.get(gk)
         try:
             result = self._pull(ctx, record)
+            try:
+                suspended = self.suspended_elsewhere(gk)
+            except StoreError:
+                suspended = None  # informational only: never turns a finished pull into a failure
+            if suspended:
+                result = {**result, "suspended": suspended}
         except NewerSchemaError:
             result = {"action": "launch", "blocked": "newer-schema"}
         except StoreUnavailable:
@@ -192,6 +200,8 @@ class SyncEngine:
             return {"action": "launch", "pending": True, "reason": "cloud-newer-game-running"}
         staged = os.path.join(self._staging, ctx.game_key, f"{snap_id}.zip")
         result = self.engine.restore(ctx.game_key, snap_id, ctx.files(), ctx.roots, False, staged_blob=staged)
+        if ctx.after_restore:
+            ctx.after_restore()
         self._set_base(ctx.game_key, snap_id)
         self.state.update(ctx.game_key, lastPull=self.clock())
         return {"action": "restored", "snapId": snap_id, "prerestore": result.get("prerestore")}
@@ -313,6 +323,8 @@ class SyncEngine:
     def _restore_now(self, ctx: GameContext, snap_id: str) -> dict[str, Any]:
         staged = os.path.join(self._staging, ctx.game_key, f"{snap_id}.zip")
         result = self.engine.restore(ctx.game_key, snap_id, ctx.files(), ctx.roots, False, staged_blob=staged)
+        if ctx.after_restore:
+            ctx.after_restore()
         self._set_base(ctx.game_key, snap_id)
         return {"prerestore": result.get("prerestore")}
 
@@ -374,6 +386,43 @@ class SyncEngine:
 
     def status(self, game_key: str) -> dict[str, Any]:
         return self.state.get(game_key)
+
+    # Suspend snapshots (slice 11, ADR-0022)
+
+    def provisional(self, ctx: GameContext) -> dict[str, Any]:
+        """Snapshot a game mid-session when the device suspends. Never a head, never the base.
+
+        Another device is only told about it (:meth:`suspended_elsewhere`) and never
+        adopts it without the user choosing to restore it.
+        """
+        gk = ctx.game_key
+        try:
+            by_id, _heads = self._cloud(gk)
+            base = by_id.get(self.state.get(gk).get("base") or "")
+            result = self.engine.take(gk, ctx.files(), ctx.roots, "provisional", base, flags=["suspend"])
+        except NewerSchemaError:
+            return {"status": "blocked", "reason": "newer-schema"}
+        except StoreUnavailable:
+            return {"status": "offline"}
+        if result["status"] == "published":
+            self.state.update(gk, lastProvisional=self.clock())
+        result.pop("meta", None)
+        return result
+
+    def suspended_elsewhere(self, game_key: str) -> dict[str, Any] | None:
+        """The newest suspend snapshot another device made on top of the current head, if any."""
+        metas = self.engine.list_metas(game_key)
+        heads = dag_heads(metas)
+        candidates = [
+            m
+            for m in metas
+            if m.get("kind") == "provisional"
+            and m.get("deviceId") != self.engine.device_id
+            and any(p in heads for p in m.get("parents", []))
+        ]
+        if not candidates:
+            return None
+        return self._summary(max(candidates, key=lambda m: (str(m.get("created")), m["snapId"])))
 
     # Read-only views for the setup wizard and the conflict modal (slice 9)
 

@@ -20,7 +20,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from .resolve import ALL_ROOTS
+from .resolve import SNAPSHOT_ROOTS as ALL_ROOTS
 from .safepath import PathEscapeError, ensure_within, join_within, validate_relative
 
 SCHEMA_VERSION = 1

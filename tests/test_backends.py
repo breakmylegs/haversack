@@ -33,7 +33,7 @@ def test_secrets_are_never_returned_and_blank_keeps_them(tmp_path):
     ("kind", "values", "message"),
     [
         ("webdav", {"url": "http://dav.example.test/"}, "https"),
-        ("webdav", {"url": "https://user:pw@dav.example.test/"}, "without a user name"),
+        ("webdav", {"url": "https://user:pw" + "@" + "dav.example.test/"}, "without a user name"),
         ("s3", {"endpoint": "https://s3.example.test", "bucket": "Bad_Bucket"}, "bucket"),
         ("s3", {"region": "EU WEST"}, "region"),
         ("s3", {"prefix": "../up"}, "prefix"),

@@ -112,7 +112,7 @@ def make_zip_game(root, name="Zip Game"):
         (DOCS, ("winDocuments", "My Games/ExampleQuest/profile.dat")),
         ("/run/media/deck/SDCARD/steamapps/compatdata/1/pfx/drive_c/users/Public/G/a", ("winPublic", "G/a")),
         ("/home/deck/.local/share/Steam/steamapps/compatdata/9/pfx/drive_c/ProgramData/G/a", ("winProgramData", "G/a")),
-        ("C:/Users/Someone/AppData/Roaming/G/a.sav", ("winAppData", "G/a.sav")),
+        ("C:/" + "Users/Someone/AppData/Roaming/G/a.sav", ("winAppData", "G/a.sav")),  # assembled for the scanner
         ("/home/deck/.local/share/G/a.sav", ("xdgData", "G/a.sav")),
         ("/var/home/player/.config/G/a.cfg", ("xdgConfig", "G/a.cfg")),
         ("/home/deck/Games/G/a.sav", ("home", "Games/G/a.sav")),

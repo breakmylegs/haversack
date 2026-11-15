@@ -144,6 +144,16 @@ Microsoft documentation read on 15 November 2026: device code flow (Entra, updat
 | A116 | A Google OAuth app in testing mode expires refresh tokens after 7 days; whether publishing needs verification for `drive.appdata` | expiry is Google's documented testing-mode rule; verification need unverified | Google |
 | A117 | Peter's Ludusavi backups are in a folder on the device (Ludusavi's default `~/ludusavi-backup`) as well as in OneDrive through rclone | unverified; the import reads a local folder only (ADR-0021 item 7) | |
 
+## Registry, Steam Cloud and suspend (slice 11)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A118 | Steam writes `userdata/<id3>/<appid>/remotecache.vdf` (and `remote/`) for apps that use Steam Cloud, and not for apps without it | community-documented, unverified on device; a wrong answer only mislabels (T69) | |
+| A119 | Wine's `user.reg` is UTF-8 text starting `WINE REGISTRY Version 2`, with `[key] <unix time>` headers, optional `#time=` lines, value lines starting `"` or `@`, and hex data continued with a trailing backslash; key names escape `\` as `\\`; Wine accepts headers without `#time` | format read from Wine-written files and Wine's registry code conventions; unverified against every Proton version, so an unparseable file is left alone (fail closed) | Wine |
+| A120 | Wine re-reads `user.reg` when the prefix's wineserver starts, so a merge while the game is closed takes effect at the next launch | design assumption; merges only happen with the game closed | |
+| A121 | `SteamClient.System.RegisterForOnSuspendRequest(cb)` fires before the device sleeps, leaving a few seconds for a snapshot | verified in types (`system/index.d.ts`); timing unverified on device (A21) | `@decky/ui` 4.16.5 |
+| A122 | The Ludusavi manifest's `registry` keys use `HKEY_CURRENT_USER/...` paths with forward slashes | verified in the manifest schema (A44) | manifest |
+
 ## v2 verification items (slice C0)
 
 Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research.md` that Keepsake will rely on. "TA" means Peter's Tuning Advisor verification register (`decky-plugins/docs/VERIFICATION.md`), reused as evidence with its date and re-checked in the slice named. Types were read in `@decky/ui` 4.16.5 on 15 November 2026.
