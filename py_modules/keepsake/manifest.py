@@ -25,7 +25,7 @@ from .yamlsubset import YamlSubsetError, iter_entries
 # being updated eventually" (assumption A42).
 MANIFEST_URL = "https://raw.githubusercontent.com/mtkennerly/ludusavi-manifest/refs/heads/data/data/manifest.yaml"
 INDEX_FILE = "manifest-index.json"
-INDEX_SCHEMA = 1
+INDEX_SCHEMA = 2  # 2 adds launch executable names ("x") for cross-device matching
 REFRESH_SECONDS = 7 * 24 * 60 * 60
 MAX_MANIFEST_BYTES = 64 * 1024 * 1024
 ATTRIBUTION = "Save locations from the Ludusavi Manifest (MIT), compiled from PCGamingWiki."
@@ -119,6 +119,17 @@ def _compact_paths(value: Any) -> list[list[Any]]:
     return out
 
 
+def _launch_exes(value: Any) -> list[str]:
+    """Lower-case Windows executable names from the manifest's ``launch`` paths (for cross-device matching)."""
+    out: list[str] = []
+    if isinstance(value, dict):
+        for path in value:
+            name = str(path).replace("\\", "/").rsplit("/", 1)[-1].lower()
+            if name.endswith(".exe") and "<" not in name and name not in out:
+                out.append(name)
+    return out
+
+
 def build_index(lines: Iterable[str], etag: str | None = None) -> dict[str, Any]:
     started = time.perf_counter()
     games: dict[str, Any] = {}
@@ -160,6 +171,9 @@ def build_index(lines: Iterable[str], etag: str | None = None) -> dict[str, Any]
             record["se"] = extra
         if install:
             record["i"] = [str(k) for k in install]
+        exes = _launch_exes(entry.get("launch"))
+        if exes:
+            record["x"] = exes
         if cloud.get("steam") is True:
             record["cs"] = True
         games[title] = record
@@ -318,9 +332,23 @@ def match_title(index: dict[str, Any], name: str, aliases: Iterable[str] = ()) -
 
 
 def match_game(index: dict[str, Any] | None, game: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
-    """Decide which manifest entry a discovered game uses.
+    """Decide which manifest entry and game key a discovered game uses.
 
-    Order: the user's manual pick, then the Steam ID for Steam apps, then the
+    A game key set by the user or by cross-device matching (``config.gameKey``)
+    always wins, so the same game shares one key on every device even when it
+    has no manifest entry. The manifest entry (for save paths) is then chosen
+    as below, when there is one.
+    """
+    result = _match_manifest(index, game, config)
+    override = config.get("gameKey")
+    if isinstance(override, str) and override:
+        method = "manual-key" if result.get("title") is None else result["method"]
+        return {**result, "method": method, "gameKey": override, "candidates": result.get("candidates", [])}
+    return result
+
+
+def _match_manifest(index: dict[str, Any] | None, game: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+    """Order: the user's manual pick, then the Steam ID for Steam apps, then the
     normalised title and aliases. Several title matches are reported as
     ambiguous with candidates rather than guessed.
     """

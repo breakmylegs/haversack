@@ -80,6 +80,18 @@ class Plugin:
     async def test_cloud(self) -> dict[str, Any]:
         return await self.app.test_cloud()
 
+    async def set_game_key(self, key: str, game_key: str | None, title: str | None = None) -> dict[str, Any]:
+        return await self.app.set_game_key(key, game_key, title)
+
+    async def approve_match(self, key: str) -> dict[str, Any]:
+        return await self.app.approve_match(key)
+
+    async def reject_match(self, key: str) -> dict[str, Any]:
+        return await self.app.reject_match(key)
+
+    async def new_game_key(self, key: str) -> dict[str, Any]:
+        return await self.app.new_game_key(key)
+
     async def on_game_event(self, kind: str, raw_id: Any) -> dict[str, Any]:
         return await self.app.on_game_event(kind, raw_id)
 

@@ -23,6 +23,7 @@ MAX_CUSTOM_PATHS = 20
 MAX_EXCLUSIONS = 50
 MAX_TEXT = 200
 _GLOB_SEGMENT = re.compile(r"^[^/\\\x00:]+$")
+_GAME_KEY = re.compile(r"^[a-z0-9][a-z0-9-]{0,99}$")
 
 DEFAULT: dict[str, Any] = {
     "matchTitle": None,
@@ -32,6 +33,8 @@ DEFAULT: dict[str, Any] = {
     "exclusions": [],
     "enabled": False,
     "launchGate": "freeze",
+    "gameKey": None,
+    "gameKeySource": None,
 }
 
 
@@ -98,6 +101,14 @@ def validate(config: dict[str, Any]) -> dict[str, Any]:
     if gate not in ("freeze", "strict", "off"):
         raise GameConfigError("launch gate must be freeze, strict or off")
     out["launchGate"] = gate
+    key = config.get("gameKey")
+    if key is not None and (not isinstance(key, str) or not _GAME_KEY.match(key)):
+        raise GameConfigError("a game key is lower-case letters, digits and hyphens")
+    out["gameKey"] = key
+    source = config.get("gameKeySource")
+    if source not in (None, "user", "auto"):
+        raise GameConfigError("invalid game key source")
+    out["gameKeySource"] = source if key else None
     return out
 
 

@@ -127,7 +127,7 @@ export interface ManifestStatus {
 }
 
 export interface MatchInfo {
-  method: "manual" | "steam-id" | "title" | "ambiguous" | "none" | "no-save-data" | "no-manifest";
+  method: "manual" | "manual-key" | "steam-id" | "title" | "ambiguous" | "none" | "no-save-data" | "no-manifest";
   title: string | null;
   gameKey: string | null;
   candidates: string[];
@@ -137,6 +137,7 @@ export interface GameMatch extends MatchInfo {
   key: string;
   name: string;
   kind: "steam" | "shortcut";
+  proposal?: { candidate: { gameKey: string; title: string | null } } | null;
 }
 
 export interface CustomPath {
@@ -152,7 +153,31 @@ export interface GameConfig {
   exclusions: string[];
   enabled: boolean;
   launchGate: "freeze" | "strict" | "off";
+  gameKey: string | null;
+  gameKeySource: "user" | "auto" | null;
 }
+
+export interface IdentitySuggestion {
+  gameKey: string;
+  title: string | null;
+  score: number;
+  signals: string[];
+  strongSignals: number;
+  sources: string[];
+}
+
+export interface MatchProposal {
+  candidate: IdentitySuggestion;
+  alternatives: IdentitySuggestion[];
+  raised: number;
+}
+
+export const approveMatch = callable<[key: string], GameConfig>("approve_match");
+export const rejectMatch = callable<[key: string], { ok: boolean }>("reject_match");
+export const setGameKey = callable<[key: string, gameKey: string | null, title: string | null], GameConfig>(
+  "set_game_key",
+);
+export const newGameKey = callable<[key: string], GameConfig>("new_game_key");
 
 export interface PreviewEntry {
   source: "manifest" | "custom";
@@ -288,7 +313,16 @@ export const refreshManifest = callable<[force: boolean], { ok: boolean; reason?
 );
 export const matchGames = callable<[], GameMatch[]>("match_games");
 export const searchTitles = callable<[query: string], string[]>("search_titles");
-export const getGame = callable<[key: string], { game: GameEntry; config: GameConfig; match: MatchInfo }>("get_game");
+export const getGame = callable<
+  [key: string],
+  {
+    game: GameEntry;
+    config: GameConfig;
+    match: MatchInfo;
+    suggestions: IdentitySuggestion[];
+    proposal: MatchProposal | null;
+  }
+>("get_game");
 export const updateGameConfig = callable<[key: string, changes: Partial<GameConfig>], GameConfig>(
   "update_game_config",
 );

@@ -259,6 +259,7 @@ class GameEntry:
     notes: list[str] = field(default_factory=list)
     steam_root: str | None = None
     default_user: str | None = None
+    exe_name: str | None = None  # lower-case file name only, for cross-device matching
 
     def public(self) -> dict[str, Any]:
         return asdict(self)
@@ -332,6 +333,7 @@ def discover(home: str | None = None) -> dict[str, Any]:
                         notes=notes,
                         steam_root=root,
                         default_user=default,
+                        exe_name=exe.replace("\\", "/").rsplit("/", 1)[-1].lower() or None if exe else None,
                     )
                 )
 

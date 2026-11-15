@@ -24,6 +24,7 @@ from typing import Any
 
 from .engine import SnapshotEngine
 from .fsutil import atomic_write_json, read_json
+from .identity import publish_identity
 from .retention import heads as dag_heads
 from .snapshot import NewerSchemaError, SnapshotError, content_hash, scan_entries, verify_blob
 from .store import StoreError, StoreUnavailable
@@ -41,6 +42,8 @@ class GameContext:
     files: Callable[[], Mapping[str, list[str]]]  # current files per root, scanned fresh each call
     roots: Mapping[str, str | None]
     running: Callable[[], bool]
+    # Builds this device's identity record for cross-device matching (ADR-0011), if known.
+    identity: Callable[[], dict[str, Any]] | None = None
 
 
 class SyncState:
@@ -234,12 +237,24 @@ class SyncEngine:
         new_id = result["snapId"]
         self._set_base(gk, new_id)
         self.state.update(gk, pending=False, lastPush=self.clock())
+        self._publish_identity(ctx)
         # Re-fetch heads: if the cloud moved during play, the upload above made a fork.
         by_id, heads = self._cloud(gk)
         if len(heads) > 1 and not self.state.get(gk).get("conflict"):
             self._conflict(gk, "fork", heads, by_id, len(result["meta"]["files"]))
             return {"status": "published-fork", "snapId": new_id}
         return {"status": "published", "snapId": new_id}
+
+    def _publish_identity(self, ctx: GameContext) -> None:
+        """Tell other devices how to recognise this game (once per device and game, best-effort)."""
+        if ctx.identity is None or self.state.get(ctx.game_key).get("identityPublished"):
+            return
+        try:
+            record = ctx.identity()
+        except (OSError, SnapshotError):
+            return
+        if publish_identity(self.engine.store, record):
+            self.state.update(ctx.game_key, identityPublished=True)
 
     # Conflicts
 

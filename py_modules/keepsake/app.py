@@ -14,7 +14,7 @@ import time
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from . import diagnostics, discovery, lifecycle, manifest, net, resolve, restore
+from . import diagnostics, discovery, identity, lifecycle, manifest, net, resolve, restore
 from .auth import AuthError, DeviceCodeFlow, TokenManager, TokenStore
 from .engine import SnapshotEngine
 from .freeze import Freezer
@@ -33,6 +33,8 @@ from .update import Updater, startup_notice
 
 EmitFn = Callable[..., Coroutine[Any, Any, None]]
 IDLE_INTERVAL_SECONDS = 30 * 60
+IDENTITY_CACHE_SECONDS = 600
+UNRESOLVED_METHODS = ("none", "ambiguous", "no-save-data", "no-manifest")
 
 FREEZE_TEST_MIN = 1
 FREEZE_TEST_MAX = 10
@@ -74,6 +76,7 @@ class KeepsakeApp:
         self._transport = transport
         self._signin: DeviceCodeFlow | None = None
         self._launching: set[str] = set()
+        self._identity_cache: tuple[float, list[dict[str, Any]]] | None = None
         self._auth_lock = asyncio.Lock()
         self.emit = emit or _no_emit
         self.proc_root = proc_root
@@ -216,15 +219,162 @@ class KeepsakeApp:
         return dict(game)
 
     async def match_games(self) -> list[dict[str, Any]]:
-        """Every discovered game with its manifest match."""
+        """Every discovered game with its match, applying strong cross-device matches (ADR-0011)."""
         games = (await self.discover_games())["games"]
         index = await asyncio.to_thread(self.manifest.load)
         out = []
         for game in games:
             config = self.game_configs.get(game["key"])
             match = manifest.match_game(index, game, config)
-            out.append({"key": game["key"], "name": game["name"], "kind": game["kind"], **match})
+            proposal = None
+            if match["method"] in UNRESOLVED_METHODS and game["kind"] == "shortcut":
+                applied = await self._apply_identity_match(game, games, index)
+                if applied:
+                    match = manifest.match_game(index, game, self.game_configs.get(game["key"]))
+                else:
+                    proposal = self._proposals().get("open", {}).get(game["key"])
+            elif game["key"] in self._proposals().get("open", {}):
+                self._clear_proposal(game["key"])  # resolved some other way
+            out.append({"key": game["key"], "name": game["name"], "kind": game["kind"], **match, "proposal": proposal})
         return out
+
+    # Match proposals: likely but uncertain matches wait for the user's approval.
+
+    def _proposals_path(self) -> str:
+        return os.path.join(self.paths.runtime_dir, "match-proposals.json")
+
+    def _proposals(self) -> dict[str, Any]:
+        data = read_json(self._proposals_path(), default={})
+        return data if isinstance(data, dict) else {}
+
+    def _save_proposals(self, data: dict[str, Any]) -> None:
+        atomic_write_json(self._proposals_path(), data)
+
+    def _clear_proposal(self, key: str) -> None:
+        data = self._proposals()
+        data.setdefault("open", {}).pop(key, None)
+        self._save_proposals(data)
+
+    async def _raise_proposal(self, game: dict[str, Any], found: dict[str, Any]) -> None:
+        data = self._proposals()
+        open_proposals = data.setdefault("open", {})
+        previous = open_proposals.get(game["key"], {})
+        is_new = previous.get("candidate", {}).get("gameKey") != found["candidate"]["gameKey"]
+        open_proposals[game["key"]] = {
+            **found,
+            "raised": previous.get("raised", time.time()) if not is_new else time.time(),
+        }
+        self._save_proposals(data)
+        if is_new:
+            label = found["candidate"].get("title") or found["candidate"]["gameKey"]
+            await self.emit(
+                "keepsake_toast",
+                f"{game['name']} looks like {label}. Open Keepsake to approve or choose another match.",
+            )
+            log_event(
+                logging.INFO,
+                "identity.proposed",
+                "Proposed a match for approval",
+                gameKey=found["candidate"]["gameKey"],
+                score=found["candidate"]["score"],
+            )
+
+    async def approve_match(self, key: str) -> dict[str, Any]:
+        """Accept the proposed match."""
+        found = self._proposals().get("open", {}).get(key)
+        if not found:
+            raise ValueError("there is no match waiting for approval")
+        candidate = found["candidate"]
+        index = await asyncio.to_thread(self.manifest.load)
+        title = candidate.get("title") if index and candidate.get("title") in index.get("games", {}) else None
+        config = await self.set_game_key(key, candidate["gameKey"], title)
+        self._clear_proposal(key)
+        return config
+
+    async def reject_match(self, key: str) -> dict[str, Any]:
+        """'Not this game': never propose this candidate for this game again."""
+        data = self._proposals()
+        found = data.setdefault("open", {}).pop(key, None)
+        if found:
+            rejected = data.setdefault("rejected", {}).setdefault(key, [])
+            if found["candidate"]["gameKey"] not in rejected:
+                rejected.append(found["candidate"]["gameKey"])
+        self._save_proposals(data)
+        return {"ok": True}
+
+    async def _identities(self) -> list[dict[str, Any]]:
+        now = time.monotonic()
+        if self._identity_cache and now - self._identity_cache[0] < IDENTITY_CACHE_SECONDS:
+            return self._identity_cache[1]
+        try:
+            records = await asyncio.to_thread(identity.cloud_identities, self._store())
+        except StoreError:
+            records = []  # offline or signed out: match with the manifest only
+        self._identity_cache = (now, records)
+        return records
+
+    async def identity_candidates(self, game: dict[str, Any], index: dict[str, Any] | None) -> list[dict[str, Any]]:
+        roots = resolve.logical_roots(game, home=self.home)
+        proton = resolve.platform_of(game) == "proton"
+        probe = identity.probe_for(roots, lambda root: proton and root in resolve.WIN_ROOTS, resolve.expand)
+        records = await self._identities()
+        device_id = str(self.settings.get("deviceId"))
+        return await asyncio.to_thread(
+            identity.candidates, identity.local_hints(game), index, records, probe, device_id
+        )
+
+    def _taken_keys(self, games: list[dict[str, Any]], index: dict[str, Any] | None, except_key: str) -> set[str]:
+        taken = set()
+        for other in games:
+            if other["key"] != except_key:
+                key = manifest.match_game(index, other, self.game_configs.get(other["key"])).get("gameKey")
+                if key:
+                    taken.add(key)
+        return taken
+
+    async def _apply_identity_match(
+        self, game: dict[str, Any], games: list[dict[str, Any]], index: dict[str, Any] | None
+    ) -> bool:
+        ranked = await self.identity_candidates(game, index)
+        taken = self._taken_keys(games, index, game["key"])
+        choice = identity.automatic_choice(ranked, taken)
+        if choice is None:
+            # Not certain: if a match is likely, ask the user instead of guessing.
+            rejected = set(self._proposals().get("rejected", {}).get(game["key"], []))
+            found = identity.proposal(ranked, taken, rejected)
+            if found:
+                await self._raise_proposal(game, found)
+            elif game["key"] in self._proposals().get("open", {}):
+                self._clear_proposal(game["key"])
+            return False
+        changes: dict[str, Any] = {"gameKey": choice["gameKey"], "gameKeySource": "auto"}
+        if choice.get("title") and index and choice["title"] in index.get("games", {}):
+            changes["matchTitle"] = choice["title"]
+        await asyncio.to_thread(self.game_configs.update, game["key"], changes)
+        log_event(
+            logging.INFO,
+            "identity.auto_match",
+            "Matched a game to another device's copy",
+            gameKey=choice["gameKey"],
+            signals=choice["signals"],
+            score=choice["score"],
+        )
+        return True
+
+    async def set_game_key(self, key: str, game_key_value: str | None, title: str | None = None) -> dict[str, Any]:
+        """Use a suggested or new game key (or clear it). Chosen by the user, so any proposal is settled."""
+        changes: dict[str, Any] = {"gameKey": game_key_value, "gameKeySource": "user" if game_key_value else None}
+        if title is not None:
+            changes["matchTitle"] = title
+        config = await self.update_game_config(key, changes)
+        if game_key_value:
+            self._clear_proposal(key)
+        return config
+
+    async def new_game_key(self, key: str) -> dict[str, Any]:
+        """Give a game the manifest does not know its own key, from its name."""
+        game = await self._game(key)
+        return await self.set_game_key(key, manifest.game_key(str(game["name"])))
 
     async def search_titles(self, query: str) -> list[str]:
         index = await asyncio.to_thread(self.manifest.load)
@@ -234,7 +384,14 @@ class KeepsakeApp:
         game = await self._game(key)
         config = self.game_configs.get(key)
         index = await asyncio.to_thread(self.manifest.load)
-        return {"game": game, "config": config, "match": manifest.match_game(index, game, config)}
+        match = manifest.match_game(index, game, config)
+        suggestions: list[dict[str, Any]] = []
+        if game["kind"] == "shortcut" and (
+            match["method"] in UNRESOLVED_METHODS or config.get("gameKeySource") == "auto"
+        ):
+            suggestions = [c for c in await self.identity_candidates(game, index) if c["score"] >= 3][:5]
+        proposal = self._proposals().get("open", {}).get(key)
+        return {"game": game, "config": config, "match": match, "suggestions": suggestions, "proposal": proposal}
 
     async def update_game_config(self, key: str, changes: dict[str, Any]) -> dict[str, Any]:
         await self._game(key)
@@ -386,9 +543,11 @@ class KeepsakeApp:
         config = self.game_configs.get(key)
         index = await asyncio.to_thread(self.manifest.load)
         match = manifest.match_game(index, game, config)
-        if not match.get("gameKey") or not index:
-            raise ValueError("match the game to a manifest entry first")
-        record = index["games"].get(match["title"])
+        if not match.get("gameKey"):
+            raise ValueError("match the game to a manifest entry or give it a game key first")
+        record = index["games"].get(match["title"]) if index and match.get("title") else None
+        if record is None and not config.get("customPaths"):
+            raise ValueError("no save folders are known for this game: match it or add custom folders")
         scan = await asyncio.to_thread(resolve.preview, game, match["title"], record, config, self.home, 0, True)
         if scan.get("truncated"):
             raise ValueError("too many files to snapshot safely; add exclusions")
@@ -520,7 +679,7 @@ class KeepsakeApp:
         config = self.game_configs.get(key)
         index = self.manifest.load() or {}
         match = manifest.match_game(index, game, config)
-        record = index.get("games", {}).get(match["title"])
+        record = index.get("games", {}).get(match["title"]) if match.get("title") else None
 
         def files() -> dict[str, list[str]]:
             scan = resolve.preview(game, match["title"], record, config, self.home, 0, True)
@@ -531,7 +690,22 @@ class KeepsakeApp:
         def processes_running() -> bool:
             return bool(find_game_processes(int(game["appid"]), game.get("prefix"), self.proc_root))
 
-        return GameContext(ctx["gameKey"], files=files, roots=ctx["roots"], running=running or processes_running)
+        def identity_record() -> dict[str, Any]:
+            return identity.identity_record(
+                ctx["gameKey"],
+                str(self.settings.get("deviceId")),
+                match.get("title"),
+                identity.local_hints(game),
+                identity.save_dirs(files()),
+            )
+
+        return GameContext(
+            ctx["gameKey"],
+            files=files,
+            roots=ctx["roots"],
+            running=running or processes_running,
+            identity=identity_record,
+        )
 
     # Lifecycle (slice 8): launch gate and exit push
 
