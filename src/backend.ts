@@ -11,6 +11,10 @@ export interface Settings {
   updateChannel: UpdateChannel;
   gateMaxRemovedPercent: number;
   gateMaxSizeDropPercent: number;
+  onedriveClientId: string;
+  snapshotStore: "local" | "onedrive";
+  launchPullTimeout: number;
+  toastOnSync: boolean;
   readOnly: boolean;
 }
 
@@ -146,6 +150,8 @@ export interface GameConfig {
   includeConfig: boolean;
   customPaths: CustomPath[];
   exclusions: string[];
+  enabled: boolean;
+  launchGate: "freeze" | "strict" | "off";
 }
 
 export interface PreviewEntry {
@@ -204,6 +210,67 @@ export interface SnapshotResult {
   deleted?: number;
 }
 
+export interface CloudStatus {
+  clientIdSet: boolean;
+  signedIn: boolean;
+  signingIn: boolean;
+  problem: string | null;
+  store: "local" | "onedrive";
+}
+
+export interface SignInCode {
+  userCode: string;
+  verificationUri: string;
+  expiresIn: number;
+}
+
+export const cloudStatus = callable<[], CloudStatus>("cloud_status");
+export const startSignin = callable<[], SignInCode>("start_signin");
+export const cancelSignin = callable<[], { ok: boolean }>("cancel_signin");
+export const signOut = callable<[], { ok: boolean }>("sign_out");
+export const testCloud = callable<[], { ok: boolean; folder?: string; error?: string }>("test_cloud");
+export interface HeadSummary {
+  snapId: string;
+  device: string | null;
+  created: string | null;
+  files: number;
+  bytes: number;
+  kind: string | null;
+}
+
+export interface SyncConflict {
+  kind: "adoption" | "fork" | "both-changed";
+  heads: HeadSummary[];
+  localFiles: number;
+  raised: number;
+}
+
+export interface SyncStatus {
+  available: boolean;
+  reason?: string;
+  gameKey?: string;
+  base?: string | null;
+  pending?: boolean;
+  conflict?: SyncConflict | null;
+  quarantined?: string;
+  sessionOpen?: { started: number } | null;
+  lastPush?: number;
+  lastPull?: number;
+}
+
+export const onGameEvent = callable<[kind: "start" | "exit", rawId: number | string], { handled: number }>(
+  "on_game_event",
+);
+export const strictWrap = callable<[key: string, currentOptions: string], { appid: number; options: string }>(
+  "strict_wrap",
+);
+export const strictUnwrap = callable<[key: string, mode: string], { appid: number; options: string }>("strict_unwrap");
+export const syncPull = callable<[key: string], Record<string, unknown>>("sync_pull");
+export const syncPush = callable<[key: string], Record<string, unknown>>("sync_push");
+export const resolveConflict = callable<[key: string, choice: string, head: string | null], Record<string, unknown>>(
+  "resolve_conflict",
+);
+export const syncStatus = callable<[key: string], SyncStatus>("sync_status");
 export const snapshotGame = callable<[key: string], SnapshotResult>("snapshot_game");
 export const listSnapshots = callable<[key: string], SnapshotListing>("list_snapshots");
 export const restoreSnapshot = callable<[key: string, snapId: string], SnapshotResult>("restore_snapshot");

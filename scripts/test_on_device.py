@@ -47,8 +47,27 @@ cd "$run"
 """
 
 
-def build_archive(root: str = ROOT) -> bytes:
+ONEDRIVE_TOKEN = "$HOME/homebrew/settings/Keepsake/onedrive-token.json"  # noqa: S105 - a path, not a secret
+
+
+def git_ignored(root: str = ROOT) -> set[str]:
+    """Files git ignores (local scratch, generated files): never sent to the device."""
+    try:
+        out = subprocess.run(
+            ["git", "ls-files", "--others", "--ignored", "--exclude-standard", *TREES],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return set()
+    return {line.strip() for line in out.splitlines() if line.strip()}
+
+
+def build_archive(root: str = ROOT, ignored: set[str] | None = None) -> bytes:
     """Return a gzipped tar of the files the tests need, with POSIX names."""
+    ignored = git_ignored(root) if ignored is None else ignored
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
         for name in FILES:
@@ -60,18 +79,28 @@ def build_archive(root: str = ROOT) -> bytes:
                     if name.endswith((".pyc", ".pyo")):
                         continue
                     src = os.path.join(folder, name)
-                    archive.add(src, arcname=os.path.relpath(src, root).replace(os.sep, "/"))
+                    rel = os.path.relpath(src, root).replace(os.sep, "/")
+                    if rel not in ignored:
+                        archive.add(src, arcname=rel)
     return buffer.getvalue()
 
 
-def remote_command(pytest_args: list[str]) -> str:
-    args = pytest_args or list(DEFAULT_ARGS)
-    return " ".join(["sh", "-c", shlex.quote(REMOTE_SCRIPT), "keepsake-test", *(shlex.quote(a) for a in args)])
+def remote_command(pytest_args: list[str], onedrive: bool = False) -> str:
+    args = pytest_args or (["-m", "onedrive", "-s"] if onedrive else list(DEFAULT_ARGS))
+    command = ["sh", "-c", shlex.quote(REMOTE_SCRIPT), "keepsake-test", *(shlex.quote(a) for a in args)]
+    if onedrive:
+        # Uses the token Keepsake's own sign-in stored on the device; it never leaves the device.
+        command.insert(0, f'KEEPSAKE_ONEDRIVE_TOKEN_FILE="{ONEDRIVE_TOKEN}"')
+    return " ".join(command)
 
 
 def main(argv: list[str]) -> int:
+    onedrive = "--onedrive" in argv
+    args = [a for a in argv if a != "--onedrive"]
     host, port = device.load_target()
-    result = subprocess.run(["ssh", "-p", port, host, remote_command(argv)], input=build_archive(), check=False)
+    result = subprocess.run(
+        ["ssh", "-p", port, host, remote_command(args, onedrive)], input=build_archive(), check=False
+    )
     return result.returncode
 
 

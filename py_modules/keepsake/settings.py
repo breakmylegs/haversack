@@ -12,6 +12,7 @@ rollback), the store opens in read-only safe mode and never writes
 from __future__ import annotations
 
 import os
+import re
 import threading
 import uuid
 from typing import Any
@@ -31,10 +32,27 @@ DEFAULTS: dict[str, Any] = {
     "updateChannel": "stable",
     "gateMaxRemovedPercent": 50,
     "gateMaxSizeDropPercent": 70,
+    "onedriveClientId": "",
+    "snapshotStore": "local",
+    "launchPullTimeout": 20,
+    "toastOnSync": True,
 }
 
 # Keys the frontend may change. deviceId and schemaVersion are managed here.
-USER_KEYS = frozenset({"deviceName", "updateChannel", "gateMaxRemovedPercent", "gateMaxSizeDropPercent"})
+USER_KEYS = frozenset(
+    {
+        "deviceName",
+        "updateChannel",
+        "gateMaxRemovedPercent",
+        "gateMaxSizeDropPercent",
+        "onedriveClientId",
+        "snapshotStore",
+        "launchPullTimeout",
+        "toastOnSync",
+    }
+)
+SNAPSHOT_STORES = ("local", "onedrive")
+_GUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 # Safety gates may only be tightened (build prompt section 9): [floor, default].
 GATE_LIMITS = {"gateMaxRemovedPercent": (5, 50), "gateMaxSizeDropPercent": (5, 70)}
 
@@ -106,6 +124,22 @@ def _validate(key: str, value: Any) -> Any:
     if key == "updateChannel":
         if value not in UPDATE_CHANNELS:
             raise SettingsError("update channel must be stable or prerelease")
+        return value
+    if key == "onedriveClientId":
+        if not isinstance(value, str) or (value.strip() and not _GUID.match(value.strip())):
+            raise SettingsError("the client ID looks like 00001111-aaaa-2222-bbbb-3333cccc4444")
+        return value.strip().lower()
+    if key == "launchPullTimeout":
+        if not isinstance(value, int) or isinstance(value, bool) or not 5 <= value <= 60:
+            raise SettingsError("the launch check timeout is 5 to 60 seconds")
+        return value
+    if key == "toastOnSync":
+        if not isinstance(value, bool):
+            raise SettingsError("must be true or false")
+        return value
+    if key == "snapshotStore":
+        if value not in SNAPSHOT_STORES:
+            raise SettingsError("store must be local or onedrive")
         return value
     if key in GATE_LIMITS:
         low, high = GATE_LIMITS[key]

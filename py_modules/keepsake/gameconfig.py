@@ -30,6 +30,8 @@ DEFAULT: dict[str, Any] = {
     "includeConfig": False,
     "customPaths": [],
     "exclusions": [],
+    "enabled": False,
+    "launchGate": "freeze",
 }
 
 
@@ -89,6 +91,13 @@ def validate(config: dict[str, Any]) -> dict[str, Any]:
         if pattern.startswith("/") or ".." in pattern.split("/"):
             raise GameConfigError("exclusions are relative to the save folder")
     out["exclusions"] = exclusions
+    if not isinstance(config.get("enabled", False), bool):
+        raise GameConfigError("enabled must be true or false")
+    out["enabled"] = config.get("enabled", False)
+    gate = config.get("launchGate", "freeze")
+    if gate not in ("freeze", "strict", "off"):
+        raise GameConfigError("launch gate must be freeze, strict or off")
+    out["launchGate"] = gate
     return out
 
 
