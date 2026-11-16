@@ -4,7 +4,7 @@
 // reports. Field names are verified in @decky/ui 4.16.5 types (App.d.ts AppDetails); behaviour is unverified
 // on device (A70 to A76). Operations only exist after an explicit user action in the backend.
 import { addEventListener, removeEventListener } from "@decky/api";
-import { steamOpsClaim, steamOpsFinish, SteamOp } from "./backend";
+import { steamOpsClaim, steamOpsFile, steamOpsFinish, SteamOp } from "./backend";
 
 const SETTLE_MS = 600;
 const PROBED = {
@@ -82,6 +82,24 @@ async function addShortcut(op: SteamOp): Promise<Outcome> {
   return { ok: true, result: { appid, compatTool: tool ?? null, readBack } };
 }
 
+// Removes a shortcut the module itself created (the backend refuses any other). Read back: the app is gone.
+async function removeShortcut(appid: number): Promise<Outcome> {
+  const before = details(appid)?.strDisplayName ?? null;
+  SteamClient.Apps.RemoveShortcut(appid);
+  await sleep(SETTLE_MS);
+  return { ok: true, result: { appid, original: before, readBack: details(appid)?.strDisplayName ?? null } };
+}
+
+// Steam has no getter for custom artwork, so success means SetCustomArtworkForApp resolved (A139).
+async function setArtwork(op: SteamOp): Promise<Outcome> {
+  const appid = Number(op.payload.appid);
+  const assetType = Number(op.payload.assetType);
+  const imageType = op.payload.imageType === "jpg" ? "jpg" : "png";
+  const { base64 } = await steamOpsFile(op.id);
+  await SteamClient.Apps.SetCustomArtworkForApp(appid, base64, imageType, assetType);
+  return { ok: true, result: { appid, assetType, readBack: "not available" } };
+}
+
 async function execute(op: SteamOp): Promise<Outcome> {
   const appid = Number(op.payload.appid);
   const value = String(op.payload.value ?? "");
@@ -90,6 +108,10 @@ async function execute(op: SteamOp): Promise<Outcome> {
       return { ok: true, result: probe() };
     case "add-shortcut":
       return addShortcut(op);
+    case "remove-shortcut":
+      return removeShortcut(appid);
+    case "set-artwork":
+      return setArtwork(op);
     case "set-launch-options":
       return applyAndReadBack(appid, () => details(appid)?.strLaunchOptions, () => SteamClient.Apps.SetAppLaunchOptions(appid, value), value);
     case "set-shortcut-name":

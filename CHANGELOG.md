@@ -2,6 +2,19 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [0.22.0]
+
+Slice 22: the Installer module, second part.
+
+### Added
+
+- Install, "Installer wants a disc drive": for ISO installs, the disc becomes a CD drive (D: or the next free letter) inside the installer's prefix. It is removed again when the install ends.
+- Install: SD cards, USB drives and network shares that are already mounted appear as places to browse from. Sources and library folders outside the home folder are made visible to the installer.
+- Install, "Remove the installer shortcut" for an install that stopped or was cancelled.
+- Install, "Sync this game's saves" once a game is installed. Other modules are told about new games.
+- Installer health in Settings, Modules: discs left mounted, installer shortcuts left behind, and Steam changes still waiting.
+- SteamGridDB artwork with your own API key is built but switched off. It waits for approval of the SteamGridDB image host.
+
 ## [0.21.0]
 
 Slice 21: the Installer module, first part.
