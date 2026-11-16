@@ -162,6 +162,14 @@ Microsoft documentation read on 15 November 2026: device code flow (Entra, updat
 | A124 | `keepsake.ed25519` is correct | verified against RFC 8032 section 7.1 test vectors 1 and 2 | RFC 8032 |
 | A125 | 50 games stay responsive: on the development laptop, discovery 0.4 s, matching 0.1 s, preview of all 1.8 s, dry run 16 s, QAM summary 0.3 s, health 0.1 s, first push of all 58 s, idle pass 14 s (local test store) | measured on Windows; on-device figures pending (run on the device with `python scripts/test_on_device.py tests/test_performance.py`) | `tests/test_performance.py` |
 
+## Module framework (slice 13)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A126 | Steam keeps per-app compatibility tool choices in `config/config.vdf` under `InstallConfigStore/Software/Valve/Steam/CompatToolMapping/<appid>/name` | community-documented, unverified on device; missing or different layouts give no tool (read-only) | |
+| A127 | `AppDetails.strDisplayName`, `strShortcutExe`, `strShortcutStartDir`, `strLaunchOptions` and `strCompatToolName` reflect a change about 600 ms after the matching setter | field names verified in `@decky/ui` 4.16.5 `App.d.ts`; timing unverified (the executor reports a mismatch rather than assuming success) | |
+| A128 | `sqlite3` with WAL mode works in Decky's embedded Python and on SD-card and internal storage | unverified (A9); without it modules needing state stay off | |
+
 ## v2 verification items (slice C0)
 
 Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research.md` that Keepsake will rely on. "TA" means Peter's Tuning Advisor verification register (`decky-plugins/docs/VERIFICATION.md`), reused as evidence with its date and re-checked in the slice named. Types were read in `@decky/ui` 4.16.5 on 15 November 2026.

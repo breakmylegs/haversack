@@ -9,12 +9,14 @@ import {
   getSteamProbe,
   httpsTest,
   simulateSyncJob,
+  steamOpsList,
+  steamProbe,
 } from "../backend";
 import { deckyMechanisms, runningAppDetails } from "../probes";
 import { HealthSection } from "./HealthSection";
 import { JsonBlock } from "./JsonBlock";
 
-type Section = "environment" | "steam" | "processes" | "frontend" | "https" | "export";
+type Section = "environment" | "steam" | "processes" | "frontend" | "https" | "steamops" | "export";
 
 const FREEZE_SECONDS = 5;
 // Long enough to open Updates and try to install while it runs.
@@ -101,6 +103,19 @@ export function DiagnosticsPage() {
         </DialogButton>
         <DialogButton style={{ width: "auto" }} disabled={!!busy} onClick={() => run("https", httpsTest)}>
           Test HTTPS
+        </DialogButton>
+        <DialogButton
+          style={{ width: "auto" }}
+          disabled={!!busy}
+          onClick={() =>
+            run("steamops", async () => {
+              await steamProbe();
+              await new Promise((resolve) => setTimeout(resolve, 1500));
+              return (await steamOpsList()).slice(0, 5);
+            })
+          }
+        >
+          Probe Steam APIs
         </DialogButton>
         <DialogButton style={{ width: "auto" }} disabled={!!busy} onClick={confirmFreeze}>
           Freeze test

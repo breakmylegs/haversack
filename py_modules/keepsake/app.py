@@ -34,6 +34,7 @@ from . import (
 )
 from .auth import GOOGLE, AuthError, DeviceCodeFlow, TokenManager, TokenStore
 from .backends import BackendConfigError, CredentialStore
+from .bus import EventBus
 from .engine import SnapshotEngine
 from .freeze import Freezer
 from .fsutil import atomic_write_json, read_json
@@ -41,11 +42,15 @@ from .gameconfig import DEFAULT as GAME_DEFAULTS
 from .gameconfig import GameConfigStore, custom_path_from_absolute
 from .importers import ludusavi
 from .jobs import JobTracker
+from .locks import GameLocks
 from .log import log_event, setup_logging, tail
+from .modules import Module, ModuleRegistry
 from .paths import PluginPaths
 from .procs import find_game_processes
 from .settings import SettingsStore
 from .snapshot import SnapshotError, content_hash, scan_entries
+from .statedb import StateDB, StateError, open_db
+from .steamops import SteamOps
 from .store import AlreadyExistsError, LocalFolderStore, Store, StoreError
 from .store.gdrive import GoogleDriveStore
 from .store.graph import GraphStore
@@ -139,6 +144,39 @@ class KeepsakeApp:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._notice: dict[str, Any] | None = None
         self._signin_warned = False
+        # v2 Core (slice 13, ADR-0012, ADR-0024): lifecycle bus, per-game locks, module registry, state database.
+        self.bus = EventBus()
+        self.locks = GameLocks()
+        self.registry = ModuleRegistry(self.bus, lambda: dict(self.settings.get("moduleFlags")))
+        self.db: StateDB | None = None
+        self.steam_ops: SteamOps | None = None
+        self._register_modules()
+
+    def _register_modules(self) -> None:
+        async def saves_health() -> list[dict[str, Any]]:
+            return await self._health(probe=False)
+
+        self.registry.register(
+            Module(
+                "saves",
+                "Saves",
+                "Keeps game saves in step between your devices through the cloud.",
+                "Save files of the games you choose, their registry keys if you allow it, and Keepsake's own settings.",
+                health=saves_health,
+            )
+        )
+        for name, title, description, writes in (
+            ("advisor", "Advisor", "Recommends settings for the game you play.", "Nothing. It only recommends."),
+            ("replication", "Replication", "Copies games between your devices.", "Games you send between devices."),
+            ("installer", "Installer", "Helps install games from ISOs and installers.", "Games you install with it."),
+            (
+                "desktop",
+                "Desktop",
+                "Keepsake in Desktop Mode, with a tray icon.",
+                "Desktop Mode shortcuts for Keepsake.",
+            ),
+        ):
+            self.registry.register(Module(name, title, description, writes, available=False))
 
     async def start(self) -> None:
         self._loop = asyncio.get_running_loop()
@@ -161,6 +199,13 @@ class KeepsakeApp:
             # Upgraded from a version without the setup wizard: games are already set up.
             self.settings.set("setupComplete", True)
         log_event(logging.INFO, "app.start", "Keepsake backend started", version=self.version)
+        try:
+            self.db = await asyncio.to_thread(open_db, self.paths.runtime_dir)
+            self.steam_ops = SteamOps(self.db) if self.db else None
+        except (StateError, OSError) as exc:  # modules needing state stay off; Saves is unaffected (P13)
+            log_event(logging.ERROR, "state.unavailable", "State database unavailable", error=str(exc))
+            self.db, self.steam_ops = None, None
+        await self.registry.start_all()
         if self._auto_refresh_manifest:
             # Weekly refresh in the background; never blocks start-up.
             self._background.append(asyncio.create_task(self.refresh_manifest(False)))
@@ -330,7 +375,7 @@ class KeepsakeApp:
 
     async def on_suspend(self) -> dict[str, Any]:
         """The device is about to sleep: snapshot running synced games as provisional snapshots."""
-        if not self.settings.get("suspendSnapshots"):
+        if not self.settings.get("suspendSnapshots") or not self.registry.enabled("saves"):
             return {"started": 0}
         states = self._sync().state.games()
         started = 0
@@ -926,11 +971,12 @@ class KeepsakeApp:
     async def restore_snapshot(self, key: str, snap_id: str) -> dict[str, Any]:
         ctx = await self._snapshot_context(key)
         eng = self._engine()
-        with self.jobs.job("restore"):
-            result = await asyncio.to_thread(
-                eng.restore, ctx["gameKey"], str(snap_id), ctx["files"], ctx["roots"], ctx["running"]
-            )
-            result = await self._after_restore(ctx, result)
+        async with self.locks.hold(ctx["gameKey"], "saves"):
+            with self.jobs.job("restore"):
+                result = await asyncio.to_thread(
+                    eng.restore, ctx["gameKey"], str(snap_id), ctx["files"], ctx["roots"], ctx["running"]
+                )
+                result = await self._after_restore(ctx, result)
         self._set_base(ctx["gameKey"], str(snap_id))
         log_event(
             logging.INFO, "snapshot.restore", "Snapshot restored", gameKey=ctx["gameKey"], status=result["status"]
@@ -940,11 +986,17 @@ class KeepsakeApp:
     async def undo_restore(self, key: str, prerestore_id: str) -> dict[str, Any]:
         ctx = await self._snapshot_context(key)
         eng = self._engine()
-        with self.jobs.job("restore"):
-            result = await asyncio.to_thread(
-                eng.restore_prerestore, ctx["gameKey"], str(prerestore_id), ctx["files"], ctx["roots"], ctx["running"]
-            )
-            result = await self._after_restore(ctx, result)
+        async with self.locks.hold(ctx["gameKey"], "saves"):
+            with self.jobs.job("restore"):
+                result = await asyncio.to_thread(
+                    eng.restore_prerestore,
+                    ctx["gameKey"],
+                    str(prerestore_id),
+                    ctx["files"],
+                    ctx["roots"],
+                    ctx["running"],
+                )
+                result = await self._after_restore(ctx, result)
         log_event(logging.INFO, "snapshot.undo", "Restore undone", gameKey=ctx["gameKey"], status=result["status"])
         return result
 
@@ -1051,6 +1103,8 @@ class KeepsakeApp:
 
     async def on_game_event(self, kind: str, raw_id: Any) -> dict[str, Any]:
         """Frontend lifetime events. Returns at once; the work runs as a task."""
+        if not self.registry.enabled("saves"):
+            return {"handled": 0}  # Saves switched off: no launch gate, no exit save
         try:
             games = await self._games_for_appid(raw_id)
         except (ValueError, TypeError):
@@ -1070,9 +1124,12 @@ class KeepsakeApp:
         abort = lifecycle.Abort()
         frozen = False
         token: str | None = None
+        game_key: str | None = None
         try:
             ctx_probe = await self._sync_context(key)
+            game_key = ctx_probe.game_key
             self._record_session(ctx_probe.game_key, lastStart=time.time())
+            await self.bus.publish("game_started", {"gameKey": game_key, "appid": game["appid"]})
             gate_files = lifecycle.GateFiles(self.paths.runtime_dir)
             if mode == "strict":
                 await asyncio.to_thread(gate_files.write_timeout, int(timeout))
@@ -1088,20 +1145,23 @@ class KeepsakeApp:
                 if procs:
                     stopped = await asyncio.to_thread(self.freezer.freeze, procs)
                     frozen = bool(stopped)
+                    if frozen:
+                        await self.bus.publish("game_frozen", {"gameKey": game_key, "appid": game["appid"]})
             if token is not None or frozen:
                 # Blocked in the gate script or frozen: safe to restore until the pull is abandoned.
                 running: Callable[[], bool] = abort.is_set
             else:
                 running = lambda: True  # noqa: E731 - could not hold the game: never restore under it
             ctx = await self._sync_context(key, running=running)
-            with self.jobs.job("sync"):
-                try:
-                    result = await asyncio.wait_for(asyncio.to_thread(self._sync().pull, ctx), timeout)
-                except TimeoutError:
-                    abort.set()
-                    self._sync().state.update(ctx.game_key, pending=True)
-                    await self.emit("keepsake_toast", lifecycle.TOAST_TIMEOUT)
-                    result = {"action": "launch", "pending": True, "reason": "timeout"}
+            async with self.locks.hold(ctx.game_key, "saves"):
+                with self.jobs.job("sync"):
+                    try:
+                        result = await asyncio.wait_for(asyncio.to_thread(self._sync().pull, ctx), timeout)
+                    except TimeoutError:
+                        abort.set()
+                        self._sync().state.update(ctx.game_key, pending=True)
+                        await self.emit("keepsake_toast", lifecycle.TOAST_TIMEOUT)
+                        result = {"action": "launch", "pending": True, "reason": "timeout"}
             await self._announce_pull(game, result)
             log_event(
                 logging.INFO,
@@ -1124,6 +1184,8 @@ class KeepsakeApp:
             if token is not None:
                 await asyncio.to_thread(lifecycle.GateFiles(self.paths.runtime_dir).release, game["appid"], token)
             self._launching.discard(key)
+            if game_key and (frozen or token is not None):
+                await self.bus.publish("game_released", {"gameKey": game_key, "appid": game["appid"]})
 
     def _wait_for_processes(self, game: dict[str, Any]) -> list[Any]:
         found: list[Any] = []
@@ -1164,8 +1226,10 @@ class KeepsakeApp:
                 )
                 return {"status": "deferred"}
             ctx = await self._sync_context(key)
-            with self.jobs.job("sync"):
-                result = await asyncio.to_thread(self._sync().push, ctx)
+            await self.bus.publish("game_exited", {"gameKey": ctx.game_key, "appid": game["appid"]})
+            async with self.locks.hold(ctx.game_key, "saves"):
+                with self.jobs.job("sync"):
+                    result = await asyncio.to_thread(self._sync().push, ctx)
             self._record_session(ctx.game_key, lastEnd=time.time())
         except (ValueError, SnapshotError, StoreError) as exc:
             log_event(logging.WARNING, "lifecycle.exit_failed", "Exit save failed", key=key, error=str(exc))
@@ -1206,8 +1270,9 @@ class KeepsakeApp:
 
     async def sync_pull(self, key: str) -> dict[str, Any]:
         ctx = await self._sync_context(key)
-        with self.jobs.job("sync"):
-            result = await asyncio.to_thread(self._sync().pull, ctx)
+        async with self.locks.hold(ctx.game_key, "saves"):
+            with self.jobs.job("sync"):
+                result = await asyncio.to_thread(self._sync().pull, ctx)
         log_event(
             logging.INFO,
             "sync.pull",
@@ -1220,8 +1285,9 @@ class KeepsakeApp:
 
     async def sync_push(self, key: str) -> dict[str, Any]:
         ctx = await self._sync_context(key)
-        with self.jobs.job("sync"):
-            result = await asyncio.to_thread(self._sync().push, ctx)
+        async with self.locks.hold(ctx.game_key, "saves"):
+            with self.jobs.job("sync"):
+                result = await asyncio.to_thread(self._sync().push, ctx)
         log_event(
             logging.INFO,
             "sync.push",
@@ -1233,8 +1299,9 @@ class KeepsakeApp:
 
     async def resolve_conflict(self, key: str, choice: str, head: str | None = None) -> dict[str, Any]:
         ctx = await self._sync_context(key)
-        with self.jobs.job("sync"):
-            result = await asyncio.to_thread(self._sync().resolve, ctx, str(choice), head)
+        async with self.locks.hold(ctx.game_key, "saves"):
+            with self.jobs.job("sync"):
+                result = await asyncio.to_thread(self._sync().resolve, ctx, str(choice), head)
         log_event(logging.WARNING, "sync.resolve", "Conflict resolved", gameKey=ctx.game_key, choice=choice)
         return result
 
@@ -1253,10 +1320,11 @@ class KeepsakeApp:
                 continue
             try:
                 ctx = await self._sync_context(game["key"])
-                with self.jobs.job("sync"):
-                    sync = self._sync()
-                    recovered = await asyncio.to_thread(sync.recover_session, ctx)
-                    outcome = await asyncio.to_thread(sync.idle, ctx)
+                async with self.locks.hold(ctx.game_key, "saves"):
+                    with self.jobs.job("sync"):
+                        sync = self._sync()
+                        recovered = await asyncio.to_thread(sync.recover_session, ctx)
+                        outcome = await asyncio.to_thread(sync.idle, ctx)
                 if recovered:
                     await self.emit("keepsake_toast", f"Recovered missed exit backup for {game['name']}")
                 session = self._sessions().get(ctx.game_key, {})
@@ -1298,7 +1366,7 @@ class KeepsakeApp:
         while True:
             await asyncio.sleep(delay)
             delay = float(self.settings.get("idleSyncMinutes")) * 60
-            if self.jobs.busy_reason() is None:
+            if self.jobs.busy_reason() is None and self.registry.enabled("saves"):
                 try:
                     await self.idle_pass()
                 except Exception:  # noqa: BLE001 - the loop must survive any single failure
@@ -1654,6 +1722,56 @@ class KeepsakeApp:
         )
         return {"gameKey": game_key, "results": results}
 
+    # Modules and the Steam Operations Executor (slice 13)
+
+    async def modules_status(self) -> dict[str, Any]:
+        return {
+            "modules": await self.registry.status(),
+            "stateDatabase": self.db is not None,
+            "locks": self.locks.held(),
+            "steamOpsPending": await asyncio.to_thread(self.steam_ops.pending_count) if self.steam_ops else 0,
+        }
+
+    async def set_module_enabled(self, name: str, enabled: bool) -> dict[str, Any]:
+        if name not in self.registry.modules:
+            raise ValueError("unknown module")
+        flags = dict(self.settings.get("moduleFlags"))
+        flags[name] = bool(enabled)
+        self.settings.set("moduleFlags", flags)
+        await self.registry.apply_flags()
+        log_event(logging.INFO, "module.flag", "Module switched", module=name, enabled=bool(enabled))
+        return await self.modules_status()
+
+    async def reset_module(self, name: str) -> dict[str, Any]:
+        if name not in self.registry.modules:
+            raise ValueError("unknown module")
+        await self.registry.reset(name)
+        return await self.modules_status()
+
+    def _ops(self) -> SteamOps:
+        if self.steam_ops is None:
+            raise ValueError("the state database is not available, so Steam operations are off")
+        return self.steam_ops
+
+    async def steam_probe(self) -> dict[str, Any]:
+        """Diagnostics button: ask the frontend which Steam client functions exist (writes nothing)."""
+        op_id = await asyncio.to_thread(self._ops().enqueue, "core", "probe", {})
+        await self.emit("keepsake_steam_ops")
+        return {"id": op_id}
+
+    async def steam_ops_claim(self) -> dict[str, Any] | None:
+        if self.steam_ops is None:
+            return None
+        return await asyncio.to_thread(self.steam_ops.claim)
+
+    async def steam_ops_finish(self, op_id: int, ok: bool, result: dict[str, Any]) -> dict[str, Any]:
+        await asyncio.to_thread(self._ops().finish, int(op_id), bool(ok), dict(result))
+        log_event(logging.INFO, "steamops.finished", "Steam operation finished", id=int(op_id), ok=bool(ok))
+        return {"ok": True}
+
+    async def steam_ops_list(self) -> list[dict[str, Any]]:
+        return await asyncio.to_thread(self.steam_ops.list) if self.steam_ops else []
+
     async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
         """Diagnostics only: hold a fake sync job so the update guard can be tested."""
         seconds = max(1, min(int(seconds), SIMULATED_JOB_MAX))
@@ -1666,6 +1784,10 @@ class KeepsakeApp:
         for task in self._background:
             task.cancel()
         await asyncio.to_thread(self.freezer.resume_all, "unload")
+        await self.registry.stop_all()
+        if self.db is not None:
+            self.db.close()
+            self.db, self.steam_ops = None, None
         log_event(logging.INFO, "app.stop", "Keepsake backend stopped")
 
     # Settings
