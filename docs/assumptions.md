@@ -215,7 +215,7 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 
 | # | Claim | Status | Source | Slice |
 |---|---|---|---|---|
-| A79 | The Decky backend keeps running in Desktop Mode on SteamOS and Bazzite | **unverified**; slice 23 stops and escalates if false | spec 8.4 | 23 |
+| A79 | The Decky backend keeps running in Desktop Mode on SteamOS and Bazzite | **unverified**; `scripts/desktop_mode_probe.py` checks it (slice 23 report); slice 23 stops and escalates if false | spec 8.4 | 23 |
 | A80 | The device's Python supports TLS-PSK through `SSLContext.set_psk_client_callback` and `set_psk_server_callback` (added in Python 3.13; needs OpenSSL PSK support in Decky's build) | unverified | Python docs; spec 8.2 | 16 |
 | A81 | Stdlib multicast sockets can do mDNS / DNS-SD from the plugin process | unverified | spec 8.2 | 16 |
 | A82 | Decky uses ports 1337 and 8080; TCP 47110 is otherwise free | 1337 and 8080 verified (TA item 12); 47110 unverified | TA item 12 | 17 |
