@@ -41,6 +41,18 @@ Branch `slice/15-advisor-2`, stacked on `slice/14-advisor-1` (#25). v2 spec slic
   - One error of mine was found and fixed. In the second round a test was failing for an unrelated reason, so "caught" meant nothing. I fixed the test and re-checked those mutations against a passing baseline first.
 - `python scripts/check.py`: all checks pass (eslint, tsc, build, versions, package, ruff, ruff format, mypy, secret scan).
 
+## Fuzzing (slice 25 work, added before release)
+
+`tests/test_fuzz_advisor.py` feeds random structures to every Advisor parser of outside input. It found six bugs, now fixed:
+
+- A Deck Verified report whose `labels` was not a list crashed the parser.
+- A NaN or infinite number in a report crashed it too.
+- An anti-cheat list entry whose `notes` or `anticheats` was not a list, or whose `status` was not text, crashed the trim.
+- An AI reply whose `in_game.settings` was not a list crashed the check.
+- An FSR 4 variable after a wrapper, or inside a quoted token, survived into the launch options. It is now removed wherever it sits, including from your own options before they are combined.
+
+Each test failed on its bug before the fix. 4 tests pass, and a run at 20,000 iterations passes.
+
 ## Known gaps
 
 - PCGamingWiki and the ProtonDB index: backlog (ADR-0029).

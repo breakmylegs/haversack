@@ -14,6 +14,7 @@ Parsing is ported from Tuning Advisor (ADR-0013); the HTTP layer is Keepsake's
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -86,7 +87,7 @@ def _int(value: Any) -> int | None:
     if isinstance(value, bool) or value is None:
         return None
     if isinstance(value, (int, float)):
-        return int(value)
+        return int(value) if math.isfinite(value) else None  # NaN and infinity are not numbers of anything
     match = re.search(r"\d+", str(value))
     return int(match.group(0)) if match else None
 
@@ -157,7 +158,8 @@ def report_device(report: dict[str, Any]) -> str:
     device = _text(data.get("device"), 80) if isinstance(data, dict) else ""
     if device:
         return device
-    for label in report.get("labels") or []:
+    labels = report.get("labels")
+    for label in labels if isinstance(labels, list) else []:
         name = str(label.get("name") or "") if isinstance(label, dict) else ""
         if name.startswith("DEVICE: "):
             return name[len("DEVICE: ") :]

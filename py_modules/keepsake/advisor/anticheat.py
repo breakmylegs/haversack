@@ -67,6 +67,10 @@ def _url(value: Any) -> str:
     return text[:300] if text.startswith("https://") else ""
 
 
+def _list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
 def trim(raw: Any) -> dict[str, Any]:
     """Keep what the page shows, keyed by Steam app ID and by name."""
     if not isinstance(raw, list):
@@ -74,10 +78,11 @@ def trim(raw: Any) -> dict[str, Any]:
     by_appid: dict[str, dict[str, Any]] = {}
     by_name: dict[str, dict[str, Any]] = {}
     for game in raw:
-        if not isinstance(game, dict) or game.get("status") not in STATUSES:
+        if not isinstance(game, dict) or not isinstance(game.get("status"), str) or game["status"] not in STATUSES:
             continue
         notes = []
-        for note in game.get("notes") or []:
+        raw_notes = game.get("notes")
+        for note in raw_notes if isinstance(raw_notes, list) else []:
             if isinstance(note, list) and note:
                 notes.append({"text": _text(note[0], 200), "url": _url(note[1] if len(note) > 1 else "")})
             if len(notes) >= MAX_NOTES:
@@ -85,7 +90,7 @@ def trim(raw: Any) -> dict[str, Any]:
         entry = {
             "name": _text(game.get("name"), 120),
             "status": game["status"],
-            "anticheats": [_text(a, 60) for a in game.get("anticheats") or [] if isinstance(a, str)][:4],
+            "anticheats": [_text(a, 60) for a in _list(game.get("anticheats")) if isinstance(a, str)][:4],
             "notes": notes,
             "slug": _text(game.get("slug"), 120),
             "changed": _text(game.get("dateChanged"), 30),

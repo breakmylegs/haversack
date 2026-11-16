@@ -367,7 +367,8 @@ def to_recommendation(data: dict[str, Any], device: dict[str, Any]) -> tuple[dic
     raw_in_game = data.get("in_game")
     in_game: dict[str, Any] = raw_in_game if isinstance(raw_in_game, dict) else {}
     settings = []
-    for item in in_game.get("settings") or []:
+    raw_settings = in_game.get("settings")
+    for item in raw_settings if isinstance(raw_settings, list) else []:
         if not (isinstance(item, dict) and isinstance(item.get("name"), str) and isinstance(item.get("value"), str)):
             discarded.append("in_game.settings: an entry was not a name and value")
             continue

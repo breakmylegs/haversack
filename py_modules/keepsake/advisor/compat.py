@@ -101,11 +101,15 @@ def flags_for(parsed: dict[str, Any], selected: dict[str, str]) -> list[str]:
     return flags
 
 
+FSR4_ASSIGN_RE = re.compile(r"FSR_?4[A-Za-z0-9_]*=", re.I)
+
+
 def drop_fsr4(parsed: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
-    kept = [e for e in parsed["env"] if not FSR4_ENV_RE.search(e.split("=", 1)[0])]
-    if len(kept) == len(parsed["env"]):
+    """Remove every token that sets an FSR 4 variable, wherever it sits (env, after a wrapper, or quoted)."""
+    out = {key: [t for t in parsed[key] if not FSR4_ASSIGN_RE.search(t)] for key in ("env", "wrappers", "args")}
+    if all(len(out[key]) == len(parsed[key]) for key in out):
         return parsed, []
-    return dict(parsed, env=kept), [
+    return dict(parsed, **out), [
         "An FSR 4 setting was removed. FSR 4 is not officially available on handheld chips under Proton."
     ]
 
@@ -156,6 +160,7 @@ def launch_section(
     if not recommended["raw"]:
         return None
     recommended, fsr_flags = drop_fsr4(recommended)
+    current_kept, current_fsr = drop_fsr4(current)  # the combined copy must not carry FSR 4 either
     rec_text = join(recommended)
     section: dict[str, Any] = {
         "recommended": rec_text,
@@ -167,7 +172,8 @@ def launch_section(
         "sameAsCurrent": False,
     }
     if current["raw"]:
-        merged, notes = merge(current, recommended)
+        merged, notes = merge(current_kept, recommended)
+        notes = notes + (current_fsr if not fsr_flags else [])
         merged_text = join(merged)
         if merged_text in (current["raw"], join(current)):
             section["sameAsCurrent"] = True
