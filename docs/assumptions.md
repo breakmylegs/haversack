@@ -285,3 +285,8 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 | A145 | The Legion Go reports `sys_vendor` `LENOVO` and `product_name` `83E1`; the Legion Go 2 `83N0` or `83N1` | Lenovo machine types; unverified on Peter's devices until `capture_device.sh` runs (c0-report Q2) | Lenovo PSREF |
 | A146 | Deck Verified answers `game_details?appid=` and `?name=` with `{"reports": [...]}`, 204 when nothing is known, and links each report to a GitHub issue | Tuning Advisor register, unverified from Keepsake | deckverified.games |
 | A147 | The manifest compact index keeps the Steam ID as `s` per game | verified (`manifest.build_index`, slice 4) | Keepsake |
+## Decky's frozen Python (v0.22.1)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A152 | Decky Loader's Python is a PyInstaller build that bundles only the stdlib modules its own code reaches plus `hiddenimports` (`logging.handlers`, `sqlite3`, `http.server`, `socketserver`, `configparser`). `xml`, `tomllib` and `resource` are not proven bundled | verified from `backend/pyinstaller.spec` and the loader's imports on `main` (16 November 2026); `xml` confirmed missing on Peter's Legion Go 2 | Decky Loader source, ADR-0030 |

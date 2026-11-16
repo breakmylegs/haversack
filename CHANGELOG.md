@@ -13,6 +13,18 @@ Slice 14: the Advisor module, first part.
 - Detects your handheld (Legion Go, Legion Go 2, Steam Deck, ROG Ally and others) and your TDP and frame generation tools, and warns when two TDP tools fight. You can choose both by hand.
 - Non-Steam shortcuts are matched to their Steam game through the save manifest, or by a Steam app ID you enter.
 - Anti-cheat status from Are We Anti-Cheat Yet for games that have it.
+## [0.22.1]
+
+Fixes Keepsake not starting at all on some devices.
+
+### Fixed
+
+- On Decky builds whose Python has no XML module, Keepsake's backend failed to start. Updates stayed on "Checking" with no version shown, and Games, the manifest update and shortcuts never loaded. Keepsake now starts normally there. Only WebDAV and S3 need the XML module, and they say so clearly if it is missing.
+
+### Added
+
+- Diagnostics, "Python modules in this Decky build": lists any module this Decky build lacks and what it stops.
+- Troubleshooting: what to do when Updates stays on "Checking", and how to read Decky's journal.
 
 ## [0.22.0]
 
