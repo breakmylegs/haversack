@@ -111,6 +111,54 @@ class Shortcut:
     exe: str
     start_dir: str
     last_play_time: int
+    launch_options: str = ""
+    icon: str = ""
+
+
+ARTWORK_SUFFIXES = ("", "p", "_hero", "_logo", "_icon")
+ARTWORK_EXTENSIONS = (".png", ".jpg", ".jpeg")
+
+
+def compat_tool_mapping(steam_root: str) -> dict[int, str]:
+    """App ID to compatibility tool name from Steam's ``config/config.vdf`` (read-only, v2 slice 3 amendment).
+
+    The mapping lives under ``InstallConfigStore/Software/Valve/Steam/CompatToolMapping``
+    (assumption A126). Returns an empty mapping when the file or the key is missing.
+    """
+    path = os.path.join(steam_root, "config", "config.vdf")
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            data = loads_text(handle.read())
+    except (OSError, VdfError):
+        return {}
+    node: Any = _lower_keys(data)
+    for key in ("installconfigstore", "software", "valve", "steam", "compattoolmapping"):
+        node = _lower_keys(node).get(key) if isinstance(node, dict) else None
+    out: dict[int, str] = {}
+    if isinstance(node, dict):
+        for appid, entry in node.items():
+            if (
+                str(appid).isdigit()
+                and isinstance(entry, dict)
+                and isinstance(entry.get("name"), str)
+                and entry["name"]
+            ):
+                out[int(appid)] = entry["name"]
+    return out
+
+
+def artwork_files(steam_root: str, user_id3: str | None, appid: int) -> list[str]:
+    """Custom artwork file names for an app in ``userdata/<id3>/config/grid`` (read-only)."""
+    if not user_id3:
+        return []
+    grid = os.path.join(steam_root, "userdata", user_id3, "config", "grid")
+    found = []
+    for suffix in ARTWORK_SUFFIXES:
+        for extension in ARTWORK_EXTENSIONS:
+            name = f"{appid}{suffix}{extension}"
+            if os.path.isfile(os.path.join(grid, name)):
+                found.append(name)
+    return found
 
 
 def _lower_keys(entry: dict[str, Any]) -> dict[str, Any]:
@@ -140,6 +188,8 @@ def read_shortcuts(path: str) -> list[Shortcut]:
                 exe=str(e.get("exe", "")),
                 start_dir=str(e.get("startdir", "")),
                 last_play_time=int(e.get("lastplaytime", 0) or 0),
+                launch_options=str(e.get("launchoptions", "")),
+                icon=str(e.get("icon", "")),
             )
         )
     return out
@@ -260,6 +310,13 @@ class GameEntry:
     steam_root: str | None = None
     default_user: str | None = None
     exe_name: str | None = None  # lower-case file name only, for cross-device matching
+    # v2 slice 3 amendment, exposed through Core for Replication and Installer. Device-local only (principle 10).
+    exe: str | None = None
+    start_dir: str | None = None
+    launch_options: str = ""
+    compat_tool: str | None = None
+    artwork: list[str] = field(default_factory=list)
+    icon: str = ""
 
     def public(self) -> dict[str, Any]:
         return asdict(self)
@@ -299,6 +356,7 @@ def discover(home: str | None = None) -> dict[str, Any]:
     seen_steam: set[int] = set()
     for root in steam_roots(home):
         libraries = library_folders(root)
+        compat = compat_tool_mapping(root)
         users = steam_user_ids(root)
         default = default_user_id(root, users)
         ordered_users = ([default] if default else []) + [u for u in users if u != default]
@@ -334,6 +392,12 @@ def discover(home: str | None = None) -> dict[str, Any]:
                         steam_root=root,
                         default_user=default,
                         exe_name=exe.replace("\\", "/").rsplit("/", 1)[-1].lower() or None if exe else None,
+                        exe=exe or None,
+                        start_dir=_unquote(sc.start_dir) or None,
+                        launch_options=sc.launch_options,
+                        compat_tool=compat.get(sc.appid_unsigned),
+                        artwork=artwork_files(root, user, sc.appid_unsigned),
+                        icon=_unquote(sc.icon),
                     )
                 )
 
@@ -360,6 +424,7 @@ def discover(home: str | None = None) -> dict[str, Any]:
                         notes=[] if install and os.path.isdir(install) else ["install-folder-missing"],
                         steam_root=root,
                         default_user=default,
+                        compat_tool=compat.get(app.appid),
                     )
                 )
     return {"roots": roots_info, "games": [g.public() for g in games]}

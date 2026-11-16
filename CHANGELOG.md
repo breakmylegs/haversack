@@ -2,6 +2,16 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [0.13.0]
+
+Slice 13: the module framework for Keepsake v2. Saves works as before.
+
+### Added
+
+- Settings, Modules: each module with its switch, health and what it writes. Saves can be switched off; Advisor, Replication, Installer and Desktop are listed as coming in later versions. A module that fails is stopped on its own, with "Try again", and never affects the others.
+- Diagnostics, Probe Steam APIs: checks which Steam client functions are available, without changing anything.
+- The Games list knows each shortcut's launch options, compatibility tool, artwork and icon, for the modules that need them.
+
 ## [0.12.0]
 
 Slice 12: hardening and documentation ahead of 1.0.0.

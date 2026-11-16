@@ -6,6 +6,7 @@ import { checkForUpdates, getStatus, qamSummary, QamSummary, syncNow, takeStartu
 import { agoText, BACKEND_LABELS, HEALTH_COLOURS, HEALTH_LABELS, SYNC_LABELS } from "./format";
 import { startLifecycle } from "./lifecycle";
 import { startProbes } from "./probes";
+import { startSteamOps } from "./steamops";
 import { KeepsakeRoute } from "./pages/KeepsakeRoute";
 import { SetupWizard } from "./pages/SetupWizard";
 import { ROUTE_PATH, SETUP_PATH } from "./routes";
@@ -160,6 +161,7 @@ export default definePlugin(() => {
   routerHook.addRoute(SETUP_PATH, SetupWizard);
   const stopProbes = startProbes();
   const stopLifecycle = startLifecycle();
+  const stopSteamOps = startSteamOps();
   // Messages from the backend, such as "Recovered missed exit backup for <game>".
   const toastListener = addEventListener<[string]>("keepsake_toast", (body) =>
     toaster.toast({ title: "Keepsake", body }),
@@ -174,6 +176,7 @@ export default definePlugin(() => {
     onDismount() {
       stopProbes();
       stopLifecycle();
+      stopSteamOps();
       removeEventListener("keepsake_toast", toastListener);
       routerHook.removeRoute(ROUTE_PATH);
       routerHook.removeRoute(SETUP_PATH);

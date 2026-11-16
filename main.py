@@ -86,6 +86,27 @@ class Plugin:
     async def set_backend_config(self, backend: str, values: dict[str, Any]) -> dict[str, Any]:
         return await self.app.set_backend_config(backend, values)
 
+    async def modules_status(self) -> dict[str, Any]:
+        return await self.app.modules_status()
+
+    async def set_module_enabled(self, name: str, enabled: bool) -> dict[str, Any]:
+        return await self.app.set_module_enabled(name, enabled)
+
+    async def reset_module(self, name: str) -> dict[str, Any]:
+        return await self.app.reset_module(name)
+
+    async def steam_probe(self) -> dict[str, Any]:
+        return await self.app.steam_probe()
+
+    async def steam_ops_claim(self) -> dict[str, Any] | None:
+        return await self.app.steam_ops_claim()
+
+    async def steam_ops_finish(self, op_id: int, ok: bool, result: dict[str, Any]) -> dict[str, Any]:
+        return await self.app.steam_ops_finish(op_id, ok, result)
+
+    async def steam_ops_list(self) -> list[dict[str, Any]]:
+        return await self.app.steam_ops_list()
+
     async def enable_steam_without_cloud(self) -> dict[str, Any]:
         return await self.app.enable_steam_without_cloud()
 

@@ -65,6 +65,9 @@ Status values: **planned** (mitigation designed, not built yet), **partial** (so
 | T67 | An imported old backup replaces current saves or raises conflicts everywhere | Imports are never heads; they are history restored by hand with a pre-restore snapshot (ADR-0021) | in place (slice 10) |
 | T68 | A suspend snapshot (mid-session state) is adopted by the other device as the current save | Provisional snapshots are never heads or bases and do not hide the head they sit on; the other device only shows a message and the user restores from History if wanted (ADR-0022) | in place (slice 11), `tests/test_slice11.py` |
 | T69 | A wrong Steam Cloud label leads to a game synced twice (Steam Cloud and Keepsake) or not at all | Detection is read-only and only labels or offers; bulk enable covers played games with no cloud files; both tools syncing the same files is still guarded by conflicts and pre-restore snapshots | in place (slice 11); detection rule unverified on device (A118) |
+| T70 | A failing v2 module takes save sync down with it | Module isolation: failures in start, stop, health or event handlers mark only that module failed; Saves keeps running (ADR-0024) | in place (slice 13), `tests/test_modules.py` |
+| T71 | A Steam operation is applied twice or left half-done when the frontend reloads | Claims time out and are offered again; every change records the original and reads the field back; success only when the read-back matches | in place (slice 13); write operations unused until slices 19 and 21 |
+| T72 | A rolled-back build corrupts a newer module's state | Per-module migration versions; a newer database refuses that module's migrations | in place (slice 13) |
 | T60 | Health checks or the diagnostics export reveal the game list | Results stay on the device; the export is written to the settings folder only (as T16) | accepted, as T16 |
 
 ## v2 additions (slice C0)
@@ -77,7 +80,7 @@ From `docs/build-prompt-v2.md` section 13. The spec numbers these T16 to T29, bu
 | T43 | T17 | Malicious manifest paths from a peer | Central path validator, canonical relative paths, rejection of absolute paths, `..`, case-only collisions and symlinks resolving outside the root; symlinks never followed | planned | 18 |
 | T44 | T18 | A partially transferred game is promoted | Staging, verification against the manifest root hash before an atomic promote, replaced files held until the job completes, rollback | planned | 18 |
 | T45 | T19 | Replication overwrites saves | P14 exclusions enforced in the path validator, per-game lock (P19), Saves source checkpoint before send, cross-module invariant test | planned | 13, 18 to 20 |
-| T46 | T20 | A Steam shortcut corrupted by API calls | Only `SteamClient` APIs after a user action, originals stored first, every field read back, retries, restore originals on failure (ADR-0015) | planned | 13, 19, 21 |
+| T46 | T20 | A Steam shortcut corrupted by API calls | Only `SteamClient` APIs after a user action, originals stored first, every field read back, retries, restore originals on failure (ADR-0015) | partial (slice 13): executor queue, originals and read-back built; restoring originals on failure arrives with the first write user in slice 19 | 13, 19, 21 |
 | T47 | T21 | The loopback web UI attacked by a malicious web page (DNS rebinding, CSRF) | `127.0.0.1` binding, `Host` validation, CSRF tokens, no CORS (ADR-0017) | planned | 23 |
 | T48 | T22 | Login token leakage | One-time, short-lived login URLs exchanged for a session cookie; never logged | planned | 23, 24 |
 | T49 | T23 | Personal data sent to AI providers | P18 payload rules and a payload-inspecting test (ADR-0019) | planned | 15 |

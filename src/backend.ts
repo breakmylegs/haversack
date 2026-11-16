@@ -26,6 +26,44 @@ export interface Settings {
 
 export type SteamCloud = "cloud" | "no-cloud" | "unknown" | null;
 
+export interface SteamOp {
+  id: number;
+  module: string;
+  kind: string;
+  payload: Record<string, unknown>;
+}
+
+export interface ModuleStatus {
+  name: string;
+  title: string;
+  description: string;
+  writes: string;
+  available: boolean;
+  flag: boolean;
+  running: boolean;
+  failed: string | null;
+  health: HealthCheck[];
+}
+
+export interface ModulesStatus {
+  modules: ModuleStatus[];
+  stateDatabase: boolean;
+  locks: Record<string, string>;
+  steamOpsPending: number;
+}
+
+export const modulesStatus = callable<[], ModulesStatus>("modules_status");
+export const setModuleEnabled = callable<[name: string, enabled: boolean], ModulesStatus>("set_module_enabled");
+export const resetModule = callable<[name: string], ModulesStatus>("reset_module");
+export const steamProbe = callable<[], { id: number }>("steam_probe");
+export const steamOpsClaim = callable<[], SteamOp | null>("steam_ops_claim");
+export const steamOpsFinish = callable<[id: number, ok: boolean, result: Record<string, unknown>], { ok: boolean }>(
+  "steam_ops_finish",
+);
+export const steamOpsList = callable<[], (SteamOp & { state: string; result: Record<string, unknown> | null })[]>(
+  "steam_ops_list",
+);
+
 export const onSuspend = callable<[], { started: number }>("on_suspend");
 export const enableSteamWithoutCloud = callable<[], { enabled: string[] }>("enable_steam_without_cloud");
 
