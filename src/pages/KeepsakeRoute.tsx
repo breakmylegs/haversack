@@ -41,7 +41,7 @@ const TABS: Tab[] = [
   { module: "saves", title: "Games", icon: <FaGamepad />, content: <GamesPage />, path: "games" },
   { module: "saves", title: "Conflicts", icon: <FaCodeBranch />, content: <ConflictsPage />, path: "conflicts" },
   { module: "saves", title: "History", icon: <FaHistory />, content: <HistoryPage />, path: "history" },
-  { module: "saves", title: "Import", icon: <FaFileImport />, content: <ImportPage />, path: "import" },
+  { module: "saves", title: "Import saves", icon: <FaFileImport />, content: <ImportPage />, path: "import" },
   { module: "installer", title: "Install", icon: <FaCompactDisc />, content: <InstallerPage />, path: "install" },
   { module: "core", title: "Settings", icon: <FaCog />, content: <SettingsPage />, path: "settings" },
   { module: "core", title: "Updates", icon: <FaCloudDownloadAlt />, content: <UpdatesPage />, path: "updates" },

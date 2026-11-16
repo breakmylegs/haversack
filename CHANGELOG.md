@@ -2,18 +2,11 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
-## [Unreleased]
-
-Slice 25 (in progress): parser hardening.
-
-### Fixed
-
-- A malformed entry in the Ludusavi manifest could stop the whole game list from loading its save locations. Now only that entry is skipped.
-- Manifest entries with a Steam ID of `true` or `false` are no longer matched to a Steam game.
-
 ## [0.22.0]
 
-Slice 22: the Installer module, second part.
+Keepsake v2 begins: Keepsake is now one plugin with modules. This release adds the Installer module and the module framework, alongside save sync, which works as before.
+
+This is the first release since 0.11.0. It also contains 0.12.0, 0.13.0 and 0.21.0 below, which were not published on their own: release signature checking, the README and help guides, the module framework with Settings, Modules, and the first part of the Installer.
 
 ### Added
 
@@ -23,6 +16,16 @@ Slice 22: the Installer module, second part.
 - Install, "Sync this game's saves" once a game is installed. Other modules are told about new games.
 - Installer health in Settings, Modules: discs left mounted, installer shortcuts left behind, and Steam changes still waiting.
 - Install, "Add artwork from SteamGridDB": once a game is installed, add its library artwork with your own SteamGridDB API key. Enter the key on the Install page.
+
+### Changed
+
+- Games, Update manifest now shows what it is doing: contacting GitHub, how much of the manifest has downloaded, how many games it has read, and saving. It also shows a weekly update that is already running, and says in words why an update failed.
+- The Import tab is now Import saves, and its page says plainly that it imports save backups from Ludusavi, not installed games.
+
+### Fixed
+
+- A malformed entry in the Ludusavi manifest could stop the whole game list from loading its save locations. Now only that entry is skipped.
+- Manifest entries with a Steam ID of `true` or `false` are no longer matched to a Steam game.
 
 ## [0.21.0]
 

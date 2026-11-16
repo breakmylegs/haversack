@@ -136,7 +136,11 @@ def _launch_exes(value: Any) -> list[str]:
     return out
 
 
-def build_index(lines: Iterable[str], etag: str | None = None) -> dict[str, Any]:
+Progress = Callable[[dict[str, Any]], None]
+PROGRESS_EVERY = 2000  # entries between indexing progress reports
+
+
+def build_index(lines: Iterable[str], etag: str | None = None, progress: Progress | None = None) -> dict[str, Any]:
     started = time.perf_counter()
     games: dict[str, Any] = {}
     aliases: dict[str, str] = {}
@@ -146,6 +150,8 @@ def build_index(lines: Iterable[str], etag: str | None = None) -> dict[str, Any]
     total = 0
     for title, entry in iter_entries(lines):
         total += 1
+        if progress is not None and total % PROGRESS_EVERY == 0:
+            progress({"stage": "indexing", "entries": total})
         if isinstance(entry, YamlSubsetError) or not isinstance(entry, dict):
             skipped_count += 1
             if len(skipped) < 50:
@@ -265,11 +271,22 @@ class ManifestStore:
             "attribution": ATTRIBUTION,
         }
 
-    def refresh(self, force: bool = False) -> dict[str, Any]:
-        """Download and index the manifest if missing, a week old, or ``force``. Quiet on failure."""
+    def refresh(self, force: bool = False, progress: Progress | None = None) -> dict[str, Any]:
+        """Download and index the manifest if missing, a week old, or ``force``. Quiet on failure.
+
+        ``progress`` receives ``{"stage": ...}`` updates: ``checking``, then
+        ``downloading`` (``bytes``, ``total``), ``indexing`` (``entries``) and
+        ``saving``. It is called from this thread; the caller throttles it.
+        """
+
+        def report(update: dict[str, Any]) -> None:
+            if progress is not None:
+                progress(update)
+
         index = self.load()
         if index is not None and not force and self._clock() - float(index.get("fetched") or 0) < REFRESH_SECONDS:
             return {"ok": True, "changed": False, "reason": "fresh"}
+        report({"stage": "checking"})
         headers = {"Accept": "text/plain"}
         if index is not None and index.get("etag"):
             headers["If-None-Match"] = str(index["etag"])
@@ -277,7 +294,13 @@ class ManifestStore:
         os.close(fd)
         try:
             check_url(MANIFEST_URL)
-            response = self._download(MANIFEST_URL, tmp, headers=headers, max_bytes=MAX_MANIFEST_BYTES)
+            response = self._download(
+                MANIFEST_URL,
+                tmp,
+                headers=headers,
+                max_bytes=MAX_MANIFEST_BYTES,
+                progress=lambda done, total: report({"stage": "downloading", "bytes": done, "total": total}),
+            )
             if response.status == 304 and index is not None:
                 index["fetched"] = self._clock()
                 atomic_write_json(self._path, index)
@@ -285,12 +308,13 @@ class ManifestStore:
             if response.status != 200:
                 return {"ok": False, "reason": f"http-{response.status}"}
             with open(tmp, encoding="utf-8", errors="replace") as handle:
-                new_index = build_index(handle, etag=response.headers.get("etag"))
+                new_index = build_index(handle, etag=response.headers.get("etag"), progress=report)
             new_index["fetched"] = self._clock()
             new_index["peakRssMb"] = peak_rss_mb()
             if not new_index["games"]:
                 # An empty result means the format changed or the download was wrong: keep the old index.
                 return {"ok": False, "reason": "empty-index"}
+            report({"stage": "saving", "entries": new_index["entries"]})
             atomic_write_json(self._path, new_index, mode=0o644)
             self._cache = new_index
             return {

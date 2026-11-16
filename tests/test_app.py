@@ -200,3 +200,45 @@ def test_settings_round_trip(tmp_path):
     app, _ = make_app(tmp_path, [])
     asyncio.run(app.set_setting("deviceName", "Handheld"))
     assert asyncio.run(app.get_settings())["deviceName"] == "Handheld"
+
+
+def test_manifest_refresh_sends_throttled_progress_and_can_be_polled(tmp_path):
+    from keepsake.net import HttpResponse
+    from test_manifest import SAMPLE
+
+    events, seen_while_running = [], []
+    paths = PluginPaths(
+        settings_dir=str(tmp_path / "settings"),
+        runtime_dir=str(tmp_path / "runtime"),
+        log_dir=str(tmp_path / "logs"),
+        plugin_dir=str(tmp_path / "plugin"),
+    )
+
+    async def emit(event, *args):
+        events.append((event, args))
+
+    def download(url, dest, headers=None, max_bytes=None, progress=None):
+        with open(dest, "w", encoding="utf-8") as handle:
+            handle.write(SAMPLE)
+        for done in range(1, 21):  # twenty chunks in a burst: only the first is sent
+            progress(done, 20)
+        seen_while_running.append(dict(app._manifest_progress))
+        return HttpResponse(status=200, headers={})
+
+    app = KeepsakeApp(paths, emit=emit, proc_root=str(tmp_path / "proc"), auto_refresh_manifest=False)
+    app.manifest._download = download
+
+    async def go():
+        assert (await app.manifest_progress()) == {"stage": "idle", "running": False}
+        result = await app.refresh_manifest(True)
+        await asyncio.sleep(0)  # let progress sent from the worker thread arrive
+        return result, await app.manifest_progress()
+
+    result, after = asyncio.run(go())
+    assert result["ok"] and after == {"stage": "idle", "running": False}
+    assert seen_while_running == [{"stage": "downloading", "bytes": 20, "total": 20, "running": True}]
+    sent = [args[0] for event, args in events if event == "keepsake_manifest_progress"]
+    stages = [s["stage"] for s in sent]
+    assert stages[0] == "checking" and stages[-1] == "finished" and "saving" in stages
+    assert stages.count("downloading") == 1  # throttled to two a second
+    assert sent[-1]["ok"] is True and sent[-1]["running"] is False and sent[-1]["games"] == result["games"]

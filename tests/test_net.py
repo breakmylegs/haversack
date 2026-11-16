@@ -53,3 +53,38 @@ def test_redirect_to_disallowed_host_is_blocked():
         request, None, 302, "Found", {}, "https://release-assets.githubusercontent.com/payload.zip"
     )
     assert allowed is not None
+
+
+class _FakeResponse:
+    def __init__(self, body, length):
+        self.body, self.status = body, 200
+        self.headers = {"Content-Length": str(length)} if length is not None else {}
+
+    def read(self, size):
+        chunk, self.body = self.body[:size], self.body[size:]
+        return chunk
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+@pytest.mark.parametrize("length", [600 * 1024, None])
+def test_fetch_to_file_reports_progress(tmp_path, monkeypatch, length):
+    body = b"y" * (600 * 1024)
+
+    class Opener:
+        def open(self, request, timeout):
+            return _FakeResponse(body, length)
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *handlers: Opener())
+    seen = []
+    dest = tmp_path / "out"
+    net.fetch_to_file(
+        "https://raw.githubusercontent.com/x", str(dest), progress=lambda done, total: seen.append((done, total))
+    )
+    assert dest.read_bytes() == body
+    assert [done for done, _ in seen] == [256 * 1024, 512 * 1024, 600 * 1024]  # after every chunk
+    assert {total for _, total in seen} == {length}  # Content-Length, or None when the server gives none
