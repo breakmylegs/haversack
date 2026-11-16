@@ -1,4 +1,4 @@
-import { DialogButton, DropdownItem, Field, Focusable, Navigation, TextField } from "@decky/ui";
+import { DialogButton, DropdownItem, Field, Focusable, Navigation, TextField, ToggleField } from "@decky/ui";
 import { addEventListener, removeEventListener, toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import {
@@ -14,6 +14,7 @@ import {
   discoverGames,
   GameEntry,
   saveAiKey,
+  savePcgwLogin,
 } from "../backend";
 
 // Advisor is read-only (P16, ADR-0019): this page shows advice and copies text. It never changes a setting.
@@ -120,6 +121,62 @@ function Recommendation({ rec }: { rec: AdvisorRecommendation }) {
         )}
       </Focusable>
     </Field>
+  );
+}
+
+// PCGamingWiki (optional, off by default): which upscalers and frame generation the game supports. Uses the
+// user's own bot password; the login goes to Keepsake's backend secrets and never comes back to this page.
+function PcgwSection({ view, busy, act }: { view: AdvisorView; busy: boolean; act: (work: () => Promise<AdvisorView>) => Promise<void> }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const settings = view.settings;
+  if (!settings) return null;
+  const wiki = view.pcgw?.data;
+
+  const saveLogin = async () => {
+    try {
+      await savePcgwLogin("pcgw", { username: username.trim(), password: password.trim() });
+      setPassword("");
+      await act(advisorRefresh);
+      toaster.toast({ title: "Keepsake", body: "PCGamingWiki login saved." });
+    } catch (err) {
+      toaster.toast({ title: "Keepsake", body: String(err) });
+    }
+  };
+
+  return (
+    <>
+      <ToggleField
+        label="PCGamingWiki (optional)"
+        description="Checks which upscalers and frame generation the game supports. Needs your own bot password from Special:BotPasswords, with the Cargo grant."
+        checked={settings.sourcePcgw}
+        disabled={busy}
+        onChange={(on) => void act(() => advisorSettings({ sourcePcgw: on }))}
+      />
+      {settings.sourcePcgw && !view.pcgwLogin && (
+        <Field label="PCGamingWiki bot login" description="The bot user name looks like YourName@keepsake." childrenLayout="below">
+          <TextField value={username} disabled={busy} onChange={(e) => setUsername(e.target.value)} />
+          <TextField value={password} bIsPassword disabled={busy} onChange={(e) => setPassword(e.target.value)} />
+          <DialogButton style={{ width: "auto", marginTop: 4 }} disabled={busy || !username.trim() || !password.trim()} onClick={() => void saveLogin()}>
+            Save login
+          </DialogButton>
+        </Field>
+      )}
+      {view.pcgw?.error && <Field label="PCGamingWiki" description={view.pcgw.error} />}
+      {wiki && (
+        <Field
+          label={`PCGamingWiki: ${wiki.page}`}
+          description={`Upscaling: ${wiki.upscaling.join(", ") || "none listed"}. Frame generation: ${wiki.frameGen.join(", ") || "none listed"}.${view.pcgw?.cached ? " (cached)" : ""} ${wiki.attribution}`}
+          childrenLayout="inline"
+        >
+          {wiki.url && (
+            <DialogButton style={{ width: "auto" }} onClick={() => Navigation.NavigateToExternalWeb(wiki.url)}>
+              Open the page
+            </DialogButton>
+          )}
+        </Field>
+      )}
+    </>
   );
 }
 
@@ -374,6 +431,7 @@ export function AdvisorPage() {
       {(view.recommendations ?? []).map((rec, i) => (
         <Recommendation key={`${rec.source}-${rec.source_url}-${i}`} rec={rec} />
       ))}
+      <PcgwSection view={view} busy={busy} act={act} />
       <AiSection view={view} busy={busy} act={act} />
       <Field label="Sources" description={(view.attribution ?? []).join(" ")} />
     </div>

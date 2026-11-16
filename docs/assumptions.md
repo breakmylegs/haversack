@@ -306,3 +306,9 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 | # | Fact | Status | Source |
 |---|---|---|---|
 | A154 | Gaming Mode's footer bar overlays the bottom of a plugin's full-screen route. Steam's own `SidebarNavigation` and `Tabs` keep their scrolling content clear of it, a plain scrolling `div` does not, and 96 px of bottom padding clears it at the Legion Go 2's scale | the overlay was seen on Peter's Legion Go 2; Decky Loader's Store uses `marginTop: 40px`, `height: calc(100% - 40px)` and Steam's `Tabs` (`frontend/src/components/store/Store.tsx`); the 96 px value is unverified on other screens | Decky Loader source, Peter's device |
+
+## PCGamingWiki (ADR-0031)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A153 | PCGamingWiki's Cargo API needs a MediaWiki bot login (`meta=tokens` then `action=login`) with the Cargo grant since August 2026, uses tables `Game` and `Video`, and blocks an IP for a minute after a 429 | from Tuning Advisor's register; unverified from Keepsake until a real bot login is tried | Tuning Advisor |
