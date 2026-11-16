@@ -2,9 +2,11 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
-## [Unreleased]
+## [0.23.0]
 
-Slices 14 and 15: the Advisor module.
+The Advisor module: tuning advice for each game, for your exact device. Advisor only recommends: it never changes a setting.
+
+It also hardens the parsers that read outside data, which fixed several crashes on malformed input.
 
 ### Added
 
