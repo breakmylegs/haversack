@@ -192,6 +192,7 @@ def test_prepare_returns_decky_arguments(tmp_path):
     updater, _ = make_ready(tmp_path)
     result = updater.prepare("v0.2.1", busy_reason=None)
     assert result == {
+        "signed": False,  # no release key pinned yet (ADR-0023)
         "ok": True,
         "artifact": "https://github.com/r/v0.2.1/zip",
         "name": "Keepsake",

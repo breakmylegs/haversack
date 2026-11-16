@@ -87,7 +87,12 @@ class LocalFolderStore(Store):
     def list(self, prefix: str = "") -> list[ObjectInfo]:
         validate_prefix(prefix)
         out: list[ObjectInfo] = []
-        for folder, dirs, files in os.walk(self._root):
+        # Walk only below the prefix's folder; walking the whole store made every listing cost O(store) (slice 12).
+        folder_part = prefix.rsplit("/", 1)[0] if "/" in prefix else ""
+        start = os.path.join(self._root, *folder_part.split("/")) if folder_part else self._root
+        if not os.path.isdir(start):
+            return out
+        for folder, dirs, files in os.walk(start):
             rel_folder = os.path.relpath(folder, self._root).replace(os.sep, "/")
             if rel_folder == ".":
                 rel_folder = ""

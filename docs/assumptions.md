@@ -154,6 +154,14 @@ Microsoft documentation read on 15 November 2026: device code flow (Entra, updat
 | A121 | `SteamClient.System.RegisterForOnSuspendRequest(cb)` fires before the device sleeps, leaving a few seconds for a snapshot | verified in types (`system/index.d.ts`); timing unverified on device (A21) | `@decky/ui` 4.16.5 |
 | A122 | The Ludusavi manifest's `registry` keys use `HKEY_CURRENT_USER/...` paths with forward slashes | verified in the manifest schema (A44) | manifest |
 
+## Hardening (slice 12)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A123 | minisign signature files have four lines (untrusted comment, base64 of algorithm, key ID and signature, trusted comment, base64 global signature over signature and trusted comment); the default algorithm `ED` signs the BLAKE2b-512 hash of the file; public keys are base64 of `Ed`, key ID and key | minisign's documented format; verified by tests built in that format, not yet against a file made by the minisign tool (the first signed release proves it) | minisign documentation |
+| A124 | `keepsake.ed25519` is correct | verified against RFC 8032 section 7.1 test vectors 1 and 2 | RFC 8032 |
+| A125 | 50 games stay responsive: on the development laptop, discovery 0.4 s, matching 0.1 s, preview of all 1.8 s, dry run 16 s, QAM summary 0.3 s, health 0.1 s, first push of all 58 s, idle pass 14 s (local test store) | measured on Windows; on-device figures pending (run on the device with `python scripts/test_on_device.py tests/test_performance.py`) | `tests/test_performance.py` |
+
 ## v2 verification items (slice C0)
 
 Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research.md` that Keepsake will rely on. "TA" means Peter's Tuning Advisor verification register (`decky-plugins/docs/VERIFICATION.md`), reused as evidence with its date and re-checked in the slice named. Types were read in `@decky/ui` 4.16.5 on 15 November 2026.
