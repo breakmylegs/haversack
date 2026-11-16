@@ -19,7 +19,7 @@ USER_REG = """WINE REGISTRY Version 2
 [Software\\\\Example Studio\\\\Example Quest] 1700000001
 #time=1d9c6e1f2a3b4c6
 "Volume"=dword:00000050
-"Slot"="C:\\\\users\\\\steamuser\\\\save.dat"
+"Slot"="C:\\\\users\\\\Public\\\\save.dat"
 "Blob"=hex:01,02,03,04,05,06,07,08,09,0a,0b,0c,0d,0e,0f,10,11,12,13,14,15,16,17,\\
   18,19,1a
 
