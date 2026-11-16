@@ -86,6 +86,63 @@ class Plugin:
     async def set_backend_config(self, backend: str, values: dict[str, Any]) -> dict[str, Any]:
         return await self.app.set_backend_config(backend, values)
 
+    async def modules_status(self) -> dict[str, Any]:
+        return await self.app.modules_status()
+
+    async def set_module_enabled(self, name: str, enabled: bool) -> dict[str, Any]:
+        return await self.app.set_module_enabled(name, enabled)
+
+    async def reset_module(self, name: str) -> dict[str, Any]:
+        return await self.app.reset_module(name)
+
+    async def steam_probe(self) -> dict[str, Any]:
+        return await self.app.steam_probe()
+
+    async def steam_ops_claim(self) -> dict[str, Any] | None:
+        return await self.app.steam_ops_claim()
+
+    async def steam_ops_finish(self, op_id: int, ok: bool, result: dict[str, Any]) -> dict[str, Any]:
+        return await self.app.steam_ops_finish(op_id, ok, result)
+
+    async def steam_ops_list(self) -> list[dict[str, Any]]:
+        return await self.app.steam_ops_list()
+
+    async def installer_status(self) -> dict[str, Any]:
+        return await self.app.installer_status()
+
+    async def installer_start(self, source: str, title: str) -> dict[str, Any]:
+        return await self.app.installer_start(source, title)
+
+    async def installer_create_shortcut(self, job_id: int, installer_rel: str) -> dict[str, Any]:
+        return await self.app.installer_create_shortcut(job_id, installer_rel)
+
+    async def installer_finished_installing(self, job_id: int) -> dict[str, Any]:
+        return await self.app.installer_finished_installing(job_id)
+
+    async def installer_retarget(self, job_id: int, exe: str) -> dict[str, Any]:
+        return await self.app.installer_retarget(job_id, exe)
+
+    async def installer_cancel(self, job_id: int) -> dict[str, Any]:
+        return await self.app.installer_cancel(job_id)
+
+    async def installer_add_cd_drive(self, job_id: int) -> dict[str, Any]:
+        return await self.app.installer_add_cd_drive(job_id)
+
+    async def installer_remove_shortcut(self, job_id: int) -> dict[str, Any]:
+        return await self.app.installer_remove_shortcut(job_id)
+
+    async def installer_artwork_search(self, job_id: int) -> list[dict[str, Any]]:
+        return await self.app.installer_artwork_search(job_id)
+
+    async def installer_artwork_apply(self, job_id: int, game_id: int) -> dict[str, Any]:
+        return await self.app.installer_artwork_apply(job_id, game_id)
+
+    async def installer_handoff(self, job_id: int) -> dict[str, Any]:
+        return await self.app.installer_handoff(job_id)
+
+    async def steam_ops_file(self, op_id: int) -> dict[str, Any]:
+        return await self.app.steam_ops_file(op_id)
+
     async def enable_steam_without_cloud(self) -> dict[str, Any]:
         return await self.app.enable_steam_without_cloud()
 

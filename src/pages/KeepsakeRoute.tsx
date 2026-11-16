@@ -1,9 +1,10 @@
 import { SidebarNavigation } from "@decky/ui";
-import { ReactElement } from "react";
+import { ReactElement, useEffect, useState } from "react";
 import {
   FaClipboardList,
   FaCloudDownloadAlt,
   FaCodeBranch,
+  FaCompactDisc,
   FaCog,
   FaFileImport,
   FaGamepad,
@@ -16,6 +17,8 @@ import { DiagnosticsPage } from "./DiagnosticsPage";
 import { GamesPage } from "./GamesPage";
 import { HistoryPage } from "./HistoryPage";
 import { ImportPage } from "./ImportPage";
+import { InstallerPage } from "./InstallerPage";
+import { modulesStatus } from "../backend";
 import { LogsPage } from "./LogsPage";
 import { SettingsPage } from "./SettingsPage";
 import { UpdatesPage } from "./UpdatesPage";
@@ -24,7 +27,7 @@ export { ROUTE_PATH };
 
 // Tabs are grouped by module so later modules (Advisor, Replication, Installer, Desktop) add
 // their own entries here without touching the Saves tabs (build prompt v2 section 10, slice 9).
-type Module = "saves" | "core";
+type Module = "saves" | "core" | "installer";
 
 interface Tab {
   module: Module;
@@ -39,6 +42,7 @@ const TABS: Tab[] = [
   { module: "saves", title: "Conflicts", icon: <FaCodeBranch />, content: <ConflictsPage />, path: "conflicts" },
   { module: "saves", title: "History", icon: <FaHistory />, content: <HistoryPage />, path: "history" },
   { module: "saves", title: "Import", icon: <FaFileImport />, content: <ImportPage />, path: "import" },
+  { module: "installer", title: "Install", icon: <FaCompactDisc />, content: <InstallerPage />, path: "install" },
   { module: "core", title: "Settings", icon: <FaCog />, content: <SettingsPage />, path: "settings" },
   { module: "core", title: "Updates", icon: <FaCloudDownloadAlt />, content: <UpdatesPage />, path: "updates" },
   { module: "core", title: "Logs", icon: <FaClipboardList />, content: <LogsPage />, path: "logs" },
@@ -46,12 +50,20 @@ const TABS: Tab[] = [
 ];
 
 export function KeepsakeRoute() {
+  // A module's tabs appear only while it runs (v2 spec 7.3: a disabled module has no UI).
+  const [running, setRunning] = useState<Set<string>>(new Set(["saves"]));
+  useEffect(() => {
+    modulesStatus()
+      .then((s) => setRunning(new Set(s.modules.filter((m) => m.running).map((m) => m.name))))
+      .catch(() => undefined);
+  }, []);
+  const tabs = TABS.filter((t) => t.module === "core" || running.has(t.module));
   return (
     <div style={{ marginTop: 40, height: "calc(100% - 40px)" }}>
       <SidebarNavigation
         title="Keepsake"
         showTitle
-        pages={TABS.map((t) => ({ title: t.title, icon: t.icon, content: t.content, route: `${ROUTE_PATH}/${t.path}` }))}
+        pages={tabs.map((t) => ({ title: t.title, icon: t.icon, content: t.content, route: `${ROUTE_PATH}/${t.path}` }))}
       />
     </div>
   );

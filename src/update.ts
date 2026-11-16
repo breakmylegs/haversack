@@ -40,6 +40,9 @@ const REASONS: Record<string, string> = {
   offline: "GitHub could not be reached. Try again when online.",
   "sums-unavailable": "The release's SHA256SUMS file could not be downloaded.",
   "sums-missing-zip": "SHA256SUMS does not list the release zip, so it cannot be verified.",
+  "unsigned-release": "That release is not signed, so Keepsake will not install it.",
+  "signature-unavailable": "The release's signature could not be downloaded. Try again later.",
+  "bad-signature": "The release's signature is not valid for Keepsake's release key, so it was not installed.",
 };
 
 export function reasonText(reason: string): string {

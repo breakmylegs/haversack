@@ -1,0 +1,428 @@
+"""Installer jobs (v2 spec 8.3, slices 21 and 22, ADR-0026 and ADR-0027).
+
+The established community method, automated: a temporary shortcut ``Install:
+<Title>`` runs the installer in its own prefix with the chosen compatibility
+tool (and ``STEAM_COMPAT_MOUNTS`` for a mounted ISO or a source outside the home
+folder); the user installs to the suggested folder and quits; Keepsake lists the
+new executables, the user picks the game's, and the same shortcut is retargeted
+to it, so the prefix is kept.
+
+States: ``choose-installer``, ``creating-shortcut``, ``run-installer``,
+``choose-game``, ``retargeting``, then ``done``, ``failed`` or ``cancelled``.
+Every Steam change is a Steam Operations Executor operation created from a user
+action (P15). The Installer writes only the CD drive links and drive type in
+the new shortcut's own prefix (slice 22) and staged artwork; the installer
+program writes the game, inside the prefix and the chosen library folder. Jobs
+live in the ``installer_jobs`` table.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import posixpath
+import re
+import time
+from collections.abc import Callable
+from typing import Any
+
+from ..statedb import StateDB
+from ..steamops import SteamOps
+from . import cdrom, files, udisks
+from .artwork import ArtworkError, SteamGridDB
+
+MIGRATIONS = [
+    """
+    CREATE TABLE installer_jobs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        state TEXT NOT NULL,
+        data TEXT NOT NULL,
+        created REAL NOT NULL,
+        updated REAL NOT NULL
+    )
+    """,
+]
+ACTIVE = ("choose-installer", "creating-shortcut", "run-installer", "choose-game", "retargeting")
+FINAL = ("done", "failed", "cancelled")
+_TITLE = re.compile(r'^[^/\\:*?"<>|\x00-\x1f]{1,80}$')
+# Wine's own files, not the game's: never offered as the game's executable.
+PREFIX_SKIP = ("windows/", "users/", "programdata/", "program files/common files/", "program files (x86)/common files/")
+_ROW = ("id", "title", "state", "created", "updated")
+
+
+class InstallerError(ValueError):
+    pass
+
+
+def windows_path(linux_path: str) -> str:
+    """How the installer sees a Linux folder: drive Z: is the root (for example Z:\\home\\deck\\Games\\Title)."""
+    return "Z:" + linux_path.replace("/", "\\")
+
+
+STALE_DISC_SECONDS = 12 * 3600
+STALE_OP_SECONDS = 15 * 60
+
+
+def health_checks(jobs: list[dict[str, Any]], ops: list[dict[str, Any]], now: float) -> list[dict[str, Any]]:
+    """Discs left attached, installer shortcuts left behind and Steam changes still waiting (v2 module doc)."""
+    discs = [
+        j["title"]
+        for j in jobs
+        if j.get("device")
+        and not j.get("unmounted")
+        and (j["state"] in FINAL or now - float(j["updated"]) > STALE_DISC_SECONDS)
+    ]
+    leftovers = [
+        j["title"]
+        for j in jobs
+        if j["state"] in ("failed", "cancelled")
+        and j.get("appid")
+        and not j.get("gameExe")
+        and not j.get("shortcutRemoved")
+    ]
+    waiting = [
+        o["kind"]
+        for o in ops
+        if o["module"] == "installer" and o["state"] in ("pending", "claimed") and now - o["created"] > STALE_OP_SECONDS
+    ]
+
+    def check(check_id: str, label: str, items: list[str], ok: str, warn: str) -> dict[str, Any]:
+        return {
+            "id": check_id,
+            "label": label,
+            "status": "warn" if items else "ok",
+            "detail": warn if items else ok,
+            "items": items,
+        }
+
+    return [
+        check(
+            "installer-discs",
+            "Discs",
+            discs,
+            "No disc left mounted.",
+            "A disc is still mounted from an earlier install. Cancel that install to release it.",
+        ),
+        check(
+            "installer-shortcuts",
+            "Installer shortcuts",
+            leftovers,
+            "No installer shortcut left behind.",
+            "An install stopped and left its Install: shortcut in Steam. Remove it from the Install page.",
+        ),
+        check(
+            "installer-steam-ops",
+            "Steam changes",
+            waiting,
+            "No Steam change waiting.",
+            "Steam changes are waiting. They are applied when Gaming Mode is open.",
+        ),
+    ]
+
+
+def _data(job: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in job.items() if k not in _ROW}
+
+
+class Installer:
+    def __init__(
+        self,
+        db: StateDB,
+        ops: SteamOps,
+        library_root: Callable[[], str],
+        prefix_for: Callable[[int], str | None],
+        runner: udisks.Runner = udisks.run,
+        has_udisks: Callable[[], bool] = udisks.available,
+        clock: Callable[[], float] = time.time,
+        *,
+        home: Callable[[], str] = lambda: os.path.expanduser("~"),
+        running: Callable[[int, str | None], bool] = lambda appid, prefix: True,  # unknown means running
+        work_dir: str = "",
+        art: SteamGridDB | None = None,
+        symlink: Callable[[str, str], None] = os.symlink,
+    ) -> None:
+        self.db = db
+        self.ops = ops
+        self.library_root = library_root
+        self.prefix_for = prefix_for
+        self.runner = runner
+        self.has_udisks = has_udisks
+        self.clock = clock
+        self.home = home
+        self.running = running
+        self.work_dir = work_dir
+        self.art = art
+        self.symlink = symlink
+        db.migrate("installer", MIGRATIONS)
+
+    # Storage
+
+    def _save(self, job_id: int, state: str, data: dict[str, Any]) -> None:
+        self.db.execute(
+            "UPDATE installer_jobs SET state = ?, data = ?, updated = ? WHERE id = ?",
+            (state, json.dumps(data, sort_keys=True), self.clock(), job_id),
+        )
+
+    def get(self, job_id: int) -> dict[str, Any]:
+        rows = self.db.execute(
+            "SELECT id, title, state, data, created, updated FROM installer_jobs WHERE id = ?", (int(job_id),)
+        )
+        if not rows:
+            raise InstallerError("no such install")
+        r = rows[0]
+        return {"id": r[0], "title": r[1], "state": r[2], **json.loads(r[3]), "created": r[4], "updated": r[5]}
+
+    def jobs(self) -> list[dict[str, Any]]:
+        ids = [r[0] for r in self.db.execute("SELECT id FROM installer_jobs ORDER BY id DESC LIMIT 20")]
+        return [self.get(i) for i in ids]
+
+    def _staging(self) -> str:
+        if not self.work_dir:
+            raise InstallerError("the Installer has no working folder")
+        folder = os.path.join(self.work_dir, "staging")
+        os.makedirs(folder, exist_ok=True)
+        return folder
+
+    def staged_file(self, op: dict[str, Any]) -> str:
+        """The staged image for a claimed ``set-artwork`` operation this module queued."""
+        if op.get("module") != "installer" or op.get("kind") != "set-artwork" or op.get("state") != "claimed":
+            raise InstallerError("that operation has no staged file")
+        path = os.path.join(self._staging(), str(op["payload"]["file"]))
+        if os.path.dirname(os.path.realpath(path)) != os.path.realpath(self._staging()):
+            raise InstallerError("that operation has no staged file")
+        return path
+
+    # Steps
+
+    def start(self, source: str, title: str) -> dict[str, Any]:
+        """Prepare an install from an ISO or a folder; mounts an ISO read-only."""
+        title = " ".join(str(title).split())
+        if not _TITLE.match(title):
+            raise InstallerError('the title is 1 to 80 characters without / \\ : * ? " < > |')
+        source = os.path.realpath(str(source)).replace(os.sep, "/")
+        data: dict[str, Any] = {"source": source, "ops": {}}
+        target = posixpath.join(self.library_root(), title)
+        if os.path.isfile(source) and source.lower().endswith(".iso"):
+            if not self.has_udisks():
+                raise InstallerError(
+                    "udisksctl is not available on this system, so ISO files cannot be opened; use a folder"
+                )
+            device, mount = udisks.mount_iso(source, self.runner)
+            data.update(kind="iso", device=device, mount=mount, contents=mount)
+        elif os.path.isdir(source):
+            data.update(kind="folder", contents=source)
+        else:
+            raise InstallerError("choose an .iso file or a folder")
+        try:
+            # The Steam runtime container only sees the home folder; anything else is passed in.
+            data["compatMounts"] = files.compat_mounts([data["contents"], target], self.home().replace(os.sep, "/"))
+        except ValueError as exc:
+            if data.get("device"):
+                udisks.detach(data["device"], self.runner)
+            raise InstallerError(str(exc)) from exc
+        data.update(
+            target=target,
+            windowsTarget=windows_path(target),
+            installers=files.find_installers(data["contents"])[:20],
+            before=files.file_list(target),
+        )
+        now = self.clock()
+        self.db.execute(
+            "INSERT INTO installer_jobs (title, state, data, created, updated) VALUES (?, 'choose-installer', ?, ?, ?)",
+            (title, json.dumps(data, sort_keys=True), now, now),
+        )
+        return self.get(int(self.db.execute("SELECT max(id) FROM installer_jobs")[0][0]))
+
+    def create_shortcut(self, job_id: int, installer_rel: str) -> dict[str, Any]:
+        """User action: queue the temporary installer shortcut."""
+        job = self.get(job_id)
+        if job["state"] != "choose-installer" or installer_rel not in job["installers"]:
+            raise InstallerError("choose one of the installers found")
+        exe = posixpath.join(job["contents"], installer_rel)
+        mounts = job.get("compatMounts", "")
+        options = f'STEAM_COMPAT_MOUNTS="{mounts}" %command%' if mounts else ""
+        op_id = self.ops.enqueue(
+            "installer",
+            "add-shortcut",
+            {
+                "name": f"Install: {job['title']}",
+                "exe": exe,
+                "startDir": posixpath.dirname(exe),
+                "launchOptions": options,
+            },
+        )
+        data = _data(job)
+        data["ops"][str(op_id)] = "add"
+        data["installerExe"] = exe
+        self._save(job_id, "creating-shortcut", data)
+        return self.get(job_id)
+
+    def op_finished(self, op_id: int, ok: bool, result: dict[str, Any]) -> dict[str, Any] | None:
+        """Record an executor result; returns the job it belonged to, as it is now."""
+        for job in self.jobs():
+            role = job["ops"].get(str(op_id))
+            if role is None:
+                continue
+            data = _data(job)
+            if role == "add":
+                if ok and isinstance(result.get("appid"), int):
+                    data["appid"] = result["appid"]
+                    self._save(job["id"], "run-installer", data)
+                else:
+                    data["error"] = str(result.get("error") or "the shortcut could not be created")
+                    self._finish(job["id"], data, "failed")
+            elif role == "retarget":
+                data.setdefault("retargetResults", {})[str(op_id)] = {"ok": ok, **result}
+                pending = [o for o, r in data["ops"].items() if r == "retarget" and o not in data["retargetResults"]]
+                if not ok:
+                    data["error"] = "Steam did not accept a change to the shortcut; check it in the game's properties"
+                    self._finish(job["id"], data, "failed")
+                elif not pending:
+                    self._finish(job["id"], data, "done")
+                else:
+                    self._save(job["id"], "retargeting", data)
+            elif role == "remove":
+                data["shortcutRemoved"] = bool(ok)
+                self._save(job["id"], job["state"], data)
+            elif role.startswith("artwork:"):
+                staged = role.split(":", 1)[1]
+                data.setdefault("artwork", {})[staged] = bool(ok)
+                path = os.path.join(self._staging(), staged)
+                if os.path.exists(path):
+                    os.unlink(path)
+                self._save(job["id"], job["state"], data)
+            return self.get(job["id"])
+        return None
+
+    def installer_exited(self, appid: int) -> dict[str, Any] | None:
+        """The installer shortcut was closed: list the executables the install created."""
+        job = next((j for j in self.jobs() if j["state"] == "run-installer" and j.get("appid") == int(appid)), None)
+        if job is None:
+            return None
+        candidates: list[tuple[str, int]] = []
+        after = files.file_list(job["target"])
+        for rel in files.new_files(job["before"], after):
+            candidates.append((posixpath.join(job["target"], rel), after[rel][0]))
+        prefix = self.prefix_for(int(appid))
+        if prefix:
+            drive_c = os.path.join(prefix, "pfx", "drive_c")
+            listing = files.file_list(drive_c)
+            for rel, (size, _mtime) in listing.items():
+                if not rel.lower().startswith(PREFIX_SKIP):
+                    candidates.append((posixpath.join(drive_c.replace(os.sep, "/"), rel), size))
+        data = _data(job)
+        data["candidates"] = files.rank_game_exes(candidates, job["title"])[:15]
+        self._save(job["id"], "choose-game", data)
+        return self.get(job["id"])
+
+    def retarget(self, job_id: int, exe: str) -> dict[str, Any]:
+        """User action: point the same shortcut at the game, keeping its prefix."""
+        job = self.get(job_id)
+        if job["state"] != "choose-game" or exe not in [c["path"] for c in job.get("candidates", [])]:
+            raise InstallerError("choose one of the programs found")
+        appid = int(job["appid"])
+        data = _data(job)
+        for kind, value in (
+            ("set-shortcut-name", job["title"]),
+            ("set-shortcut-exe", exe),  # never pre-quoted (research 2.1)
+            ("set-shortcut-start-dir", posixpath.dirname(exe)),
+            ("set-launch-options", ""),  # the installer-only STEAM_COMPAT_MOUNTS goes
+        ):
+            data["ops"][str(self.ops.enqueue("installer", kind, {"appid": appid, "value": value}))] = "retarget"
+        data["gameExe"] = exe
+        self._save(job_id, "retargeting", data)
+        return self.get(job_id)
+
+    def cancel(self, job_id: int) -> dict[str, Any]:
+        job = self.get(job_id)
+        if job["state"] not in ACTIVE:
+            raise InstallerError("that install has already finished")
+        self._finish(job_id, _data(job), "cancelled")
+        return self.get(job_id)
+
+    # Slice 22
+
+    def add_cd_drive(self, job_id: int) -> dict[str, Any]:
+        """User action: make the mounted disc a CD drive in the installer shortcut's prefix."""
+        job = self.get(job_id)
+        if job.get("kind") != "iso" or job["state"] != "run-installer":
+            raise InstallerError("a disc drive can only be added while an ISO install is waiting for the installer")
+        if job.get("cdDrive"):
+            return job
+        prefix = self.prefix_for(int(job["appid"]))
+        if not prefix:
+            raise InstallerError("start the installer shortcut once and quit it, so Proton creates its prefix first")
+        if self.running(int(job["appid"]), prefix):
+            raise InstallerError("quit the installer first; Keepsake never changes a prefix while it runs")
+        try:
+            made = cdrom.add_drive(
+                prefix, job["mount"], job["device"], os.path.join(self.work_dir, "registry-backups"), self.symlink
+            )
+        except cdrom.CdromError as exc:
+            raise InstallerError(str(exc)) from exc
+        data = _data(job)
+        links = [str(link) for link in made["links"]]
+        targets = {link: (job["device"] if link.endswith("::") else job["mount"]) for link in links}
+        data["cdDrive"] = {"letter": made["letter"], "links": links, "targets": targets}
+        self._save(job_id, job["state"], data)
+        return self.get(job_id)
+
+    def remove_shortcut(self, job_id: int) -> dict[str, Any]:
+        """User action: remove the ``Install:`` shortcut a failed or cancelled install left in Steam."""
+        job = self.get(job_id)
+        if job["state"] not in ("failed", "cancelled") or not job.get("appid") or job.get("shortcutRemoved"):
+            raise InstallerError("there is no installer shortcut to remove for this install")
+        if job.get("gameExe"):
+            raise InstallerError("this shortcut was already pointed at the game; remove it in Steam if you mean to")
+        data = _data(job)
+        data["ops"][str(self.ops.enqueue("installer", "remove-shortcut", {"appid": int(job["appid"])}))] = "remove"
+        self._save(job_id, job["state"], data)
+        return self.get(job_id)
+
+    def search_artwork(self, job_id: int) -> list[dict[str, Any]]:
+        job = self.get(job_id)
+        if self.art is None:
+            raise InstallerError("SteamGridDB artwork is not available")
+        try:
+            return self.art.search(job["title"])
+        except ArtworkError as exc:
+            raise InstallerError(str(exc)) from exc
+
+    def queue_artwork(self, job_id: int, game_id: int) -> dict[str, Any]:
+        """User action: stage SteamGridDB's top images and queue them for the finished shortcut."""
+        job = self.get(job_id)
+        if job["state"] != "done" or not job.get("appid"):
+            raise InstallerError("artwork is added once the shortcut starts the game")
+        if self.art is None:
+            raise InstallerError("SteamGridDB artwork is not available")
+        data = _data(job)
+        queued = 0
+        try:
+            for item in self.art.choose(int(game_id)):
+                name = f"job{job_id}-{item['label']}"
+                path = os.path.join(self._staging(), name)
+                kind = self.art.download(item["url"], path)
+                staged = f"{name}.{kind}"
+                os.replace(path, os.path.join(self._staging(), staged))
+                payload = {"appid": int(job["appid"]), "assetType": item["assetType"], "imageType": kind}
+                op_id = self.ops.enqueue("installer", "set-artwork", {**payload, "file": staged})
+                data["ops"][str(op_id)] = f"artwork:{staged}"
+                queued += 1
+        except ArtworkError as exc:
+            self._save(job_id, job["state"], data)
+            raise InstallerError(str(exc)) from exc
+        if not queued:
+            raise InstallerError("SteamGridDB has no artwork for that game")
+        self._save(job_id, job["state"], data)
+        return self.get(job_id)
+
+    def _finish(self, job_id: int, data: dict[str, Any], state: str) -> None:
+        drive = data.get("cdDrive")
+        if drive and drive.get("links"):
+            cdrom.remove_links(drive["links"], drive.get("targets", {}))
+            drive["links"] = []
+        if data.get("device"):
+            udisks.detach(data["device"], self.runner)
+            data["unmounted"] = True
+        self._save(job_id, state, data)

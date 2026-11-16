@@ -7,6 +7,7 @@ it. Keeping the logic here means it can be tested without Decky.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -34,18 +35,28 @@ from . import (
 )
 from .auth import GOOGLE, AuthError, DeviceCodeFlow, TokenManager, TokenStore
 from .backends import BackendConfigError, CredentialStore
+from .bus import EventBus
 from .engine import SnapshotEngine
 from .freeze import Freezer
 from .fsutil import atomic_write_json, read_json
 from .gameconfig import DEFAULT as GAME_DEFAULTS
 from .gameconfig import GameConfigStore, custom_path_from_absolute
 from .importers import ludusavi
+from .installer import artwork, udisks
+from .installer import files as installer_files
+from .installer.artwork import SteamGridDB
+from .installer.service import Installer, InstallerError
+from .installer.service import health_checks as installer_health_checks
 from .jobs import JobTracker
+from .locks import GameLocks
 from .log import log_event, setup_logging, tail
+from .modules import Module, ModuleRegistry
 from .paths import PluginPaths
 from .procs import find_game_processes
 from .settings import SettingsStore
 from .snapshot import SnapshotError, content_hash, scan_entries
+from .statedb import StateDB, StateError, open_db
+from .steamops import SteamOps
 from .store import AlreadyExistsError, LocalFolderStore, Store, StoreError
 from .store.gdrive import GoogleDriveStore
 from .store.graph import GraphStore
@@ -73,10 +84,16 @@ FREEZE_TEST_MIN = 1
 FREEZE_TEST_MAX = 10
 SIMULATED_JOB_MAX = 120
 IDLE_EVENT = "keepsake_idle"
+RETARGET_KINDS = ("set-shortcut-name", "set-shortcut-exe", "set-shortcut-start-dir", "set-launch-options")
 
 
 async def _no_emit(event: str, *args: Any) -> None:
     return None
+
+
+def _read_bytes(path: str) -> bytes:
+    with open(path, "rb") as handle:
+        return handle.read()
 
 
 class KeepsakeApp:
@@ -139,6 +156,107 @@ class KeepsakeApp:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._notice: dict[str, Any] | None = None
         self._signin_warned = False
+        # v2 Core (slice 13, ADR-0012, ADR-0024): lifecycle bus, per-game locks, module registry, state database.
+        self.bus = EventBus()
+        self.locks = GameLocks()
+        self.registry = ModuleRegistry(self.bus, lambda: dict(self.settings.get("moduleFlags")))
+        self.db: StateDB | None = None
+        self.steam_ops: SteamOps | None = None
+        self._register_modules()
+
+    def _register_modules(self) -> None:
+        async def saves_health() -> list[dict[str, Any]]:
+            return await self._health(probe=False)
+
+        self.registry.register(
+            Module(
+                "saves",
+                "Saves",
+                "Keeps game saves in step between your devices through the cloud.",
+                "Save files of the games you choose, their registry keys if you allow it, and Keepsake's own settings.",
+                health=saves_health,
+            )
+        )
+        for name, title, description, writes in (
+            ("advisor", "Advisor", "Recommends settings for the game you play.", "Nothing. It only recommends."),
+            ("replication", "Replication", "Copies games between your devices.", "Games you send between devices."),
+            (
+                "desktop",
+                "Desktop",
+                "Keepsake in Desktop Mode, with a tray icon.",
+                "Desktop Mode shortcuts for Keepsake.",
+            ),
+        ):
+            self.registry.register(Module(name, title, description, writes, available=False))
+        self.installer: Installer | None = None
+
+        async def installer_start() -> None:
+            if self.db is None or self.steam_ops is None:
+                raise RuntimeError("the state database is not available")
+            self.installer = Installer(
+                self.db,
+                self.steam_ops,
+                self._library_root,
+                self._prefix_for,
+                home=lambda: discovery.real_home(self.home),
+                running=lambda appid, prefix: bool(find_game_processes(appid, prefix, self.proc_root)),
+                work_dir=os.path.join(self.paths.runtime_dir, "installer"),
+                art=SteamGridDB(lambda: str(self.credentials.load("steamgriddb")["apiKey"])),
+            )
+
+        async def installer_stop() -> None:
+            self.installer = None
+
+        async def installer_exit(payload: dict[str, Any]) -> None:
+            if self.installer and payload.get("gameKey") is None:
+                job = await asyncio.to_thread(self.installer.installer_exited, int(payload["appid"]))
+                if job:
+                    await self.emit(
+                        "keepsake_toast", f"{job['title']}: choose the game's program in Keepsake, Installer."
+                    )
+
+        async def installer_health() -> list[dict[str, Any]]:
+            ok = udisks.available()
+            checks: list[dict[str, Any]] = [
+                {
+                    "id": "udisksctl",
+                    "label": "ISO support",
+                    "status": "ok" if ok else "warn",
+                    "detail": "udisksctl found." if ok else "udisksctl is missing: install from folders only.",
+                    "items": [],
+                }
+            ]
+            if self.installer is None:
+                return checks
+            jobs = await asyncio.to_thread(self.installer.jobs)
+            ops = await asyncio.to_thread(self._ops().list)
+            checks.extend(installer_health_checks(jobs, ops, time.time()))
+            return checks
+
+        self.registry.register(
+            Module(
+                "installer",
+                "Installer",
+                "Installs games from ISO files, folders and installers into their own Steam shortcut.",
+                "A temporary installer shortcut in Steam, then the same shortcut pointed at the game. The installer "
+                "program itself writes the game into the folder you choose and the shortcut's prefix.",
+                start=installer_start,
+                stop=installer_stop,
+                health=installer_health,
+                listeners={"game_exited": installer_exit},
+            )
+        )
+
+    def _library_root(self) -> str:
+        configured = str(self.settings.get("libraryRoot") or "").strip()
+        return configured or os.path.join(discovery.real_home(self.home), "Games").replace(os.sep, "/")
+
+    def _prefix_for(self, appid: int) -> str | None:
+        for root in discovery.steam_roots(self.home):
+            found = discovery.find_compatdata(int(appid), discovery.library_folders(root))
+            if found:
+                return found
+        return None
 
     async def start(self) -> None:
         self._loop = asyncio.get_running_loop()
@@ -161,6 +279,13 @@ class KeepsakeApp:
             # Upgraded from a version without the setup wizard: games are already set up.
             self.settings.set("setupComplete", True)
         log_event(logging.INFO, "app.start", "Keepsake backend started", version=self.version)
+        try:
+            self.db = await asyncio.to_thread(open_db, self.paths.runtime_dir)
+            self.steam_ops = SteamOps(self.db) if self.db else None
+        except (StateError, OSError) as exc:  # modules needing state stay off; Saves is unaffected (P13)
+            log_event(logging.ERROR, "state.unavailable", "State database unavailable", error=str(exc))
+            self.db, self.steam_ops = None, None
+        await self.registry.start_all()
         if self._auto_refresh_manifest:
             # Weekly refresh in the background; never blocks start-up.
             self._background.append(asyncio.create_task(self.refresh_manifest(False)))
@@ -330,7 +455,7 @@ class KeepsakeApp:
 
     async def on_suspend(self) -> dict[str, Any]:
         """The device is about to sleep: snapshot running synced games as provisional snapshots."""
-        if not self.settings.get("suspendSnapshots"):
+        if not self.settings.get("suspendSnapshots") or not self.registry.enabled("saves"):
             return {"started": 0}
         states = self._sync().state.games()
         started = 0
@@ -926,11 +1051,12 @@ class KeepsakeApp:
     async def restore_snapshot(self, key: str, snap_id: str) -> dict[str, Any]:
         ctx = await self._snapshot_context(key)
         eng = self._engine()
-        with self.jobs.job("restore"):
-            result = await asyncio.to_thread(
-                eng.restore, ctx["gameKey"], str(snap_id), ctx["files"], ctx["roots"], ctx["running"]
-            )
-            result = await self._after_restore(ctx, result)
+        async with self.locks.hold(ctx["gameKey"], "saves"):
+            with self.jobs.job("restore"):
+                result = await asyncio.to_thread(
+                    eng.restore, ctx["gameKey"], str(snap_id), ctx["files"], ctx["roots"], ctx["running"]
+                )
+                result = await self._after_restore(ctx, result)
         self._set_base(ctx["gameKey"], str(snap_id))
         log_event(
             logging.INFO, "snapshot.restore", "Snapshot restored", gameKey=ctx["gameKey"], status=result["status"]
@@ -940,11 +1066,17 @@ class KeepsakeApp:
     async def undo_restore(self, key: str, prerestore_id: str) -> dict[str, Any]:
         ctx = await self._snapshot_context(key)
         eng = self._engine()
-        with self.jobs.job("restore"):
-            result = await asyncio.to_thread(
-                eng.restore_prerestore, ctx["gameKey"], str(prerestore_id), ctx["files"], ctx["roots"], ctx["running"]
-            )
-            result = await self._after_restore(ctx, result)
+        async with self.locks.hold(ctx["gameKey"], "saves"):
+            with self.jobs.job("restore"):
+                result = await asyncio.to_thread(
+                    eng.restore_prerestore,
+                    ctx["gameKey"],
+                    str(prerestore_id),
+                    ctx["files"],
+                    ctx["roots"],
+                    ctx["running"],
+                )
+                result = await self._after_restore(ctx, result)
         log_event(logging.INFO, "snapshot.undo", "Restore undone", gameKey=ctx["gameKey"], status=result["status"])
         return result
 
@@ -1055,6 +1187,11 @@ class KeepsakeApp:
             games = await self._games_for_appid(raw_id)
         except (ValueError, TypeError):
             return {"handled": 0}
+        if kind == "exit" and not games:
+            # Apps Saves does not sync (an installer shortcut, for example) still reach other modules.
+            await self.bus.publish("game_exited", {"gameKey": None, "appid": lifecycle.normalise_appid(raw_id)})
+        if not self.registry.enabled("saves"):
+            return {"handled": 0}  # Saves switched off: no launch gate, no exit save
         for game in games:
             if kind == "start" and game["key"] not in self._launching:
                 self._launching.add(game["key"])
@@ -1070,9 +1207,12 @@ class KeepsakeApp:
         abort = lifecycle.Abort()
         frozen = False
         token: str | None = None
+        game_key: str | None = None
         try:
             ctx_probe = await self._sync_context(key)
+            game_key = ctx_probe.game_key
             self._record_session(ctx_probe.game_key, lastStart=time.time())
+            await self.bus.publish("game_started", {"gameKey": game_key, "appid": game["appid"]})
             gate_files = lifecycle.GateFiles(self.paths.runtime_dir)
             if mode == "strict":
                 await asyncio.to_thread(gate_files.write_timeout, int(timeout))
@@ -1088,20 +1228,23 @@ class KeepsakeApp:
                 if procs:
                     stopped = await asyncio.to_thread(self.freezer.freeze, procs)
                     frozen = bool(stopped)
+                    if frozen:
+                        await self.bus.publish("game_frozen", {"gameKey": game_key, "appid": game["appid"]})
             if token is not None or frozen:
                 # Blocked in the gate script or frozen: safe to restore until the pull is abandoned.
                 running: Callable[[], bool] = abort.is_set
             else:
                 running = lambda: True  # noqa: E731 - could not hold the game: never restore under it
             ctx = await self._sync_context(key, running=running)
-            with self.jobs.job("sync"):
-                try:
-                    result = await asyncio.wait_for(asyncio.to_thread(self._sync().pull, ctx), timeout)
-                except TimeoutError:
-                    abort.set()
-                    self._sync().state.update(ctx.game_key, pending=True)
-                    await self.emit("keepsake_toast", lifecycle.TOAST_TIMEOUT)
-                    result = {"action": "launch", "pending": True, "reason": "timeout"}
+            async with self.locks.hold(ctx.game_key, "saves"):
+                with self.jobs.job("sync"):
+                    try:
+                        result = await asyncio.wait_for(asyncio.to_thread(self._sync().pull, ctx), timeout)
+                    except TimeoutError:
+                        abort.set()
+                        self._sync().state.update(ctx.game_key, pending=True)
+                        await self.emit("keepsake_toast", lifecycle.TOAST_TIMEOUT)
+                        result = {"action": "launch", "pending": True, "reason": "timeout"}
             await self._announce_pull(game, result)
             log_event(
                 logging.INFO,
@@ -1124,6 +1267,8 @@ class KeepsakeApp:
             if token is not None:
                 await asyncio.to_thread(lifecycle.GateFiles(self.paths.runtime_dir).release, game["appid"], token)
             self._launching.discard(key)
+            if game_key and (frozen or token is not None):
+                await self.bus.publish("game_released", {"gameKey": game_key, "appid": game["appid"]})
 
     def _wait_for_processes(self, game: dict[str, Any]) -> list[Any]:
         found: list[Any] = []
@@ -1164,8 +1309,10 @@ class KeepsakeApp:
                 )
                 return {"status": "deferred"}
             ctx = await self._sync_context(key)
-            with self.jobs.job("sync"):
-                result = await asyncio.to_thread(self._sync().push, ctx)
+            await self.bus.publish("game_exited", {"gameKey": ctx.game_key, "appid": game["appid"]})
+            async with self.locks.hold(ctx.game_key, "saves"):
+                with self.jobs.job("sync"):
+                    result = await asyncio.to_thread(self._sync().push, ctx)
             self._record_session(ctx.game_key, lastEnd=time.time())
         except (ValueError, SnapshotError, StoreError) as exc:
             log_event(logging.WARNING, "lifecycle.exit_failed", "Exit save failed", key=key, error=str(exc))
@@ -1206,8 +1353,9 @@ class KeepsakeApp:
 
     async def sync_pull(self, key: str) -> dict[str, Any]:
         ctx = await self._sync_context(key)
-        with self.jobs.job("sync"):
-            result = await asyncio.to_thread(self._sync().pull, ctx)
+        async with self.locks.hold(ctx.game_key, "saves"):
+            with self.jobs.job("sync"):
+                result = await asyncio.to_thread(self._sync().pull, ctx)
         log_event(
             logging.INFO,
             "sync.pull",
@@ -1220,8 +1368,9 @@ class KeepsakeApp:
 
     async def sync_push(self, key: str) -> dict[str, Any]:
         ctx = await self._sync_context(key)
-        with self.jobs.job("sync"):
-            result = await asyncio.to_thread(self._sync().push, ctx)
+        async with self.locks.hold(ctx.game_key, "saves"):
+            with self.jobs.job("sync"):
+                result = await asyncio.to_thread(self._sync().push, ctx)
         log_event(
             logging.INFO,
             "sync.push",
@@ -1233,8 +1382,9 @@ class KeepsakeApp:
 
     async def resolve_conflict(self, key: str, choice: str, head: str | None = None) -> dict[str, Any]:
         ctx = await self._sync_context(key)
-        with self.jobs.job("sync"):
-            result = await asyncio.to_thread(self._sync().resolve, ctx, str(choice), head)
+        async with self.locks.hold(ctx.game_key, "saves"):
+            with self.jobs.job("sync"):
+                result = await asyncio.to_thread(self._sync().resolve, ctx, str(choice), head)
         log_event(logging.WARNING, "sync.resolve", "Conflict resolved", gameKey=ctx.game_key, choice=choice)
         return result
 
@@ -1253,10 +1403,11 @@ class KeepsakeApp:
                 continue
             try:
                 ctx = await self._sync_context(game["key"])
-                with self.jobs.job("sync"):
-                    sync = self._sync()
-                    recovered = await asyncio.to_thread(sync.recover_session, ctx)
-                    outcome = await asyncio.to_thread(sync.idle, ctx)
+                async with self.locks.hold(ctx.game_key, "saves"):
+                    with self.jobs.job("sync"):
+                        sync = self._sync()
+                        recovered = await asyncio.to_thread(sync.recover_session, ctx)
+                        outcome = await asyncio.to_thread(sync.idle, ctx)
                 if recovered:
                     await self.emit("keepsake_toast", f"Recovered missed exit backup for {game['name']}")
                 session = self._sessions().get(ctx.game_key, {})
@@ -1298,7 +1449,7 @@ class KeepsakeApp:
         while True:
             await asyncio.sleep(delay)
             delay = float(self.settings.get("idleSyncMinutes")) * 60
-            if self.jobs.busy_reason() is None:
+            if self.jobs.busy_reason() is None and self.registry.enabled("saves"):
                 try:
                     await self.idle_pass()
                 except Exception:  # noqa: BLE001 - the loop must survive any single failure
@@ -1654,6 +1805,184 @@ class KeepsakeApp:
         )
         return {"gameKey": game_key, "results": results}
 
+    # Modules and the Steam Operations Executor (slice 13)
+
+    async def modules_status(self) -> dict[str, Any]:
+        return {
+            "modules": await self.registry.status(),
+            "stateDatabase": self.db is not None,
+            "locks": self.locks.held(),
+            "steamOpsPending": await asyncio.to_thread(self.steam_ops.pending_count) if self.steam_ops else 0,
+        }
+
+    async def set_module_enabled(self, name: str, enabled: bool) -> dict[str, Any]:
+        if name not in self.registry.modules:
+            raise ValueError("unknown module")
+        flags = dict(self.settings.get("moduleFlags"))
+        flags[name] = bool(enabled)
+        self.settings.set("moduleFlags", flags)
+        await self.registry.apply_flags()
+        log_event(logging.INFO, "module.flag", "Module switched", module=name, enabled=bool(enabled))
+        return await self.modules_status()
+
+    async def reset_module(self, name: str) -> dict[str, Any]:
+        if name not in self.registry.modules:
+            raise ValueError("unknown module")
+        await self.registry.reset(name)
+        return await self.modules_status()
+
+    def _ops(self) -> SteamOps:
+        if self.steam_ops is None:
+            raise ValueError("the state database is not available, so Steam operations are off")
+        return self.steam_ops
+
+    async def steam_probe(self) -> dict[str, Any]:
+        """Diagnostics button: ask the frontend which Steam client functions exist (writes nothing)."""
+        op_id = await asyncio.to_thread(self._ops().enqueue, "core", "probe", {})
+        await self.emit("keepsake_steam_ops")
+        return {"id": op_id}
+
+    async def steam_ops_claim(self) -> dict[str, Any] | None:
+        if self.steam_ops is None:
+            return None
+        return await asyncio.to_thread(self.steam_ops.claim)
+
+    async def steam_ops_finish(self, op_id: int, ok: bool, result: dict[str, Any]) -> dict[str, Any]:
+        await asyncio.to_thread(self._ops().finish, int(op_id), bool(ok), dict(result))
+        log_event(logging.INFO, "steamops.finished", "Steam operation finished", id=int(op_id), ok=bool(ok))
+        op = await asyncio.to_thread(self._ops().get, int(op_id))
+        if op and op["module"] == "installer" and self.installer:
+            job = await asyncio.to_thread(self.installer.op_finished, int(op_id), bool(ok), dict(result))
+            if job and job["state"] == "done" and op["kind"] in RETARGET_KINDS:
+                # Hand-off (slice 22): other modules hear about the new game; the user opts in to each.
+                await self.bus.publish(
+                    "game_installed", {"gameKey": None, "appid": job["appid"], "title": job["title"]}
+                )
+                await self.emit("keepsake_toast", f"{job['title']} is installed. Start it from your library.")
+        return {"ok": True}
+
+    async def steam_ops_file(self, op_id: int) -> dict[str, Any]:
+        """The staged image for a claimed artwork operation, base64-encoded for ``SetCustomArtworkForApp``."""
+        op = await asyncio.to_thread(self._ops().get, int(op_id))
+        if not op or op["module"] != "installer":
+            raise ValueError("that operation has no staged file")
+        try:
+            path = self._installer().staged_file(op)
+            data = await asyncio.to_thread(_read_bytes, path)
+        except (InstallerError, OSError) as exc:
+            raise ValueError("the staged image is missing") from exc
+        return {"base64": base64.b64encode(data).decode("ascii")}
+
+    # Installer (slice 21, ADR-0026)
+
+    def _installer(self) -> Installer:
+        if self.installer is None:
+            raise ValueError("the Installer module is off; switch it on in Settings, Modules")
+        return self.installer
+
+    async def installer_status(self) -> dict[str, Any]:
+        return {
+            "running": self.installer is not None,
+            "udisks": udisks.available(),
+            "libraryRoot": self._library_root(),
+            "artwork": artwork.available(),
+            "artworkKey": self.credentials.configured("steamgriddb"),
+            "sources": await asyncio.to_thread(self._install_sources),
+            "jobs": await asyncio.to_thread(self.installer.jobs) if self.installer else [],
+        }
+
+    def _install_sources(self) -> dict[str, Any]:
+        """Places to start the file picker: home, the library, removable drives and network shares already mounted."""
+        home = discovery.real_home(self.home).replace(os.sep, "/")
+        user = os.path.basename(home.rstrip("/"))
+        try:
+            with open(os.path.join(self.proc_root, "self", "mounts"), encoding="utf-8", errors="replace") as handle:
+                mounts = handle.read()
+        except OSError:
+            mounts = ""
+        found = installer_files.mounted_sources(mounts, (f"/run/media/{user}/", "/run/media/", "/media/"))
+        return {"home": home, **found}
+
+    async def _installer_call(self, method: str, *args: Any) -> dict[str, Any]:
+        try:
+            result: dict[str, Any] = await asyncio.to_thread(getattr(self._installer(), method), *args)
+        except InstallerError as exc:
+            raise ValueError(str(exc)) from exc
+        return result
+
+    async def installer_add_cd_drive(self, job_id: int) -> dict[str, Any]:
+        job = await self._installer_call("add_cd_drive", int(job_id))
+        log_event(logging.INFO, "installer.cdrom", "Disc drive added", job=int(job_id))
+        return job
+
+    async def installer_remove_shortcut(self, job_id: int) -> dict[str, Any]:
+        job = await self._installer_call("remove_shortcut", int(job_id))
+        await self.emit("keepsake_steam_ops")
+        return job
+
+    async def installer_artwork_search(self, job_id: int) -> list[dict[str, Any]]:
+        try:
+            return await asyncio.to_thread(self._installer().search_artwork, int(job_id))
+        except InstallerError as exc:
+            raise ValueError(str(exc)) from exc
+
+    async def installer_artwork_apply(self, job_id: int, game_id: int) -> dict[str, Any]:
+        job = await self._installer_call("queue_artwork", int(job_id), int(game_id))
+        await self.emit("keepsake_steam_ops")
+        return job
+
+    async def installer_handoff(self, job_id: int) -> dict[str, Any]:
+        """The Games list key for a finished install, so the user can switch on save sync for it."""
+        job = await self._installer_call("get", int(job_id))
+        if job["state"] != "done":
+            raise ValueError("the install has not finished")
+        games = (await self.discover_games(True))["games"]
+        game = next((g for g in games if g["appid"] == job["appid"]), None)
+        if game is None:
+            raise ValueError("Keepsake cannot see the new shortcut yet; try again in a moment")
+        return {"key": game["key"], "replication": self.registry.enabled("replication")}
+
+    async def installer_start(self, source: str, title: str) -> dict[str, Any]:
+        try:
+            job = await asyncio.to_thread(self._installer().start, str(source), str(title))
+        except (InstallerError, udisks.UdisksError) as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(logging.INFO, "installer.start", "Install prepared", job=job["id"], kind=job["kind"])
+        return job
+
+    async def installer_create_shortcut(self, job_id: int, installer_rel: str) -> dict[str, Any]:
+        try:
+            job = await asyncio.to_thread(self._installer().create_shortcut, int(job_id), str(installer_rel))
+        except InstallerError as exc:
+            raise ValueError(str(exc)) from exc
+        await self.emit("keepsake_steam_ops")
+        return job
+
+    async def installer_finished_installing(self, job_id: int) -> dict[str, Any]:
+        """Fallback when Steam did not report the installer closing: look for the new programs now."""
+        job = await asyncio.to_thread(self._installer().get, int(job_id))
+        if job["state"] != "run-installer" or not job.get("appid"):
+            raise ValueError("this install is not waiting for the installer")
+        found = await asyncio.to_thread(self._installer().installer_exited, int(job["appid"]))
+        return found or job
+
+    async def installer_retarget(self, job_id: int, exe: str) -> dict[str, Any]:
+        try:
+            job = await asyncio.to_thread(self._installer().retarget, int(job_id), str(exe))
+        except InstallerError as exc:
+            raise ValueError(str(exc)) from exc
+        await self.emit("keepsake_steam_ops")
+        return job
+
+    async def installer_cancel(self, job_id: int) -> dict[str, Any]:
+        try:
+            return await asyncio.to_thread(self._installer().cancel, int(job_id))
+        except InstallerError as exc:
+            raise ValueError(str(exc)) from exc
+
+    async def steam_ops_list(self) -> list[dict[str, Any]]:
+        return await asyncio.to_thread(self.steam_ops.list) if self.steam_ops else []
+
     async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
         """Diagnostics only: hold a fake sync job so the update guard can be tested."""
         seconds = max(1, min(int(seconds), SIMULATED_JOB_MAX))
@@ -1666,6 +1995,10 @@ class KeepsakeApp:
         for task in self._background:
             task.cancel()
         await asyncio.to_thread(self.freezer.resume_all, "unload")
+        await self.registry.stop_all()
+        if self.db is not None:
+            self.db.close()
+            self.db, self.steam_ops = None, None
         log_event(logging.INFO, "app.stop", "Keepsake backend stopped")
 
     # Settings

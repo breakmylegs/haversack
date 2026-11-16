@@ -11,6 +11,55 @@ Slice 25 (in progress): parser hardening.
 - A malformed entry in the Ludusavi manifest could stop the whole game list from loading its save locations. Now only that entry is skipped.
 - Manifest entries with a Steam ID of `true` or `false` are no longer matched to a Steam game.
 
+## [0.22.0]
+
+Slice 22: the Installer module, second part.
+
+### Added
+
+- Install, "Installer wants a disc drive": for ISO installs, the disc becomes a CD drive (D: or the next free letter) inside the installer's prefix. It is removed again when the install ends.
+- Install: SD cards, USB drives and network shares that are already mounted appear as places to browse from. Sources and library folders outside the home folder are made visible to the installer.
+- Install, "Remove the installer shortcut" for an install that stopped or was cancelled.
+- Install, "Sync this game's saves" once a game is installed. Other modules are told about new games.
+- Installer health in Settings, Modules: discs left mounted, installer shortcuts left behind, and Steam changes still waiting.
+- Install, "Add artwork from SteamGridDB": once a game is installed, add its library artwork with your own SteamGridDB API key. Enter the key on the Install page.
+
+## [0.21.0]
+
+Slice 21: the Installer module, first part.
+
+### Added
+
+- Keepsake, Install: install a Windows game from an ISO file or a folder without leaving Gaming Mode. Keepsake adds an `Install: <Title>` shortcut with the newest GE-Proton, shows where to install, notices when the installer closes, lists the programs it created and points the same shortcut at the one you choose, so the game keeps its Proton prefix. ISO files are mounted read-only and released when the install ends.
+- Install, Change folder: where games are installed (default `~/Games`), for example a folder on the SD card.
+
+### Changed
+
+- Module tabs appear in the Keepsake page only while their module is running.
+
+## [0.13.0]
+
+Slice 13: the module framework for Keepsake v2. Saves works as before.
+
+### Added
+
+- Settings, Modules: each module with its switch, health and what it writes. Saves can be switched off; Advisor, Replication, Installer and Desktop are listed as coming in later versions. A module that fails is stopped on its own, with "Try again", and never affects the others.
+- Diagnostics, Probe Steam APIs: checks which Steam client functions are available, without changing anything.
+- The Games list knows each shortcut's launch options, compatibility tool, artwork and icon, for the modules that need them.
+
+## [0.12.0]
+
+Slice 12: hardening and documentation ahead of 1.0.0.
+
+### Added
+
+- Release signature checking: once the owner's release key is pinned in the plugin, an update without a valid signature is refused. Until then the Updates page installs with the SHA-256 check, as before.
+- README with install and first-run steps, a troubleshooting guide, the cutover plan from Ludusavi, and a security review of the threat model.
+
+### Fixed
+
+- Background sync with many games was slow on the device's local test store, because every listing walked the whole store. With 50 games an idle pass now takes seconds instead of minutes.
+
 ## [0.11.0]
 
 Slice 11: registry saves, Steam Cloud detection and sleep snapshots. Each has its own setting.

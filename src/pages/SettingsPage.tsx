@@ -4,15 +4,7 @@ import { useEffect, useState } from "react";
 import { getSettings, setSetting, Settings } from "../backend";
 import { ROUTE_PATH, SETUP_PATH } from "../routes";
 import { CloudSection } from "./CloudSection";
-
-// Build prompt v2 section 10: a placeholder until the module registry arrives in slice 13.
-const MODULES = [
-  { name: "Saves", state: "On", writes: "Save files of the games you choose, and its own settings." },
-  { name: "Advisor", state: "Coming later", writes: "Nothing. It only recommends settings." },
-  { name: "Replication", state: "Coming later", writes: "Games you send between your devices." },
-  { name: "Installer", state: "Coming later", writes: "Games you install with it." },
-  { name: "Desktop", state: "Coming later", writes: "Desktop Mode shortcuts for Keepsake." },
-];
+import { ModulesSection } from "./ModulesSection";
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -154,10 +146,7 @@ export function SettingsPage() {
           Run setup again
         </DialogButton>
       </Field>
-      <Field label="Modules" description="Keepsake is growing into several modules. Each says here what it writes." />
-      {MODULES.map((m) => (
-        <Field key={m.name} focusable label={`${m.name}: ${m.state}`} description={`Writes: ${m.writes}`} />
-      ))}
+      <ModulesSection locked={locked} />
       {settings && <Field label="Device ID" description={settings.deviceId} />}
     </div>
   );

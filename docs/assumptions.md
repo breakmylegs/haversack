@@ -154,6 +154,45 @@ Microsoft documentation read on 15 November 2026: device code flow (Entra, updat
 | A121 | `SteamClient.System.RegisterForOnSuspendRequest(cb)` fires before the device sleeps, leaving a few seconds for a snapshot | verified in types (`system/index.d.ts`); timing unverified on device (A21) | `@decky/ui` 4.16.5 |
 | A122 | The Ludusavi manifest's `registry` keys use `HKEY_CURRENT_USER/...` paths with forward slashes | verified in the manifest schema (A44) | manifest |
 
+## Hardening (slice 12)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A123 | minisign signature files have four lines (untrusted comment, base64 of algorithm, key ID and signature, trusted comment, base64 global signature over signature and trusted comment); the default algorithm `ED` signs the BLAKE2b-512 hash of the file; public keys are base64 of `Ed`, key ID and key | minisign's documented format; verified by tests built in that format, not yet against a file made by the minisign tool (the first signed release proves it) | minisign documentation |
+| A124 | `keepsake.ed25519` is correct | verified against RFC 8032 section 7.1 test vectors 1 and 2 | RFC 8032 |
+| A125 | 50 games stay responsive: on the development laptop, discovery 0.4 s, matching 0.1 s, preview of all 1.8 s, dry run 16 s, QAM summary 0.3 s, health 0.1 s, first push of all 58 s, idle pass 14 s (local test store) | measured on Windows; on-device figures pending (run on the device with `python scripts/test_on_device.py tests/test_performance.py`) | `tests/test_performance.py` |
+
+## Module framework (slice 13)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A126 | Steam keeps per-app compatibility tool choices in `config/config.vdf` under `InstallConfigStore/Software/Valve/Steam/CompatToolMapping/<appid>/name` | community-documented, unverified on device; missing or different layouts give no tool (read-only) | |
+| A127 | `AppDetails.strDisplayName`, `strShortcutExe`, `strShortcutStartDir`, `strLaunchOptions` and `strCompatToolName` reflect a change about 600 ms after the matching setter | field names verified in `@decky/ui` 4.16.5 `App.d.ts`; timing unverified (the executor reports a mismatch rather than assuming success) | |
+| A128 | `sqlite3` with WAL mode works in Decky's embedded Python and on SD-card and internal storage | unverified (A9); without it modules needing state stay off | |
+
+## Installer (slice 21)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A129 | `openFilePicker(select, startPath, includeFiles, includeFolders, filter, extensions, ...)` with `FileSelectionType` `FILE = 0` and `FOLDER = 1` (a type-only const enum, so the numbers are used) | verified in `@decky/api` types | `@decky/api` |
+| A130 | `GetAvailableCompatTools(appId)` returns `CompatibilityTool[]` with `strToolName`; GE-Proton builds are named `GE-Proton<major>-<minor>`, so a numeric descending sort finds the newest | type verified in `@decky/ui` 4.16.5 `App.d.ts`; naming community-documented, unverified on device | `App.d.ts` |
+| A131 | `udisksctl` prints `Mapped file X as /dev/loopN.` and `Mounted /dev/loopN at <path>` | udisks documentation; unverified on device (A85); other wording fails closed with an error | udisks |
+| A132 | Installers see the Linux root as drive `Z:`, so `Z:\home\deck\Games\Title` reaches the library folder | standard Wine behaviour, unverified with Proton on device | Wine |
+| A133 | `STEAM_COMPAT_MOUNTS` makes a path outside the home folder visible inside the Steam Linux Runtime container | community-documented, unverified | research 2.1 |
+| A134 | Steam reports the installer shortcut's exit through the same lifetime notification as games, so the Installer hears it | unverified; "I have finished installing" is the manual fallback | |
+
+## Installer II (slice 22)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A135 | Wine maps drive letters through `<pfx>/dosdevices/<x>:` links, takes the raw device from `<x>::`, and reads the drive type from `HKLM\Software\Wine\Drives` (`"d:"="cdrom"`) in `system.reg` | standard Wine behaviour; unverified with Proton on device | Wine |
+| A136 | Proton has finished creating a prefix once `pfx/system.reg` exists | unverified; adding a drive earlier is refused | Proton |
+| A137 | The Steam runtime container shows the home folder but not other paths, so `STEAM_COMPAT_MOUNTS` is needed for sources and library folders elsewhere | community-documented, unverified; pressure-vessel may already share `/run/media` and `/mnt`, in which case the option is harmless | research 2.1 |
+| A138 | SteamGridDB API v2: `search/autocomplete/<term>`, `grids/game/<id>?dimensions=`, `heroes/game/<id>`, `logos/game/<id>`, a bearer key, and `{"success": true, "data": [...]}` with image `url`s on `cdn2.steamgriddb.com` | SteamGridDB API documentation and the decky-steamgriddb plugin; unverified until the image host is approved | SteamGridDB |
+| A139 | `SetCustomArtworkForApp(appId, base64, 'png' or 'jpg', ELibraryAssetType)` (Capsule 0, Hero 1, Logo 2, Header 3) applies artwork to a shortcut, and Steam offers no getter to read it back | signature and enum verified in `@decky/ui` 4.16.5 `App.d.ts`; effect unverified | `App.d.ts` |
+| A140 | `RemoveShortcut(appId): void` removes a non-Steam shortcut, and `AppDetails` is gone afterwards | signature verified in types (A75); effect unverified | `App.d.ts` |
+| A141 | `/proc/self/mounts` in the plugin process lists the user's CIFS, NFS, gvfs and kio-fuse mounts | unverified; the network mount probe checks it | spike |
+
 ## v2 verification items (slice C0)
 
 Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research.md` that Keepsake will rely on. "TA" means Peter's Tuning Advisor verification register (`decky-plugins/docs/VERIFICATION.md`), reused as evidence with its date and re-checked in the slice named. Types were read in `@decky/ui` 4.16.5 on 15 November 2026.
@@ -176,7 +215,7 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 
 | # | Claim | Status | Source | Slice |
 |---|---|---|---|---|
-| A79 | The Decky backend keeps running in Desktop Mode on SteamOS and Bazzite | **unverified**; slice 23 stops and escalates if false | spec 8.4 | 23 |
+| A79 | The Decky backend keeps running in Desktop Mode on SteamOS and Bazzite | **unverified**; `scripts/desktop_mode_probe.py` checks it (slice 23 report); slice 23 stops and escalates if false | spec 8.4 | 23 |
 | A80 | The device's Python supports TLS-PSK through `SSLContext.set_psk_client_callback` and `set_psk_server_callback` (added in Python 3.13; needs OpenSSL PSK support in Decky's build) | unverified | Python docs; spec 8.2 | 16 |
 | A81 | Stdlib multicast sockets can do mDNS / DNS-SD from the plugin process | unverified | spec 8.2 | 16 |
 | A82 | Decky uses ports 1337 and 8080; TCP 47110 is otherwise free | 1337 and 8080 verified (TA item 12); 47110 unverified | TA item 12 | 17 |

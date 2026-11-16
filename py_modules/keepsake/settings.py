@@ -43,7 +43,12 @@ DEFAULTS: dict[str, Any] = {
     "registrySync": True,  # available; each game still opts in (off by default per game)
     "steamCloudDetection": True,
     "suspendSnapshots": False,
+    # v2 module flags (slice 13); missing names use modules.DEFAULT_FLAGS.
+    "moduleFlags": {},
+    # Installer (slice 21): where games are installed; empty means ~/Games.
+    "libraryRoot": "",
 }
+MODULE_NAMES = ("saves", "advisor", "replication", "installer", "desktop")
 
 # Keys the frontend may change. deviceId and schemaVersion are managed here.
 USER_KEYS = frozenset(
@@ -62,6 +67,8 @@ USER_KEYS = frozenset(
         "registrySync",
         "steamCloudDetection",
         "suspendSnapshots",
+        "moduleFlags",
+        "libraryRoot",
     }
 )
 IDLE_MINUTES_RANGE = (10, 240)
@@ -147,6 +154,19 @@ def _validate(key: str, value: Any) -> Any:
         if not isinstance(value, int) or isinstance(value, bool) or not 5 <= value <= 60:
             raise SettingsError("the launch check timeout is 5 to 60 seconds")
         return value
+    if key == "libraryRoot":
+        if not isinstance(value, str) or len(value) > 300 or "\x00" in value:
+            raise SettingsError("the library folder is a path")
+        value = value.strip().rstrip("/")
+        if value and not value.startswith("/"):
+            raise SettingsError("the library folder must be a full path starting with /")
+        return value
+    if key == "moduleFlags":
+        if not isinstance(value, dict) or set(value) - set(MODULE_NAMES):
+            raise SettingsError("unknown module")
+        if not all(isinstance(v, bool) for v in value.values()):
+            raise SettingsError("module flags are true or false")
+        return dict(value)
     if key == "idleSyncMinutes":
         low, high = IDLE_MINUTES_RANGE
         if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:

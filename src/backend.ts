@@ -21,10 +21,96 @@ export interface Settings {
   registrySync: boolean;
   steamCloudDetection: boolean;
   suspendSnapshots: boolean;
+  libraryRoot: string;
   readOnly: boolean;
 }
 
 export type SteamCloud = "cloud" | "no-cloud" | "unknown" | null;
+
+export interface SteamOp {
+  id: number;
+  module: string;
+  kind: string;
+  payload: Record<string, unknown>;
+}
+
+export interface ModuleStatus {
+  name: string;
+  title: string;
+  description: string;
+  writes: string;
+  available: boolean;
+  flag: boolean;
+  running: boolean;
+  failed: string | null;
+  health: HealthCheck[];
+}
+
+export interface ModulesStatus {
+  modules: ModuleStatus[];
+  stateDatabase: boolean;
+  locks: Record<string, string>;
+  steamOpsPending: number;
+}
+
+export interface InstallJob {
+  id: number;
+  title: string;
+  state: "choose-installer" | "creating-shortcut" | "run-installer" | "choose-game" | "retargeting" | "done" | "failed" | "cancelled";
+  kind: "iso" | "folder";
+  source: string;
+  target: string;
+  windowsTarget: string;
+  installers: string[];
+  candidates?: { path: string; size: number; score: number }[];
+  appid?: number;
+  error?: string;
+  cdDrive?: { letter: string };
+  shortcutRemoved?: boolean;
+  gameExe?: string;
+  artwork?: Record<string, boolean>;
+}
+
+export interface InstallerStatus {
+  running: boolean;
+  udisks: boolean;
+  libraryRoot: string;
+  artwork: boolean;
+  artworkKey: boolean;
+  sources: { home: string; network: string[]; removable: string[] };
+  jobs: InstallJob[];
+}
+
+export const installerStatus = callable<[], InstallerStatus>("installer_status");
+export const installerAddCdDrive = callable<[jobId: number], InstallJob>("installer_add_cd_drive");
+export const installerRemoveShortcut = callable<[jobId: number], InstallJob>("installer_remove_shortcut");
+export const installerArtworkSearch = callable<[jobId: number], { id: number; name: string; verified: boolean }[]>(
+  "installer_artwork_search",
+);
+export const installerArtworkApply = callable<[jobId: number, gameId: number], InstallJob>("installer_artwork_apply");
+export const installerHandoff = callable<[jobId: number], { key: string; replication: boolean }>("installer_handoff");
+export const steamOpsFile = callable<[id: number], { base64: string }>("steam_ops_file");
+// The SteamGridDB key is kept with the backend secrets; only whether it is set comes back.
+export const saveSteamGridDbKey = callable<[kind: "steamgriddb", values: { apiKey: string }], { configured: boolean }>(
+  "set_backend_config",
+);
+export const installerStart = callable<[source: string, title: string], InstallJob>("installer_start");
+export const installerCreateShortcut = callable<[jobId: number, installer: string], InstallJob>("installer_create_shortcut");
+export const installerFinishedInstalling = callable<[jobId: number], InstallJob>("installer_finished_installing");
+export const installerRetarget = callable<[jobId: number, exe: string], InstallJob>("installer_retarget");
+export const installerCancel = callable<[jobId: number], InstallJob>("installer_cancel");
+
+export const modulesStatus = callable<[], ModulesStatus>("modules_status");
+export const setModuleEnabled = callable<[name: string, enabled: boolean], ModulesStatus>("set_module_enabled");
+export const resetModule = callable<[name: string], ModulesStatus>("reset_module");
+export const steamProbe = callable<[], { id: number }>("steam_probe");
+export const steamOpsClaim = callable<[], SteamOp | null>("steam_ops_claim");
+export const steamOpsFinish = callable<[id: number, ok: boolean, result: Record<string, unknown>], { ok: boolean }>(
+  "steam_ops_finish",
+);
+export const steamOpsList = callable<[], (SteamOp & { state: string; result: Record<string, unknown> | null })[]>(
+  "steam_ops_list",
+);
 
 export const onSuspend = callable<[], { started: number }>("on_suspend");
 export const enableSteamWithoutCloud = callable<[], { enabled: string[] }>("enable_steam_without_cloud");
