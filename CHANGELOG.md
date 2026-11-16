@@ -2,6 +2,12 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [Unreleased]
+
+### Added
+
+- Advisor, PCGamingWiki (optional, off by default): which upscalers and frame generation a game supports, with a link to its page. Advisor warns when a report recommends an upscaler the wiki does not list. It needs your own PCGamingWiki bot password, which stays on the device.
+
 ## [0.23.0]
 
 The Advisor module: tuning advice for each game, for your exact device. Advisor only recommends: it never changes a setting.

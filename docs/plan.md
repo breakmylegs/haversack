@@ -66,5 +66,5 @@ Desktop (23 and 24) stays at the end of the feature queue, as Peter asked. Only 
 
 ## Backlog (not scheduled)
 
-- Advisor data sources deferred from slice 15 (ADR-0029): PCGamingWiki Cargo API with the user's bot password (optional, off by default), and the ProtonDB monthly-dump index published as a release asset under the ODbL (c0-report Q4, option a).
+- Advisor data source deferred from slice 15 (ADR-0029): the ProtonDB monthly-dump index (PCGamingWiki done, ADR-0031) published as a release asset under the ODbL (c0-report Q4, option a).
 From spec section 15: home lab hub peer, offload and rehydrate, offline USB bundles, content-defined chunking, USB4 direct link preference, `.reg` path rewriting, consented VDF fallback and CEF DevTools executors, optional uninstall propagation.
