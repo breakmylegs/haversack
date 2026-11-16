@@ -1,6 +1,6 @@
 # ADR-0013: Licence and Tuning Advisor audit outcome
 
-- Status: proposed (slice C0, awaiting Peter's sign-off of the audit)
+- Status: accepted. Peter signed off the audit on 16 November 2026. The other C0 questions took their recommended answers: Q2 manufacturer sources only, Q4 the ProtonDB dump index, Q5 no app ID in AI requests. See ADR-0028.
 - Date: 15 November 2026
 - Deciders: Peter (owner)
 - Sources: `docs/build-prompt-v2.md` sections 2, 5 and 6.1; `docs/advisor-port-audit.md`

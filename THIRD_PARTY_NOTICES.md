@@ -25,3 +25,15 @@ Save location data comes from the Ludusavi Manifest, https://github.com/mtkenner
 Copyright (c) 2020 Matthew T. Kennerly (mtkennerly)
 
 Licensed under the MIT licence, with the same terms as above.
+
+## Are We Anti-Cheat Yet (downloaded at run time; status wording included in the Advisor)
+
+Anti-cheat status comes from Are We Anti-Cheat Yet, https://github.com/AreWeAntiCheatYet/AreWeAntiCheatYet. The Advisor downloads its `games.json` at run time and uses the project's own wording for each status.
+
+Copyright © 2021 Starz0r, Curve
+
+Licensed under the MIT licence, with the same terms as above.
+
+## Deck Verified (fetched at run time, not bundled)
+
+Community reports come from Deck Verified by DeckSettings, https://deckverified.games. The report data is GPL-3.0. Keepsake shows it with a link to each report and caches it on the device only. No report data is part of Keepsake.

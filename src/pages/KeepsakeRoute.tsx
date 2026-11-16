@@ -9,6 +9,7 @@ import {
   FaFileImport,
   FaGamepad,
   FaHistory,
+  FaLightbulb,
   FaStethoscope,
 } from "react-icons/fa";
 import { ROUTE_PATH } from "../routes";
@@ -18,6 +19,7 @@ import { GamesPage } from "./GamesPage";
 import { HistoryPage } from "./HistoryPage";
 import { ImportPage } from "./ImportPage";
 import { InstallerPage } from "./InstallerPage";
+import { AdvisorPage } from "./AdvisorPage";
 import { modulesStatus } from "../backend";
 import { LogsPage } from "./LogsPage";
 import { SettingsPage } from "./SettingsPage";
@@ -27,7 +29,7 @@ export { ROUTE_PATH };
 
 // Tabs are grouped by module so later modules (Advisor, Replication, Installer, Desktop) add
 // their own entries here without touching the Saves tabs (build prompt v2 section 10, slice 9).
-type Module = "saves" | "core" | "installer";
+type Module = "saves" | "core" | "installer" | "advisor";
 
 interface Tab {
   module: Module;
@@ -42,6 +44,7 @@ const TABS: Tab[] = [
   { module: "saves", title: "Conflicts", icon: <FaCodeBranch />, content: <ConflictsPage />, path: "conflicts" },
   { module: "saves", title: "History", icon: <FaHistory />, content: <HistoryPage />, path: "history" },
   { module: "saves", title: "Import saves", icon: <FaFileImport />, content: <ImportPage />, path: "import" },
+  { module: "advisor", title: "Advisor", icon: <FaLightbulb />, content: <AdvisorPage />, path: "advisor" },
   { module: "installer", title: "Install", icon: <FaCompactDisc />, content: <InstallerPage />, path: "install" },
   { module: "core", title: "Settings", icon: <FaCog />, content: <SettingsPage />, path: "settings" },
   { module: "core", title: "Updates", icon: <FaCloudDownloadAlt />, content: <UpdatesPage />, path: "updates" },

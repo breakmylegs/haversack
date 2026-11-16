@@ -33,6 +33,8 @@ from . import (
     restore,
     steamcloud,
 )
+from .advisor import anticheat, deckverified
+from .advisor.service import Advisor, AdvisorError
 from .auth import GOOGLE, AuthError, DeviceCodeFlow, TokenManager, TokenStore
 from .backends import BackendConfigError, CredentialStore
 from .bus import EventBus
@@ -85,6 +87,7 @@ FREEZE_TEST_MAX = 10
 SIMULATED_JOB_MAX = 120
 IDLE_EVENT = "keepsake_idle"
 MANIFEST_PROGRESS_EVENT = "keepsake_manifest_progress"
+ADVISOR_EVENT = "keepsake_advisor"
 MANIFEST_PROGRESS_SECONDS = 0.5
 RETARGET_KINDS = ("set-shortcut-name", "set-shortcut-exe", "set-shortcut-start-dir", "set-launch-options")
 
@@ -154,6 +157,7 @@ class KeepsakeApp:
         self.freezer = Freezer(paths.runtime_dir, proc_root=proc_root)
         self.jobs = JobTracker(on_idle=self._on_idle)
         self.updater = Updater(paths.runtime_dir, self.version, fetch)
+        self._fetch = fetch  # Advisor's sources use the same injected fetcher, so tests never reach the network
         self._freeze_lock = asyncio.Lock()
         self._update_lock = asyncio.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -180,8 +184,56 @@ class KeepsakeApp:
                 health=saves_health,
             )
         )
+        self.advisor: Advisor | None = None
+
+        async def advisor_start() -> None:
+            home = discovery.real_home(self.home)
+            advisor = Advisor(
+                self.paths.settings_dir,
+                os.path.join(self.paths.runtime_dir, "advisor-cache"),
+                os.environ.get("DECKY_HOME") or os.path.join(home, "homebrew"),
+                home,
+                os.environ.get("DECKY_USER") or os.path.basename(home.rstrip("/")),
+                self._advisor_map_game,
+                fetch_reports=lambda appid, name: deckverified.fetch(appid, name, self._fetch),
+                anticheat_fetch=lambda: anticheat.download(self._fetch),
+            )
+            await asyncio.to_thread(advisor.detect)
+            self.advisor = advisor
+
+        async def advisor_stop() -> None:
+            self.advisor = None
+
+        async def advisor_load(advisor: Advisor, appid: int) -> None:
+            try:
+                await asyncio.to_thread(advisor.set_game, appid)
+            except Exception as exc:  # noqa: BLE001 - advice must never disturb the game or Saves
+                log_event(logging.WARNING, "advisor.load_failed", "Advisor could not load the game", error=str(exc))
+                return
+            await self.emit(ADVISOR_EVENT)
+
+        async def advisor_game_started(payload: dict[str, Any]) -> None:
+            # The running game, from the lifecycle bus (spec 8.1). Saves publishes this inside its launch
+            # gate, so the work runs as a task and the handler returns at once: advice never delays a game.
+            if self.advisor is not None:
+                self._background.append(asyncio.create_task(advisor_load(self.advisor, int(payload["appid"]))))
+
+        async def advisor_health() -> list[dict[str, Any]]:
+            return self.advisor.health() if self.advisor else []
+
+        self.registry.register(
+            Module(
+                "advisor",
+                "Advisor",
+                "Recommends settings for the game you play, from your device and community reports.",
+                "Nothing outside its own settings and cache. It only recommends; you copy or apply advice yourself.",
+                start=advisor_start,
+                stop=advisor_stop,
+                health=advisor_health,
+                listeners={"game_started": advisor_game_started},
+            )
+        )
         for name, title, description, writes in (
-            ("advisor", "Advisor", "Recommends settings for the game you play.", "Nothing. It only recommends."),
             ("replication", "Replication", "Copies games between your devices.", "Games you send between devices."),
             (
                 "desktop",
@@ -253,6 +305,28 @@ class KeepsakeApp:
     def _library_root(self) -> str:
         configured = str(self.settings.get("libraryRoot") or "").strip()
         return configured or os.path.join(discovery.real_home(self.home), "Games").replace(os.sep, "/")
+
+    def _advisor_map_game(self, appid: int) -> dict[str, Any]:
+        """For Advisor (worker thread): a game's name and, for a shortcut, the Steam app ID of its manifest entry."""
+        games = (self._games or discovery.discover(self.home))["games"]
+        game = next((g for g in games if g["appid"] == appid), None)
+        if game is None and self._games is not None:
+            # Installed since the last scan, perhaps: look once more before giving up.
+            game = next((g for g in discovery.discover(self.home)["games"] if g["appid"] == appid), None)
+        if game is None:
+            return {"name": "", "kind": "unknown"}  # not in the Games list: general advice only, nothing looked up
+        out: dict[str, Any] = {"name": game["name"], "kind": game["kind"]}
+        if game["kind"] == "steam":
+            out["steamAppid"] = appid
+            return out
+        index = self.manifest.load()
+        match = manifest.match_game(index, game, self.game_configs.get(game["key"]))
+        title = match.get("title")
+        record = (index or {}).get("games", {}).get(title) if title else None
+        out["manifestTitle"] = title
+        if isinstance(record, dict) and isinstance(record.get("s"), int):
+            out["steamAppid"] = record["s"]
+        return out
 
     def _prefix_for(self, appid: int) -> str | None:
         for root in discovery.steam_roots(self.home):
@@ -1211,9 +1285,11 @@ class KeepsakeApp:
             games = await self._games_for_appid(raw_id)
         except (ValueError, TypeError):
             return {"handled": 0}
-        if kind == "exit" and not games:
-            # Apps Saves does not sync (an installer shortcut, for example) still reach other modules.
-            await self.bus.publish("game_exited", {"gameKey": None, "appid": lifecycle.normalise_appid(raw_id)})
+        if not games:
+            # Apps Saves does not sync (an installer shortcut, or any game for Advisor) still reach other modules.
+            event = {"start": "game_started", "exit": "game_exited"}.get(kind)
+            if event:
+                await self.bus.publish(event, {"gameKey": None, "appid": lifecycle.normalise_appid(raw_id)})
         if not self.registry.enabled("saves"):
             return {"handled": 0}  # Saves switched off: no launch gate, no exit save
         for game in games:
@@ -1896,6 +1972,41 @@ class KeepsakeApp:
         except (InstallerError, OSError) as exc:
             raise ValueError("the staged image is missing") from exc
         return {"base64": base64.b64encode(data).decode("ascii")}
+
+    # Advisor (slice 14, ADR-0028)
+
+    def _the_advisor(self) -> Advisor:
+        if self.advisor is None:
+            raise ValueError("the Advisor module is off; switch it on in Settings, Modules")
+        return self.advisor
+
+    async def advisor_view(self) -> dict[str, Any]:
+        if self.advisor is None:
+            return {"running": False}
+        return {"running": True, **await asyncio.to_thread(self.advisor.view)}
+
+    async def advisor_select_game(self, appid: int) -> dict[str, Any]:
+        """Advise on any game from the Games list, not only the running one."""
+        await asyncio.to_thread(self._the_advisor().set_game, int(appid))
+        return await self.advisor_view()
+
+    async def advisor_refresh(self) -> dict[str, Any]:
+        await asyncio.to_thread(self._the_advisor().load_reports, True)
+        return await self.advisor_view()
+
+    async def advisor_redetect(self) -> dict[str, Any]:
+        await asyncio.to_thread(self._the_advisor().detect)
+        return await self.advisor_view()
+
+    async def advisor_settings(self, values: dict[str, Any]) -> dict[str, Any]:
+        advisor = self._the_advisor()
+        try:
+            await asyncio.to_thread(advisor.save_settings, dict(values))
+        except AdvisorError as exc:
+            raise ValueError(str(exc)) from exc
+        if advisor.game and set(values) & {"steamIdOverrides", "sourceDeckVerified", "sourceAntiCheat"}:
+            await asyncio.to_thread(advisor.set_game, int(advisor.game["appid"]))
+        return await self.advisor_view()
 
     # Installer (slice 21, ADR-0026)
 

@@ -596,3 +596,66 @@ export const httpsTest = callable<[], HttpsTestResult>("https_test");
 export const recordProbeEvent = callable<[kind: string, payload: unknown], number>("record_probe_event");
 export const exportDiagnostics = callable<[frontend: Record<string, unknown>], string>("export_diagnostics");
 export const freezeTest = callable<[appid: number, seconds: number], FreezeTestResult>("freeze_test");
+
+// Advisor (slice 14, ADR-0028). Read-only: nothing here changes a setting anywhere (P16).
+export interface AdvisorRecommendation {
+  source: "deckverified" | "fallback";
+  source_url: string;
+  report_title?: string;
+  report_date: string;
+  votes: number;
+  device_reported: string;
+  device_match: string;
+  matchLabel: string;
+  confidence: "high" | "medium" | "low";
+  workload?: string;
+  lines: Record<"power" | "display" | "scaling" | "frame_gen" | "in_game" | "battery", string[]>;
+  flags: string[];
+  compat: { proton: string | null; launch_options: string | null };
+  notes: string;
+}
+
+export interface AdvisorView {
+  running: boolean;
+  settings?: {
+    deviceOverride: string;
+    workload: "light" | "medium" | "heavy";
+    sourceDeckVerified: boolean;
+    sourceAntiCheat: boolean;
+    steamIdOverrides: Record<string, number>;
+    stackOverrides: Record<string, string>;
+  };
+  device?: { id: string; name: string; apu: string; how: "detected" | "override" | "generic"; generic: boolean; verified: boolean };
+  devices?: { id: string; name: string }[];
+  os?: { id: string; pretty: string };
+  stack?: {
+    detected: { id: string; disabled?: boolean }[];
+    selected: Record<string, string>;
+    names: Record<string, string>;
+    categories: string[];
+    options: Record<string, string[]>;
+  };
+  conflicts?: { kind: string; text: string }[];
+  game?: {
+    appid: number;
+    name: string;
+    shortcut: boolean;
+    steamAppid: number | null;
+    mapping: "steam" | "manifest" | "manual" | "name";
+    manifestTitle?: string | null;
+  } | null;
+  source?: { enabled: boolean; cached: boolean; error: string | null; fetchedAt: number | null };
+  anticheat?: {
+    enabled: boolean;
+    error: string | null;
+    entry: { name: string; status: string; meaning: string; blocked: boolean; url: string; attribution: string } | null;
+  };
+  recommendations?: AdvisorRecommendation[];
+  attribution?: string[];
+}
+
+export const advisorView = callable<[], AdvisorView>("advisor_view");
+export const advisorSelectGame = callable<[appid: number], AdvisorView>("advisor_select_game");
+export const advisorRefresh = callable<[], AdvisorView>("advisor_refresh");
+export const advisorRedetect = callable<[], AdvisorView>("advisor_redetect");
+export const advisorSettings = callable<[values: Record<string, unknown>], AdvisorView>("advisor_settings");

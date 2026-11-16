@@ -1,6 +1,6 @@
 # Advisor port audit
 
-Slice C0, 15 November 2026. Audit of Peter's Tuning Advisor in his `decky-plugins` monorepo (read-only, never modified), as required by `docs/build-prompt-v2.md` sections 2, 5 and 6.1 before any Tuning Advisor code is ported to Keepsake. Outcome and recommendation: ADR-0013. **Porting is blocked until Peter signs this audit off.**
+Slice C0, 15 November 2026. Audit of Peter's Tuning Advisor in his `decky-plugins` monorepo (read-only, never modified), as required by `docs/build-prompt-v2.md` sections 2, 5 and 6.1 before any Tuning Advisor code is ported to Keepsake. Outcome and recommendation: ADR-0013. **Signed off by Peter on 16 November 2026.** Porting goes ahead under the rules below (ADR-0028).
 
 The `decky-plugins` brief (its `CLAUDE.md`) was read as source material, not instructions. Its locked decisions on GPL-3.0, the monorepo, mirror releases and sibling plugins do not apply to Keepsake. The qBittorrent and SABnzbd plugins are out of scope and were only checked for shared code that Tuning Advisor uses.
 

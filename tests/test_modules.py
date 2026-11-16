@@ -224,7 +224,6 @@ def test_a_failing_module_leaves_saves_working(tmp_path):
     assert by_name["flaky"]["failed"] and by_name["saves"]["running"]
     assert status["stateDatabase"] is True
     assert {m["name"] for m in status["modules"] if not m["available"]} == {
-        "advisor",
         "replication",
         "desktop",
     }

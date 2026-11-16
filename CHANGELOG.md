@@ -2,6 +2,18 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [Unreleased]
+
+Slice 14: the Advisor module, first part.
+
+### Added
+
+- Keepsake, Advisor: recommendations for the game you are playing, or any game you choose, for your exact device. It covers TDP in your tuning tool's own words, frame cap and VRR, render resolution and scaling filter, in-game preset and battery estimate. Each recommendation shows its source and confidence, and it uses Deck Verified community reports where there are any. It changes nothing: launch options are offered to copy.
+- Advice in the Quick Access Menu for the running game.
+- Detects your handheld (Legion Go, Legion Go 2, Steam Deck, ROG Ally and others) and your TDP and frame generation tools, and warns when two TDP tools fight. You can choose both by hand.
+- Non-Steam shortcuts are matched to their Steam game through the save manifest, or by a Steam app ID you enter.
+- Anti-cheat status from Are We Anti-Cheat Yet for games that have it.
+
 ## [0.22.0]
 
 Keepsake v2 begins: Keepsake is now one plugin with modules. This release adds the Installer module and the module framework, alongside save sync, which works as before.

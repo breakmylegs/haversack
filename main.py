@@ -110,6 +110,21 @@ class Plugin:
     async def steam_ops_list(self) -> list[dict[str, Any]]:
         return await self.app.steam_ops_list()
 
+    async def advisor_view(self) -> dict[str, Any]:
+        return await self.app.advisor_view()
+
+    async def advisor_select_game(self, appid: int) -> dict[str, Any]:
+        return await self.app.advisor_select_game(appid)
+
+    async def advisor_refresh(self) -> dict[str, Any]:
+        return await self.app.advisor_refresh()
+
+    async def advisor_redetect(self) -> dict[str, Any]:
+        return await self.app.advisor_redetect()
+
+    async def advisor_settings(self, values: dict[str, Any]) -> dict[str, Any]:
+        return await self.app.advisor_settings(values)
+
     async def installer_status(self) -> dict[str, Any]:
         return await self.app.installer_status()
 

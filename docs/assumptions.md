@@ -274,3 +274,14 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 | A31 | SteamOS and Bazzite ship `python3` with the `venv` module and `ensurepip`, and the device can reach PyPI, so `scripts/test_on_device.py` can create its test venv | unverified, first device run confirms |
 | A32 | **Differs from the build prompt:** sections 1, 6, 13, 16 and 17 assume GitHub Actions for pull request checks and releases. Replaced by `pnpm run check`, device tests and a local `pnpm release` (ADR-0004) | owner decision |
 | A29 | `LocalFolderStore` create-only writes use hard links, which exFAT and FAT32 SD cards do not support | known gap; acceptable for tests and the simulator, revisit before offering it as a user backend |
+
+## Advisor I (slice 14)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A142 | `navigator.clipboard.writeText` works in Steam's Gaming Mode CEF for a Decky page | unverified (the Steam client has no clipboard API); the text is always shown as well | Tuning Advisor register |
+| A143 | `Navigation.NavigateToExternalWeb(url)` opens a page from Gaming Mode | verified in `@decky/ui` 4.16.5 `Router.d.ts`; behaviour unverified on device | `@decky/ui` |
+| A144 | `DropdownItem` with `rgOptions`, `selectedOption` and `onChange` | verified in `@decky/ui` 4.16.5 `Dropdown.d.ts` | `@decky/ui` |
+| A145 | The Legion Go reports `sys_vendor` `LENOVO` and `product_name` `83E1`; the Legion Go 2 `83N0` or `83N1` | Lenovo machine types; unverified on Peter's devices until `capture_device.sh` runs (c0-report Q2) | Lenovo PSREF |
+| A146 | Deck Verified answers `game_details?appid=` and `?name=` with `{"reports": [...]}`, 204 when nothing is known, and links each report to a GitHub issue | Tuning Advisor register, unverified from Keepsake | deckverified.games |
+| A147 | The manifest compact index keeps the Steam ID as `s` per game | verified (`manifest.build_index`, slice 4) | Keepsake |
