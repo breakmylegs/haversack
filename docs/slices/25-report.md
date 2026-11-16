@@ -36,7 +36,7 @@ Only the fuzzing can be done before slices 14 to 24 land and the devices are che
 
 ## Still to do in slice 25
 
-- Fuzz `minisign.parse_public_key` and the signature parser once #16 (slice 12) merges. They are not on `main` yet.
+- Done on #16 (slice 12), where those parsers live: `tests/test_fuzz_signatures.py` fuzzes minisign keys and signatures and Ed25519 verification. A mutated signature never verifies unless only its unsigned comment changed.
 - Fuzz the v2 parsers once their slices merge: Replication manifests and the peer protocol (slices 17 and 18), and the Installer's mount table parsing (#20).
 - The full threat model review, the 50-game performance check on both devices, documentation, and the v2.0.0 release with clean installs on SteamOS and Bazzite.
 
