@@ -10,7 +10,7 @@ Releases can be signed with [minisign](https://jedisct1.github.io/minisign/). Wi
 2. Generate a key pair outside the repository: `minisign -G -p keepsake.pub -s %USERPROFILE%\.minisign\keepsake.key`.
 3. Keep the secret key and its password safe and offline. Never commit it; `.gitignore` blocks `*.minisign.key` and `minisign.key` as a backstop.
 4. Set `KEEPSAKE_MINISIGN_KEY` to the secret key path in your shell before publishing.
-5. Send me the public key (`keepsake.pub`); it will be pinned in the plugin when in-plugin verification is built.
+5. Pin the public key in the plugin: copy the base64 line from `keepsake.pub` (the line after the comment) into `PUBLIC_KEY` in `py_modules/keepsake/release_key.py` and merge that change through a pull request. From the next release, the updater refuses any update without a valid `SHA256SUMS.minisig` made with this key (ADR-0023), so publish that release with `KEEPSAKE_MINISIGN_KEY` set. The public key is not secret; the secret key never leaves your machine.
 
 ## Each release
 

@@ -17,6 +17,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from . import minisign, release_key
 from .fsutil import atomic_write_json, read_json
 from .net import Fetcher, NetError, check_url
 
@@ -140,11 +141,13 @@ class Updater:
         current_version: str,
         fetch: Fetcher,
         clock: Callable[[], float] = time.time,
+        public_key: str = release_key.PUBLIC_KEY,
     ) -> None:
         self._path = os.path.join(runtime_dir, STATE_FILE)
         self.current_version = current_version
         self._fetch = fetch
         self._clock = clock
+        self.public_key = public_key.strip()
 
     # State
 
@@ -243,10 +246,15 @@ class Updater:
             return {"ok": False, "reason": "offline", "detail": str(exc)}
         if response.status != 200 or len(response.body) > SUMS_MAX_BYTES:
             return {"ok": False, "reason": "sums-unavailable"}
+        if self.public_key:
+            refused = self._check_signature(release, response.body)
+            if refused:
+                return refused
         digest = parse_sums(response.body.decode("utf-8", errors="replace")).get(release.zip_name)
         if digest is None:
             return {"ok": False, "reason": "sums-missing-zip"}
         return {
+            "signed": bool(self.public_key),
             "ok": True,
             "artifact": release.zip_url,
             "name": PLUGIN_NAME,
@@ -256,6 +264,23 @@ class Updater:
             "sha256": digest,
             "installType": self.install_type(release.version),
         }
+
+    def _check_signature(self, release: Release, sums: bytes) -> dict[str, Any] | None:
+        """With a pinned key, ``SHA256SUMS`` must carry a valid minisign signature (T10). None means valid."""
+        if not release.signature_url:
+            return {"ok": False, "reason": "unsigned-release"}
+        try:
+            check_url(release.signature_url)
+            response = self._fetch(release.signature_url, headers={"Accept": "application/octet-stream"})
+        except NetError as exc:
+            return {"ok": False, "reason": "offline", "detail": str(exc)}
+        if response.status != 200 or len(response.body) > minisign.MAX_SIGNATURE_BYTES:
+            return {"ok": False, "reason": "signature-unavailable"}
+        try:
+            minisign.verify(self.public_key, response.body.decode("utf-8", errors="replace"), sums)
+        except minisign.MinisignError as exc:
+            return {"ok": False, "reason": "bad-signature", "detail": str(exc)}
+        return None
 
     def install_type(self, version: str) -> int:
         current, target = parse_version(self.current_version), parse_version(version)

@@ -2,6 +2,19 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [0.12.0]
+
+Slice 12: hardening and documentation ahead of 1.0.0.
+
+### Added
+
+- Release signature checking: once the owner's release key is pinned in the plugin, an update without a valid signature is refused. Until then the Updates page installs with the SHA-256 check, as before.
+- README with install and first-run steps, a troubleshooting guide, the cutover plan from Ludusavi, and a security review of the threat model.
+
+### Fixed
+
+- Background sync with many games was slow on the device's local test store, because every listing walked the whole store. With 50 games an idle pass now takes seconds instead of minutes.
+
 ## [0.11.0]
 
 Slice 11: registry saves, Steam Cloud detection and sleep snapshots. Each has its own setting.
