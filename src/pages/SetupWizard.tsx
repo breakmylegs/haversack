@@ -26,6 +26,9 @@ function matchLine(m: GameMatch): string {
   return "No match yet. You can match it later on its game page.";
 }
 
+// Gaming Mode's footer bar (Steam menu, Select and Back hints) overlays the bottom of full-screen pages.
+const FOOTER_CLEARANCE = 96;
+
 export function SetupWizard() {
   const [step, setStep] = useState(0);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -68,9 +71,90 @@ export function SetupWizard() {
   const back = () => setStep((s) => Math.max(s - 1, 0));
   const syncable = (matches ?? []).filter((m) => m.gameKey && !m.proposal);
 
+  // Back, Continue and Skip: under the step title, so they never need scrolling and controller focus reaches
+  // them first, and again at the end of the step (A154).
+  const nav = (
+    <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "16px 0" }}>
+      {step > 0 && (
+        <DialogButton style={{ width: "auto" }} disabled={busy} onClick={back}>
+          Back
+        </DialogButton>
+      )}
+      {step === 0 && (
+        <DialogButton
+          style={{ width: "auto" }}
+          disabled={busy || !settings || settings.readOnly}
+          onClick={() =>
+            void work(async () => {
+              setSettings(await setSetting("deviceName", name));
+              next();
+            })
+          }
+        >
+          Save and continue
+        </DialogButton>
+      )}
+      {(step === 1 || step === 3 || (step === 2 && matches !== null)) && (
+        <DialogButton style={{ width: "auto" }} disabled={busy} onClick={next}>
+          Continue
+        </DialogButton>
+      )}
+      {step === 4 && (
+        <DialogButton
+          style={{ width: "auto" }}
+          disabled={busy}
+          onClick={() =>
+            void work(async () => {
+              setPlan(await planSync(chosen));
+              next();
+            })
+          }
+        >
+          Show the plan
+        </DialogButton>
+      )}
+      {step === 5 && (
+        <DialogButton style={{ width: "auto" }} disabled={busy} onClick={next}>
+          Continue
+        </DialogButton>
+      )}
+      {step === 6 && (
+        <DialogButton
+          style={{ width: "auto" }}
+          disabled={busy}
+          onClick={() =>
+            void work(async () => {
+              const result = await finishSetup(chosen);
+              toaster.toast({ title: "Keepsake", body: `Setup finished. Syncing ${result.enabled} games.` });
+              leave();
+            })
+          }
+        >
+          Finish setup
+        </DialogButton>
+      )}
+      <DialogButton
+        style={{ width: "auto" }}
+        disabled={busy}
+        onClick={() =>
+          void work(async () => {
+            await setSetting("setupComplete", true);
+            leave();
+          })
+        }
+      >
+        Skip setup
+      </DialogButton>
+    </Focusable>
+  );
+
   return (
-    <div style={{ marginTop: 40, padding: "0 24px", height: "calc(100% - 40px)", overflowY: "auto" }}>
+    // The same top clearance as Decky's own full-screen pages; the bottom padding clears Gaming Mode's footer bar.
+    <div
+      style={{ marginTop: 40, padding: `0 24px ${FOOTER_CLEARANCE}px`, height: "calc(100% - 40px)", overflowY: "auto", boxSizing: "border-box" }}
+    >
       <Field label={`Set up Keepsake: step ${step + 1} of ${STEPS.length}, ${STEPS[step]}`} />
+      {nav}
 
       {step === 0 && (
         <>
@@ -178,78 +262,7 @@ export function SetupWizard() {
         />
       )}
 
-      <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "16px 0" }}>
-        {step > 0 && (
-          <DialogButton style={{ width: "auto" }} disabled={busy} onClick={back}>
-            Back
-          </DialogButton>
-        )}
-        {step === 0 && (
-          <DialogButton
-            style={{ width: "auto" }}
-            disabled={busy || !settings || settings.readOnly}
-            onClick={() =>
-              void work(async () => {
-                setSettings(await setSetting("deviceName", name));
-                next();
-              })
-            }
-          >
-            Save and continue
-          </DialogButton>
-        )}
-        {(step === 1 || step === 3 || (step === 2 && matches !== null)) && (
-          <DialogButton style={{ width: "auto" }} disabled={busy} onClick={next}>
-            Continue
-          </DialogButton>
-        )}
-        {step === 4 && (
-          <DialogButton
-            style={{ width: "auto" }}
-            disabled={busy}
-            onClick={() =>
-              void work(async () => {
-                setPlan(await planSync(chosen));
-                next();
-              })
-            }
-          >
-            Show the plan
-          </DialogButton>
-        )}
-        {step === 5 && (
-          <DialogButton style={{ width: "auto" }} disabled={busy} onClick={next}>
-            Continue
-          </DialogButton>
-        )}
-        {step === 6 && (
-          <DialogButton
-            style={{ width: "auto" }}
-            disabled={busy}
-            onClick={() =>
-              void work(async () => {
-                const result = await finishSetup(chosen);
-                toaster.toast({ title: "Keepsake", body: `Setup finished. Syncing ${result.enabled} games.` });
-                leave();
-              })
-            }
-          >
-            Finish setup
-          </DialogButton>
-        )}
-        <DialogButton
-          style={{ width: "auto" }}
-          disabled={busy}
-          onClick={() =>
-            void work(async () => {
-              await setSetting("setupComplete", true);
-              leave();
-            })
-          }
-        >
-          Skip setup
-        </DialogButton>
-      </Focusable>
+      {nav}
     </div>
   );
 }

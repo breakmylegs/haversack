@@ -36,6 +36,7 @@ from . import (
 )
 from .advisor import anticheat, deckverified
 from .advisor import compat as advisor_compat
+from .advisor.pcgw import PcgwClient
 from .advisor.service import Advisor, AdvisorError
 from .auth import GOOGLE, AuthError, DeviceCodeFlow, TokenManager, TokenStore
 from .backends import BackendConfigError, CredentialStore
@@ -202,6 +203,7 @@ class KeepsakeApp:
                 anticheat_fetch=lambda: anticheat.download(self._fetch),
                 installed_tools=lambda: advisor_compat.installed_ge_proton(discovery.steam_roots(self.home)),
                 ai_key=lambda provider: str(self.credentials.load(provider)["apiKey"]),
+                pcgw_client=self._pcgw_client,
             )
             await asyncio.to_thread(advisor.detect)
             self.advisor = advisor
@@ -310,6 +312,14 @@ class KeepsakeApp:
     def _library_root(self) -> str:
         configured = str(self.settings.get("libraryRoot") or "").strip()
         return configured or os.path.join(discovery.real_home(self.home), "Games").replace(os.sep, "/")
+
+    def _pcgw_client(self) -> PcgwClient | None:
+        """The user's own PCGamingWiki bot login, or None until it is entered."""
+        if not self.credentials.configured("pcgw"):
+            return None
+        c = self.credentials.load("pcgw")
+        user_agent = f"Keepsake/{self.version} (+https://github.com/breakmylegs/keepsake)"
+        return PcgwClient(str(c["username"]), str(c["password"]), user_agent)
 
     def _advisor_map_game(self, appid: int) -> dict[str, Any]:
         """For Advisor (worker thread): a game's name and, for a shortcut, the Steam app ID of its manifest entry."""
@@ -2001,7 +2011,8 @@ class KeepsakeApp:
     async def advisor_view(self) -> dict[str, Any]:
         if self.advisor is None:
             return {"running": False}
-        return {"running": True, **await asyncio.to_thread(self.advisor.view)}
+        view = await asyncio.to_thread(self.advisor.view)
+        return {"running": True, **view, "pcgwLogin": self.credentials.configured("pcgw")}
 
     async def advisor_select_game(self, appid: int) -> dict[str, Any]:
         """Advise on any game from the Games list, not only the running one."""

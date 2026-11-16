@@ -9,6 +9,14 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 - Games: games whose match needs your approval come first, then any with a prefix mismatch, a conflict or a quarantined save, then the rest by name (numbers in order, so Game 2 comes before Game 10). The order is the same under every filter, and in setup's match review.
 - Games: an Approve button on each row that needs it, next to Open, with the same confirmation as the game's page. "Review matches" in the banner opens the first match waiting for you.
 
+### Fixed
+
+- Setup: the Back, Continue and Skip setup buttons could sit under Gaming Mode's footer bar after a long game list. They now also appear at the top of every step, and the page ends clear of the footer.
+
+### Added
+
+- Advisor, PCGamingWiki (optional, off by default): which upscalers and frame generation a game supports, with a link to its page. Advisor warns when a report recommends an upscaler the wiki does not list. It needs your own PCGamingWiki bot password, which stays on the device.
+
 ## [0.23.0]
 
 The Advisor module: tuning advice for each game, for your exact device. Advisor only recommends: it never changes a setting.
