@@ -21,7 +21,7 @@ from typing import Any
 
 from .. import devices
 from ..fsutil import atomic_write_json, read_json
-from . import ai, anticheat, compat, current, deckverified, recommend, stack
+from . import ai, anticheat, compat, current, deckverified, pcgw, recommend, stack
 from .cache import SourceCache
 
 SETTINGS_FILE = "advisor.json"
@@ -31,6 +31,7 @@ DEFAULTS: dict[str, Any] = {
     "workload": "medium",
     "sourceDeckVerified": True,
     "sourceAntiCheat": True,
+    "sourcePcgw": False,  # optional: needs the user's PCGamingWiki bot password
     "steamIdOverrides": {},  # shortcut app ID (text) -> Steam app ID
     "aiProvider": "",  # opt-in per provider (P18): empty means AI is off
     "aiModel": "",
@@ -60,6 +61,7 @@ class Advisor:
         installed_tools: Callable[[], list[str]] = lambda: [],
         ai_key: Callable[[str], str] = lambda provider: "",
         ai_transport: ai.Transport | None = None,
+        pcgw_client: Callable[[], pcgw.PcgwClient | None] = lambda: None,
     ) -> None:
         self._settings_path = os.path.join(settings_dir, SETTINGS_FILE)
         self.cache_dir = cache_dir
@@ -71,6 +73,8 @@ class Advisor:
         self._map_game = map_game
         self._fetch_reports = fetch_reports
         self._installed_tools = installed_tools
+        self._pcgw_client = pcgw_client
+        self.pcgw_state: dict[str, Any] = {"enabled": False, "error": None, "cached": False, "data": None}
         self._ai_key = ai_key
         self.ai_providers = {pid: (cls(ai_transport) if ai_transport else cls()) for pid, cls in ai.PROVIDERS.items()}
         self.ai_usage = ai.Usage(cache_dir)
@@ -103,7 +107,7 @@ class Advisor:
             raise AdvisorError("unknown device")
         if "workload" in values and values["workload"] not in recommend.WORKLOADS:
             raise AdvisorError("workload must be light, medium or heavy")
-        for key in ("sourceDeckVerified", "sourceAntiCheat"):
+        for key in ("sourceDeckVerified", "sourceAntiCheat", "sourcePcgw"):
             if key in values and not isinstance(values[key], bool):
                 raise AdvisorError(f"{key} must be true or false")
         if "stackOverrides" in values:
@@ -180,6 +184,7 @@ class Advisor:
         with self._lock:
             self.game = game
             self.ai_result = None
+            self.pcgw_state = {"enabled": False, "error": None, "cached": False, "data": None}
         self.load_reports(force)
 
     def _cache_key(self, game: dict[str, Any]) -> str:
@@ -222,9 +227,29 @@ class Advisor:
             except anticheat.AntiCheatError as exc:
                 ac["error"] = exc.hint
             ac["entry"] = self.anticheat.lookup(game.get("steamAppid"), "" if game.get("steamAppid") else game["name"])
+        wiki = self._load_pcgw(game, settings["sourcePcgw"], force)
         with self._lock:
             if self.game is game:  # the player may have picked another game meanwhile
-                self.reports, self.source_state, self.ac_state = reports, state, ac
+                self.reports, self.source_state, self.ac_state, self.pcgw_state = reports, state, ac, wiki
+
+    def _load_pcgw(self, game: dict[str, Any], enabled: bool, force: bool) -> dict[str, Any]:
+        """PCGamingWiki (optional, off by default): cached 7 days, a stale copy kept when it cannot be reached."""
+        state: dict[str, Any] = {"enabled": enabled, "error": None, "cached": False, "data": None}
+        if not enabled or not (game.get("steamAppid") or game.get("name")):
+            return state
+        key = "pcgw:" + self._cache_key(game)
+        cached = self.cache.get(pcgw.SOURCE, key)
+        if cached and not force and self.cache.fresh(cached[1]):
+            return {**state, "cached": True, "data": cached[0]}
+        client = self._pcgw_client()
+        if client is None:
+            return {**state, "error": "Enter your PCGamingWiki bot user name and bot password in Advisor first."}
+        try:
+            data = client.game(game.get("steamAppid"), None if game.get("steamAppid") else game["name"])
+        except pcgw.PcgwError as exc:
+            return {**state, "error": exc.hint, "cached": bool(cached), "data": cached[0] if cached else None}
+        self.cache.put(pcgw.SOURCE, key, data)
+        return {**state, "data": data}
 
     def recommendations(self) -> list[dict[str, Any]]:
         game = self.game or {}
@@ -241,6 +266,11 @@ class Advisor:
                 selected,
                 bool(game.get("shortcut")),
             )
+        listed = (self.pcgw_state.get("data") or {}).get("upscaling") or []
+        for rec in recs:
+            name = (rec.get("upscaler") or {}).get("name")
+            if name and listed and not pcgw.upscaler_supported(name, listed):
+                rec["flags"].append(f"PCGamingWiki does not list {name} for this game. It lists {', '.join(listed)}.")
         return recs
 
     def proton(self, recs: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -362,7 +392,9 @@ class Advisor:
             "source": self.source_state,
             "anticheat": self.ac_state,
             "recommendations": recs,
-            "attribution": [deckverified.ATTRIBUTION, anticheat.ATTRIBUTION],
+            "pcgw": self.pcgw_state,
+            "attribution": [deckverified.ATTRIBUTION, anticheat.ATTRIBUTION]
+            + ([pcgw.ATTRIBUTION] if self.pcgw_state.get("data") else []),
         }
 
     def health(self) -> list[dict[str, Any]]:

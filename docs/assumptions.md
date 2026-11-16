@@ -300,3 +300,9 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 | # | Fact | Status | Source |
 |---|---|---|---|
 | A152 | Decky Loader's Python is a PyInstaller build that bundles only the stdlib modules its own code reaches plus `hiddenimports` (`logging.handlers`, `sqlite3`, `http.server`, `socketserver`, `configparser`). `xml`, `tomllib` and `resource` are not proven bundled | verified from `backend/pyinstaller.spec` and the loader's imports on `main` (16 November 2026); `xml` confirmed missing on Peter's Legion Go 2 | Decky Loader source, ADR-0030 |
+
+## PCGamingWiki (ADR-0031)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A153 | PCGamingWiki's Cargo API needs a MediaWiki bot login (`meta=tokens` then `action=login`) with the Cargo grant since August 2026, uses tables `Game` and `Video`, and blocks an IP for a minute after a 429 | from Tuning Advisor's register; unverified from Keepsake until a real bot login is tried | Tuning Advisor |

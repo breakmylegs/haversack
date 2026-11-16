@@ -83,6 +83,15 @@ def ssl_context() -> ssl.SSLContext:
         return ssl.create_default_context()
 
 
+def _headers(message: Any) -> dict[str, str]:
+    """Lower-cased response headers. Repeated `Set-Cookie` lines are kept, joined by newlines (sessions need them)."""
+    out: dict[str, str] = {}
+    for key, value in (message or {}).items():
+        key = key.lower()
+        out[key] = f"{out[key]}\n{value}" if key == "set-cookie" and key in out else value
+    return out
+
+
 class _AllowlistRedirect(urllib.request.HTTPRedirectHandler):
     def __init__(self, allowed: frozenset[str]) -> None:
         self.allowed = allowed
@@ -130,9 +139,9 @@ def fetch_to_file(
                 out.write(chunk)
                 if progress is not None:
                     progress(written, total)
-            return HttpResponse(status=response.status, headers={k.lower(): v for k, v in response.headers.items()})
+            return HttpResponse(status=response.status, headers=_headers(response.headers))
     except urllib.error.HTTPError as exc:
-        return HttpResponse(status=exc.code, headers={k.lower(): v for k, v in (exc.headers or {}).items()})
+        return HttpResponse(status=exc.code, headers=_headers(exc.headers))
     except NetError:
         raise
     except (urllib.error.URLError, OSError, ValueError) as exc:
@@ -157,11 +166,11 @@ def fetch(
         with opener.open(request, timeout=timeout) as response:
             body = response.read(max_bytes + 1)
             status = response.status
-            response_headers = {k.lower(): v for k, v in response.headers.items()}
+            response_headers = _headers(response.headers)
     except urllib.error.HTTPError as exc:
         body = exc.read(max_bytes + 1) if exc.fp else b""
         status = exc.code
-        response_headers = {k.lower(): v for k, v in (exc.headers or {}).items()}
+        response_headers = _headers(exc.headers)
     except NetError:
         raise
     except (urllib.error.URLError, OSError, ValueError) as exc:
@@ -203,7 +212,7 @@ def request(
     opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl_context()), _NoRedirect())
     try:
         with opener.open(req, timeout=timeout) as response:
-            response_headers = {k.lower(): v for k, v in response.headers.items()}
+            response_headers = _headers(response.headers)
             if dest is not None and response.status == 200:
                 written = 0
                 with open(dest, "wb") as out:
@@ -218,7 +227,7 @@ def request(
     except urllib.error.HTTPError as exc:
         data = exc.read(max_bytes + 1) if exc.fp else b""
         status = exc.code
-        response_headers = {k.lower(): v for k, v in (exc.headers or {}).items()}
+        response_headers = _headers(exc.headers)
     except NetError:
         raise
     except (urllib.error.URLError, OSError, ValueError) as exc:

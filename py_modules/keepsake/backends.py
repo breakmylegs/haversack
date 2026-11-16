@@ -25,6 +25,7 @@ FILES = {
     "anthropic": "ai-anthropic.json",
     "openai": "ai-openai.json",
     "gemini": "ai-gemini.json",
+    "pcgw": "pcgw.json",
 }
 FIELDS: dict[str, dict[str, str]] = {
     "webdav": {"url": "text", "username": "text", "password": "secret"},
@@ -42,6 +43,7 @@ FIELDS: dict[str, dict[str, str]] = {
     "anthropic": {"apiKey": "secret"},
     "openai": {"apiKey": "secret"},
     "gemini": {"apiKey": "secret"},
+    "pcgw": {"username": "text", "password": "secret"},
 }
 REQUIRED = {
     "webdav": ("url", "username", "password"),
@@ -51,6 +53,7 @@ REQUIRED = {
     "anthropic": ("apiKey",),
     "openai": ("apiKey",),
     "gemini": ("apiKey",),
+    "pcgw": ("username", "password"),
 }
 DEFAULTS: dict[str, dict[str, Any]] = {
     "webdav": {"url": "", "username": "", "password": ""},
@@ -68,6 +71,7 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     "anthropic": {"apiKey": ""},
     "openai": {"apiKey": ""},
     "gemini": {"apiKey": ""},
+    "pcgw": {"username": "", "password": ""},
 }
 MAX_TEXT = 300
 AI_KINDS = ("anthropic", "openai", "gemini")  # Advisor's optional AI providers (P18): user keys only
