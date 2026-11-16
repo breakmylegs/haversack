@@ -2,6 +2,12 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [Unreleased]
+
+### Added
+
+- Import saves, "Import every game": after Read folder, import the latest backup of every game, or all backups of every game, in one go. It shows how many games and backups each will import. It shows "Importing 7 of 42: Game name" as it goes, and can stop between games. One game failing does not stop the rest, and running it again skips what is already imported. It ends with a summary, and games that failed move to the top. Games not on this device or not in the manifest are included, so their backups are ready if you install them later or play them on your other device.
+
 ## [0.23.0]
 
 The Advisor module: tuning advice for each game, for your exact device. Advisor only recommends: it never changes a setting.

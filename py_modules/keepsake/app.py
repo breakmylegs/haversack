@@ -90,8 +90,21 @@ SIMULATED_JOB_MAX = 120
 IDLE_EVENT = "keepsake_idle"
 MANIFEST_PROGRESS_EVENT = "keepsake_manifest_progress"
 ADVISOR_EVENT = "keepsake_advisor"
+IMPORT_PROGRESS_EVENT = "keepsake_import_progress"
 MANIFEST_PROGRESS_SECONDS = 0.5
 RETARGET_KINDS = ("set-shortcut-name", "set-shortcut-exe", "set-shortcut-start-dir", "set-launch-options")
+
+
+def import_verdict(results: list[dict[str, Any]], error: str | None) -> str:
+    """One game's outcome in an import of every game: failed, imported, already imported or nothing to import."""
+    statuses = {r.get("status") for r in results}
+    if error or "error" in statuses:
+        return "failed"
+    if "published" in statuses:
+        return "imported"
+    if statuses == {"already-imported"}:
+        return "already-imported"
+    return "nothing-to-import"
 
 
 async def _no_emit(event: str, *args: Any) -> None:
@@ -139,6 +152,8 @@ class KeepsakeApp:
         self.game_configs = GameConfigStore(paths.settings_dir)
         self._auto_refresh_manifest = auto_refresh_manifest
         self._manifest_lock = asyncio.Lock()
+        self._import_all: dict[str, Any] = {"running": False, "done": 0, "total": 0, "games": {}, "summary": {}}
+        self._import_cancel = False
         self._manifest_progress: dict[str, Any] = {"stage": "idle", "running": False}
         self._background: list[asyncio.Task[Any]] = []
         self.token_store = TokenStore(paths.settings_dir)
@@ -1921,6 +1936,78 @@ class KeepsakeApp:
         return {"gameKey": game_key, "results": results}
 
     # Modules and the Steam Operations Executor (slice 13)
+
+    # Import every game at once (Peter, 16 November 2026)
+
+    def import_all_status(self) -> dict[str, Any]:
+        return dict(self._import_all)
+
+    async def ludusavi_import_all(self, root: str, mode: str) -> dict[str, Any]:
+        """Start importing the latest (or every) backup of every readable game, one game at a time, in the background.
+
+        Games not found on this device or not in the manifest are included: an import only adds History
+        snapshots under the game's key and never touches saves, so the backups are ready for a later install
+        or the other device. A failing game is recorded and the rest carry on; already-imported backups are
+        skipped, so running it again is safe. ``ludusavi_import_cancel`` stops between games.
+        """
+        if mode not in ("latest", "all"):
+            raise ValueError("choose the latest backup or all backups")
+        if self._import_all.get("running"):
+            raise ValueError("an import of every game is already running")
+        scanned = await self.ludusavi_scan(root)
+        games = [g for g in scanned["games"] if not g.get("error") and g.get("backups")]
+        self._import_all = {
+            "running": True,
+            "cancelled": False,
+            "mode": mode,
+            "done": 0,
+            "total": len(games),
+            "current": None,
+            "games": {},
+            "summary": {"imported": 0, "already-imported": 0, "nothing-to-import": 0, "failed": 0},
+        }
+        self._import_cancel = False
+        self._background.append(asyncio.create_task(self._run_import_all(scanned["root"], games, mode)))
+        return self.import_all_status()
+
+    async def _run_import_all(self, root: str, games: list[dict[str, Any]], mode: str) -> None:
+        state = self._import_all
+        try:
+            for game in games:
+                if self._import_cancel:
+                    state["cancelled"] = True
+                    break
+                state["current"] = game["name"]
+                await self.emit(IMPORT_PROGRESS_EVENT, self.import_all_status())
+                ids = (
+                    [b["id"] for b in game["backups"]][-1:] if mode == "latest" else [b["id"] for b in game["backups"]]
+                )
+                try:
+                    outcome = await self.ludusavi_import(root, game["folder"], ids, game["gameKey"])
+                    results = outcome["results"]
+                    error = next((r.get("error") for r in results if r["status"] == "error"), None)
+                except Exception as exc:  # noqa: BLE001 - one game failing must not stop the rest
+                    results, error = [], str(exc)
+                verdict = import_verdict(results, error)
+                state["games"][game["folder"]] = {
+                    "name": game["name"],
+                    "status": verdict,
+                    "error": error,
+                    "results": results,
+                }
+                state["summary"][verdict] += 1
+                state["done"] += 1
+        finally:
+            state["running"], state["current"] = False, None
+            log_event(logging.INFO, "import.ludusavi_all", "Import of every game finished", **state["summary"])
+            await self.emit(IMPORT_PROGRESS_EVENT, self.import_all_status())
+
+    async def ludusavi_import_cancel(self) -> dict[str, Any]:
+        self._import_cancel = True
+        return self.import_all_status()
+
+    async def ludusavi_import_status(self) -> dict[str, Any]:
+        return self.import_all_status()
 
     async def modules_status(self) -> dict[str, Any]:
         return {

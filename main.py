@@ -179,6 +179,15 @@ class Plugin:
     async def ludusavi_import(self, root: str, folder: str, backup_ids: list[str], game_key: str) -> dict[str, Any]:
         return await self.app.ludusavi_import(root, folder, backup_ids, game_key)
 
+    async def ludusavi_import_all(self, root: str, mode: str) -> dict[str, Any]:
+        return await self.app.ludusavi_import_all(root, mode)
+
+    async def ludusavi_import_cancel(self) -> dict[str, Any]:
+        return await self.app.ludusavi_import_cancel()
+
+    async def ludusavi_import_status(self) -> dict[str, Any]:
+        return await self.app.ludusavi_import_status()
+
     async def set_game_key(self, key: str, game_key: str | None, title: str | None = None) -> dict[str, Any]:
         return await self.app.set_game_key(key, game_key, title)
 
