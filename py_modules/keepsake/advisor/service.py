@@ -21,7 +21,7 @@ from typing import Any
 
 from .. import devices
 from ..fsutil import atomic_write_json, read_json
-from . import anticheat, deckverified, recommend, stack
+from . import ai, anticheat, compat, current, deckverified, recommend, stack
 from .cache import SourceCache
 
 SETTINGS_FILE = "advisor.json"
@@ -32,6 +32,9 @@ DEFAULTS: dict[str, Any] = {
     "sourceDeckVerified": True,
     "sourceAntiCheat": True,
     "steamIdOverrides": {},  # shortcut app ID (text) -> Steam app ID
+    "aiProvider": "",  # opt-in per provider (P18): empty means AI is off
+    "aiModel": "",
+    "aiDailyCap": 20,
 }
 SHORTCUT_APPID_MIN = 2**31  # non-Steam shortcuts use app IDs at or above this
 
@@ -54,6 +57,9 @@ class Advisor:
         root: str = "/",
         fetch_reports: Callable[[int | None, str | None], dict[str, Any]] = deckverified.fetch,
         anticheat_fetch: Callable[[], bytes] | None = None,
+        installed_tools: Callable[[], list[str]] = lambda: [],
+        ai_key: Callable[[str], str] = lambda provider: "",
+        ai_transport: ai.Transport | None = None,
     ) -> None:
         self._settings_path = os.path.join(settings_dir, SETTINGS_FILE)
         self.cache_dir = cache_dir
@@ -64,6 +70,11 @@ class Advisor:
         self.decky_home, self.user_home, self.user, self.root = decky_home, user_home, user, root
         self._map_game = map_game
         self._fetch_reports = fetch_reports
+        self._installed_tools = installed_tools
+        self._ai_key = ai_key
+        self.ai_providers = {pid: (cls(ai_transport) if ai_transport else cls()) for pid, cls in ai.PROVIDERS.items()}
+        self.ai_usage = ai.Usage(cache_dir)
+        self.ai_result: dict[str, Any] | None = None
         self._lock = threading.Lock()
         self.facts: dict[str, Any] = {}
         self.device: dict[str, Any] = devices.generic_profile({})
@@ -112,6 +123,16 @@ class Advisor:
                 for k, v in mapping.items()
             ):
                 raise AdvisorError("a Steam app ID is a whole number below 2147483648")
+        if "aiProvider" in values and values["aiProvider"] not in ("", *ai.PROVIDERS):
+            raise AdvisorError("unknown AI provider")
+        if "aiModel" in values and (not isinstance(values["aiModel"], str) or len(values["aiModel"]) > 120):
+            raise AdvisorError("the model is a name from the provider's list")
+        if "aiDailyCap" in values:
+            cap = values["aiDailyCap"]
+            if not isinstance(cap, int) or isinstance(cap, bool) or not 0 <= cap <= 1000:
+                raise AdvisorError("the daily limit is 0 to 1000 requests")
+        if values.get("aiProvider", current["aiProvider"]) != current["aiProvider"]:
+            values = {**values, "aiModel": values.get("aiModel", "")}  # a new provider needs its own model
         merged = {**current, **values}
         os.makedirs(os.path.dirname(self._settings_path), exist_ok=True)
         atomic_write_json(self._settings_path, merged)
@@ -152,9 +173,13 @@ class Advisor:
             "steamAppid": steam_appid,
             "mapping": how,
             "manifestTitle": found.get("manifestTitle"),
+            # Read from Steam's own files by discovery, shown beside the advice and never changed (P16).
+            "launchOptions": compat.clean(found.get("launchOptions")),
+            "compatTool": compat.clean(found.get("compatTool")),
         }
         with self._lock:
             self.game = game
+            self.ai_result = None
         self.load_reports(force)
 
     def _cache_key(self, game: dict[str, Any]) -> str:
@@ -205,16 +230,113 @@ class Advisor:
         game = self.game or {}
         low = bool(game.get("shortcut") and not game.get("steamAppid"))
         reports = self.reports if self.game else []
-        return recommend.build(
-            reports, self.profiles, self.tools, self.device, self.selected(), self.settings()["workload"], low
+        selected = self.selected()
+        recs = recommend.build(
+            reports, self.profiles, self.tools, self.device, selected, self.settings()["workload"], low
         )
+        for rec in recs:
+            rec["launch"] = compat.launch_section(
+                (rec.get("compat") or {}).get("launch_options"),
+                game.get("launchOptions"),
+                selected,
+                bool(game.get("shortcut")),
+            )
+        return recs
+
+    def proton(self, recs: list[dict[str, Any]]) -> dict[str, Any] | None:
+        """Proton advice in the spec's signal order: peer (not yet), reports, newest installed GE-Proton."""
+        game = self.game or {}
+        if not self.game:
+            return None
+        reports = [r for r in recs if r.get("source") == "deckverified"]
+        return compat.proton_section(
+            reports, game.get("compatTool"), bool(game.get("shortcut")), self._installed_tools()
+        )
+
+    # AI (button-triggered only, P18)
+
+    def list_models(self, provider_id: str) -> list[dict[str, str]]:
+        """Blocking."""
+        provider = self.ai_providers.get(provider_id)
+        if provider is None:
+            raise AdvisorError("pick a provider first")
+        key = self._ai_key(provider_id)
+        if not key:
+            raise AdvisorError(f"add your {provider.name} API key first")
+        try:
+            return provider.list_models(key)
+        except ai.AiError as exc:
+            raise AdvisorError(exc.hint) from exc
+
+    def generate_ai(self) -> dict[str, Any]:
+        """Blocking. One request to the chosen provider; never raises, the result says what happened."""
+        settings = self.settings()
+        provider_id, model = settings["aiProvider"], settings["aiModel"]
+        result: dict[str, Any] = {
+            "label": ai.LABEL,
+            "provider": provider_id,
+            "model": model,
+            "rec": None,
+            "discarded": [],
+            "error": None,
+        }
+        try:
+            provider = self.ai_providers.get(provider_id)
+            if provider is None:
+                raise ai.AiError("Choose an AI provider in Advisor settings first.")
+            if not model:
+                raise ai.AiError("Load the model list and pick a model first.")
+            key = self._ai_key(provider_id)
+            if not key:
+                raise ai.AiError(f"Add your {provider.name} API key first.")
+            if self.game is None:
+                raise ai.AiError("Choose a game first.")
+            cap = settings["aiDailyCap"]
+            if cap and self.ai_usage.today() >= cap:
+                raise ai.AiError(
+                    f"Today's limit of {cap} AI requests is reached. Raise it in Advisor settings or try tomorrow."
+                )
+            selected = self.selected()
+            body = ai.payload(
+                self.game["name"], self.device, selected, {t["id"]: t["name"] for t in self.tools.tools}, self.reports
+            )
+            self.ai_usage.count()
+            data = ai.parse_reply(provider.generate(key, model, ai.prompt(body)))
+            rec, discarded = ai.to_recommendation(data, self.device)
+            final = recommend.translate(
+                recommend.validate(rec, self.device, selected), self.tools, self.device, selected
+            )
+            final["launch"] = compat.launch_section(
+                final["compat"].get("launch_options"),
+                self.game.get("launchOptions"),
+                selected,
+                bool(self.game.get("shortcut")),
+            )
+            result.update(rec=final, discarded=discarded)
+        except ai.AiError as exc:
+            result["error"] = exc.hint
+        with self._lock:
+            self.ai_result = result
+        return result
 
     # Views
 
     def view(self) -> dict[str, Any]:
         selected = self.selected()
         names = {t["id"]: t["name"] for t in self.tools.tools}
+        recs = self.recommendations()
+        game = self.game or {}
         return {
+            "current": current.read(selected, self.detected, self.decky_home, self.user_home, game.get("appid")),
+            "proton": self.proton(recs),
+            "ai": {
+                "providers": [
+                    {"id": pid, "name": p.name, "keySet": bool(self._ai_key(pid))}
+                    for pid, p in self.ai_providers.items()
+                ],
+                "usedToday": self.ai_usage.today(),
+                "result": self.ai_result,
+            },
             "settings": self.settings(),
             "device": {
                 "id": self.device["id"],
@@ -239,7 +361,7 @@ class Advisor:
             "game": self.game,
             "source": self.source_state,
             "anticheat": self.ac_state,
-            "recommendations": self.recommendations(),
+            "recommendations": recs,
             "attribution": [deckverified.ATTRIBUTION, anticheat.ATTRIBUTION],
         }
 

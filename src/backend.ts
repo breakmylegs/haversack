@@ -613,6 +613,28 @@ export interface AdvisorRecommendation {
   flags: string[];
   compat: { proton: string | null; launch_options: string | null };
   notes: string;
+  launch?: {
+    recommended: string;
+    current: string;
+    where: string;
+    flags: string[];
+    merged: string | null;
+    mergeNotes: string[];
+    sameAsCurrent: boolean;
+  } | null;
+}
+
+export interface AdvisorProton {
+  recommended: string;
+  force: boolean;
+  signal: "report" | "installed";
+  signalText: string;
+  installNote: string | null;
+  current: string;
+  matches: boolean;
+  where: string;
+  asReported: string;
+  peer: string;
 }
 
 export interface AdvisorView {
@@ -624,6 +646,19 @@ export interface AdvisorView {
     sourceAntiCheat: boolean;
     steamIdOverrides: Record<string, number>;
     stackOverrides: Record<string, string>;
+    aiProvider: "" | "anthropic" | "openai" | "gemini";
+    aiModel: string;
+    aiDailyCap: number;
+  };
+  current?: {
+    power: { tdp_w: number | null; scope: string; note: string | null; tool: string; preset?: string | null } | null;
+    framegen: { profile: string | null; multiplier: number | null; tool: string } | null;
+  };
+  proton?: AdvisorProton | null;
+  ai?: {
+    providers: { id: "anthropic" | "openai" | "gemini"; name: string; keySet: boolean }[];
+    usedToday: number;
+    result: { label: string; provider: string; model: string; rec: AdvisorRecommendation | null; discarded: string[]; error: string | null } | null;
   };
   device?: { id: string; name: string; apu: string; how: "detected" | "override" | "generic"; generic: boolean; verified: boolean };
   devices?: { id: string; name: string }[];
@@ -643,6 +678,8 @@ export interface AdvisorView {
     steamAppid: number | null;
     mapping: "steam" | "manifest" | "manual" | "name";
     manifestTitle?: string | null;
+    launchOptions?: string;
+    compatTool?: string;
   } | null;
   source?: { enabled: boolean; cached: boolean; error: string | null; fetchedAt: number | null };
   anticheat?: {
@@ -659,3 +696,10 @@ export const advisorSelectGame = callable<[appid: number], AdvisorView>("advisor
 export const advisorRefresh = callable<[], AdvisorView>("advisor_refresh");
 export const advisorRedetect = callable<[], AdvisorView>("advisor_redetect");
 export const advisorSettings = callable<[values: Record<string, unknown>], AdvisorView>("advisor_settings");
+
+export const advisorAiModels = callable<[provider: string], { id: string; label: string }[]>("advisor_ai_models");
+export const advisorAiGenerate = callable<[], AdvisorView>("advisor_ai_generate");
+// AI keys are kept with the backend secrets; only whether one is set comes back.
+export const saveAiKey = callable<[kind: "anthropic" | "openai" | "gemini", values: { apiKey: string }], { configured: boolean }>(
+  "set_backend_config",
+);

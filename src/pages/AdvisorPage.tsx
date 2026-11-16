@@ -2,6 +2,8 @@ import { DialogButton, DropdownItem, Field, Focusable, Navigation, TextField } f
 import { addEventListener, removeEventListener, toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import {
+  advisorAiGenerate,
+  advisorAiModels,
   advisorRedetect,
   advisorRefresh,
   advisorSelectGame,
@@ -11,6 +13,7 @@ import {
   AdvisorView,
   discoverGames,
   GameEntry,
+  saveAiKey,
 } from "../backend";
 
 // Advisor is read-only (P16, ADR-0019): this page shows advice and copies text. It never changes a setting.
@@ -79,16 +82,35 @@ function Recommendation({ rec }: { rec: AdvisorRecommendation }) {
           </div>
         ))}
         {rec.notes && <div style={{ opacity: 0.8 }}>{rec.notes}</div>}
-        {rec.compat.launch_options && (
+        {rec.launch && (
           <div style={{ marginTop: 4 }}>
-            Launch options from the report: <code>{rec.compat.launch_options}</code>
+            <div>
+              Launch options: <code>{rec.launch.recommended}</code>
+            </div>
+            {rec.launch.sameAsCurrent && <div>These match what you already have.</div>}
+            {rec.launch.merged && (
+              <div>
+                Combined with yours: <code>{rec.launch.merged}</code> {rec.launch.mergeNotes.join(" ")}
+              </div>
+            )}
+            {rec.launch.flags.map((flag) => (
+              <div key={flag} style={{ color: "#e5b33a" }}>
+                {flag}
+              </div>
+            ))}
+            <div style={{ opacity: 0.8 }}>Set them yourself in {rec.launch.where}.</div>
           </div>
         )}
       </div>
       <Focusable style={{ display: "flex", gap: 8, marginTop: 4 }}>
-        {rec.compat.launch_options && (
-          <DialogButton style={{ width: "auto" }} onClick={() => void copyText(rec.compat.launch_options ?? "")}>
+        {rec.launch && !rec.launch.sameAsCurrent && (
+          <DialogButton style={{ width: "auto" }} onClick={() => void copyText(rec.launch?.recommended ?? "")}>
             Copy launch options
+          </DialogButton>
+        )}
+        {rec.launch?.merged && (
+          <DialogButton style={{ width: "auto" }} onClick={() => void copyText(rec.launch?.merged ?? "")}>
+            Copy combined
           </DialogButton>
         )}
         {rec.source_url && (
@@ -98,6 +120,98 @@ function Recommendation({ rec }: { rec: AdvisorRecommendation }) {
         )}
       </Focusable>
     </Field>
+  );
+}
+
+// Optional AI advice (P18): off until a provider is chosen and its key added. Asked only from the button, shown
+// as unverified, never acted on. The key goes to Keepsake's backend secrets and never comes back to this page.
+function AiSection({ view, busy, act }: { view: AdvisorView; busy: boolean; act: (work: () => Promise<AdvisorView>) => Promise<void> }) {
+  const [key, setKey] = useState("");
+  const [models, setModels] = useState<{ id: string; label: string }[]>([]);
+  const settings = view.settings;
+  const ai = view.ai;
+  if (!settings || !ai) return null;
+  const provider = ai.providers.find((p) => p.id === settings.aiProvider);
+
+  const saveKey = async () => {
+    if (!provider) return;
+    try {
+      await saveAiKey(provider.id, { apiKey: key.trim() });
+      setKey("");
+      await act(advisorView);
+      toaster.toast({ title: "Keepsake", body: `${provider.name} key saved.` });
+    } catch (err) {
+      toaster.toast({ title: "Keepsake", body: String(err) });
+    }
+  };
+
+  const loadModels = async () => {
+    if (!provider) return;
+    try {
+      setModels(await advisorAiModels(provider.id));
+    } catch (err) {
+      toaster.toast({ title: "Keepsake", body: String(err) });
+    }
+  };
+
+  return (
+    <>
+      <DropdownItem
+        label="AI advice (optional)"
+        description="Uses your own key. Sends only the game's title, your device's hardware, your tools and the settings shown above."
+        rgOptions={[{ data: "", label: "Off" }, ...ai.providers.map((p) => ({ data: p.id, label: p.name }))]}
+        selectedOption={settings.aiProvider}
+        disabled={busy}
+        onChange={(option) => void act(() => advisorSettings({ aiProvider: option.data }))}
+      />
+      {provider && !provider.keySet && (
+        <Field label={`${provider.name} API key`} childrenLayout="below">
+          <TextField value={key} bIsPassword disabled={busy} onChange={(e) => setKey(e.target.value)} />
+          <DialogButton style={{ width: "auto", marginTop: 4 }} disabled={busy || !key.trim()} onClick={() => void saveKey()}>
+            Save key
+          </DialogButton>
+        </Field>
+      )}
+      {provider?.keySet && (
+        <>
+          <Focusable style={{ display: "flex", gap: 8, margin: "4px 0" }}>
+            <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void loadModels()}>
+              Load models
+            </DialogButton>
+            <DialogButton
+              style={{ width: "auto" }}
+              disabled={busy || !settings.aiModel || !view.game}
+              onClick={() => void act(advisorAiGenerate)}
+            >
+              Ask {provider.name}
+            </DialogButton>
+          </Focusable>
+          {models.length > 0 && (
+            <DropdownItem
+              label="Model"
+              rgOptions={models.map((m) => ({ data: m.id, label: m.label }))}
+              selectedOption={settings.aiModel}
+              disabled={busy}
+              onChange={(option) => void act(() => advisorSettings({ aiModel: option.data }))}
+            />
+          )}
+          <Field
+            label={settings.aiModel ? `Model: ${settings.aiModel}` : "No model chosen yet"}
+            description={`${ai.usedToday} of ${settings.aiDailyCap || "unlimited"} requests used today.`}
+          />
+        </>
+      )}
+      {ai.result?.error && <Field label="AI advice" description={ai.result.error} />}
+      {ai.result?.rec && (
+        <>
+          <Field
+            label={`${ai.result.label}: ${ai.result.provider}, ${ai.result.model}`}
+            description={ai.result.discarded.length ? `Left out because they did not fit: ${ai.result.discarded.join("; ")}.` : "Checked against your device."}
+          />
+          <Recommendation rec={ai.result.rec} />
+        </>
+      )}
+    </>
   );
 }
 
@@ -232,6 +346,24 @@ export function AdvisorPage() {
           </DialogButton>
         </Field>
       )}
+      {view.proton && (
+        <Field
+          label={`Proton: ${view.proton.recommended}${view.proton.matches ? " (already set)" : ""}`}
+          description={`${view.proton.signalText}${view.proton.asReported ? ` Reported as ${view.proton.asReported}.` : ""} You have ${view.proton.current}. ${view.proton.matches ? "" : `To change it: ${view.proton.where}.`} ${view.proton.installNote ?? ""} ${view.proton.peer}`}
+        />
+      )}
+      {view.current?.power && (
+        <Field
+          label={`Your ${view.stack?.names[view.current.power.tool] ?? view.current.power.tool} setting: ${view.current.power.tdp_w ?? "off"}${view.current.power.tdp_w ? " W" : ""}`}
+          description={`From its ${view.current.power.scope}.${view.current.power.note ? ` ${view.current.power.note}` : ""}`}
+        />
+      )}
+      {view.current?.framegen && (
+        <Field
+          label={`Your lsfg-vk profile: ${view.current.framegen.profile ?? "none for this game"}`}
+          description={view.current.framegen.multiplier ? `Multiplier ${view.current.framegen.multiplier}x.` : "No frame generation set for this game."}
+        />
+      )}
       {view.anticheat?.entry && (
         <Field
           label={`Anti-cheat: ${view.anticheat.entry.status}`}
@@ -242,6 +374,7 @@ export function AdvisorPage() {
       {(view.recommendations ?? []).map((rec, i) => (
         <Recommendation key={`${rec.source}-${rec.source_url}-${i}`} rec={rec} />
       ))}
+      <AiSection view={view} busy={busy} act={act} />
       <Field label="Sources" description={(view.attribution ?? []).join(" ")} />
     </div>
   );

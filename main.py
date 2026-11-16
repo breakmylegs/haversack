@@ -125,6 +125,12 @@ class Plugin:
     async def advisor_settings(self, values: dict[str, Any]) -> dict[str, Any]:
         return await self.app.advisor_settings(values)
 
+    async def advisor_ai_models(self, provider: str) -> list[dict[str, str]]:
+        return await self.app.advisor_ai_models(provider)
+
+    async def advisor_ai_generate(self) -> dict[str, Any]:
+        return await self.app.advisor_ai_generate()
+
     async def installer_status(self) -> dict[str, Any]:
         return await self.app.installer_status()
 

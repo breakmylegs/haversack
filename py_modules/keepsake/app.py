@@ -34,6 +34,7 @@ from . import (
     steamcloud,
 )
 from .advisor import anticheat, deckverified
+from .advisor import compat as advisor_compat
 from .advisor.service import Advisor, AdvisorError
 from .auth import GOOGLE, AuthError, DeviceCodeFlow, TokenManager, TokenStore
 from .backends import BackendConfigError, CredentialStore
@@ -197,6 +198,8 @@ class KeepsakeApp:
                 self._advisor_map_game,
                 fetch_reports=lambda appid, name: deckverified.fetch(appid, name, self._fetch),
                 anticheat_fetch=lambda: anticheat.download(self._fetch),
+                installed_tools=lambda: advisor_compat.installed_ge_proton(discovery.steam_roots(self.home)),
+                ai_key=lambda provider: str(self.credentials.load(provider)["apiKey"]),
             )
             await asyncio.to_thread(advisor.detect)
             self.advisor = advisor
@@ -315,7 +318,12 @@ class KeepsakeApp:
             game = next((g for g in discovery.discover(self.home)["games"] if g["appid"] == appid), None)
         if game is None:
             return {"name": "", "kind": "unknown"}  # not in the Games list: general advice only, nothing looked up
-        out: dict[str, Any] = {"name": game["name"], "kind": game["kind"]}
+        out: dict[str, Any] = {
+            "name": game["name"],
+            "kind": game["kind"],
+            "launchOptions": game.get("launch_options") or "",
+            "compatTool": game.get("compat_tool") or "",
+        }
         if game["kind"] == "steam":
             out["steamAppid"] = appid
             return out
@@ -1996,6 +2004,20 @@ class KeepsakeApp:
 
     async def advisor_redetect(self) -> dict[str, Any]:
         await asyncio.to_thread(self._the_advisor().detect)
+        return await self.advisor_view()
+
+    async def advisor_ai_models(self, provider: str) -> list[dict[str, str]]:
+        try:
+            return await asyncio.to_thread(self._the_advisor().list_models, str(provider))
+        except AdvisorError as exc:
+            raise ValueError(str(exc)) from exc
+
+    async def advisor_ai_generate(self) -> dict[str, Any]:
+        """Button only (P18): one request to the chosen provider with the minimal payload."""
+        result = await asyncio.to_thread(self._the_advisor().generate_ai)
+        log_event(
+            logging.INFO, "advisor.ai", "AI advice requested", provider=result["provider"], ok=result["error"] is None
+        )
         return await self.advisor_view()
 
     async def advisor_settings(self, values: dict[str, Any]) -> dict[str, Any]:

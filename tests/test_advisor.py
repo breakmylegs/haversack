@@ -424,6 +424,8 @@ def test_the_app_maps_a_shortcut_through_the_manifest_steam_id(tmp_path):
     assert mapped == {
         "name": "Example Quest",
         "kind": "shortcut",
+        "launchOptions": "",
+        "compatTool": "",
         "manifestTitle": "Example Quest",
         "steamAppid": 1999999103,
     }
