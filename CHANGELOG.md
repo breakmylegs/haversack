@@ -2,6 +2,19 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [0.22.1]
+
+Fixes Keepsake not starting at all on some devices.
+
+### Fixed
+
+- On Decky builds whose Python has no XML module, Keepsake's backend failed to start. Updates stayed on "Checking" with no version shown, and Games, the manifest update and shortcuts never loaded. Keepsake now starts normally there. Only WebDAV and S3 need the XML module, and they say so clearly if it is missing.
+
+### Added
+
+- Diagnostics, "Python modules in this Decky build": lists any module this Decky build lacks and what it stops.
+- Troubleshooting: what to do when Updates stays on "Checking", and how to read Decky's journal.
+
 ## [0.22.0]
 
 Keepsake v2 begins: Keepsake is now one plugin with modules. This release adds the Installer module and the module framework, alongside save sync, which works as before.

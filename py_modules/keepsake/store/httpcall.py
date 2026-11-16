@@ -8,12 +8,31 @@ allowlist is refused at once and never retried.
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import time
-import xml.etree.ElementTree as ElementTree
 from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING
 
 from .. import net
 from .base import StoreError, StoreUnavailable
+
+if TYPE_CHECKING:
+    import xml.etree.ElementTree as ElementTree
+
+# Decky's frozen Python only bundles the stdlib modules Decky Loader itself imports, and it imports no `xml`.
+# So `xml` is imported only where WebDAV and S3 read a listing, never at start-up (ADR-0030).
+XML_MISSING = (
+    "WebDAV and S3 are not supported by this Decky build: its Python has no XML module. "
+    "Use OneDrive, Google Drive or the local store."
+)
+
+
+def xml_available() -> bool:
+    try:
+        return importlib.util.find_spec("xml.etree.ElementTree") is not None
+    except (ImportError, ValueError):
+        return False
+
 
 MAX_RETRIES = 4
 MAX_RETRY_AFTER = 30.0
@@ -63,6 +82,10 @@ def parse_xml(body: bytes, what: str) -> ElementTree.Element:
     expansion and external entity attacks ``defusedxml`` guards against; the
     body is also size-capped by the transport. Stdlib only (principle 9).
     """
+    try:
+        import xml.etree.ElementTree as ElementTree  # lazy: Decky may not bundle xml (ADR-0030)
+    except ImportError as exc:
+        raise StoreError(XML_MISSING) from exc
     head = body[:4096].lower()
     if b"<!doctype" in head or b"<!entity" in body.lower():
         raise StoreError(f"the {what} sent XML with a document type declaration; refused")

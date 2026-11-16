@@ -17,6 +17,18 @@ Start with Keepsake, Diagnostics, **Run checks**. Each check says what is wrong 
 | Update refused: "not signed" or "signature is not valid" | A release key is pinned and the release does not carry a valid signature | Do not install it; report it on the repository's Issues page |
 | Update refused while syncing | Updates wait for sync jobs and open game sessions | Use "Update when idle", or quit the game |
 | Settings are read-only ("safe mode") | You went back to an older version than the one that wrote the settings | Update Keepsake from the Updates page |
+| Updates stuck on "Checking", no installed version shown, and Games, the manifest update or shortcuts never load | Keepsake's backend did not start, so the page waits for answers that never come. The usual cause is a Python module missing from this Decky build | Read Decky's journal (below). If it names a missing module, install the latest Keepsake from the install link and report the module name on the repository's Issues page |
+| Diagnostics, "Python modules in this Decky build" warns about `xml` | Decky's Python on this device has no XML module | Save sync is fine with OneDrive, Google Drive or the local store. WebDAV and S3 need it, so choose another cloud |
+
+## Reading Decky's journal
+
+When Keepsake's page loads but nothing answers (Updates stays on "Checking" and no installed version is shown), its backend failed to start. Decky records why in the system journal.
+
+1. Open a terminal: Desktop Mode's Konsole, or SSH from another computer (`ssh deck@<address>`).
+2. Run `journalctl -u plugin_loader -b` to see this boot's Decky messages. Add `--no-pager | grep -i -A5 keepsake` to show only Keepsake's lines, or `-f` to follow it live while you open Keepsake.
+3. Look for a `Traceback` near `Keepsake`. The last line says what failed, for example `ModuleNotFoundError: No module named 'xml.etree'`.
+
+Decky runs plugins with its own built-in Python, which only includes the standard modules Decky itself uses. Keepsake imports anything else only inside the feature that needs it, so a missing module switches that feature off instead of stopping the backend (ADR-0030). If the journal shows a missing module anyway, that is a Keepsake bug: report the line on the repository's Issues page. Installing the latest release from the install link (see the README) is the fix once it is out.
 
 ## Getting details off the device
 

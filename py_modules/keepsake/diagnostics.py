@@ -98,6 +98,10 @@ def environment() -> dict[str, Any]:
         },
         "modules": {
             "sqlite3": _module_info("sqlite3", "sqlite_version"),
+            # Not bundled by every Decky build (ADR-0030): each is imported only by the feature that needs it.
+            "xml": _module_info("xml.etree.ElementTree"),
+            "tomllib": _module_info("tomllib"),
+            "resource": _module_info("resource"),
             "ssl": {"available": True, "version": ssl.OPENSSL_VERSION},
             "aiohttp": _module_info("aiohttp", "__version__"),
             "certifi": _module_info("certifi", "__version__"),

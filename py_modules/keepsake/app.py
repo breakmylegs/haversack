@@ -56,8 +56,9 @@ from .procs import find_game_processes
 from .settings import SettingsStore
 from .snapshot import SnapshotError, content_hash, scan_entries
 from .statedb import StateDB, StateError, open_db
+from .statedb import sqlite_available as statedb_sqlite_available
 from .steamops import SteamOps
-from .store import AlreadyExistsError, LocalFolderStore, Store, StoreError
+from .store import AlreadyExistsError, LocalFolderStore, Store, StoreError, httpcall
 from .store.gdrive import GoogleDriveStore
 from .store.graph import GraphStore
 from .store.s3 import S3Store
@@ -795,12 +796,16 @@ class KeepsakeApp:
         return GoogleDriveStore(self.google_tokens, transport=self._google_transport)
 
     def _webdav(self) -> WebDavStore:
+        if not httpcall.xml_available():
+            raise StoreError(httpcall.XML_MISSING)
         c = self.credentials.load("webdav")
         if not self.credentials.configured("webdav"):
             raise StoreError("enter the WebDAV address, user name and password first")
         return WebDavStore(c["url"], c["username"], c["password"], transport=self._endpoint_transport(c["url"]))
 
     def _s3(self) -> S3Store:
+        if not httpcall.xml_available():
+            raise StoreError(httpcall.XML_MISSING)
         c = self.credentials.load("s3")
         if not self.credentials.configured("s3"):
             raise StoreError("enter the S3 endpoint, bucket and access key first")
@@ -1664,6 +1669,8 @@ class KeepsakeApp:
             "mismatches": [names.get(k, "Unreadable mismatch record") for k in mismatches],
             "manifest": await asyncio.to_thread(self.manifest.status),
             "ludusavi": await asyncio.to_thread(health.detect_decky_plugin, os.environ.get("DECKY_HOME"), "ludusavi"),
+            "pythonModules": {"xml": httpcall.xml_available(), "sqlite3": statedb_sqlite_available()},
+            "store": self.settings.get("snapshotStore"),
         }
         return health.run(facts)
 

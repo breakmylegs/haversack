@@ -163,7 +163,37 @@ def run(facts: Mapping[str, Any]) -> list[dict[str, Any]]:
     )
     checks.append(_manifest(facts.get("manifest") or {}, now))
     checks.append(_ludusavi(facts.get("ludusavi") or {}, bool(games)))
+    checks.append(_python_modules(facts.get("pythonModules") or {}, str(facts.get("store") or "")))
     return checks
+
+
+def _python_modules(modules: Mapping[str, Any], store: str) -> dict[str, Any]:
+    """Stdlib modules Decky's frozen Python may leave out (ADR-0030), in words: what each missing one stops."""
+    label = "Python modules in this Decky build"
+    missing = []
+    if modules.get("xml") is False:
+        missing.append("xml (needed for WebDAV and S3)")
+    if modules.get("sqlite3") is False:
+        missing.append("sqlite3 (needed for the Installer and the module state)")
+    if not missing:
+        return _check("python-modules", label, OK, "Everything Keepsake uses is present.")
+    if store in ("webdav", "s3") and modules.get("xml") is False:
+        return _check(
+            "python-modules",
+            label,
+            FAIL,
+            "This Decky build's Python has no XML module, so WebDAV and S3 cannot work. "
+            "Choose OneDrive, Google Drive or the local store in Settings.",
+            missing,
+        )
+    return _check(
+        "python-modules",
+        label,
+        WARN,
+        "Some features are not available with this Decky build. Save sync with OneDrive, Google Drive or "
+        "the local store still works.",
+        missing,
+    )
 
 
 def _manifest(status: Mapping[str, Any], now: float) -> dict[str, Any]:
