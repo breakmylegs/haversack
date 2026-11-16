@@ -2,11 +2,14 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
-## [Unreleased]
+## [0.24.0]
+
+Import every game's save backups at once, games that need your approval at the top of the Games list, setup buttons clear of the Gaming Mode footer, and PCGamingWiki in Advisor.
 
 ### Added
 
 - Import saves, "Import every game": after Read folder, import the latest backup of every game, or all backups of every game, in one go. It shows how many games and backups each will import. It shows "Importing 7 of 42: Game name" as it goes, and can stop between games. One game failing does not stop the rest, and running it again skips what is already imported. It ends with a summary, and games that failed move to the top. Games not on this device or not in the manifest are included, so their backups are ready if you install them later or play them on your other device.
+- Advisor, PCGamingWiki (optional, off by default): which upscalers and frame generation a game supports, with a link to its page. Advisor warns when a report recommends an upscaler the wiki does not list. It needs your own PCGamingWiki bot password, which stays on the device.
 
 ### Changed
 
@@ -16,10 +19,6 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 ### Fixed
 
 - Setup: the Back, Continue and Skip setup buttons could sit under Gaming Mode's footer bar after a long game list. They now also appear at the top of every step, and the page ends clear of the footer.
-
-### Added
-
-- Advisor, PCGamingWiki (optional, off by default): which upscalers and frame generation a game supports, with a link to its page. Advisor warns when a report recommends an upscaler the wiki does not list. It needs your own PCGamingWiki bot password, which stays on the device.
 
 ## [0.23.0]
 
