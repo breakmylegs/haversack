@@ -660,6 +660,7 @@ export interface AdvisorView {
     workload: "light" | "medium" | "heavy";
     sourceDeckVerified: boolean;
     sourceAntiCheat: boolean;
+    sourcePcgw: boolean;
     steamIdOverrides: Record<string, number>;
     stackOverrides: Record<string, string>;
     aiProvider: "" | "anthropic" | "openai" | "gemini";
@@ -703,6 +704,13 @@ export interface AdvisorView {
     error: string | null;
     entry: { name: string; status: string; meaning: string; blocked: boolean; url: string; attribution: string } | null;
   };
+  pcgw?: {
+    enabled: boolean;
+    error: string | null;
+    cached: boolean;
+    data: { page: string; url: string; upscaling: string[]; frameGen: string[]; hdr: string | null; rayTracing: string | null; attribution: string } | null;
+  };
+  pcgwLogin?: boolean;
   recommendations?: AdvisorRecommendation[];
   attribution?: string[];
 }
@@ -717,5 +725,10 @@ export const advisorAiModels = callable<[provider: string], { id: string; label:
 export const advisorAiGenerate = callable<[], AdvisorView>("advisor_ai_generate");
 // AI keys are kept with the backend secrets; only whether one is set comes back.
 export const saveAiKey = callable<[kind: "anthropic" | "openai" | "gemini", values: { apiKey: string }], { configured: boolean }>(
+  "set_backend_config",
+);
+
+// The PCGamingWiki bot login is kept with the backend secrets; only whether it is set comes back.
+export const savePcgwLogin = callable<[kind: "pcgw", values: { username: string; password: string }], { configured: boolean }>(
   "set_backend_config",
 );

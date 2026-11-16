@@ -20,6 +20,7 @@ import {
 } from "../backend";
 import { SYNC_LABELS } from "../format";
 import { GameDetail } from "./GameDetail";
+import { askApproveMatch } from "../matchApproval";
 
 type Filter = "enabled" | "shortcuts" | "steam" | "all";
 
@@ -115,13 +116,15 @@ export function GamesPage() {
   const [progress, setProgress] = useState<ManifestProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [order, setOrder] = useState<string[]>([]);
 
   const scan = async (refresh: boolean) => {
     setScanning(true);
     try {
       setResult(await discoverGames(refresh));
-      const list = await matchGames();
+      const list = await matchGames(); // already in attention order (backend ordering.py)
       setMatches(Object.fromEntries(list.map((m) => [m.key, m])));
+      setOrder(list.map((m) => m.key));
       setStatus(await manifestStatus());
       setError(null);
     } catch (err) {
@@ -191,12 +194,18 @@ export function GamesPage() {
   // Steam apps are off by default because Steam Cloud covers them (build prompt section 14).
   const filters = (Object.keys(FILTER_LABELS) as Filter[]).filter((f) => showSteam || f !== "steam");
   const visible = (result?.games ?? []).filter((g) => showSteam || g.kind === "shortcut");
-  const games = visible.filter((g) => {
-    if (filter === "enabled") return matches[g.key]?.enabled;
-    if (filter === "shortcuts") return g.kind === "shortcut";
-    if (filter === "steam") return g.kind === "steam";
-    return true;
-  });
+  // Needs approval first, then prefix mismatch, conflict, quarantined, then by name: the backend's order,
+  // kept under every filter. Games not matched yet go last.
+  const rank = new Map(order.map((key, i) => [key, i]));
+  const games = visible
+    .filter((g) => {
+      if (filter === "enabled") return matches[g.key]?.enabled;
+      if (filter === "shortcuts") return g.kind === "shortcut";
+      if (filter === "steam") return g.kind === "steam";
+      return true;
+    })
+    .sort((a, b) => (rank.get(a.key) ?? Infinity) - (rank.get(b.key) ?? Infinity));
+  const waiting = order.filter((key) => matches[key]?.proposal);
 
   const crossCheck = async (game: GameEntry) => {
     const outcome = await checkRunningPrefix(game.key);
@@ -259,11 +268,16 @@ export function GamesPage() {
       )}
       {error && <Field label="Scan failed" description={error} />}
       {result && result.roots.length === 0 && <Field label="No Steam installation found" />}
-      {Object.values(matches).some((m) => m.proposal) && (
+      {waiting.length > 0 && (
         <Field
-          label={`${Object.values(matches).filter((m) => m.proposal).length} matches need your approval`}
-          description="Keepsake found likely matches it is not certain about. Open each game marked Confirm match to approve or choose another."
-        />
+          label={`${waiting.length} ${waiting.length === 1 ? "match needs" : "matches need"} your approval`}
+          description="Keepsake found likely matches it is not certain about. They are at the top of the list: approve each one there, or review them one by one."
+          childrenLayout="inline"
+        >
+          <DialogButton style={{ width: "auto" }} onClick={() => setSelected(waiting[0])}>
+            Review matches
+          </DialogButton>
+        </Field>
       )}
       {result && (
         <Field
@@ -294,6 +308,17 @@ export function GamesPage() {
             childrenLayout="inline"
           >
             <Focusable style={{ display: "flex", gap: 8 }}>
+              {matches[game.key]?.proposal && (
+                <DialogButton
+                  style={{ width: "auto" }}
+                  onClick={() => {
+                    const proposal = matches[game.key]?.proposal;
+                    if (proposal) askApproveMatch(game.key, game.name, proposal.candidate, () => void scan(false));
+                  }}
+                >
+                  Approve
+                </DialogButton>
+              )}
               <DialogButton style={{ width: "auto" }} onClick={() => setSelected(game.key)}>
                 Open
               </DialogButton>
