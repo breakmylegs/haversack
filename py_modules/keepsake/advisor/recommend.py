@@ -31,6 +31,7 @@ MATCH_LABELS = {
 RECENT = timedelta(days=365)
 FPS_TARGETS = {"light": 60, "medium": 45, "heavy": 30}
 WORKLOADS = tuple(FPS_TARGETS)
+FRAMEGEN_MIN_BASE = 40  # research 6.4: lsfg-vk only from about 40 fps, to avoid visible artefacts
 FSR4_RE = re.compile(r"\b(?:fsr|fidelityfx super resolution)\s*4\b", re.I)
 
 
@@ -167,6 +168,12 @@ def validate(rec: dict[str, Any], device: dict[str, Any], selected: dict[str, st
     if tool and selected.get("framegen") != tool:
         out["frame_gen"]["requires"] = tool
         flags.append(f"Uses frame generation that needs {tool}, which is not in your selected tools.")
+    base = out["display"].get("fps_cap")
+    if tool == "lsfg-vk" and base and base < FRAMEGEN_MIN_BASE:
+        flags.append(
+            f"Frame generation from a base of {base} fps shows visible artefacts. "
+            f"lsfg-vk needs about {FRAMEGEN_MIN_BASE} fps or more to look right."
+        )
 
     out["flags"] = flags
     return out
@@ -211,17 +218,35 @@ def translate(rec: dict[str, Any], tools: Tools, device: dict[str, Any], selecte
     elif display.get("vrr") is False and (device.get("display") or {}).get("vrr"):
         lines["display"].append("Leave Variable Refresh Rate off.")
 
+    # Upscaling order (spec 8.1): the game's own upscaler first, then Steam's scaling filter.
     scaling = rec["scaling"]
     if scaling.get("game_resolution"):
         lines["scaling"].append(f"Set the game resolution to {scaling['game_resolution']}.")
-    if scaling.get("steam_filter"):
-        lines["scaling"].append(f"Set Scaling Filter to {scaling['steam_filter']} in Steam, Performance.")
     upscaler = rec.get("upscaler") or {}
     if upscaler.get("name"):
         mode = f" ({upscaler['mode']})." if upscaler.get("mode") else "."
         lines["scaling"].append(f"In game, use {upscaler['name']}{mode}")
+    elif rec.get("source") == "fallback" and _below_native(scaling.get("game_resolution"), device):
+        lines["scaling"].append(
+            "If the game has its own upscaler (FSR 2 or 3, XeSS or TSR), use it first at your screen's resolution. "
+            "Otherwise use Steam's filter:"
+        )
+    if scaling.get("steam_filter"):
+        lines["scaling"].append(f"Set Scaling Filter to {scaling['steam_filter']} in Steam, Performance.")
 
     fg = rec.get("frame_gen") or {}
+    if rec.get("source") == "fallback" and selected.get("framegen") == "lsfg-vk":
+        base = rec["display"].get("fps_cap")
+        if base and base >= FRAMEGEN_MIN_BASE:
+            lines["frame_gen"].append(
+                f"Use the game's own frame generation if it has one. Otherwise lsfg-vk at 2x works from this base of "
+                f"{base} fps."
+            )
+        elif base:
+            lines["frame_gen"].append(
+                f"Frame generation is not advised: a base of {base} fps is below the {FRAMEGEN_MIN_BASE} fps "
+                "lsfg-vk needs to avoid visible artefacts."
+            )
     if fg.get("tool"):
         fg_tool = tools.tool(fg["tool"])
         phrase = (fg_tool or {}).get("vocabulary", {}).get("framegen") if fg_tool else None
@@ -271,6 +296,15 @@ def battery_lines(rec: dict[str, Any], device: dict[str, Any]) -> list[str]:
 
 
 # Fallback
+
+
+def _below_native(resolution: Any, device: dict[str, Any]) -> bool:
+    display = device.get("display") or {}
+    try:
+        width = int(str(resolution).split("x")[0])
+    except (ValueError, IndexError):
+        return False
+    return bool(display.get("width")) and width < int(display["width"])
 
 
 def render_advice(device: dict[str, Any], workload: str) -> tuple[str | None, str]:

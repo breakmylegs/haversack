@@ -17,7 +17,15 @@ from urllib.parse import urlsplit
 
 from .fsutil import atomic_write_json, read_json
 
-FILES = {"webdav": "webdav.json", "s3": "s3.json", "gdrive": "google-client.json", "steamgriddb": "steamgriddb.json"}
+FILES = {
+    "webdav": "webdav.json",
+    "s3": "s3.json",
+    "gdrive": "google-client.json",
+    "steamgriddb": "steamgriddb.json",
+    "anthropic": "ai-anthropic.json",
+    "openai": "ai-openai.json",
+    "gemini": "ai-gemini.json",
+}
 FIELDS: dict[str, dict[str, str]] = {
     "webdav": {"url": "text", "username": "text", "password": "secret"},
     "s3": {
@@ -31,12 +39,18 @@ FIELDS: dict[str, dict[str, str]] = {
     },
     "gdrive": {"clientId": "text", "clientSecret": "secret"},
     "steamgriddb": {"apiKey": "secret"},
+    "anthropic": {"apiKey": "secret"},
+    "openai": {"apiKey": "secret"},
+    "gemini": {"apiKey": "secret"},
 }
 REQUIRED = {
     "webdav": ("url", "username", "password"),
     "s3": ("endpoint", "bucket", "accessKey", "secretKey"),
     "gdrive": ("clientId", "clientSecret"),
     "steamgriddb": ("apiKey",),
+    "anthropic": ("apiKey",),
+    "openai": ("apiKey",),
+    "gemini": ("apiKey",),
 }
 DEFAULTS: dict[str, dict[str, Any]] = {
     "webdav": {"url": "", "username": "", "password": ""},
@@ -51,8 +65,12 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     },
     "gdrive": {"clientId": "", "clientSecret": ""},
     "steamgriddb": {"apiKey": ""},
+    "anthropic": {"apiKey": ""},
+    "openai": {"apiKey": ""},
+    "gemini": {"apiKey": ""},
 }
 MAX_TEXT = 300
+AI_KINDS = ("anthropic", "openai", "gemini")  # Advisor's optional AI providers (P18): user keys only
 _BUCKET = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 _REGION = re.compile(r"^[a-z0-9-]{1,32}$")
 _PREFIX = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]{0,63})(/[A-Za-z0-9][A-Za-z0-9._-]{0,63}){0,4}$")
@@ -97,6 +115,8 @@ def _validate(kind: str, values: dict[str, Any]) -> dict[str, Any]:
         out["prefix"] = out["prefix"].strip("/")
     if kind == "steamgriddb" and out["apiKey"] and not re.match(r"^[A-Za-z0-9]{16,64}$", out["apiKey"]):
         raise BackendConfigError("a SteamGridDB API key is 16 to 64 letters and digits")
+    if kind in AI_KINDS and out["apiKey"] and not re.match(r"^[A-Za-z0-9._\-]{16,300}$", out["apiKey"]):
+        raise BackendConfigError("an API key is 16 to 300 letters, digits, dots, hyphens or underscores")
     return out
 
 

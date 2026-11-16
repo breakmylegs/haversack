@@ -285,6 +285,16 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 | A145 | The Legion Go reports `sys_vendor` `LENOVO` and `product_name` `83E1`; the Legion Go 2 `83N0` or `83N1` | Lenovo machine types; unverified on Peter's devices until `capture_device.sh` runs (c0-report Q2) | Lenovo PSREF |
 | A146 | Deck Verified answers `game_details?appid=` and `?name=` with `{"reports": [...]}`, 204 when nothing is known, and links each report to a GitHub issue | Tuning Advisor register, unverified from Keepsake | deckverified.games |
 | A147 | The manifest compact index keeps the Steam ID as `s` per game | verified (`manifest.build_index`, slice 4) | Keepsake |
+
+## Advisor II (slice 15)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A148 | Provider request and reply shapes: Anthropic Messages API version 2026-10-21 with `output_config.format`, OpenAI Responses API with strict `json_schema`, Gemini `generateContent` with `responseJsonSchema` | from Tuning Advisor's register (recorded replies), unverified from Keepsake until a real key is tried | Tuning Advisor |
+| A149 | GE-Proton installs as `<steam root>/compatibilitytools.d/GE-Proton<major>-<minor>` | community-documented (ProtonUp-Qt, ProtonPlus), unverified on Peter's devices | |
+| A150 | The tools' settings formats in `current.py` (SimpleDeckyTDP, PowerControl, LeGoTDP, Legion Go 2 Companion, lsfg-vk `conf.toml` version 2) | checked by Tuning Advisor on 26 October 2026 against each tool's source; may drift | Tuning Advisor register item 23 |
+| A151 | lsfg-vk shows visible artefacts below a base of about 40 fps | research 6.4 heuristic, to tune with testing | research |
+
 ## Decky's frozen Python (v0.22.1)
 
 | # | Fact | Status | Source |

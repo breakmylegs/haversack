@@ -4,7 +4,7 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
-Slice 14: the Advisor module, first part.
+Slices 14 and 15: the Advisor module.
 
 ### Added
 
@@ -13,6 +13,13 @@ Slice 14: the Advisor module, first part.
 - Detects your handheld (Legion Go, Legion Go 2, Steam Deck, ROG Ally and others) and your TDP and frame generation tools, and warns when two TDP tools fight. You can choose both by hand.
 - Non-Steam shortcuts are matched to their Steam game through the save manifest, or by a Steam app ID you enter.
 - Anti-cheat status from Are We Anti-Cheat Yet for games that have it.
+- Advisor, Proton: which Proton to use and why (a community report, or for non-Steam games the newest GE-Proton you have installed), next to what the game uses now.
+- Advisor, launch options from reports, explained and combined with your own, with warnings for anything that runs other programs. Copy them, then set them yourself in Steam.
+- Advisor, frame generation and upscaling: the game's own upscaler and frame generation first, and lsfg-vk only when the base frame rate is 40 fps or more.
+- Advisor shows what your TDP tool and lsfg-vk are set to for the game.
+- Advisor is hardened against malformed community reports, anti-cheat entries and AI replies, and never suggests an FSR 4 setting in launch options, wherever it appears.
+- Optional AI advice with your own Anthropic, OpenAI or Gemini key, from a button only, with a daily limit. It sends only the game's title, your device's hardware, your tools and the settings shown.
+
 ## [0.22.1]
 
 Fixes Keepsake not starting at all on some devices.
