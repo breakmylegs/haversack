@@ -26,6 +26,8 @@ Branch `slice/22-installer-2`, stacked on `slice/21-installer-1` (#19). v2 spec 
 
 ## Needs Peter (escalation)
 
+**Update, 16 November 2026:** Peter decided item 1 ("pick the best option"), so the recommendation below was taken and artwork is on. Item 2 still waits for the probe results.
+
 1. **SteamGridDB image host `cdn2.steamgriddb.com`.** The spec allowlists the `www.steamgriddb.com` API, but SteamGridDB serves its images from `cdn2.steamgriddb.com`. That host is outside v2 section 6.2, so adding it is an escalation item.
    - Recommendation: approve it, under the same conditions as the API host (only with a user key and while the Installer is on; the key is never sent to it).
    - Approval is one constant, `artwork.IMAGE_HOST_APPROVED`, plus the CLAUDE.md allowlist line.
@@ -51,7 +53,7 @@ Branch `slice/22-installer-2`, stacked on `slice/21-installer-1` (#19). v2 spec 
 ## Known gaps
 
 - Games that need the disc while playing are not covered, because the disc is released when the install ends.
-- Artwork is off until the image host is approved.
+- Artwork is on since Peter approved the image host on 16 November 2026.
 - There is no Replication hand-off button yet. Replication arrives in slices 17 to 20 and can subscribe to `game_installed`.
 - Everything touching Wine, Proton, Steam and udisks is unverified until the device checks: A135 to A141, plus slice 21's A70 to A76, A85 and A131 to A134.
 

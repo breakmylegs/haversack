@@ -13,7 +13,7 @@ Slice 22: the Installer module, second part.
 - Install, "Remove the installer shortcut" for an install that stopped or was cancelled.
 - Install, "Sync this game's saves" once a game is installed. Other modules are told about new games.
 - Installer health in Settings, Modules: discs left mounted, installer shortcuts left behind, and Steam changes still waiting.
-- SteamGridDB artwork with your own API key is built but switched off. It waits for approval of the SteamGridDB image host.
+- Install, "Add artwork from SteamGridDB": once a game is installed, add its library artwork with your own SteamGridDB API key. Enter the key on the Install page.
 
 ## [0.21.0]
 

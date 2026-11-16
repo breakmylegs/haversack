@@ -1,9 +1,9 @@
 """SteamGridDB artwork with the user's own key (v2 spec 6.2 and 8.3, slice 22, ADR-0027).
 
 The API is ``www.steamgriddb.com`` (allowlisted, only with a user key). The
-images themselves are served from ``cdn2.steamgriddb.com``, which is **not** on
-the allowlist: adding it is an escalation item, so downloads stay off until the
-owner approves it (``IMAGE_HOST_APPROVED``). The key is sent only to the API
+images themselves are served from ``cdn2.steamgriddb.com``, which Peter approved
+on 16 November 2026 (ADR-0027) on the same terms as the API host. The
+``IMAGE_HOST_APPROVED`` switch stays, so it can be turned off again. The key is sent only to the API
 host, never to the image host, and never logged or returned to the frontend.
 
 Images are checked by their first bytes (PNG or JPEG only, which is all
@@ -24,8 +24,8 @@ from .. import net
 API_HOST = "www.steamgriddb.com"
 API = f"https://{API_HOST}/api/v2"
 IMAGE_HOSTS = frozenset({"cdn2.steamgriddb.com"})
-# Escalation (CLAUDE.md section 4): the image host is outside the allowlist until Peter approves it.
-IMAGE_HOST_APPROVED = False
+# Approved by Peter on 16 November 2026 (ADR-0027): only with the user's key and while the Installer is on.
+IMAGE_HOST_APPROVED = True
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 KEY = re.compile(r"^[A-Za-z0-9]{16,64}$")
 # Steam's ELibraryAssetType (verified in @decky/ui 4.16.5 App.d.ts) and the SteamGridDB query for each.

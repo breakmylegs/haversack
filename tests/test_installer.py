@@ -455,9 +455,11 @@ class FakeGrid:
         return net.HttpResponse(200, {})
 
 
-def test_artwork_stays_off_until_the_image_host_is_approved(tmp_path):
+def test_artwork_is_approved_and_the_switch_still_stops_downloads(tmp_path, monkeypatch):
     from keepsake.installer import artwork
 
+    assert artwork.available() is True  # image host approved by Peter, 16 November 2026 (ADR-0027)
+    monkeypatch.setattr(artwork, "IMAGE_HOST_APPROVED", False)
     grid = FakeGrid()
     client = artwork.SteamGridDB(lambda: KEY, grid.fetch, grid.fetch_to_file)
     assert artwork.available() is False
