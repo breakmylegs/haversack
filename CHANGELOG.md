@@ -20,6 +20,19 @@ Slices 14 and 15: the Advisor module.
 - Advisor is hardened against malformed community reports, anti-cheat entries and AI replies, and never suggests an FSR 4 setting in launch options, wherever it appears.
 - Optional AI advice with your own Anthropic, OpenAI or Gemini key, from a button only, with a daily limit. It sends only the game's title, your device's hardware, your tools and the settings shown.
 
+## [0.22.1]
+
+Fixes Keepsake not starting at all on some devices.
+
+### Fixed
+
+- On Decky builds whose Python has no XML module, Keepsake's backend failed to start. Updates stayed on "Checking" with no version shown, and Games, the manifest update and shortcuts never loaded. Keepsake now starts normally there. Only WebDAV and S3 need the XML module, and they say so clearly if it is missing.
+
+### Added
+
+- Diagnostics, "Python modules in this Decky build": lists any module this Decky build lacks and what it stops.
+- Troubleshooting: what to do when Updates stays on "Checking", and how to read Decky's journal.
+
 ## [0.22.0]
 
 Keepsake v2 begins: Keepsake is now one plugin with modules. This release adds the Installer module and the module framework, alongside save sync, which works as before.

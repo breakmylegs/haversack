@@ -294,3 +294,9 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 | A149 | GE-Proton installs as `<steam root>/compatibilitytools.d/GE-Proton<major>-<minor>` | community-documented (ProtonUp-Qt, ProtonPlus), unverified on Peter's devices | |
 | A150 | The tools' settings formats in `current.py` (SimpleDeckyTDP, PowerControl, LeGoTDP, Legion Go 2 Companion, lsfg-vk `conf.toml` version 2) | checked by Tuning Advisor on 26 October 2026 against each tool's source; may drift | Tuning Advisor register item 23 |
 | A151 | lsfg-vk shows visible artefacts below a base of about 40 fps | research 6.4 heuristic, to tune with testing | research |
+
+## Decky's frozen Python (v0.22.1)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A152 | Decky Loader's Python is a PyInstaller build that bundles only the stdlib modules its own code reaches plus `hiddenimports` (`logging.handlers`, `sqlite3`, `http.server`, `socketserver`, `configparser`). `xml`, `tomllib` and `resource` are not proven bundled | verified from `backend/pyinstaller.spec` and the loader's imports on `main` (16 November 2026); `xml` confirmed missing on Peter's Legion Go 2 | Decky Loader source, ADR-0030 |
