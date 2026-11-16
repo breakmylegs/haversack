@@ -170,6 +170,17 @@ Microsoft documentation read on 15 November 2026: device code flow (Entra, updat
 | A127 | `AppDetails.strDisplayName`, `strShortcutExe`, `strShortcutStartDir`, `strLaunchOptions` and `strCompatToolName` reflect a change about 600 ms after the matching setter | field names verified in `@decky/ui` 4.16.5 `App.d.ts`; timing unverified (the executor reports a mismatch rather than assuming success) | |
 | A128 | `sqlite3` with WAL mode works in Decky's embedded Python and on SD-card and internal storage | unverified (A9); without it modules needing state stay off | |
 
+## Installer (slice 21)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A129 | `openFilePicker(select, startPath, includeFiles, includeFolders, filter, extensions, ...)` with `FileSelectionType` `FILE = 0` and `FOLDER = 1` (a type-only const enum, so the numbers are used) | verified in `@decky/api` types | `@decky/api` |
+| A130 | `GetAvailableCompatTools(appId)` returns `CompatibilityTool[]` with `strToolName`; GE-Proton builds are named `GE-Proton<major>-<minor>`, so a numeric descending sort finds the newest | type verified in `@decky/ui` 4.16.5 `App.d.ts`; naming community-documented, unverified on device | `App.d.ts` |
+| A131 | `udisksctl` prints `Mapped file X as /dev/loopN.` and `Mounted /dev/loopN at <path>` | udisks documentation; unverified on device (A85); other wording fails closed with an error | udisks |
+| A132 | Installers see the Linux root as drive `Z:`, so `Z:\home\deck\Games\Title` reaches the library folder | standard Wine behaviour, unverified with Proton on device | Wine |
+| A133 | `STEAM_COMPAT_MOUNTS` makes a path outside the home folder visible inside the Steam Linux Runtime container | community-documented, unverified | research 2.1 |
+| A134 | Steam reports the installer shortcut's exit through the same lifetime notification as games, so the Installer hears it | unverified; "I have finished installing" is the manual fallback | |
+
 ## v2 verification items (slice C0)
 
 Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research.md` that Keepsake will rely on. "TA" means Peter's Tuning Advisor verification register (`decky-plugins/docs/VERIFICATION.md`), reused as evidence with its date and re-checked in the slice named. Types were read in `@decky/ui` 4.16.5 on 15 November 2026.

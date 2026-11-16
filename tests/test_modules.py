@@ -226,7 +226,6 @@ def test_a_failing_module_leaves_saves_working(tmp_path):
     assert {m["name"] for m in status["modules"] if not m["available"]} == {
         "advisor",
         "replication",
-        "installer",
         "desktop",
     }
 

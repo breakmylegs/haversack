@@ -107,6 +107,24 @@ class Plugin:
     async def steam_ops_list(self) -> list[dict[str, Any]]:
         return await self.app.steam_ops_list()
 
+    async def installer_status(self) -> dict[str, Any]:
+        return await self.app.installer_status()
+
+    async def installer_start(self, source: str, title: str) -> dict[str, Any]:
+        return await self.app.installer_start(source, title)
+
+    async def installer_create_shortcut(self, job_id: int, installer_rel: str) -> dict[str, Any]:
+        return await self.app.installer_create_shortcut(job_id, installer_rel)
+
+    async def installer_finished_installing(self, job_id: int) -> dict[str, Any]:
+        return await self.app.installer_finished_installing(job_id)
+
+    async def installer_retarget(self, job_id: int, exe: str) -> dict[str, Any]:
+        return await self.app.installer_retarget(job_id, exe)
+
+    async def installer_cancel(self, job_id: int) -> dict[str, Any]:
+        return await self.app.installer_cancel(job_id)
+
     async def enable_steam_without_cloud(self) -> dict[str, Any]:
         return await self.app.enable_steam_without_cloud()
 
