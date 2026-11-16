@@ -7,6 +7,7 @@ import { agoText, BACKEND_LABELS, HEALTH_COLOURS, HEALTH_LABELS, SYNC_LABELS } f
 import { startLifecycle } from "./lifecycle";
 import { startProbes } from "./probes";
 import { startSteamOps } from "./steamops";
+import { AdvisorQam } from "./pages/AdvisorQam";
 import { KeepsakeRoute } from "./pages/KeepsakeRoute";
 import { SetupWizard } from "./pages/SetupWizard";
 import { ROUTE_PATH, SETUP_PATH } from "./routes";
@@ -68,6 +69,7 @@ function Content() {
   };
 
   return (
+    <>
     <PanelSection title="Status">
       <PanelSectionRow>
         <div style={{ fontSize: 12 }}>
@@ -140,6 +142,8 @@ function Content() {
         </ButtonItem>
       </PanelSectionRow>
     </PanelSection>
+    <AdvisorQam onOpen={() => openRoute(`${ROUTE_PATH}/advisor`)} />
+    </>
   );
 }
 
