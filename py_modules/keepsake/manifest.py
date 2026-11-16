@@ -93,6 +93,11 @@ def game_key(title: str) -> str:
 # Index building
 
 
+def _steam_id(value: Any) -> int | None:
+    """A Steam app ID, or None. ``True`` is an ``int`` in Python but never an app ID."""
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+
+
 def _compact_whens(value: Any) -> list[list[str | None]]:
     out: list[list[str | None]] = []
     if isinstance(value, list):
@@ -113,7 +118,8 @@ def _compact_paths(value: Any) -> list[list[Any]]:
         info = info if isinstance(info, dict) else {}
         raw_tags = info.get("tags")
         tags: list[Any] = raw_tags if isinstance(raw_tags, list) else []
-        code = "".join(sorted({_TAGS[t] for t in tags if t in _TAGS}, key="sc".index))
+        # Only string tags count: a mapping or list here is malformed and must not stop the whole index.
+        code = "".join(sorted({_TAGS[t] for t in tags if isinstance(t, str) and t in _TAGS}, key="sc".index))
         if code:
             out.append([str(path), code, _compact_whens(info.get("when"))])
     return out
@@ -152,14 +158,14 @@ def build_index(lines: Iterable[str], etag: str | None = None) -> dict[str, Any]
         files = _compact_paths(entry.get("files"))
         registry = _compact_paths(entry.get("registry"))
         steam = entry.get("steam") if isinstance(entry.get("steam"), dict) else {}
-        steam_id = steam.get("id") if isinstance(steam.get("id"), int) else None
+        steam_id = _steam_id(steam.get("id"))
         if not files and not registry:
             if steam_id is not None:
                 steam_no_data.append(steam_id)
             continue
         ids = entry.get("id") if isinstance(entry.get("id"), dict) else {}
         steam_extra = ids.get("steamExtra") if isinstance(ids, dict) else None
-        extra = [i for i in steam_extra if isinstance(i, int)] if isinstance(steam_extra, list) else []
+        extra = [i for i in steam_extra if _steam_id(i)] if isinstance(steam_extra, list) else []
         install = entry.get("installDir") if isinstance(entry.get("installDir"), dict) else {}
         cloud = entry.get("cloud") if isinstance(entry.get("cloud"), dict) else {}
         record: dict[str, Any] = {"f": files}

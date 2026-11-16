@@ -2,23 +2,24 @@
 
 The full queue after the v2 consolidation (slice C0). v1 slices come from `docs/build-prompt.md` section 16, amended by `docs/build-prompt-v2.md` section 10. v2 slices come from `docs/build-prompt-v2.md` section 12. Every slice follows the working conventions in `CLAUDE.md`: its own branch, a pull request, a slice report, threat model and assumptions updated, and a stop for Peter's on-device checks.
 
-## Status on 15 November 2026
+## Status on 16 November 2026
+
+Slices 1 to 11, C0, cross-device matching and the stable install link are merged and released in v0.11.0 (#1 to #15). Open:
 
 | Slice | Branch | Pull request | State |
 |---|---|---|---|
-| 1 Skeleton, dev loop, diagnostics | `slice/01-skeleton` | #1 | merged, released in v0.1.0 |
-| 2 Release pipeline and updater | `slice/02-release-updater` | #2 | merged, released in v0.2.0 |
-| Release `--accept-untested` option | `chore/release-accept-untested` | #3 | merged |
-| 3 Discovery | `slice/03-discovery` | #4 | open, awaiting on-device checks |
-| 4 Manifest resolution and preview | `slice/04-manifest` | #5 | open, stacked on #4 |
-| 5 Snapshot engine and safety rails | `slice/05-snapshots-clean` | #6 | open, stacked on #5 |
-| 6 to 8 OneDrive store, sync engine, lifecycle | `slice/06-08-cloud-sync-lifecycle` | #7 | open, stacked on #6 |
-| Cross-device matching (ADR-0011) | `feat/cross-device-matching` | #8 | open, stacked on #7 |
-| Stable `Keepsake.zip` install URL | `feat/stable-latest-link` | #9 | open, based on `main` |
-| C0 Consolidation (documentation only) | `slice/c0-consolidation` | this slice | open, stacked on #8 |
+| 12 Hardening and v1 docs | `slice/12-hardening` | #16 | open, based on `main`; v1.0.0 waits for the release key, the security review sign-off and clean installs |
+| 13 Module framework | `slice/13-module-framework` | #17 | open, stacked on #16 |
+| 14, 15 Advisor | | | blocked: the licence audit needs Peter's sign-off (C0 Q1) |
+| 16 Replication spike | `slice/16-replication-spike` | #18 | in progress, stacked on #17; waits for device measurements and R1 to R3 |
+| 17 to 20 Replication | | | blocked on slice 16's results and ADR-0025 |
+| 21 Installer I | `slice/21-installer-1` | #19 | open, stacked on #17; taken ahead because 14 to 20 are blocked |
+| 22 Installer II | `slice/22-installer-2` | #20 | open, stacked on #19; SteamGridDB image host is an escalation |
+| 23 Desktop I | `slice/23-desktop-1` | #21 | in progress, stacked on #20; step 0 (A79 probe) waits for device runs |
+| 24 Desktop II | | | after 23 |
+| 25 v2 hardening | `slice/25-v2-hardening` | this branch | in progress, based on `main`: parser fuzzing first, the rest after the other slices |
 
-Merge order: #4, #5, #6, #7, #8, C0. #9 can merge at any time.
-
+Merge order: #16, #17, then #18, #19, #20, #21 in order. Retarget each to `main` once its base has merged. The slice 25 branch can merge at any time.
 ## Section 10 amendments: where each is delivered
 
 Spec section 10 applies amendments to v1 slices not yet merged, and moves them to slice 13 for merged slices. Slices 3, 4 and 8 are complete and awaiting on-device checks, but not merged. Reopening them would invalidate checks already prepared, so their amendments are delivered as follows (decision under Peter's delegation; c0-report Q6 lets him reverse it).

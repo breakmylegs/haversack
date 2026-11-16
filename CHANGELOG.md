@@ -2,6 +2,15 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [Unreleased]
+
+Slice 25 (in progress): parser hardening.
+
+### Fixed
+
+- A malformed entry in the Ludusavi manifest could stop the whole game list from loading its save locations. Now only that entry is skipped.
+- Manifest entries with a Steam ID of `true` or `false` are no longer matched to a Steam game.
+
 ## [0.22.0]
 
 Slice 22: the Installer module, second part.
