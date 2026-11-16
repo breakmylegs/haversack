@@ -13,6 +13,7 @@ Stored in the ``core_steam_ops`` table of the state database.
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections.abc import Callable
 from typing import Any
@@ -27,7 +28,10 @@ KINDS = (
     "set-shortcut-exe",
     "set-shortcut-start-dir",
     "set-compat-tool",
+    "remove-shortcut",  # payload: appid; only for a shortcut the module itself created
+    "set-artwork",  # payload: appid, assetType (0 to 3), imageType (png or jpg), file (a staged image's name)
 )
+_STAGED_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 STATES = ("pending", "claimed", "done", "failed")
 CLAIM_TIMEOUT = 120.0  # a claim not completed in this time is offered again (the frontend may have reloaded)
 MIGRATIONS = [
@@ -65,6 +69,12 @@ class SteamOps:
                 raise SteamOpsError("a new shortcut needs a name, exe, start folder and launch options")
         elif kind != "probe" and not isinstance(payload.get("appid"), int):
             raise SteamOpsError("Steam operations need the app ID")
+        if kind == "set-artwork" and (
+            payload.get("assetType") not in (0, 1, 2, 3)
+            or payload.get("imageType") not in ("png", "jpg")
+            or not _STAGED_NAME.match(str(payload.get("file", "")))  # no "/" and no leading dot, so no ".."
+        ):
+            raise SteamOpsError("artwork needs an asset type, a PNG or JPEG and a staged file name")
         now = self.clock()
         self.db.execute(
             "INSERT INTO core_steam_ops (module, kind, payload, state, created, updated) "
@@ -117,8 +127,13 @@ class SteamOps:
         ]
 
     def get(self, op_id: int) -> dict[str, Any] | None:
-        rows = self.db.execute("SELECT id, module, kind, state FROM core_steam_ops WHERE id = ?", (int(op_id),))
-        return {"id": rows[0][0], "module": rows[0][1], "kind": rows[0][2], "state": rows[0][3]} if rows else None
+        rows = self.db.execute(
+            "SELECT id, module, kind, state, payload FROM core_steam_ops WHERE id = ?", (int(op_id),)
+        )
+        if not rows:
+            return None
+        r = rows[0]
+        return {"id": r[0], "module": r[1], "kind": r[2], "state": r[3], "payload": json.loads(r[4])}
 
     def pending_count(self) -> int:
         return int(self.db.execute("SELECT count(*) FROM core_steam_ops WHERE state IN ('pending', 'claimed')")[0][0])

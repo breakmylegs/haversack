@@ -7,6 +7,7 @@ it. Keeping the logic here means it can be tested without Decky.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -41,8 +42,11 @@ from .fsutil import atomic_write_json, read_json
 from .gameconfig import DEFAULT as GAME_DEFAULTS
 from .gameconfig import GameConfigStore, custom_path_from_absolute
 from .importers import ludusavi
-from .installer import udisks
+from .installer import artwork, udisks
+from .installer import files as installer_files
+from .installer.artwork import SteamGridDB
 from .installer.service import Installer, InstallerError
+from .installer.service import health_checks as installer_health_checks
 from .jobs import JobTracker
 from .locks import GameLocks
 from .log import log_event, setup_logging, tail
@@ -80,10 +84,16 @@ FREEZE_TEST_MIN = 1
 FREEZE_TEST_MAX = 10
 SIMULATED_JOB_MAX = 120
 IDLE_EVENT = "keepsake_idle"
+RETARGET_KINDS = ("set-shortcut-name", "set-shortcut-exe", "set-shortcut-start-dir", "set-launch-options")
 
 
 async def _no_emit(event: str, *args: Any) -> None:
     return None
+
+
+def _read_bytes(path: str) -> bytes:
+    with open(path, "rb") as handle:
+        return handle.read()
 
 
 class KeepsakeApp:
@@ -183,7 +193,16 @@ class KeepsakeApp:
         async def installer_start() -> None:
             if self.db is None or self.steam_ops is None:
                 raise RuntimeError("the state database is not available")
-            self.installer = Installer(self.db, self.steam_ops, self._library_root, self._prefix_for)
+            self.installer = Installer(
+                self.db,
+                self.steam_ops,
+                self._library_root,
+                self._prefix_for,
+                home=lambda: discovery.real_home(self.home),
+                running=lambda appid, prefix: bool(find_game_processes(appid, prefix, self.proc_root)),
+                work_dir=os.path.join(self.paths.runtime_dir, "installer"),
+                art=SteamGridDB(lambda: str(self.credentials.load("steamgriddb")["apiKey"])),
+            )
 
         async def installer_stop() -> None:
             self.installer = None
@@ -198,7 +217,7 @@ class KeepsakeApp:
 
         async def installer_health() -> list[dict[str, Any]]:
             ok = udisks.available()
-            return [
+            checks: list[dict[str, Any]] = [
                 {
                     "id": "udisksctl",
                     "label": "ISO support",
@@ -207,6 +226,12 @@ class KeepsakeApp:
                     "items": [],
                 }
             ]
+            if self.installer is None:
+                return checks
+            jobs = await asyncio.to_thread(self.installer.jobs)
+            ops = await asyncio.to_thread(self._ops().list)
+            checks.extend(installer_health_checks(jobs, ops, time.time()))
+            return checks
 
         self.registry.register(
             Module(
@@ -1827,8 +1852,26 @@ class KeepsakeApp:
         log_event(logging.INFO, "steamops.finished", "Steam operation finished", id=int(op_id), ok=bool(ok))
         op = await asyncio.to_thread(self._ops().get, int(op_id))
         if op and op["module"] == "installer" and self.installer:
-            await asyncio.to_thread(self.installer.op_finished, int(op_id), bool(ok), dict(result))
+            job = await asyncio.to_thread(self.installer.op_finished, int(op_id), bool(ok), dict(result))
+            if job and job["state"] == "done" and op["kind"] in RETARGET_KINDS:
+                # Hand-off (slice 22): other modules hear about the new game; the user opts in to each.
+                await self.bus.publish(
+                    "game_installed", {"gameKey": None, "appid": job["appid"], "title": job["title"]}
+                )
+                await self.emit("keepsake_toast", f"{job['title']} is installed. Start it from your library.")
         return {"ok": True}
+
+    async def steam_ops_file(self, op_id: int) -> dict[str, Any]:
+        """The staged image for a claimed artwork operation, base64-encoded for ``SetCustomArtworkForApp``."""
+        op = await asyncio.to_thread(self._ops().get, int(op_id))
+        if not op or op["module"] != "installer":
+            raise ValueError("that operation has no staged file")
+        try:
+            path = self._installer().staged_file(op)
+            data = await asyncio.to_thread(_read_bytes, path)
+        except (InstallerError, OSError) as exc:
+            raise ValueError("the staged image is missing") from exc
+        return {"base64": base64.b64encode(data).decode("ascii")}
 
     # Installer (slice 21, ADR-0026)
 
@@ -1842,8 +1885,62 @@ class KeepsakeApp:
             "running": self.installer is not None,
             "udisks": udisks.available(),
             "libraryRoot": self._library_root(),
+            "artwork": artwork.available(),
+            "artworkKey": self.credentials.configured("steamgriddb"),
+            "sources": await asyncio.to_thread(self._install_sources),
             "jobs": await asyncio.to_thread(self.installer.jobs) if self.installer else [],
         }
+
+    def _install_sources(self) -> dict[str, Any]:
+        """Places to start the file picker: home, the library, removable drives and network shares already mounted."""
+        home = discovery.real_home(self.home).replace(os.sep, "/")
+        user = os.path.basename(home.rstrip("/"))
+        try:
+            with open(os.path.join(self.proc_root, "self", "mounts"), encoding="utf-8", errors="replace") as handle:
+                mounts = handle.read()
+        except OSError:
+            mounts = ""
+        found = installer_files.mounted_sources(mounts, (f"/run/media/{user}/", "/run/media/", "/media/"))
+        return {"home": home, **found}
+
+    async def _installer_call(self, method: str, *args: Any) -> dict[str, Any]:
+        try:
+            result: dict[str, Any] = await asyncio.to_thread(getattr(self._installer(), method), *args)
+        except InstallerError as exc:
+            raise ValueError(str(exc)) from exc
+        return result
+
+    async def installer_add_cd_drive(self, job_id: int) -> dict[str, Any]:
+        job = await self._installer_call("add_cd_drive", int(job_id))
+        log_event(logging.INFO, "installer.cdrom", "Disc drive added", job=int(job_id))
+        return job
+
+    async def installer_remove_shortcut(self, job_id: int) -> dict[str, Any]:
+        job = await self._installer_call("remove_shortcut", int(job_id))
+        await self.emit("keepsake_steam_ops")
+        return job
+
+    async def installer_artwork_search(self, job_id: int) -> list[dict[str, Any]]:
+        try:
+            return await asyncio.to_thread(self._installer().search_artwork, int(job_id))
+        except InstallerError as exc:
+            raise ValueError(str(exc)) from exc
+
+    async def installer_artwork_apply(self, job_id: int, game_id: int) -> dict[str, Any]:
+        job = await self._installer_call("queue_artwork", int(job_id), int(game_id))
+        await self.emit("keepsake_steam_ops")
+        return job
+
+    async def installer_handoff(self, job_id: int) -> dict[str, Any]:
+        """The Games list key for a finished install, so the user can switch on save sync for it."""
+        job = await self._installer_call("get", int(job_id))
+        if job["state"] != "done":
+            raise ValueError("the install has not finished")
+        games = (await self.discover_games(True))["games"]
+        game = next((g for g in games if g["appid"] == job["appid"]), None)
+        if game is None:
+            raise ValueError("Keepsake cannot see the new shortcut yet; try again in a moment")
+        return {"key": game["key"], "replication": self.registry.enabled("replication")}
 
     async def installer_start(self, source: str, title: str) -> dict[str, Any]:
         try:

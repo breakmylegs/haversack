@@ -16,7 +16,8 @@ from typing import Any
 
 from .log import log_event
 
-EVENTS = ("game_started", "game_frozen", "game_released", "game_exited")
+# game_installed (slice 22): the Installer finished a new shortcut; gameKey is None, with appid and title.
+EVENTS = ("game_started", "game_frozen", "game_released", "game_exited", "game_installed")
 Handler = Callable[[dict[str, Any]], Awaitable[None]]
 
 

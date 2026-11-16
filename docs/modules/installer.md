@@ -6,8 +6,8 @@ ISO and installer assistant with exe retargeting.
 |---|---|
 | Flag default | On |
 | Spec | `docs/build-prompt-v2.md` sections 4, 6.3, 6.4 and 8.3; research section 6.2 (Rclone SMB mounting is a spike, not a feature) |
-| ADRs | 0012, 0014, 0015, 0018 |
-| Code (planned) | `py_modules/keepsake/installer/`, `src/modules/installer/` |
+| ADRs | 0012, 0014, 0015, 0018, 0026, 0027 |
+| Code | `py_modules/keepsake/installer/`, `src/pages/InstallerPage.tsx` |
 | Slices | 21 (Installer I), 22 (Installer II, minor release) |
 
 ## What it does

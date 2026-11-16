@@ -73,6 +73,53 @@ def rank_game_exes(paths: list[tuple[str, int]], title: str) -> list[dict[str, A
     return sorted(ranked, key=lambda r: (-r["score"], r["path"]))
 
 
+NETWORK_FS = frozenset(
+    {"cifs", "smb3", "nfs", "nfs4", "fuse.sshfs", "fuse.rclone", "fuse.gvfsd-fuse", "fuse.kio-fuse", "9p"}
+)
+REMOVABLE_FS = frozenset({"vfat", "exfat", "ntfs", "ntfs3", "fuseblk", "ext4", "btrfs", "f2fs", "iso9660", "udf"})
+
+
+def _unescape(field: str) -> str:
+    # /proc/mounts writes space, tab, newline and backslash as octal escapes.
+    return re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), field)
+
+
+def mounted_sources(mounts_text: str, user_run_dirs: tuple[str, ...]) -> dict[str, list[str]]:
+    """Network shares and removable drives the user has already mounted, from ``/proc/self/mounts``.
+
+    Keepsake never mounts a share itself (that needs root or a binary; see the
+    network mount spike). Network mounts count wherever they are; removable
+    drives only under the user's ``/run/media/<user>`` or ``/media`` folders.
+    """
+    network: list[str] = []
+    removable: list[str] = []
+    for line in mounts_text.splitlines():
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        point, fstype = _unescape(parts[1]), parts[2]
+        if fstype in NETWORK_FS or (fstype.startswith("fuse.") and "/gvfs" in point):
+            network.append(point)
+        elif fstype in REMOVABLE_FS and point.startswith(user_run_dirs):
+            removable.append(point)
+    return {"network": sorted(set(network)), "removable": sorted(set(removable))}
+
+
+def compat_mounts(paths: list[str], home: str) -> str:
+    """``STEAM_COMPAT_MOUNTS`` for paths outside the home folder, which the Steam runtime container hides.
+
+    Refuses paths that would break the colon-separated, quoted launch option.
+    """
+    outside = []
+    for path in paths:
+        if path == home or path.startswith(home.rstrip("/") + "/") or path in outside:
+            continue
+        if any(c in path for c in ':"%\n'):
+            raise ValueError('a folder name contains : " or %, which Steam launch options cannot carry')
+        outside.append(path)
+    return ":".join(outside)
+
+
 def find_installers(source: str) -> list[str]:
     """Likely installer programs in a mounted disc or folder, most likely first (relative paths)."""
     found: list[tuple[int, str]] = []

@@ -125,6 +125,24 @@ class Plugin:
     async def installer_cancel(self, job_id: int) -> dict[str, Any]:
         return await self.app.installer_cancel(job_id)
 
+    async def installer_add_cd_drive(self, job_id: int) -> dict[str, Any]:
+        return await self.app.installer_add_cd_drive(job_id)
+
+    async def installer_remove_shortcut(self, job_id: int) -> dict[str, Any]:
+        return await self.app.installer_remove_shortcut(job_id)
+
+    async def installer_artwork_search(self, job_id: int) -> list[dict[str, Any]]:
+        return await self.app.installer_artwork_search(job_id)
+
+    async def installer_artwork_apply(self, job_id: int, game_id: int) -> dict[str, Any]:
+        return await self.app.installer_artwork_apply(job_id, game_id)
+
+    async def installer_handoff(self, job_id: int) -> dict[str, Any]:
+        return await self.app.installer_handoff(job_id)
+
+    async def steam_ops_file(self, op_id: int) -> dict[str, Any]:
+        return await self.app.steam_ops_file(op_id)
+
     async def enable_steam_without_cloud(self) -> dict[str, Any]:
         return await self.app.enable_steam_without_cloud()
 

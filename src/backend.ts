@@ -65,10 +65,34 @@ export interface InstallJob {
   candidates?: { path: string; size: number; score: number }[];
   appid?: number;
   error?: string;
+  cdDrive?: { letter: string };
+  shortcutRemoved?: boolean;
+  gameExe?: string;
+  artwork?: Record<string, boolean>;
 }
 
-export const installerStatus = callable<[], { running: boolean; udisks: boolean; libraryRoot: string; jobs: InstallJob[] }>(
-  "installer_status",
+export interface InstallerStatus {
+  running: boolean;
+  udisks: boolean;
+  libraryRoot: string;
+  artwork: boolean;
+  artworkKey: boolean;
+  sources: { home: string; network: string[]; removable: string[] };
+  jobs: InstallJob[];
+}
+
+export const installerStatus = callable<[], InstallerStatus>("installer_status");
+export const installerAddCdDrive = callable<[jobId: number], InstallJob>("installer_add_cd_drive");
+export const installerRemoveShortcut = callable<[jobId: number], InstallJob>("installer_remove_shortcut");
+export const installerArtworkSearch = callable<[jobId: number], { id: number; name: string; verified: boolean }[]>(
+  "installer_artwork_search",
+);
+export const installerArtworkApply = callable<[jobId: number, gameId: number], InstallJob>("installer_artwork_apply");
+export const installerHandoff = callable<[jobId: number], { key: string; replication: boolean }>("installer_handoff");
+export const steamOpsFile = callable<[id: number], { base64: string }>("steam_ops_file");
+// The SteamGridDB key is kept with the backend secrets; only whether it is set comes back.
+export const saveSteamGridDbKey = callable<[kind: "steamgriddb", values: { apiKey: string }], { configured: boolean }>(
+  "set_backend_config",
 );
 export const installerStart = callable<[source: string, title: string], InstallJob>("installer_start");
 export const installerCreateShortcut = callable<[jobId: number, installer: string], InstallJob>("installer_create_shortcut");

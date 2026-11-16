@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 
 from .fsutil import atomic_write_json, read_json
 
-FILES = {"webdav": "webdav.json", "s3": "s3.json", "gdrive": "google-client.json"}
+FILES = {"webdav": "webdav.json", "s3": "s3.json", "gdrive": "google-client.json", "steamgriddb": "steamgriddb.json"}
 FIELDS: dict[str, dict[str, str]] = {
     "webdav": {"url": "text", "username": "text", "password": "secret"},
     "s3": {
@@ -30,11 +30,13 @@ FIELDS: dict[str, dict[str, str]] = {
         "pathStyle": "bool",
     },
     "gdrive": {"clientId": "text", "clientSecret": "secret"},
+    "steamgriddb": {"apiKey": "secret"},
 }
 REQUIRED = {
     "webdav": ("url", "username", "password"),
     "s3": ("endpoint", "bucket", "accessKey", "secretKey"),
     "gdrive": ("clientId", "clientSecret"),
+    "steamgriddb": ("apiKey",),
 }
 DEFAULTS: dict[str, dict[str, Any]] = {
     "webdav": {"url": "", "username": "", "password": ""},
@@ -48,6 +50,7 @@ DEFAULTS: dict[str, dict[str, Any]] = {
         "pathStyle": True,
     },
     "gdrive": {"clientId": "", "clientSecret": ""},
+    "steamgriddb": {"apiKey": ""},
 }
 MAX_TEXT = 300
 _BUCKET = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
@@ -92,6 +95,8 @@ def _validate(kind: str, values: dict[str, Any]) -> dict[str, Any]:
         if out["prefix"] and not _PREFIX.match(out["prefix"].strip("/")):
             raise BackendConfigError("the key prefix is folder names separated by /")
         out["prefix"] = out["prefix"].strip("/")
+    if kind == "steamgriddb" and out["apiKey"] and not re.match(r"^[A-Za-z0-9]{16,64}$", out["apiKey"]):
+        raise BackendConfigError("a SteamGridDB API key is 16 to 64 letters and digits")
     return out
 
 

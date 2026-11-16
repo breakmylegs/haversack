@@ -53,6 +53,8 @@ Moving from Ludusavi? Follow [docs/cutover.md](docs/cutover.md).
 
 Keepsake's **Install** page installs a Windows game from an ISO file or a folder into its own Steam shortcut and Proton prefix, all from Gaming Mode. It adds an `Install: <Title>` shortcut that runs the installer; you install into the folder Keepsake shows, quit, choose the game's program, and the same shortcut then starts the game.
 
+If an installer asks for the disc, press **Installer wants a disc drive** and start the installer again. To install from a NAS, mount the share first (for example by opening it in Dolphin in Desktop Mode); it then appears on the Install page.
+
 **An installer is a Windows program that runs with your user's rights. A Proton prefix is not a sandbox.** Only install software you trust.
 
 ## Help
