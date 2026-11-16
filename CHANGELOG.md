@@ -2,6 +2,12 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [Unreleased]
+
+### Fixed
+
+- Setup: the Back, Continue and Skip setup buttons could sit under Gaming Mode's footer bar after a long game list. They now also appear at the top of every step, and the page ends clear of the footer.
+
 ## [0.23.0]
 
 The Advisor module: tuning advice for each game, for your exact device. Advisor only recommends: it never changes a setting.
