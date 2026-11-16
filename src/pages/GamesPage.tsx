@@ -1,5 +1,5 @@
 import { DialogButton, Field, Focusable } from "@decky/ui";
-import { toaster } from "@decky/api";
+import { addEventListener, removeEventListener, toaster } from "@decky/api";
 import { ReactElement, useEffect, useState } from "react";
 import { FaCheckCircle, FaClock, FaCodeBranch, FaExclamationTriangle, FaMinusCircle, FaRegCircle } from "react-icons/fa";
 import {
@@ -10,6 +10,8 @@ import {
   GameEntry,
   GameMatch,
   getSettings,
+  manifestProgress,
+  ManifestProgress,
   manifestStatus,
   ManifestStatus,
   matchGames,
@@ -67,6 +69,36 @@ function matchText(match: GameMatch | undefined): string {
   }
 }
 
+const MANIFEST_EVENT = "keepsake_manifest_progress";
+
+// Failure reasons from the backend, in words (raw codes such as "busy" read as a hang).
+const MANIFEST_REASONS: Record<string, string> = {
+  busy: "an update is already running",
+  offline: "GitHub could not be reached; check the connection and try again",
+  "empty-index": "the download had no games in it, so the previous manifest was kept",
+};
+
+function megabytes(bytes: number): string {
+  return (bytes / 1024 / 1024).toFixed(1);
+}
+
+function manifestProgressText(p: ManifestProgress): string {
+  switch (p.stage) {
+    case "checking":
+      return "Contacting GitHub for the latest manifest...";
+    case "downloading":
+      return p.total
+        ? `Downloading the manifest: ${megabytes(p.bytes ?? 0)} of ${megabytes(p.total)} MB (${Math.floor(((p.bytes ?? 0) / p.total) * 100)}%)`
+        : `Downloading the manifest: ${megabytes(p.bytes ?? 0)} MB so far`;
+    case "indexing":
+      return `Reading the manifest: ${(p.entries ?? 0).toLocaleString()} games checked so far. This takes a minute or two on a handheld.`;
+    case "saving":
+      return `Saving the manifest (${(p.entries ?? 0).toLocaleString()} games read)...`;
+    default:
+      return "";
+  }
+}
+
 function dateText(seconds: number | undefined): string {
   return seconds ? new Date(seconds * 1000).toISOString().slice(0, 10) : "never";
 }
@@ -80,6 +112,7 @@ export function GamesPage() {
   const [cloudDetection, setCloudDetection] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [progress, setProgress] = useState<ManifestProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -108,17 +141,37 @@ export function GamesPage() {
     void scan(false);
   }, []);
 
+  // Live progress of any manifest refresh, including the weekly one started in the background.
+  useEffect(() => {
+    const listener = addEventListener<[ManifestProgress]>(MANIFEST_EVENT, (update) => {
+      setProgress(update.running ? update : null);
+      if (update.stage === "finished" && update.ok) void scan(false);
+    });
+    manifestProgress()
+      .then((now) => setProgress(now.running ? now : null))
+      .catch(() => undefined);
+    return () => removeEventListener(MANIFEST_EVENT, listener);
+  }, []);
+
   const updateManifest = async () => {
     setRefreshing(true);
+    setProgress({ stage: "checking", running: true });
     try {
       const outcome = await refreshManifest(true);
+      if (outcome.reason === "busy") return; // the running update keeps reporting its progress
       toaster.toast({
         title: "Keepsake",
-        body: outcome.ok ? "Manifest is up to date." : `Manifest not updated: ${outcome.reason}`,
+        body: outcome.ok
+          ? outcome.games
+            ? `Manifest updated: ${outcome.games.toLocaleString()} games with save data.`
+            : "Manifest is already up to date."
+          : `Manifest not updated: ${MANIFEST_REASONS[outcome.reason ?? ""] ?? outcome.reason}.`,
       });
-      await scan(false);
+    } catch (err) {
+      toaster.toast({ title: "Keepsake", body: `Manifest not updated: ${err}` });
     } finally {
       setRefreshing(false);
+      setProgress(null);
     }
   };
 
@@ -180,10 +233,11 @@ export function GamesPage() {
         <DialogButton style={{ width: "auto" }} disabled={scanning} onClick={() => void scan(true)}>
           {scanning ? "Scanning" : "Rescan"}
         </DialogButton>
-        <DialogButton style={{ width: "auto" }} disabled={refreshing} onClick={() => void updateManifest()}>
-          {refreshing ? "Updating manifest" : "Update manifest"}
+        <DialogButton style={{ width: "auto" }} disabled={refreshing || !!progress} onClick={() => void updateManifest()}>
+          {refreshing || progress ? "Updating manifest..." : "Update manifest"}
         </DialogButton>
       </Focusable>
+      {progress && <Field label="Updating the save-location manifest" description={manifestProgressText(progress)} />}
       {showSteam && cloudDetection && Object.values(matches).some((m) => m.steamCloud === "no-cloud" && !m.enabled) && (
         <Field
           label={`${Object.values(matches).filter((m) => m.steamCloud === "no-cloud" && !m.enabled).length} Steam games have no Steam Cloud saves`}

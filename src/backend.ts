@@ -545,6 +545,18 @@ export const runRetention = callable<[key: string], { pruned: string[]; kept: nu
   "run_retention",
 );
 export const manifestStatus = callable<[], ManifestStatus>("manifest_status");
+// Sent as "keepsake_manifest_progress" while a refresh runs, and returned by manifestProgress().
+export interface ManifestProgress {
+  stage: "idle" | "checking" | "downloading" | "indexing" | "saving" | "finished";
+  running: boolean;
+  bytes?: number;
+  total?: number | null;
+  entries?: number;
+  ok?: boolean;
+  reason?: string;
+  games?: number;
+}
+export const manifestProgress = callable<[], ManifestProgress>("manifest_progress");
 export const refreshManifest = callable<[force: boolean], { ok: boolean; reason?: string; games?: number }>(
   "refresh_manifest",
 );

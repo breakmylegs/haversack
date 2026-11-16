@@ -145,13 +145,16 @@ class FakeDownloader:
         self.status, self.body, self.etag, self.error = status, body, etag, error
         self.calls = []
 
-    def __call__(self, url, dest, headers=None, max_bytes=None):
+    def __call__(self, url, dest, headers=None, max_bytes=None, progress=None):
         self.calls.append((url, dict(headers or {})))
         if self.error:
             raise self.error
         if self.status == 200:
             with open(dest, "w", encoding="utf-8") as handle:
                 handle.write(self.body)
+            if progress is not None:
+                progress(len(self.body) // 2, len(self.body))
+                progress(len(self.body), len(self.body))
         return HttpResponse(status=self.status, headers={"etag": self.etag})
 
 
@@ -199,3 +202,26 @@ def test_refresh_failures_keep_old_index(tmp_path):
     assert store.refresh(force=True)["reason"] == "http-500"
     fresh = manifest.ManifestStore(str(tmp_path))
     assert len(fresh.load()["games"]) == 4
+
+
+def test_refresh_reports_each_stage(tmp_path, monkeypatch):
+    monkeypatch.setattr(manifest, "PROGRESS_EVERY", 2)
+    seen = []
+    store = manifest.ManifestStore(str(tmp_path), download=FakeDownloader(), clock=Clock())
+    assert store.refresh(True, progress=seen.append)["ok"]
+    stages = [s["stage"] for s in seen]
+    assert stages[0] == "checking" and stages[-1] == "saving"
+    downloading = [s for s in seen if s["stage"] == "downloading"]
+    assert downloading[-1]["bytes"] == downloading[-1]["total"] == len(SAMPLE)
+    counts = [s["entries"] for s in seen if s["stage"] == "indexing"]
+    assert counts and counts == list(range(2, 2 * len(counts) + 1, 2))  # every PROGRESS_EVERY entries
+    assert stages.index("downloading") < stages.index("indexing") < stages.index("saving")
+    quiet = []
+    assert store.refresh(False, progress=quiet.append)["reason"] == "fresh" and quiet == []  # nothing to do
+
+
+def test_refresh_failure_reports_no_saving(tmp_path):
+    seen = []
+    store = manifest.ManifestStore(str(tmp_path), download=FakeDownloader(error=NetError("down")), clock=Clock())
+    assert store.refresh(True, progress=seen.append)["reason"] == "offline"
+    assert [s["stage"] for s in seen] == ["checking"]

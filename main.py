@@ -47,6 +47,9 @@ class Plugin:
     async def refresh_manifest(self, force: bool = False) -> dict[str, Any]:
         return await self.app.refresh_manifest(force)
 
+    async def manifest_progress(self) -> dict[str, Any]:
+        return await self.app.manifest_progress()
+
     async def match_games(self) -> list[dict[str, Any]]:
         return await self.app.match_games()
 

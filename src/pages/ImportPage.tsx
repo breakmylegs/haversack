@@ -70,8 +70,8 @@ export function ImportPage() {
   return (
     <div>
       <Field
-        label="Import from Ludusavi"
-        description="Bring in backups that Ludusavi made on this device. Files are checked against Ludusavi's records, and paths inside any Proton prefix are recognised whatever its compatdata number. Ludusavi's folder is only read, never changed."
+        label="Import save backups from Ludusavi"
+        description="Bring in save-game backups that Ludusavi made on this device. This imports saves only: it does not install, copy or move games. Files are checked against Ludusavi's records, and paths inside any Proton prefix are recognised whatever its compatdata number. Ludusavi's folder is only read, never changed."
       />
       <Field label="Ludusavi backup folder" childrenLayout="below">
         <TextField value={root} disabled={busy} onChange={(e) => setRoot(e.target.value)} />

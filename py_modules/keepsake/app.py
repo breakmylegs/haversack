@@ -84,6 +84,8 @@ FREEZE_TEST_MIN = 1
 FREEZE_TEST_MAX = 10
 SIMULATED_JOB_MAX = 120
 IDLE_EVENT = "keepsake_idle"
+MANIFEST_PROGRESS_EVENT = "keepsake_manifest_progress"
+MANIFEST_PROGRESS_SECONDS = 0.5
 RETARGET_KINDS = ("set-shortcut-name", "set-shortcut-exe", "set-shortcut-start-dir", "set-launch-options")
 
 
@@ -132,6 +134,7 @@ class KeepsakeApp:
         self.game_configs = GameConfigStore(paths.settings_dir)
         self._auto_refresh_manifest = auto_refresh_manifest
         self._manifest_lock = asyncio.Lock()
+        self._manifest_progress: dict[str, Any] = {"stage": "idle", "running": False}
         self._background: list[asyncio.Task[Any]] = []
         self.token_store = TokenStore(paths.settings_dir)
         self.tokens = TokenManager(
@@ -373,8 +376,25 @@ class KeepsakeApp:
     async def refresh_manifest(self, force: bool = False) -> dict[str, Any]:
         if self._manifest_lock.locked():
             return {"ok": False, "reason": "busy"}
+        loop = asyncio.get_running_loop()
+        last_sent: dict[str, Any] = {"at": 0.0, "stage": None}
+
+        def progress(update: dict[str, Any]) -> None:
+            # Runs in the worker thread. Keep the latest for polling. A new stage is sent at once;
+            # updates within a stage at most twice a second.
+            self._manifest_progress = {**update, "running": True}
+            now = time.monotonic()
+            if update["stage"] != last_sent["stage"] or now - last_sent["at"] >= MANIFEST_PROGRESS_SECONDS:
+                last_sent.update(at=now, stage=update["stage"])
+                snapshot = dict(self._manifest_progress)
+                loop.call_soon_threadsafe(lambda: loop.create_task(self.emit(MANIFEST_PROGRESS_EVENT, snapshot)))
+
         async with self._manifest_lock:
-            result = await asyncio.to_thread(self.manifest.refresh, bool(force))
+            try:
+                result = await asyncio.to_thread(self.manifest.refresh, bool(force), progress)
+            finally:
+                self._manifest_progress = {"stage": "idle", "running": False}
+        await self.emit(MANIFEST_PROGRESS_EVENT, {"stage": "finished", "running": False, **result})
         log_event(
             logging.INFO,
             "manifest.refresh",
@@ -386,6 +406,10 @@ class KeepsakeApp:
             },
         )
         return result
+
+    async def manifest_progress(self) -> dict[str, Any]:
+        """What a manifest refresh is doing now, for a page opened while one runs (the weekly one, say)."""
+        return dict(self._manifest_progress)
 
     async def _game(self, key: str) -> dict[str, Any]:
         games = (await self.discover_games())["games"]

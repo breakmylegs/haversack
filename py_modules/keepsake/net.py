@@ -101,11 +101,14 @@ def fetch_to_file(
     timeout: float = 60.0,
     max_bytes: int = DEFAULT_MAX_BYTES,
     allowed: frozenset[str] = ALLOWED_HOSTS,
+    progress: Callable[[int, int | None], None] | None = None,
 ) -> HttpResponse:
     """GET ``url`` and stream a 200 body into ``dest`` (body is not kept in memory).
 
     Returns the status and headers; ``body`` is empty. Raises :class:`NetError`
-    on transport errors or when the body exceeds ``max_bytes``.
+    on transport errors or when the body exceeds ``max_bytes``. ``progress`` is
+    called after each chunk with the bytes written so far and the expected
+    total from ``Content-Length`` (None when the server does not say).
     """
     check_url(url, allowed)
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
@@ -115,14 +118,18 @@ def fetch_to_file(
     try:
         with opener.open(request, timeout=timeout) as response, open(dest, "wb") as out:
             written = 0
+            length = response.headers.get("Content-Length")
+            total = int(length) if length and length.isdigit() else None
             while True:
-                chunk = response.read(1024 * 1024)
+                chunk = response.read(256 * 1024)
                 if not chunk:
                     break
                 written += len(chunk)
                 if written > max_bytes:
                     raise NetError(f"response larger than {max_bytes} bytes")
                 out.write(chunk)
+                if progress is not None:
+                    progress(written, total)
             return HttpResponse(status=response.status, headers={k.lower(): v for k, v in response.headers.items()})
     except urllib.error.HTTPError as exc:
         return HttpResponse(status=exc.code, headers={k.lower(): v for k, v in (exc.headers or {}).items()})
