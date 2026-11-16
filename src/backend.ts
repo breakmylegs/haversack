@@ -159,6 +159,22 @@ export const ludusaviImport = callable<
   { gameKey: string; results: ImportResult[] }
 >("ludusavi_import");
 
+// Import every game at once: runs in the backend, sends "keepsake_import_progress" after each game.
+export type ImportVerdict = "imported" | "already-imported" | "nothing-to-import" | "failed";
+export interface ImportAllStatus {
+  running: boolean;
+  cancelled?: boolean;
+  mode?: "latest" | "all";
+  done: number;
+  total: number;
+  current?: string | null;
+  games: Record<string, { name: string; status: ImportVerdict; error: string | null; results: ImportResult[] }>;
+  summary: Partial<Record<ImportVerdict, number>>;
+}
+export const ludusaviImportAll = callable<[root: string, mode: "latest" | "all"], ImportAllStatus>("ludusavi_import_all");
+export const ludusaviImportCancel = callable<[], ImportAllStatus>("ludusavi_import_cancel");
+export const ludusaviImportStatus = callable<[], ImportAllStatus>("ludusavi_import_status");
+
 export type SyncWord ="off" | "not-synced" | "synced" | "pending" | "conflict" | "quarantined";
 export type HealthStatus = "ok" | "info" | "warn" | "fail";
 
