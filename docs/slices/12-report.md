@@ -20,6 +20,7 @@ Branch `slice/12-hardening`, based on `main` after v0.11.0. Build prompt slice 1
 ## Tests
 
 - New: `test_signatures.py` (8, including RFC 8032's test vectors 1 and 2, both minisign algorithms, tampering, wrong key, changed trusted comment, and the updater with and without a pinned key), `test_performance.py` (the 50-game check). Changed: `test_update.py` (the prepared update now reports `signed`).
+- Added later (slice 25 hardening): `test_fuzz_signatures.py` (3). A mutated signature file never verifies unless only the unsigned comment changed. Mutated public keys and arbitrary Ed25519 keys and signatures, including off-curve and small-order points, never raise. Removing the trusted comment check makes it fail.
 - Re-run because they cover touched code: `test_update.py`, `test_store_contract.py -k local`, `test_store_local.py`.
 - 50-game timings on the development laptop are recorded in assumption A125. All are well inside their budgets.
 - Mutation checks: 8 guards broken one at a time:
