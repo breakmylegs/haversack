@@ -28,6 +28,7 @@ from . import (
     lifecycle,
     manifest,
     net,
+    ordering,
     registry,
     resolve,
     restore,
@@ -546,7 +547,9 @@ class KeepsakeApp:
                     ),
                 }
             )
-        return out
+        # Games needing attention first, then by name (Peter, 16 November 2026).
+        mismatched = await asyncio.to_thread(discovery.load_mismatches, self.paths.runtime_dir)
+        return ordering.order(out, mismatched)
 
     def _steam_cloud(self, game: dict[str, Any]) -> str | None:
         """Steam Cloud state for Steam apps when detection is on (slice 11), else None."""

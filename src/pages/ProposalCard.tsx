@@ -1,7 +1,8 @@
-import { ConfirmModal, DialogButton, Field, Focusable, showModal } from "@decky/ui";
+import { DialogButton, Field, Focusable } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useState } from "react";
-import { approveMatch, IdentitySuggestion, MatchProposal, rejectMatch, setGameKey } from "../backend";
+import { IdentitySuggestion, MatchProposal, rejectMatch, setGameKey } from "../backend";
+import { askApproveMatch } from "../matchApproval";
 
 const SIGNAL_TEXT: Record<string, string> = {
   exe: "same program file",
@@ -45,16 +46,7 @@ export function ProposalCard({
     }
   };
 
-  const approve = () =>
-    showModal(
-      <ConfirmModal
-        strTitle="Use this match?"
-        strDescription={`${gameName} will sync as ${label(proposal.candidate)}. If both devices have different saves, Keepsake asks you which to keep before anything is replaced.`}
-        strOKButtonText="Approve"
-        strCancelButtonText="Not yet"
-        onOK={() => void run(() => approveMatch(gameKey), `${gameName} now syncs as ${label(proposal.candidate)}.`)}
-      />,
-    );
+  const approve = () => askApproveMatch(gameKey, gameName, proposal.candidate, onChanged);
 
   return (
     <Field
