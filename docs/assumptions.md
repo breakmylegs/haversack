@@ -274,3 +274,9 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 | A31 | SteamOS and Bazzite ship `python3` with the `venv` module and `ensurepip`, and the device can reach PyPI, so `scripts/test_on_device.py` can create its test venv | unverified, first device run confirms |
 | A32 | **Differs from the build prompt:** sections 1, 6, 13, 16 and 17 assume GitHub Actions for pull request checks and releases. Replaced by `pnpm run check`, device tests and a local `pnpm release` (ADR-0004) | owner decision |
 | A29 | `LocalFolderStore` create-only writes use hard links, which exFAT and FAT32 SD cards do not support | known gap; acceptable for tests and the simulator, revisit before offering it as a user backend |
+
+## Decky's frozen Python (v0.22.1)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A152 | Decky Loader's Python is a PyInstaller build that bundles only the stdlib modules its own code reaches plus `hiddenimports` (`logging.handlers`, `sqlite3`, `http.server`, `socketserver`, `configparser`). `xml`, `tomllib` and `resource` are not proven bundled | verified from `backend/pyinstaller.spec` and the loader's imports on `main` (16 November 2026); `xml` confirmed missing on Peter's Legion Go 2 | Decky Loader source, ADR-0030 |

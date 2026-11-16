@@ -28,6 +28,10 @@ except ImportError:  # pragma: no cover - depends on the embedded Python
 DB_FILE = "keepsake.db"
 
 
+def sqlite_available() -> bool:
+    return sqlite3 is not None
+
+
 class StateError(Exception):
     pass
 

@@ -35,6 +35,7 @@ def test_all_clear_is_ok():
         "played-without",
         "manifest",
         "ludusavi",
+        "python-modules",
     }
 
 
@@ -99,3 +100,16 @@ def test_detect_decky_plugin(tmp_path):
     (tmp_path / "settings").mkdir()
     (tmp_path / "settings" / "loader.json").write_text(json.dumps({"disabled_plugins": ["Decky Ludusavi"]}))
     assert health.detect_decky_plugin(str(tmp_path), "ludusavi")["disabled"] is True
+
+
+def test_python_modules_missing_from_the_decky_build():
+    ok = by_id(health.run(facts()))["python-modules"]
+    assert ok["status"] == "ok"
+    no_xml = facts(pythonModules={"xml": False, "sqlite3": True})
+    assert by_id(health.run(no_xml))["python-modules"]["status"] == "warn"
+    assert by_id(health.run(no_xml))["python-modules"]["items"] == ["xml (needed for WebDAV and S3)"]
+    for store in ("webdav", "s3"):
+        failing = by_id(health.run(facts(pythonModules={"xml": False}, store=store)))["python-modules"]
+        assert failing["status"] == "fail" and "Choose OneDrive, Google Drive or the local store" in failing["detail"]
+    no_sqlite = by_id(health.run(facts(pythonModules={"xml": True, "sqlite3": False})))["python-modules"]
+    assert no_sqlite["items"] == ["sqlite3 (needed for the Installer and the module state)"]
