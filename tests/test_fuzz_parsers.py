@@ -303,3 +303,82 @@ def test_manifest_steam_ids_are_positive_integers_never_booleans():
     )
     record = manifest.build_index(text.splitlines(keepends=True))["games"]["True Game"]
     assert "s" not in record and record["se"] == [3000000009]
+
+
+# v2: the Installer's mount table, udisksctl output and launch option mounts (slice 25 part 2)
+
+MOUNTS = (
+    "/dev/nvme0n1p8 /home ext4 rw 0 0\n//nas/games /mnt/nas\\040games cifs rw 0 0\n"
+    "/dev/sda1 /run/media/deck/USB exfat rw 0 0\ngvfsd-fuse /run/user/1000/gvfs fuse.gvfsd-fuse rw 0 0\n"
+)
+
+
+def test_mount_table_fuzz():
+    from keepsake.installer import files
+
+    rng = random.Random(2511)
+    specials = [" ", "\n", "\\040", "\\", "\\777", "cifs", "fuse.", "/gvfs", "/run/media/deck/", "\t", "\x00"]
+    for _ in range(ITERATIONS):
+        found = files.mounted_sources(mutate_text(rng, MOUNTS, specials), ("/run/media/deck/",))
+        assert set(found) == {"network", "removable"}
+        assert all(p.startswith("/run/media/deck/") for p in found["removable"])
+
+
+def test_udisks_output_fuzz():
+    from keepsake.installer import udisks
+
+    rng = random.Random(2512)
+    loop = "Mapped file /x.iso as /dev/loop7.\n"
+    mounted = "Mounted /dev/loop7 at /run/media/deck/DISC\n"
+    specials = [" as ", " at ", "/dev/loop", ".", "\n", "Mounted", "Mapped", "/", "\x00"]
+    for _ in range(ITERATIONS // 3):
+        outputs = {"loop-setup": mutate_text(rng, loop, specials), "mount": mutate_text(rng, mounted, specials)}
+        calls = []
+
+        def runner(command, calls=calls, outputs=outputs):
+            calls.append(command[1])
+            return outputs.get(command[1], "")
+
+        try:
+            device, mount = udisks.mount_iso("/x.iso", runner)
+        except udisks.UdisksError:
+            if "mount" in calls:
+                assert calls[-2:] == ["unmount", "loop-delete"]  # a failed mount always releases the loop device
+            continue
+        assert device and mount and calls == ["loop-setup", "mount"]
+
+
+def test_compat_mounts_never_break_the_launch_option():
+    from keepsake.installer import files
+
+    rng = random.Random(2513)
+    alphabet = 'abc/ :"%\n\x00.-_'
+    for _ in range(ITERATIONS):
+        paths = [
+            "/" + "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 12))) for _ in range(rng.randint(1, 3))
+        ]
+        try:
+            value = files.compat_mounts(paths, "/home/deck")
+        except ValueError:
+            continue
+        assert not any(c in value for c in '"%\n')
+        assert all(part.startswith("/") for part in value.split(":") if part)
+
+
+def test_installer_ranking_fuzz():
+    from keepsake.installer import files
+
+    rng = random.Random(2514)
+    alphabet = "abcXYZ019 ._-/\\()[]{}é"
+    for _ in range(ITERATIONS):
+        paths = [
+            (
+                "/g/"
+                + "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 20)))
+                + rng.choice([".exe", ".EXE", ".dll", ""]),
+                rng.randint(0, 2**40),
+            )
+            for _ in range(rng.randint(0, 6))
+        ]
+        ranked = files.rank_game_exes(paths, "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 30))))
+        assert all(r["path"].lower().endswith(".exe") for r in ranked)

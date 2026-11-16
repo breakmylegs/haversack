@@ -37,7 +37,9 @@ Only the fuzzing can be done before slices 14 to 24 land and the devices are che
 ## Still to do in slice 25
 
 - Done on #16 (slice 12), where those parsers live: `tests/test_fuzz_signatures.py` fuzzes minisign keys and signatures and Ed25519 verification. A mutated signature never verifies unless only its unsigned comment changed.
-- Fuzz the v2 parsers once their slices merge: Replication manifests and the peer protocol (slices 17 and 18), and the Installer's mount table parsing (#20).
+- Done (part 2, from `main` after #20): the Installer's mount table, `udisksctl` output, the `STEAM_COMPAT_MOUNTS` builder (it never emits a quote, `%` or newline) and installer program ranking. A mount whose output cannot be parsed always releases its loop device. Four tests, no bugs found. A long run at 20,000 iterations passes. Breaking either the release on failure or the character check makes them fail.
+- The Advisor's parsers (Deck Verified reports, the anti-cheat list, AI replies and launch options) are fuzzed on #26, where that code lives until it merges.
+- Still to fuzz once their slices merge: Replication manifests and the peer protocol (slices 17 and 18).
 - The full threat model review, the 50-game performance check on both devices, documentation, and the v2.0.0 release with clean installs on SteamOS and Bazzite.
 
 ## On-device checklist
