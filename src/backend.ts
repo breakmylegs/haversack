@@ -21,6 +21,7 @@ export interface Settings {
   registrySync: boolean;
   steamCloudDetection: boolean;
   suspendSnapshots: boolean;
+  libraryRoot: string;
   readOnly: boolean;
 }
 
@@ -51,6 +52,29 @@ export interface ModulesStatus {
   locks: Record<string, string>;
   steamOpsPending: number;
 }
+
+export interface InstallJob {
+  id: number;
+  title: string;
+  state: "choose-installer" | "creating-shortcut" | "run-installer" | "choose-game" | "retargeting" | "done" | "failed" | "cancelled";
+  kind: "iso" | "folder";
+  source: string;
+  target: string;
+  windowsTarget: string;
+  installers: string[];
+  candidates?: { path: string; size: number; score: number }[];
+  appid?: number;
+  error?: string;
+}
+
+export const installerStatus = callable<[], { running: boolean; udisks: boolean; libraryRoot: string; jobs: InstallJob[] }>(
+  "installer_status",
+);
+export const installerStart = callable<[source: string, title: string], InstallJob>("installer_start");
+export const installerCreateShortcut = callable<[jobId: number, installer: string], InstallJob>("installer_create_shortcut");
+export const installerFinishedInstalling = callable<[jobId: number], InstallJob>("installer_finished_installing");
+export const installerRetarget = callable<[jobId: number, exe: string], InstallJob>("installer_retarget");
+export const installerCancel = callable<[jobId: number], InstallJob>("installer_cancel");
 
 export const modulesStatus = callable<[], ModulesStatus>("modules_status");
 export const setModuleEnabled = callable<[name: string, enabled: boolean], ModulesStatus>("set_module_enabled");

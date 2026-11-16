@@ -57,12 +57,39 @@ async function applyAndReadBack(
   return { ok: readBack === wanted, result: { appid, original, readBack, wanted } };
 }
 
+// Creates a shortcut, then sets every field again after Steam settles, because AddShortcut's own
+// start dir and launch options may be ignored (A70, A71). The compatibility tool is the newest
+// installed GE-Proton, else Proton Experimental (Advisor will recommend one in a later version).
+async function addShortcut(op: SteamOp): Promise<Outcome> {
+  const { name, exe, startDir, launchOptions } = op.payload as Record<string, string>;
+  const appid = await SteamClient.Apps.AddShortcut(name, exe, startDir, launchOptions);
+  if (!appid) return { ok: false, result: { error: "Steam did not create the shortcut" } };
+  await sleep(SETTLE_MS);
+  SteamClient.Apps.SetShortcutName(appid, name);
+  SteamClient.Apps.SetShortcutExe(appid, exe);
+  SteamClient.Apps.SetShortcutStartDir(appid, startDir);
+  SteamClient.Apps.SetAppLaunchOptions(appid, launchOptions);
+  const tools = (await SteamClient.Apps.GetAvailableCompatTools(appid)).map((t) => t.strToolName);
+  // Numeric order, so GE-Proton10-3 is newer than GE-Proton9-27.
+  const ge = tools
+    .filter((t) => t.startsWith("GE-Proton"))
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+  const tool = ge[0] ?? (tools.includes("proton_experimental") ? "proton_experimental" : tools[0]);
+  if (tool) SteamClient.Apps.SpecifyCompatTool(appid, tool);
+  await sleep(SETTLE_MS);
+  const d = details(appid);
+  const readBack = { name: d?.strDisplayName, exe: d?.strShortcutExe, startDir: d?.strShortcutStartDir, compatTool: d?.strCompatToolName };
+  return { ok: true, result: { appid, compatTool: tool ?? null, readBack } };
+}
+
 async function execute(op: SteamOp): Promise<Outcome> {
   const appid = Number(op.payload.appid);
   const value = String(op.payload.value ?? "");
   switch (op.kind) {
     case "probe":
       return { ok: true, result: probe() };
+    case "add-shortcut":
+      return addShortcut(op);
     case "set-launch-options":
       return applyAndReadBack(appid, () => details(appid)?.strLaunchOptions, () => SteamClient.Apps.SetAppLaunchOptions(appid, value), value);
     case "set-shortcut-name":

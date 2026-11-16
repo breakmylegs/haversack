@@ -2,6 +2,19 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [0.21.0]
+
+Slice 21: the Installer module, first part.
+
+### Added
+
+- Keepsake, Install: install a Windows game from an ISO file or a folder without leaving Gaming Mode. Keepsake adds an `Install: <Title>` shortcut with the newest GE-Proton, shows where to install, notices when the installer closes, lists the programs it created and points the same shortcut at the one you choose, so the game keeps its Proton prefix. ISO files are mounted read-only and released when the install ends.
+- Install, Change folder: where games are installed (default `~/Games`), for example a folder on the SD card.
+
+### Changed
+
+- Module tabs appear in the Keepsake page only while their module is running.
+
 ## [0.13.0]
 
 Slice 13: the module framework for Keepsake v2. Saves works as before.

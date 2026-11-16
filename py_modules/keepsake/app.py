@@ -41,6 +41,8 @@ from .fsutil import atomic_write_json, read_json
 from .gameconfig import DEFAULT as GAME_DEFAULTS
 from .gameconfig import GameConfigStore, custom_path_from_absolute
 from .importers import ludusavi
+from .installer import udisks
+from .installer.service import Installer, InstallerError
 from .jobs import JobTracker
 from .locks import GameLocks
 from .log import log_event, setup_logging, tail
@@ -168,7 +170,6 @@ class KeepsakeApp:
         for name, title, description, writes in (
             ("advisor", "Advisor", "Recommends settings for the game you play.", "Nothing. It only recommends."),
             ("replication", "Replication", "Copies games between your devices.", "Games you send between devices."),
-            ("installer", "Installer", "Helps install games from ISOs and installers.", "Games you install with it."),
             (
                 "desktop",
                 "Desktop",
@@ -177,6 +178,60 @@ class KeepsakeApp:
             ),
         ):
             self.registry.register(Module(name, title, description, writes, available=False))
+        self.installer: Installer | None = None
+
+        async def installer_start() -> None:
+            if self.db is None or self.steam_ops is None:
+                raise RuntimeError("the state database is not available")
+            self.installer = Installer(self.db, self.steam_ops, self._library_root, self._prefix_for)
+
+        async def installer_stop() -> None:
+            self.installer = None
+
+        async def installer_exit(payload: dict[str, Any]) -> None:
+            if self.installer and payload.get("gameKey") is None:
+                job = await asyncio.to_thread(self.installer.installer_exited, int(payload["appid"]))
+                if job:
+                    await self.emit(
+                        "keepsake_toast", f"{job['title']}: choose the game's program in Keepsake, Installer."
+                    )
+
+        async def installer_health() -> list[dict[str, Any]]:
+            ok = udisks.available()
+            return [
+                {
+                    "id": "udisksctl",
+                    "label": "ISO support",
+                    "status": "ok" if ok else "warn",
+                    "detail": "udisksctl found." if ok else "udisksctl is missing: install from folders only.",
+                    "items": [],
+                }
+            ]
+
+        self.registry.register(
+            Module(
+                "installer",
+                "Installer",
+                "Installs games from ISO files, folders and installers into their own Steam shortcut.",
+                "A temporary installer shortcut in Steam, then the same shortcut pointed at the game. The installer "
+                "program itself writes the game into the folder you choose and the shortcut's prefix.",
+                start=installer_start,
+                stop=installer_stop,
+                health=installer_health,
+                listeners={"game_exited": installer_exit},
+            )
+        )
+
+    def _library_root(self) -> str:
+        configured = str(self.settings.get("libraryRoot") or "").strip()
+        return configured or os.path.join(discovery.real_home(self.home), "Games").replace(os.sep, "/")
+
+    def _prefix_for(self, appid: int) -> str | None:
+        for root in discovery.steam_roots(self.home):
+            found = discovery.find_compatdata(int(appid), discovery.library_folders(root))
+            if found:
+                return found
+        return None
 
     async def start(self) -> None:
         self._loop = asyncio.get_running_loop()
@@ -1103,12 +1158,15 @@ class KeepsakeApp:
 
     async def on_game_event(self, kind: str, raw_id: Any) -> dict[str, Any]:
         """Frontend lifetime events. Returns at once; the work runs as a task."""
-        if not self.registry.enabled("saves"):
-            return {"handled": 0}  # Saves switched off: no launch gate, no exit save
         try:
             games = await self._games_for_appid(raw_id)
         except (ValueError, TypeError):
             return {"handled": 0}
+        if kind == "exit" and not games:
+            # Apps Saves does not sync (an installer shortcut, for example) still reach other modules.
+            await self.bus.publish("game_exited", {"gameKey": None, "appid": lifecycle.normalise_appid(raw_id)})
+        if not self.registry.enabled("saves"):
+            return {"handled": 0}  # Saves switched off: no launch gate, no exit save
         for game in games:
             if kind == "start" and game["key"] not in self._launching:
                 self._launching.add(game["key"])
@@ -1767,7 +1825,63 @@ class KeepsakeApp:
     async def steam_ops_finish(self, op_id: int, ok: bool, result: dict[str, Any]) -> dict[str, Any]:
         await asyncio.to_thread(self._ops().finish, int(op_id), bool(ok), dict(result))
         log_event(logging.INFO, "steamops.finished", "Steam operation finished", id=int(op_id), ok=bool(ok))
+        op = await asyncio.to_thread(self._ops().get, int(op_id))
+        if op and op["module"] == "installer" and self.installer:
+            await asyncio.to_thread(self.installer.op_finished, int(op_id), bool(ok), dict(result))
         return {"ok": True}
+
+    # Installer (slice 21, ADR-0026)
+
+    def _installer(self) -> Installer:
+        if self.installer is None:
+            raise ValueError("the Installer module is off; switch it on in Settings, Modules")
+        return self.installer
+
+    async def installer_status(self) -> dict[str, Any]:
+        return {
+            "running": self.installer is not None,
+            "udisks": udisks.available(),
+            "libraryRoot": self._library_root(),
+            "jobs": await asyncio.to_thread(self.installer.jobs) if self.installer else [],
+        }
+
+    async def installer_start(self, source: str, title: str) -> dict[str, Any]:
+        try:
+            job = await asyncio.to_thread(self._installer().start, str(source), str(title))
+        except (InstallerError, udisks.UdisksError) as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(logging.INFO, "installer.start", "Install prepared", job=job["id"], kind=job["kind"])
+        return job
+
+    async def installer_create_shortcut(self, job_id: int, installer_rel: str) -> dict[str, Any]:
+        try:
+            job = await asyncio.to_thread(self._installer().create_shortcut, int(job_id), str(installer_rel))
+        except InstallerError as exc:
+            raise ValueError(str(exc)) from exc
+        await self.emit("keepsake_steam_ops")
+        return job
+
+    async def installer_finished_installing(self, job_id: int) -> dict[str, Any]:
+        """Fallback when Steam did not report the installer closing: look for the new programs now."""
+        job = await asyncio.to_thread(self._installer().get, int(job_id))
+        if job["state"] != "run-installer" or not job.get("appid"):
+            raise ValueError("this install is not waiting for the installer")
+        found = await asyncio.to_thread(self._installer().installer_exited, int(job["appid"]))
+        return found or job
+
+    async def installer_retarget(self, job_id: int, exe: str) -> dict[str, Any]:
+        try:
+            job = await asyncio.to_thread(self._installer().retarget, int(job_id), str(exe))
+        except InstallerError as exc:
+            raise ValueError(str(exc)) from exc
+        await self.emit("keepsake_steam_ops")
+        return job
+
+    async def installer_cancel(self, job_id: int) -> dict[str, Any]:
+        try:
+            return await asyncio.to_thread(self._installer().cancel, int(job_id))
+        except InstallerError as exc:
+            raise ValueError(str(exc)) from exc
 
     async def steam_ops_list(self) -> list[dict[str, Any]]:
         return await asyncio.to_thread(self.steam_ops.list) if self.steam_ops else []

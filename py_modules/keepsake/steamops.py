@@ -21,6 +21,7 @@ from .statedb import StateDB
 
 KINDS = (
     "probe",
+    "add-shortcut",  # payload: name, exe, startDir, launchOptions; the result carries the new appid
     "set-launch-options",
     "set-shortcut-name",
     "set-shortcut-exe",
@@ -59,7 +60,10 @@ class SteamOps:
     def enqueue(self, module: str, kind: str, payload: dict[str, Any]) -> int:
         if kind not in KINDS:
             raise SteamOpsError(f"unknown Steam operation {kind}")
-        if kind != "probe" and not isinstance(payload.get("appid"), int):
+        if kind == "add-shortcut":
+            if not all(isinstance(payload.get(k), str) for k in ("name", "exe", "startDir", "launchOptions")):
+                raise SteamOpsError("a new shortcut needs a name, exe, start folder and launch options")
+        elif kind != "probe" and not isinstance(payload.get("appid"), int):
             raise SteamOpsError("Steam operations need the app ID")
         now = self.clock()
         self.db.execute(
@@ -111,6 +115,10 @@ class SteamOps:
             }
             for r in rows
         ]
+
+    def get(self, op_id: int) -> dict[str, Any] | None:
+        rows = self.db.execute("SELECT id, module, kind, state FROM core_steam_ops WHERE id = ?", (int(op_id),))
+        return {"id": rows[0][0], "module": rows[0][1], "kind": rows[0][2], "state": rows[0][3]} if rows else None
 
     def pending_count(self) -> int:
         return int(self.db.execute("SELECT count(*) FROM core_steam_ops WHERE state IN ('pending', 'claimed')")[0][0])
