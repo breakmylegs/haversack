@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import os
-import tomllib
 from collections.abc import Callable
 from typing import Any
 
@@ -121,6 +120,10 @@ def legiongo2companion(settings_dir: str, appid: str) -> dict[str, Any] | None:
 
 
 def lsfg(user_home: str, appid: str) -> dict[str, Any] | None:
+    try:
+        import tomllib  # lazy: Decky's frozen Python may not bundle it (ADR-0030)
+    except ImportError:
+        return None  # lsfg-vk values are simply not shown
     path = os.path.join(user_home, ".config", "lsfg-vk", "conf.toml")
     try:
         if os.path.getsize(path) > MAX_BYTES:

@@ -308,3 +308,20 @@ def test_current_values_respect_each_tools_own_switches(tmp_path):
     )
     assert found["power"]["tdp_w"] == 15 and "Per-game profiles are off" in found["power"]["note"]
     assert found["framegen"] is None  # an older lsfg-vk config format is not guessed at
+
+
+def test_lsfg_reader_without_tomllib(tmp_path, monkeypatch):
+    """Decky's frozen Python may not bundle tomllib (ADR-0030): the lsfg-vk values are then simply not shown."""
+    import builtins
+
+    write(str(tmp_path / ".config/lsfg-vk/conf.toml"), 'version = 2\n[[profile]]\nactive_in = ["1999999101"]\n')
+    assert current.lsfg(str(tmp_path), "1999999101") is not None
+    real_import = builtins.__import__
+
+    def no_tomllib(name, *args, **kwargs):
+        if name == "tomllib":
+            raise ModuleNotFoundError("No module named 'tomllib'", name=name)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", no_tomllib)
+    assert current.lsfg(str(tmp_path), "1999999101") is None
