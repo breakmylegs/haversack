@@ -40,7 +40,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
-from . import hosts
+from . import discovery, hosts, pcwatch
 from .fsutil import atomic_write_json
 from .paths import PluginPaths
 
@@ -440,9 +440,17 @@ async def run(port: int, open_browser: bool) -> None:
                 loop.add_signal_handler(sig, stop.set)
             except (NotImplementedError, RuntimeError):
                 signal.signal(sig, lambda *_: loop.call_soon_threadsafe(stop.set))
+
+    # Games start and exit outside Keepsake on a PC: watch for them (ADR-0038, P4).
+    async def watched_games() -> list[dict[str, Any]]:
+        return list((await app.discover_games())["games"])
+
+    watcher = pcwatch.Watcher(watched_games, app.on_game_event, home=discovery.real_home(None))
+    watching = asyncio.create_task(watcher.run(stop))
     try:
         await stop.wait()
     finally:
+        await watching
         server.shutdown()
         await app.stop()
 
