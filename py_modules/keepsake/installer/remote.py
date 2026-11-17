@@ -435,14 +435,21 @@ class LocationStore:
 
     def save(self, url: str, username: str, password: str, location_id: str | None = None) -> list[dict[str, Any]]:
         """Remember a location. An empty password keeps the stored one."""
-        url = check_location(url)
+        smb = str(url).strip().lower().startswith("smb://")
+        if smb:
+            from . import smbshare  # imports this module; the vendored pysmb itself loads only on use
+
+            url = smbshare.parse(url).url()
+        else:
+            url = check_location(url)
         username = str(username or "").strip()
         if len(username) > 200 or any(ord(c) < 32 for c in username):
             raise RemoteError("the user name is not valid text")
         items = self._load()
         existing = next((loc for loc in items if loc["id"] == location_id), None) if location_id else None
         kept = self.credentials.keyed_get(SECRETS, existing["id"]) if existing else ""
-        Session(url, username, password or kept)  # refuses a password over plain http
+        if not smb:
+            Session(url, username, password or kept)  # refuses a password over plain http
         if existing is None:
             if len(items) >= LOCATIONS_MAX:
                 raise RemoteError(f"Keepsake remembers up to {LOCATIONS_MAX} locations; forget one first")

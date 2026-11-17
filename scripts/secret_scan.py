@@ -48,6 +48,10 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 EMAIL_ALLOW = re.compile(
     r"(@users\.noreply\.github\.com|noreply@anthropic\.com|@example\.(com|org|net)|you@you\.tld)$", re.IGNORECASE
 )
+# Vendored third-party code keeps its authors' public copyright lines, which its licences
+# forbid removing (ADR-0034). Only the email rule is relaxed there; every other check applies,
+# and tests/test_vendored.py pins each file to the hash scripts/vendor.py recorded.
+EMAIL_EXEMPT_PREFIXES = ("py_modules/keepsake/_vendor/",)
 
 
 def git(*args: str) -> str:
@@ -91,7 +95,9 @@ def scan_text(path: str, text: str, denylist: list[str]) -> list[str]:
     for number, line in enumerate(text.splitlines(), start=1):
         for label, pattern in PATTERNS:
             for match in pattern.finditer(line):
-                if label == "email address" and EMAIL_ALLOW.search(match.group(0)):
+                if label == "email address" and (
+                    EMAIL_ALLOW.search(match.group(0)) or path.startswith(EMAIL_EXEMPT_PREFIXES)
+                ):
                     continue
                 findings.append(f"{path}:{number}: {label}")
         if path not in DENYLIST_EXEMPT:

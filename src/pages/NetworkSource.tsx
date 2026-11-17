@@ -24,13 +24,45 @@ function gib(bytes: number): string {
   return `${(bytes / GIB).toFixed(1)} GiB`;
 }
 
+// Plain string handling: browsers give smb:// addresses no origin, so URL() is not used.
+function splitUrl(url: string): { root: string; path: string } {
+  const m = /^([a-z]+:\/\/[^/]+)(\/.*)?$/i.exec(url);
+  return { root: m?.[1] ?? url, path: m?.[2] ?? "/" };
+}
+
+function hostOf(url: string): string {
+  return splitUrl(url).root.replace(/^[a-z]+:\/\//i, "");
+}
+
 function parent(url: string): string | null {
-  const u = new URL(url);
-  const parts = u.pathname.split("/").filter(Boolean);
+  const { root, path } = splitUrl(url);
+  const parts = path.split("/").filter(Boolean);
   if (!parts.length) return null;
   parts.pop();
-  return `${u.origin}/${parts.map((p) => `${p}/`).join("")}`;
+  return `${root}/${parts.map((p) => `${p}/`).join("")}`;
 }
+
+function folderLabel(url: string): string {
+  try {
+    return decodeURIComponent(splitUrl(url).path);
+  } catch {
+    return splitUrl(url).path;
+  }
+}
+
+const HINTS: Record<"http" | "smb", { scheme: string; address: string; password: string }> = {
+  http: {
+    scheme: "https://",
+    address: "For example https://nas.local/games/. Plain http:// works only on your local network, without a password.",
+    password: "Sent only over https://, only to this server. Kept on this device.",
+  },
+  smb: {
+    scheme: "smb://",
+    address:
+      "For example smb://nas.local/Games/, or smb://nas.local/ to list its shares. Only servers on your local network, using SMB 2 or 3.",
+    password: "Sent only to this server, protected by the sign-in protocol (NTLMv2). Kept on this device.",
+  },
+};
 
 /** Install → "From a network location": browse an HTTP or HTTPS server and download one ISO (ADR-0033). */
 export function NetworkSource({
@@ -74,8 +106,14 @@ export function NetworkSource({
     return () => removeEventListener(PROGRESS_EVENT, listener);
   }, []);
 
+  // "nas.local/Games" is taken to mean the chosen protocol's scheme.
+  const fullUrl = () => {
+    const text = url.trim();
+    return text && !text.includes("://") ? `${protocol === "smb" ? "smb://" : "https://"}${text}` : text;
+  };
+
   const access = (extra: string[] = allowHosts): NetAccess =>
-    chosen ? { locationId: chosen, allowHosts: extra } : { url, username, password, allowHosts: extra };
+    chosen ? { locationId: chosen, allowHosts: extra } : { url: fullUrl(), username, password, allowHosts: extra };
 
   const askRedirect = (host: string) =>
     showModal(
@@ -102,9 +140,10 @@ export function NetworkSource({
   const browse = (target: string) =>
     run(async () => {
       if (!chosen && remember) {
-        const saved = await installerNetRemember({ url, username, password });
+        const before = new Set(locations.map((l) => l.id));
+        const saved = await installerNetRemember({ url: fullUrl(), username, password });
         setLocations(saved);
-        const made = saved.find((l) => l.url === url.trim() && l.username === username.trim());
+        const made = saved.find((l) => !before.has(l.id));
         if (made) setChosen(made.id);
         setRemember(false);
       }
@@ -157,6 +196,8 @@ export function NetworkSource({
   }
 
   const location = locations.find((l) => l.id === chosen);
+  const form = protocol === "nfs" ? null : HINTS[protocol];
+  const mine = locations.filter((l) => (protocol === "smb") === l.url.toLowerCase().startsWith("smb://"));
 
   return (
     <div>
@@ -168,24 +209,27 @@ export function NetworkSource({
             ["nfs", "NFS"],
           ] as [Protocol, string][]
         ).map(([p, label]) => (
-          <DialogButton key={p} style={{ width: "auto", opacity: protocol === p ? 1 : 0.6 }} onClick={() => setProtocol(p)}>
+          <DialogButton
+            key={p}
+            style={{ width: "auto", opacity: protocol === p ? 1 : 0.6 }}
+            onClick={() => {
+              setProtocol(p);
+              setChosen(null);
+              setFolder(null);
+              setEntries([]);
+            }}
+          >
             {label}
           </DialogButton>
         ))}
       </Focusable>
-      {protocol === "smb" && (
-        <Field
-          label="Windows shares are coming"
-          description="Until then, open the share once in Desktop Mode (Dolphin); it then appears in the places above. Or turn on your NAS's web server and choose Web server."
-        />
-      )}
       {protocol === "nfs" && (
         <Field
           label="NFS needs the share mounted"
           description="Keepsake cannot mount NFS without root. Mount it once (for example in Desktop Mode or with an fstab entry) and it appears in the places above."
         />
       )}
-      {protocol === "http" && (
+      {form && (
         <>
           {stagingFree != null && stagingFree < LOW_SPACE && (
             <Field
@@ -193,11 +237,11 @@ export function NetworkSource({
               description={`Only ${gib(stagingFree)} is free on this device. An ISO is copied here before it is installed.`}
             />
           )}
-          {locations.length > 0 && (
+          {mine.length > 0 && (
             <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-              {locations.map((l) => (
+              {mine.map((l) => (
                 <DialogButton key={l.id} style={{ width: "auto", opacity: chosen === l.id ? 1 : 0.6 }} onClick={() => setChosen(l.id)}>
-                  {new URL(l.url).host}
+                  {hostOf(l.url)}
                   {l.username ? ` (${l.username})` : ""}
                 </DialogButton>
               ))}
@@ -214,13 +258,13 @@ export function NetworkSource({
             </Field>
           ) : (
             <>
-              <Field label="Address" description="For example https://nas.local/games/. Plain http:// works only on your local network, without a password." childrenLayout="below">
+              <Field label="Address" description={form.address} childrenLayout="below">
                 <TextField value={url} disabled={busy} onChange={(e) => setUrl(e.target.value)} />
               </Field>
               <Field label="User name (optional)" childrenLayout="below">
                 <TextField value={username} disabled={busy} onChange={(e) => setUsername(e.target.value)} />
               </Field>
-              <Field label="Password (optional)" description="Sent only over https://, only to this server. Kept on this device." childrenLayout="below">
+              <Field label="Password (optional)" description={form.password} childrenLayout="below">
                 <TextField value={password} bIsPassword disabled={busy} onChange={(e) => setPassword(e.target.value)} />
               </Field>
               <ToggleField label="Remember this location" checked={remember} disabled={busy} onChange={setRemember} />
@@ -233,7 +277,7 @@ export function NetworkSource({
             <DialogButton
               style={{ width: "auto" }}
               disabled={busy || (!location && !url.trim())}
-              onClick={() => void browse(location?.url ?? url.trim())}
+              onClick={() => void browse(location?.url ?? fullUrl())}
             >
               {busy ? "Working" : "Browse"}
             </DialogButton>
@@ -244,7 +288,7 @@ export function NetworkSource({
             )}
           </Focusable>
           {download.error && !download.running && <Field label="Last download" description={download.error} />}
-          {folder && <Field label={decodeURIComponent(new URL(folder).pathname)} description={`${entries.length} folders and ISO files.`} />}
+          {folder && <Field label={folderLabel(folder)} description={`${entries.length} folders and ISO files.`} />}
           {entries.map((e) => (
             <DialogButton
               key={e.url}
