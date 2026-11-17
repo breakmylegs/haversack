@@ -1,6 +1,10 @@
 """Open Keepsake on a PC: reuse the running host, or start one (ADR-0038, P5).
 
-    python -m keepsake.launcher [--background]
+    python -m keepsake.launcher [--background] [--restart]
+
+``--restart`` (after a self-update, ADR-0043) first waits for the old host to stop,
+then starts the version ``current.json`` names and opens it in the browser, since the
+old page's token is gone with the old host.
 
 ``host.json`` (port and token) is trusted only after the host it names answers a
 token-protected call: a file left by a host that has stopped, or a port now used
@@ -13,15 +17,18 @@ import asyncio
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 import webbrowser
+from collections.abc import Callable
 from typing import Any
 
 from . import host as pc_host
 from . import hosts
 
 CHECK_TIMEOUT = 3.0
+RESTART_WAIT = 30.0
 
 
 def running_host(runtime_dir: str, opener: Any = urllib.request.urlopen) -> str | None:
@@ -50,10 +57,28 @@ def running_host(runtime_dir: str, opener: Any = urllib.request.urlopen) -> str 
     return f"http://127.0.0.1:{port}/#token={token}"
 
 
+def wait_for_exit(
+    runtime_dir: str,
+    check: Callable[[str], str | None] = running_host,
+    sleep: Callable[[float], None] = time.sleep,
+    timeout: float = RESTART_WAIT,
+) -> bool:
+    """After an update, wait for the old host to stop, so the new one gets the port. False on timeout."""
+    waited = 0.0
+    while check(runtime_dir):
+        if waited >= timeout:
+            return False
+        sleep(0.5)
+        waited += 0.5
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     background = "--background" in argv
     paths = pc_host.platform_paths(hosts.host())
+    if "--restart" in argv and not wait_for_exit(paths.runtime_dir):
+        return 1  # the old host is still running: leave it be
     link = running_host(paths.runtime_dir)
     if link:
         if not background:

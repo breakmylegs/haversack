@@ -10,6 +10,7 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 - PC preview, Steam for Windows: on Windows, Keepsake finds Steam where Steam for Windows records it, and reads its libraries, games and non-Steam shortcuts. Games run natively there, so their saves are found in your Windows folders (ADR-0038).
 - PC preview, saves after you play: the PC host notices when a game starts and stops. When you quit, it saves to the cloud within seconds. It never restores a save while a game is running. On a PC, saves from your other devices arrive when Keepsake syncs while the game is closed (ADR-0041).
 - PC preview, install from the release: each release now carries `Keepsake-desktop-v<version>.zip`, covered by the release signature. Unzip it and run `install.pyw`. Keepsake installs into your own folders with no administrator rights, starts when you sign in, and opens in your browser. `install.pyw --uninstall` removes it and keeps your settings and saves (ADR-0042).
+- PC preview, updates: the desktop interface has an Updates page. Check, Install, then Restart. Keepsake installs a new version only when the release signature and checksum prove it is Keepsake's own. It keeps the version you had, so "Go back" returns to it. Your settings, saves and start-up choice are left as they are (ADR-0043).
 
 ## [0.25.0]
 

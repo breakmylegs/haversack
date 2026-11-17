@@ -105,6 +105,20 @@ def test_only_the_plugin_callables_can_be_called(running):
     assert call(api, "__init__", [])[0] == 404 and call(api, "_store", [])[0] == 404
 
 
+class FakeControl:
+    async def pc_update_status(self):
+        return {"installed": True}
+
+
+def test_host_only_calls_exist_only_once_the_host_has_set_them_up(running):
+    api, _ = running
+    assert call(api, "pc_update_status", [])[0] == 404
+    api.control = FakeControl()
+    assert call(api, "pc_update_status", []) == (200, {"ok": True, "result": {"installed": True}})
+    assert call(api, "pc_update_status", [], headers={"X-Keepsake-Token": "wrong"})[0] == 401
+    assert call(api, "_lock", [])[0] == 404 and api.app.calls == []
+
+
 def test_request_shape_rules(running):
     api, _ = running
     headers = {"X-Keepsake-Token": "synthetic-token", "Content-Type": "text/plain"}

@@ -61,6 +61,7 @@ class Release:
     zip_url: str | None
     sums_url: str | None
     signature_url: str | None
+    desktop_url: str | None = None  # Keepsake-desktop-v<version>.zip, the PC package (ADR-0042)
 
     @property
     def key(self) -> VersionKey:
@@ -108,10 +109,15 @@ def parse_releases(payload: Any) -> list[Release]:
                 zip_url=assets.get(zip_name),
                 sums_url=assets.get(SUMS_NAME),
                 signature_url=assets.get(SUMS_NAME + ".minisig"),
+                desktop_url=assets.get(desktop_zip_name(version)),
             )
         )
     releases.sort(key=lambda r: r.key, reverse=True)
     return releases
+
+
+def desktop_zip_name(version: str) -> str:
+    return f"{PLUGIN_NAME}-desktop-v{version}.zip"
 
 
 def parse_sums(text: str) -> dict[str, str]:
@@ -263,6 +269,42 @@ class Updater:
             "displayVersion": release.version,
             "sha256": digest,
             "installType": self.install_type(release.version),
+        }
+
+    def prepare_desktop(self, tag: str) -> dict[str, Any]:
+        """Verify the PC package of ``tag`` (ADR-0042): its ``SHA256SUMS`` entry, under the release signature.
+
+        Returns the address and SHA-256 to download and check; the PC self-update installs it.
+        """
+        releases = parse_releases(self._state().get("releases", []))
+        release = next((r for r in releases if r.tag == tag), None)
+        if release is None:
+            return {"ok": False, "reason": "unknown-release"}
+        if not release.desktop_url or not release.sums_url:
+            return {"ok": False, "reason": "no-pc-package"}
+        try:
+            check_url(release.desktop_url)
+            check_url(release.sums_url)
+            response = self._fetch(release.sums_url, headers={"Accept": "application/octet-stream"})
+        except NetError as exc:
+            return {"ok": False, "reason": "offline", "detail": str(exc)}
+        if response.status != 200 or len(response.body) > SUMS_MAX_BYTES:
+            return {"ok": False, "reason": "sums-unavailable"}
+        if self.public_key:
+            refused = self._check_signature(release, response.body)
+            if refused:
+                return refused
+        name = desktop_zip_name(release.version)
+        digest = parse_sums(response.body.decode("utf-8", errors="replace")).get(name)
+        if digest is None:
+            return {"ok": False, "reason": "sums-missing-zip"}
+        return {
+            "ok": True,
+            "signed": bool(self.public_key),
+            "url": release.desktop_url,
+            "name": name,
+            "version": release.version,
+            "sha256": digest,
         }
 
     def _check_signature(self, release: Release, sums: bytes) -> dict[str, Any] | None:

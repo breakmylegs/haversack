@@ -80,7 +80,7 @@ def installed(host: str, env: Mapping[str, str] | None = None) -> dict[str, Any]
     return data if isinstance(data, dict) else {}
 
 
-def _pythonw(python: str) -> str:
+def pythonw(python: str) -> str:
     """``pythonw.exe`` next to ``python.exe`` on Windows, so start-up opens no console window."""
     candidate = os.path.join(os.path.dirname(python), "pythonw.exe")
     return candidate if os.path.isfile(candidate) else python
@@ -93,8 +93,12 @@ def install(
     python: str = sys.executable,
     autostart: bool = True,
     registry: Any = None,
+    entries: bool = True,
 ) -> dict[str, Any]:
-    """Copy the package into its version folder, switch ``current.json``, write the launcher and start-up entries."""
+    """Copy the package into its version folder, switch ``current.json``, write the launcher and start-up entries.
+
+    ``entries=False`` (self-update) leaves the start-up and menu entries as the user set them.
+    """
     if host not in ("windows", "linux-desktop"):
         raise InstallError("on a Decky device Keepsake is installed through Decky, not this installer")
     version = package_version(package_dir)
@@ -115,8 +119,8 @@ def install(
     with open(launcher, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(LAUNCHER_TEXT)
     pruned = _prune(root, {version, record["previous"]})
-    entries = _start_entries(host, launcher, python, env, autostart, registry)
-    return {"version": version, "folder": target, "launcher": launcher, "pruned": pruned, "entries": entries}
+    written = _start_entries(host, launcher, python, env, autostart, registry) if entries else []
+    return {"version": version, "folder": target, "launcher": launcher, "pruned": pruned, "entries": written}
 
 
 def _prune(root: str, keep: set[str | None]) -> list[str]:
@@ -142,7 +146,7 @@ def _start_entries(
     written: list[str] = []
     if host == "windows":
         if autostart:
-            command = f'"{_pythonw(python)}" "{launcher}" --background'
+            command = f'"{pythonw(python)}" "{launcher}" --background'
             _set_run_value(command, registry)
             written.append("HKCU Run: Keepsake")
         return written
@@ -217,5 +221,5 @@ def main(package_dir: str, argv: list[str]) -> int:
         return 1
     print(f"Keepsake {result['version']} is installed in {result['folder']}.")
     if "--no-start" not in argv:
-        subprocess.Popen([_pythonw(sys.executable), result["launcher"]], close_fds=True)
+        subprocess.Popen([pythonw(sys.executable), result["launcher"]], close_fds=True)
     return 0

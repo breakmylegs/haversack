@@ -27,11 +27,13 @@ import argparse
 import asyncio
 import hmac
 import json
+import logging
 import os
 import re
 import secrets
 import signal
 import socket
+import subprocess
 import sys
 import threading
 import webbrowser
@@ -40,8 +42,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
-from . import discovery, hosts, pcwatch
+from . import discovery, hosts, pcinstall, pcupdate, pcwatch
 from .fsutil import atomic_write_json
+from .log import log_event
 from .paths import PluginPaths
 
 DEFAULT_PORT = 47120  # clear of 8080, 8384, 27040 and 1714 to 1764 (CLAUDE.md), and of Replication's 47110
@@ -158,6 +161,84 @@ CALLABLES = frozenset(
     }
 )
 
+# Calls only the PC host has: it updates and restarts itself, where Decky has its own installer (ADR-0043).
+HOST_CALLABLES = frozenset({"pc_update_status", "pc_update_apply", "pc_rollback", "pc_restart"})
+RESTART_DELAY = 0.5  # long enough for the answer to reach the page before the host stops
+
+
+def _spawn(command: list[str]) -> None:
+    subprocess.Popen(command, close_fds=True)
+
+
+class PcControl:
+    """The host-only calls (ADR-0043). Nothing here runs on a Decky device."""
+
+    def __init__(
+        self,
+        app: Any,
+        host: str,
+        stop: Callable[[], None],
+        env: Mapping[str, str] | None = None,
+        spawn: Callable[[list[str]], None] = _spawn,
+        fetch: pcupdate.Downloader = pcupdate.download,
+    ) -> None:
+        self.app, self.host, self._stop, self._env, self._spawn, self._fetch = app, host, stop, env, spawn, fetch
+        self._lock = asyncio.Lock()
+
+    def _installed(self) -> dict[str, Any]:
+        return pcinstall.installed(self.host, self._env)
+
+    async def pc_update_status(self) -> dict[str, Any]:
+        installed = self._installed()
+        return {
+            "installed": bool(installed.get("version")),
+            "running": self.app.version,
+            "current": installed.get("version"),
+            "previous": installed.get("previous"),
+            "busy": self.app.jobs.busy_reason(),
+        }
+
+    async def pc_update_apply(self, tag: str) -> dict[str, Any]:
+        if not self._installed().get("version"):
+            return {"ok": False, "reason": "not-installed"}
+        async with self._lock:
+            prepared: dict[str, Any] = await asyncio.to_thread(self.app.updater.prepare_desktop, str(tag))
+            if not prepared.get("ok"):
+                log_event(
+                    logging.INFO, "update.pc_refused", "PC update refused", tag=tag, reason=prepared.get("reason")
+                )
+                return prepared
+            try:
+                result = await asyncio.to_thread(pcupdate.apply, prepared, self.host, self._fetch, self._env)
+            except pcupdate.UpdateError as exc:
+                log_event(logging.WARNING, "update.pc_failed", "PC update failed", tag=tag, error=str(exc))
+                return {"ok": False, "reason": "install-failed", "detail": str(exc)}
+        log_event(logging.INFO, "update.pc_installed", "PC update installed", version=result["version"])
+        return result
+
+    async def pc_rollback(self) -> dict[str, Any]:
+        async with self._lock:
+            try:
+                result = await asyncio.to_thread(pcupdate.rollback, self.host, self._env)
+            except pcupdate.UpdateError as exc:
+                return {"ok": False, "reason": "no-previous", "detail": str(exc)}
+        log_event(
+            logging.INFO, "update.pc_rollback", "Switched back to the previous version", version=result["version"]
+        )
+        return result
+
+    async def pc_restart(self) -> dict[str, Any]:
+        """Start the installed launcher, which waits for this host to stop, then stop."""
+        busy = self.app.jobs.busy_reason()
+        if busy:
+            return {"ok": False, "reason": "busy", "detail": busy}
+        launcher = os.path.join(pcinstall.app_root(self.host, self._env), pcinstall.LAUNCHER)
+        if not os.path.isfile(launcher):
+            return {"ok": False, "reason": "not-installed"}
+        self._spawn([pcinstall.pythonw(sys.executable), launcher, "--restart"])
+        asyncio.get_running_loop().call_later(RESTART_DELAY, self._stop)
+        return {"ok": True}
+
 
 def platform_paths(host: str, env: Mapping[str, str] | None = None) -> PluginPaths:
     """Settings, state and logs where the platform keeps them; never inside the program folder."""
@@ -226,6 +307,7 @@ class Api:
     ) -> None:
         self.app, self.loop, self.token, self.events, self.page = app, loop, token, events, page
         self.ui_dir = ui_dir  # the built desktop interface (ADR-0040); None serves ``page`` only
+        self.control: PcControl | None = None  # the host-only calls, once the host has set them up
         self.port = 0
 
     def ui_file(self, path: str) -> tuple[bytes, str] | None:
@@ -252,8 +334,12 @@ class Api:
     def allowed_origins(self) -> set[str]:
         return {f"http://{h}" for h in self.allowed_hosts()}
 
+    def callable(self, name: str) -> bool:
+        return name in CALLABLES or (name in HOST_CALLABLES and self.control is not None)
+
     def call(self, name: str, args: list[Any]) -> Any:
-        method: Callable[..., Coroutine[Any, Any, Any]] = getattr(self.app, name)
+        target = self.control if name in HOST_CALLABLES else self.app
+        method: Callable[..., Coroutine[Any, Any, Any]] = getattr(target, name)
         return asyncio.run_coroutine_threadsafe(method(*args), self.loop).result(CALL_TIMEOUT)
 
 
@@ -348,7 +434,7 @@ def make_handler(api: Api) -> type[BaseHTTPRequestHandler]:
                 return
             parts = urlsplit(self.path)
             name = parts.path.removeprefix("/api/call/")
-            if not parts.path.startswith("/api/call/") or name not in CALLABLES:
+            if not parts.path.startswith("/api/call/") or not api.callable(name):
                 self._json(404, {"ok": False, "error": "no such call"})
                 return
             if (self.headers.get("Content-Type") or "").split(";")[0].strip() != "application/json":
@@ -414,16 +500,26 @@ PLACEHOLDER = (
 )
 
 
+def package_version(plugin_dir: str) -> str | None:
+    """The installed package's version (its ``VERSION`` file, ADR-0042); None when run from source."""
+    try:
+        return pcinstall.package_version(plugin_dir)
+    except pcinstall.InstallError:
+        return None
+
+
 async def run(port: int, open_browser: bool) -> None:
     from .app import KeepsakeApp
 
     host = hosts.host()
     paths = platform_paths(host)
     events = Events()
-    app = KeepsakeApp(paths, emit=events.emit, host=host)
+    app = KeepsakeApp(paths, emit=events.emit, host=host, version=package_version(paths.plugin_dir))
     await app.start()
     ui_dir = os.path.join(paths.plugin_dir, "desktop")
     api = Api(app, asyncio.get_running_loop(), secrets.token_urlsafe(32), events, PLACEHOLDER, ui_dir)
+    stop = asyncio.Event()
+    api.control = PcControl(app, host, stop.set)
     server = serve(api, port)
     os.makedirs(paths.runtime_dir, exist_ok=True)
     atomic_write_json(os.path.join(paths.runtime_dir, STATE_FILE), {"port": api.port, "token": api.token})
@@ -431,7 +527,6 @@ async def run(port: int, open_browser: bool) -> None:
     print(f"Keepsake ({host}) is running on http://127.0.0.1:{api.port}/", flush=True)
     if open_browser:
         webbrowser.open(url)
-    stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for name in ("SIGINT", "SIGTERM"):
         sig = getattr(signal, name, None)

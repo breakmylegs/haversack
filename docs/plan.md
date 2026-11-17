@@ -89,11 +89,21 @@ What changes in the remaining slices:
 
 Advisor is off by default and hidden on PCs. Installer stays Decky only (ADR-0038).
 
+### Owner requirements (Peter, 17 November 2026)
+
+These two come before R0. S1 is next after the PC self-update change. Each is recorded in its own ADR, and the research is checked against primary sources first.
+
+| Item | Scope | Rule |
+|---|---|---|
+| S1 One-button cloud sign-in | Authorization code with PKCE (S256) and an RFC 8252 loopback redirect: a one-shot listener on 127.0.0.1 on a random port, with a checked `state` and a timeout. The browser opens itself: the default browser on a PC and in Desktop Mode, Steam's browser in Gaming Mode where the provider allows it. Otherwise "Sign in on your phone" with a QR code, and device code is kept as the fallback. Tokens refresh silently. Client IDs only appear under Advanced. Also: an ADR on "one sign-in for all devices", ADR-0032's registration steps updated, and a Steam browser probe for the Legion Go 2. | Next after the current change. |
+| S2 Replication direct-only requirements | Hard requirements for slices 16 to 20:<br>- never through cloud storage or a relay (with a test);<br>- no compression at any layer (`OP_NO_COMPRESSION` asserted and tested);<br>- pause and resume with a durable journal and automatic recovery;<br>- "Stop and remove" cleans up everything;<br>- free-space checks, preallocation and sleep inhibition;<br>- speed and progress UI, and a bandwidth cap;<br>- cross-OS targets;<br>- fault injection tests.<br>Updates `docs/modules/replication.md`, the threat model and the slice plans, plus an ADR and the slice 16 device steps. | After S1, before R0. |
+
 ### After slice 25 (Peter, 17 November 2026)
 
 | Item | Scope | Rule |
 |---|---|---|
 | D1 User documentation | Detailed user docs on GitHub with screenshots and diagrams:<br>- Getting started for each device type;<br>- a guide per feature, privacy and an FAQ;<br>- automated screenshots from a frontend harness with sample data, with a personal-data check;<br>- Mermaid or SVG diagrams;<br>- a release-time step that regenerates screenshots and checks links and images.<br>Where it lives and how it is published is decided in its own ADR. | Not started before the items above, unless all of them are blocked. Its own pull request. |
+| R0 Post-v2 roadmap (Peter, 17 November 2026) | A candidate backlog of 32 items from market research, not a spec:<br>- A: save sync and safety;<br>- B: coverage;<br>- C: storage and prefixes;<br>- D: multi-device;<br>- E: Advisor;<br>- F: Installer;<br>- G: UX and accessibility;<br>- H: distribution and security.<br>For each item: check the code (skip or shrink what exists), the principles (P7, P9, P18) and the threat model; research primary sources; decide build, defer or reject in one ADR, "Post-v2 roadmap". Accepted items become new slices here, and anything that changes a principle gets its own ADR. The full list is in the request of 17 November 2026, recorded in that ADR. | After D1. Started only when everything ahead is done or blocked. Peter gets a table of item, decision and slice, then building carries on. |
 
 ## Backlog (not scheduled)
 

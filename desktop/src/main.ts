@@ -3,7 +3,17 @@
 
 import { ApiError, call, hasToken, initialPage, onEvents } from "./api.js";
 import { h, replace, size, when } from "./dom.js";
-import type { ConflictDetails, ConflictEntry, HealthCheck, HistoryItem, ModuleStatus, QamSummary } from "./types.js";
+import type {
+  ConflictDetails,
+  ConflictEntry,
+  HealthCheck,
+  HistoryItem,
+  ModuleStatus,
+  PcResult,
+  PcUpdateStatus,
+  QamSummary,
+  UpdateCheck,
+} from "./types.js";
 
 type Page = { id: string; title: string; render: (main: HTMLElement) => Promise<void> };
 
@@ -248,6 +258,91 @@ function toggle(m: ModuleStatus, main: HTMLElement): HTMLInputElement {
   return input;
 }
 
+// Updates (the PC host updates itself, ADR-0043)
+
+const updateRefusals: Record<string, string> = {
+  "not-installed": "Keepsake is running from a folder, not installed, so it cannot update itself here.",
+  "no-pc-package": "This release has no PC package.",
+  "unsigned-release": "This release is not signed, so it is refused.",
+  "bad-signature": "This release's signature is not valid, so it is refused.",
+  "sums-missing-zip": "This release's checksums do not list the PC package.",
+  offline: "GitHub could not be reached.",
+  busy: "Keepsake is busy. Try again when it has finished.",
+};
+
+function refusal(result: PcResult): string {
+  return result.detail ?? updateRefusals[result.reason ?? ""] ?? `Refused: ${result.reason ?? "unknown reason"}`;
+}
+
+function restartButton(): HTMLButtonElement {
+  return button(
+    "Restart Keepsake now",
+    async () => {
+      const result = await call<PcResult>("pc_restart");
+      if (!result.ok) {
+        toast(refusal(result));
+        return;
+      }
+      replace(document.getElementById("main") as HTMLElement, h("h1", {}, "Restarting"), h("p", {}, "Keepsake opens again in a new tab in a few seconds. You can close this one."));
+    },
+    "primary",
+  );
+}
+
+async function updates(main: HTMLElement, check?: UpdateCheck, installed?: string): Promise<void> {
+  const status = await call<PcUpdateStatus>("pc_update_status");
+  const latest = check?.latest;
+  const offer = check?.updateAvailable && latest?.desktop_url ? latest : null;
+  replace(
+    main,
+    h("h1", {}, "Updates"),
+    h(
+      "dl",
+      { class: "facts" },
+      h("dt", {}, "Running"),
+      h("dd", {}, status.running),
+      h("dt", {}, "Installed"),
+      h("dd", {}, status.installed ? (status.current ?? "") : "Not installed (running from a folder)"),
+      h("dt", {}, "Previous version"),
+      h("dd", {}, status.previous ?? "None kept"),
+    ),
+    h("p", { class: "small" }, "Every update is checked against Keepsake's release signature before anything is installed. Your settings and saves are never touched."),
+    check?.error ? h("p", { class: "warn" }, `Could not check: ${check.error}`) : null,
+    check && !check.error && !offer ? h("p", {}, latest && check.updateAvailable ? `Keepsake ${latest.version} has no PC package yet.` : "Keepsake is up to date.") : null,
+    installed ? h("p", {}, `Keepsake ${installed} is installed. It starts when Keepsake restarts.`) : null,
+    h(
+      "div",
+      { class: "actions" },
+      button("Check for updates", async () => updates(main, await call<UpdateCheck>("check_for_updates", true))),
+      offer && status.installed
+        ? button(
+            `Install ${offer.version}`,
+            async () => {
+              const result = await call<PcResult>("pc_update_apply", offer.tag);
+              if (!result.ok) {
+                toast(refusal(result));
+                return;
+              }
+              await updates(main, undefined, result.version);
+            },
+            "primary",
+          )
+        : null,
+      installed || (status.installed && status.current !== status.running) ? restartButton() : null,
+      status.installed && status.previous
+        ? button(`Go back to ${status.previous}`, async () => {
+            const result = await call<PcResult>("pc_rollback");
+            if (!result.ok) {
+              toast(refusal(result));
+              return;
+            }
+            await updates(main, undefined, result.version);
+          })
+        : null,
+    ),
+  );
+}
+
 // The shell
 
 const PAGES: Page[] = [
@@ -256,6 +351,7 @@ const PAGES: Page[] = [
   { id: "history", title: "History", render: history },
   { id: "health", title: "Health", render: health },
   { id: "modules", title: "Modules", render: modules },
+  { id: "updates", title: "Updates", render: (main) => updates(main) },
 ];
 
 async function show(id: string): Promise<void> {
