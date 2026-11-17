@@ -81,3 +81,32 @@ export interface ModuleStatus {
   running: boolean;
   failed: string | null;
 }
+
+export interface ReleaseInfo {
+  tag: string;
+  version: string;
+  prerelease: boolean;
+  desktop_url: string | null;
+}
+
+export interface UpdateCheck {
+  current: string;
+  latest: ReleaseInfo | null;
+  updateAvailable: boolean;
+  error: string | null;
+}
+
+export interface PcUpdateStatus {
+  installed: boolean;
+  running: string;
+  current: string | null;
+  previous: string | null;
+  busy: string | null;
+}
+
+export interface PcResult {
+  ok: boolean;
+  reason?: string;
+  detail?: string;
+  version?: string;
+}

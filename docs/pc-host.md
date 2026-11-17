@@ -1,6 +1,6 @@
 # Keepsake on a PC (preview)
 
-The PC host runs Keepsake's core without Decky, on Windows or Linux (ADR-0038). It is a preview: the desktop interface (P3), the process watcher (P4) and the signed PC package with self-update (P5) come next. Until then, it is for development and for trying the save layout on a real PC.
+The PC host runs Keepsake's core without Decky, on Windows or Linux (ADR-0038). It is a preview: the desktop interface has its first screens, and the rest follow. Until it is complete, it is for trying Keepsake on a real PC.
 
 ## Install it from a release
 
@@ -14,6 +14,14 @@ Later, open Keepsake by running `keepsake.pyw` in `%LOCALAPPDATA%\Keepsake\app` 
 - **Install without starting at sign-in:** add `--no-autostart`.
 
 The zip is listed in the release's signed `SHA256SUMS`.
+
+## Update it
+
+Open the **Updates** page and choose **Check for updates**, then **Install**, then **Restart Keepsake now**. Keepsake opens again in a new tab.
+
+- **What is checked:** an update is installed only when the release's signature and checksum prove it is Keepsake's own.
+- **Going back:** the version you had is kept. **Go back to** returns to it after a restart.
+- **What stays:** your settings, saves and start-up choice are never changed by an update (ADR-0043).
 
 ## Run it from a clone
 
