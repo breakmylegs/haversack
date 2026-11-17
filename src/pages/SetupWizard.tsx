@@ -166,7 +166,7 @@ export function SetupWizard() {
 
       {step === 1 && settings && (
         <>
-          <Field description="Choose OneDrive and sign in with your phone using the code or QR code. You can stay on the test store and sign in later, but saves then stay on this device." />
+          <Field description="OneDrive is recommended: press Sign in, then on your phone scan the QR code or enter the code, and allow Keepsake access to Apps/Keepsake only. You can stay on the test store and sign in later, but saves then stay on this device." />
           <CloudSection settings={settings} onSettings={setSettings} />
         </>
       )}

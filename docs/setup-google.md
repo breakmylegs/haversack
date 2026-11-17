@@ -1,6 +1,10 @@
 # Set up Google Drive for Keepsake
 
-Keepsake signs in to Google Drive with the device flow for TVs and limited-input devices, so you finish sign-in on your phone. Because the Keepsake repository is public, it ships no Google credentials: you create your own once. Keepsake asks only for the `drive.appdata` scope, so it can see its own hidden app folder in your Drive and nothing else.
+Keepsake signs in to Google Drive with the device flow for TVs and limited-input devices, so you finish sign-in on your phone. Keepsake asks only for the `drive.appdata` scope, so it can see its own hidden app folder in your Drive and nothing else.
+
+**Most people do not need this page.** Once a release carries Keepsake's built-in Google client (ADR-0032: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `py_modules/keepsake/clients.py`), you press **Sign in** and approve on your phone. Google says the secret of this client type cannot be kept confidential, so shipping it is expected. The steps below are for the owner creating that client, and for anyone who wants their own under **Advanced: use my own client ID**.
+
+For the built-in client, publish the consent screen to **Production**: `drive.appdata` is a non-sensitive scope, so Production has no 100-user cap, no 7-day sign-in expiry and no unverified-app warning (A156).
 
 ## Create the credentials (once, on a computer or phone browser)
 
@@ -12,7 +16,7 @@ Keepsake signs in to Google Drive with the device flow for TVs and limited-input
 
 ## In Keepsake (Gaming Mode)
 
-1. Settings, Cloud, Google Drive.
+1. Settings, Cloud, Google Drive. If the release has a built-in client, turn on **Advanced: use my own client ID**.
 2. Enter the client ID and client secret with the on-screen keyboard, then Save settings.
 3. Sign in: open the address shown (or scan the QR code) on your phone, check the page is on google.com and names your app, and enter the code.
 4. Test connection, then "Use Google Drive for snapshots".

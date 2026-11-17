@@ -1,5 +1,7 @@
 # Setting up the OneDrive app registration
 
+**Most people do not need this page.** Once a release carries Keepsake's built-in client (ADR-0032), you pick OneDrive, press **Sign in** and approve on your phone. This page is for the owner registering that built-in client, and for anyone who wants their own registration under **Advanced: use my own client ID**.
+
 Keepsake signs in to OneDrive with Microsoft's device code flow: the handheld shows a code, and you finish sign-in on your phone. For that, Keepsake needs a **public client app registration** in Microsoft Entra. It takes about five minutes, once, from any browser.
 
 A public client ID is not a secret. It identifies the app; it cannot be used to read anyone's files without that person signing in.
@@ -23,7 +25,7 @@ A public client ID is not a secret. It identifies the app; it cannot be used to 
 
 ## In Keepsake
 
-1. Open Keepsake, Settings, **Cloud: OneDrive**.
+1. Open Keepsake, Settings, **Cloud: OneDrive**. If the release has a built-in client, turn on **Advanced: use my own client ID**.
 2. Enter the client ID with the on-screen keyboard and press **Save client ID**.
 3. Press **Sign in**. Scan the QR code with your phone (or open `microsoft.com/devicelogin`), enter the code shown, sign in, and accept the permissions. Check that the page is on `microsoft.com` and names **Keepsake**.
 4. The handheld shows "Signed in to OneDrive". Repeat on the other device with the same client ID and the same Microsoft account.
@@ -32,6 +34,6 @@ A public client ID is not a secret. It identifies the app; it cannot be used to 
 
 Only its own folder, `Apps/Keepsake` in your OneDrive. It cannot see any other file. You can see, back up or delete that folder in OneDrive like any other.
 
-## Committing the client ID
+## The built-in client ID
 
-Because it is not a secret, the client ID may be committed to the repository later as a default, so new installs do not need to type it. Until then it is entered per device.
+Because it is not a secret, the owner's client ID is committed as `ONEDRIVE_CLIENT_ID` in `py_modules/keepsake/clients.py`, so new installs do not need to type it. A client ID you saved yourself is used instead, and every saved sign-in keeps refreshing with the client it was made with. Turning the Advanced option off clears your own ID; the built-in one is used from the next sign-in.

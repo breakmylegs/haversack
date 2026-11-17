@@ -20,7 +20,8 @@ import { BACKEND_LABELS } from "../format";
 import { QrCode } from "./QrCode";
 
 const SIGNIN_EVENT = "keepsake_signin";
-const BACKENDS: Backend[] = ["local", "onedrive", "gdrive", "webdav", "s3"];
+// OneDrive first: with the built-in client it is pick, sign in on the phone, done (ADR-0032).
+const BACKENDS: Backend[] = ["onedrive", "gdrive", "webdav", "s3", "local"];
 
 type FieldSpec = { name: string; label: string; secret?: boolean; bool?: boolean; hint?: string };
 
@@ -45,17 +46,24 @@ const FORMS: Partial<Record<Backend, FieldSpec[]>> = {
   ],
 };
 
+const GRANT: Partial<Record<Backend, string>> = {
+  onedrive: "Microsoft asks you to allow Keepsake access to Apps/Keepsake only.",
+  gdrive: "Google asks you to allow Keepsake access to its own app data only.",
+};
+
 const HELP: Record<Backend, string> = {
   local: "Snapshots stay in a test store on this device. Nothing is shared with your other devices.",
-  onedrive: "Keepsake can see only its own folder, Apps/Keepsake, in your OneDrive.",
-  gdrive: "Keepsake can see only its own hidden app folder in your Google Drive, never your files.",
+  onedrive: "Sign in with your Microsoft account on your phone. Keepsake can read and write only the Apps/Keepsake folder in your OneDrive, never your other files.",
+  gdrive: "Sign in with your Google account on your phone. Keepsake can use only its own hidden app folder in your Google Drive, never your files.",
   webdav: "Your own WebDAV server, such as Nextcloud. It must refuse to overwrite files (Keepsake checks).",
   s3: "Amazon S3 or an S3-compatible service. It must support conditional writes (Keepsake checks).",
 };
 
 export function CloudSection({ settings, onSettings }: { settings: Settings; onSettings: (s: Settings) => void }) {
   const [status, setStatus] = useState<CloudStatus | null>(null);
-  const [view, setView] = useState<Backend>(settings.snapshotStore);
+  // Still on the test store: open on OneDrive, the recommended choice.
+  const [view, setView] = useState<Backend>(settings.snapshotStore === "local" ? "onedrive" : settings.snapshotStore);
+  const [advanced, setAdvanced] = useState(false);
   const [clientId, setClientId] = useState(settings.onedriveClientId);
   const [config, setConfig] = useState<BackendConfig | null>(null);
   const [draft, setDraft] = useState<Record<string, string | boolean>>({});
@@ -80,6 +88,7 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
   useEffect(() => {
     setConfig(null);
     setDraft({});
+    setAdvanced(false);
     if (FORMS[view]) {
       backendConfig(view)
         .then((c) => {
@@ -116,6 +125,29 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
     });
 
   const locked = settings.readOnly || busy;
+  const oauth = view === "onedrive" || view === "gdrive";
+  const builtIn = oauth && Boolean(status?.builtInClient?.[view]);
+  const own = oauth && Boolean(status?.ownClient?.[view]);
+  // With a built-in client the client ID fields are an Advanced option, shown while one is saved.
+  const showOwn = !builtIn || advanced || own;
+  const form = view === "gdrive" && !showOwn ? [] : (FORMS[view] ?? []);
+  const canSignIn = view === "onedrive" ? builtIn || Boolean(settings.onedriveClientId) : builtIn || Boolean(config?.configured);
+
+  const useOwnClient = (on: boolean) => {
+    setAdvanced(on);
+    if (on || !own) return;
+    // Back to Keepsake's built-in client. A saved sign-in keeps refreshing with the client it was made with.
+    void run(async () => {
+      if (view === "onedrive") {
+        onSettings(await setSetting("onedriveClientId", ""));
+        setClientId("");
+      } else {
+        setConfig(await setBackendConfig("gdrive", { clientId: "", clientSecret: "" }));
+        setDraft({ clientId: "" });
+      }
+      return "Your own client ID is cleared. Keepsake's built-in sign-in is used from the next sign-in.";
+    });
+  };
 
   return (
     <div>
@@ -133,7 +165,21 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
       </Focusable>
       <Field description={HELP[view]} />
 
-      {view === "onedrive" && (
+      {builtIn && (
+        <ToggleField
+          label="Advanced: use my own client ID"
+          description={
+            own
+              ? "Your own app registration is in use. Turn this off to use Keepsake's built-in sign-in."
+              : "Only if you have your own app registration. Keepsake's built-in sign-in needs none."
+          }
+          checked={advanced || own}
+          disabled={locked}
+          onChange={useOwnClient}
+        />
+      )}
+
+      {view === "onedrive" && showOwn && (
         <Field label="OneDrive client ID" description="From your app registration. See docs/setup-entra.md." childrenLayout="below">
           <TextField value={clientId} disabled={locked} onChange={(e) => setClientId(e.target.value)} />
           <DialogButton
@@ -146,7 +192,7 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
         </Field>
       )}
 
-      {(FORMS[view] ?? []).map((f) =>
+      {form.map((f) =>
         f.bool ? (
           <ToggleField
             key={f.name}
@@ -172,7 +218,7 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
           </Field>
         ),
       )}
-      {FORMS[view] && (
+      {form.length > 0 && (
         <DialogButton
           style={{ width: "auto", margin: "8px 0" }}
           disabled={locked}
@@ -192,7 +238,7 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
           label="Sign in with your phone"
           description={`Open ${code.verificationUri} or scan the code, then enter the code below. Check the page is on ${
             view === "gdrive" ? "google.com" : "microsoft.com"
-          } and asks for access for Keepsake. The code expires in ${Math.round(code.expiresIn / 60)} minutes.`}
+          } and asks for access for Keepsake. ${GRANT[view] ?? ""} The code expires in ${Math.round(code.expiresIn / 60)} minutes.`}
           childrenLayout="below"
         >
           <div style={{ fontSize: 40, fontWeight: "bold", letterSpacing: 4, margin: "8px 0" }}>{code.userCode}</div>
@@ -204,10 +250,10 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
       )}
 
       <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "8px 0" }}>
-        {(view === "onedrive" || view === "gdrive") && !signedIn && !code && (
+        {oauth && !signedIn && !code && (
           <DialogButton
             style={{ width: "auto" }}
-            disabled={locked || (view === "onedrive" ? !clientId : !config?.configured)}
+            disabled={locked || !canSignIn}
             onClick={() => void run(async () => (setCode(await startSignin(view)), null))}
           >
             Sign in

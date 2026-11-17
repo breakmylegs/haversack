@@ -119,7 +119,7 @@ def test_google_refresh_sends_the_secret_and_no_scope(tmp_path):
     store = TokenStore(str(tmp_path), GOOGLE.token_file)
     store.save({"client_id": "c", "access_token": "old", "refresh_token": "rt", "expires_at": 0})
     transport = Recorder([(200, {"access_token": "new", "expires_in": 3600})])
-    manager = TokenManager(store, lambda: "c", transport=transport, provider=GOOGLE, client_secret=lambda: SECRET)
+    manager = TokenManager(store, lambda: "c", transport=transport, provider=GOOGLE, client_secret=lambda _: SECRET)
     assert manager.access_token() == "new"
     form = transport.calls[0][1]
     assert form["client_secret"] == SECRET and "scope" not in form and form["refresh_token"] == "rt"

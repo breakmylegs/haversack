@@ -236,7 +236,7 @@ class TokenManager:
         transport: net.Transport = net.request,
         clock: Callable[[], float] = time.time,
         provider: Provider = MICROSOFT,
-        client_secret: Callable[[], str] = lambda: "",
+        client_secret: Callable[[str], str] = lambda client_id: "",
     ) -> None:
         self.store = store
         self.client_id = client_id
@@ -264,7 +264,7 @@ class TokenManager:
         fields = {"grant_type": "refresh_token", "client_id": client_id, "refresh_token": str(tokens["refresh_token"])}
         if self.provider.refresh_with_scope:
             fields["scope"] = self.provider.scope
-        secret = self.client_secret()
+        secret = self.client_secret(client_id)  # the secret of the client this sign-in was made with
         if secret:
             fields["client_secret"] = secret
         status, data = _form(self.transport, self.provider.token_url, fields)

@@ -20,6 +20,7 @@ from collections.abc import Callable, Coroutine
 from typing import Any
 
 from . import (
+    clients,
     configrev,
     diagnostics,
     discovery,
@@ -142,10 +143,10 @@ class KeepsakeApp:
         self.credentials = CredentialStore(paths.settings_dir)
         self.google_tokens = TokenManager(
             TokenStore(paths.settings_dir, GOOGLE.token_file),
-            lambda: str(self.credentials.load("gdrive")["clientId"]),
+            lambda: clients.google_client(self.credentials.load("gdrive"))[0],
             transport=google_transport,
             provider=GOOGLE,
-            client_secret=lambda: str(self.credentials.load("gdrive")["clientSecret"]),
+            client_secret=lambda client_id: clients.google_secret_for(client_id, self.credentials.load("gdrive")),
         )
         self.paths = paths
         self.home = home
@@ -160,7 +161,9 @@ class KeepsakeApp:
         self._background: list[asyncio.Task[Any]] = []
         self.token_store = TokenStore(paths.settings_dir)
         self.tokens = TokenManager(
-            self.token_store, lambda: str(self.settings.get("onedriveClientId")), transport=transport
+            self.token_store,
+            lambda: clients.onedrive_client_id(self.settings.get("onedriveClientId")),
+            transport=transport,
         )
         self._transport = transport
         self._signin: DeviceCodeFlow | None = None
@@ -825,7 +828,9 @@ class KeepsakeApp:
         else:
             manager = self._token_manager(store)
             client_set = bool(
-                self.credentials.configured("gdrive") if store == "gdrive" else self.settings.get("onedriveClientId")
+                clients.google_client(self.credentials.load("gdrive"))[0]
+                if store == "gdrive"
+                else clients.onedrive_client_id(self.settings.get("onedriveClientId"))
             )
             signed_in = await asyncio.to_thread(manager.signed_in)
             problem = manager.last_error
@@ -838,6 +843,13 @@ class KeepsakeApp:
             "name": BACKEND_NAMES.get(store, store),
             "onedriveSignedIn": await asyncio.to_thread(self.tokens.signed_in),
             "googleSignedIn": await asyncio.to_thread(self.google_tokens.signed_in),
+            # ADR-0032: with a built-in client the sign-in screens need no client ID, and
+            # "Use my own client ID" moves under Advanced (shown open while one is saved).
+            "builtInClient": {"onedrive": clients.onedrive_builtin(), "gdrive": clients.google_builtin()},
+            "ownClient": {
+                "onedrive": bool(self.settings.get("onedriveClientId")),
+                "gdrive": self.credentials.configured("gdrive"),
+            },
         }
 
     async def start_signin(self, backend: str = "onedrive") -> dict[str, Any]:
@@ -847,17 +859,19 @@ class KeepsakeApp:
             if self._signin is not None:
                 self._signin.cancelled.set()
             if backend == "gdrive":
-                client = self.credentials.load("gdrive")
+                client_id, secret = clients.google_client(self.credentials.load("gdrive"))
                 flow = DeviceCodeFlow(
-                    str(client["clientId"]),
+                    client_id,
                     self.google_tokens.store,
                     transport=self._google_transport,
                     provider=GOOGLE,
-                    client_secret=str(client["clientSecret"]),
+                    client_secret=secret,
                 )
             else:
                 flow = DeviceCodeFlow(
-                    str(self.settings.get("onedriveClientId")), self.token_store, transport=self._transport
+                    clients.onedrive_client_id(self.settings.get("onedriveClientId")),
+                    self.token_store,
+                    transport=self._transport,
                 )
             shown = await asyncio.to_thread(flow.start)
             self._signin = flow
