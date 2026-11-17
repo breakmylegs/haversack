@@ -22,6 +22,8 @@ extend-exclude = [
     "out",
     ".venv",
     "decky.pyi",
+    # Third-party code, rebuilt by scripts/vendor.py and pinned by tests/test_vendored.py (ADR-0034).
+    "py_modules/keepsake/_vendor",
     "tests/test_restore_regression_tmp_path_factory_temppathfactory.py",
 ]
 
@@ -43,3 +45,8 @@ mypy_path = ["py_modules", "."]
 files = ["py_modules/keepsake", "main.py"]
 strict = true
 warn_unused_ignores = true
+exclude = ["py_modules/keepsake/_vendor/"]
+
+[[tool.mypy.overrides]]
+module = ["smb.*", "nmb.*"]  # vendored pysmb has no type hints (ADR-0034)
+ignore_missing_imports = true

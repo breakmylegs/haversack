@@ -2,3 +2,5 @@
 * text=auto eol=lf
 *.png binary
 *.zip binary
+# Vendored code is kept byte for byte as scripts/vendor.py wrote it; tests/test_vendored.py checks the hashes.
+py_modules/keepsake/_vendor/** -text

@@ -49,7 +49,7 @@ from .fsutil import atomic_write_json, read_json
 from .gameconfig import DEFAULT as GAME_DEFAULTS
 from .gameconfig import GameConfigStore, custom_path_from_absolute
 from .importers import ludusavi
-from .installer import artwork, remote, udisks
+from .installer import artwork, remote, smbshare, udisks
 from .installer import files as installer_files
 from .installer.artwork import SteamGridDB
 from .installer.service import Installer, InstallerError
@@ -162,6 +162,8 @@ class KeepsakeApp:
         self._net: dict[str, Any] = {"running": False}
         self._net_cancel = False
         self._net_connect: remote.Connector = remote._connect  # tests use a scripted server
+        self._smb_connect: smbshare.Connector = smbshare._connect  # and a fake share
+        self._net_resolve: remote.Resolver = remote._resolve
         self._manifest_progress: dict[str, Any] = {"stage": "idle", "running": False}
         self._background: list[asyncio.Task[Any]] = []
         self.token_store = TokenStore(paths.settings_dir)
@@ -2253,8 +2255,11 @@ class KeepsakeApp:
 
     NET_PROGRESS_EVENT = "keepsake_netinstall_progress"
 
-    def _net_session(self, access: dict[str, Any]) -> remote.Session:
-        """A session for one user action: a remembered location, or an address typed just now."""
+    def _net_session(self, access: dict[str, Any]) -> remote.Session | smbshare.Share:
+        """A session for one user action: a remembered location, or an address typed just now.
+
+        ``smb://`` addresses are Windows shares (ADR-0034); everything else is HTTP or HTTPS.
+        """
         access = access if isinstance(access, dict) else {}
         allowed = {str(h) for h in access.get("allowHosts") or [] if isinstance(h, str)}
         if access.get("locationId"):
@@ -2262,7 +2267,25 @@ class KeepsakeApp:
             url, username = loc["url"], loc["username"]
         else:
             url, username, password = (str(access.get(k) or "") for k in ("url", "username", "password"))
-        return remote.Session(url, username, password, allowed=allowed, connect=self._net_connect)
+        if url.strip().lower().startswith("smb://"):
+            return smbshare.Share(url, username, password, connect=self._smb_connect, resolve=self._net_resolve)
+        return remote.Session(
+            url, username, password, allowed=allowed, connect=self._net_connect, resolve=self._net_resolve
+        )
+
+    @staticmethod
+    def _net_target(session: remote.Session | smbshare.Share, url: str, what: str) -> str:
+        """``url`` checked to be on the session's own server."""
+        if isinstance(session, smbshare.Share):
+            address = smbshare.parse(url)
+            same = (address.host, address.port) == (session.home, session.address.port)
+            target = address.url(folder=what == "browse")
+        else:
+            target = remote.check_location(url)
+            same = (urlsplit(target).hostname or "").lower() == session.home
+        if not same:
+            raise remote.RemoteError(f"{what} within the location you chose")
+        return target
 
     async def installer_net_locations(self) -> list[dict[str, Any]]:
         return await asyncio.to_thread(self.net_locations.public)
@@ -2288,10 +2311,9 @@ class KeepsakeApp:
         self._installer()
         try:
             session = self._net_session(access)
-            target = remote.check_location(url or session.url)
-            if (urlsplit(target).hostname or "").lower() != session.home:
-                raise remote.RemoteError("browse within the location you chose")
-            entries = await asyncio.to_thread(remote.list_folder, session, target)
+            target = self._net_target(session, url or session.url, "browse")
+            lister = smbshare.list_folder if isinstance(session, smbshare.Share) else remote.list_folder
+            entries = await asyncio.to_thread(lister, session, target)  # type: ignore[arg-type]
         except remote.RedirectElsewhere as exc:
             return {"url": url, "entries": [], "redirectHost": exc.host, "error": str(exc)}
         except remote.RemoteError as exc:
@@ -2315,11 +2337,9 @@ class KeepsakeApp:
             raise ValueError("a download is already running; cancel it first")
         try:
             session = self._net_session(access)
-            url = remote.check_location(url)
+            url = self._net_target(session, url, "download")
             name = remote.file_name(url)
             remote.check_sha256(sha256)
-            if (urlsplit(url).hostname or "").lower() != session.home:
-                raise remote.RemoteError("download from the location you chose")
             folder = await asyncio.to_thread(installer.downloads_dir)
         except (remote.RemoteError, InstallerError) as exc:
             raise ValueError(str(exc)) from exc
@@ -2339,7 +2359,13 @@ class KeepsakeApp:
         return dict(self._net)
 
     async def _run_net_download(
-        self, installer: Installer, session: remote.Session, url: str, folder: str, title: str, sha256: str
+        self,
+        installer: Installer,
+        session: remote.Session | smbshare.Share,
+        url: str,
+        folder: str,
+        title: str,
+        sha256: str,
     ) -> None:
         loop = asyncio.get_running_loop()
         last = [0.0]
@@ -2355,8 +2381,9 @@ class KeepsakeApp:
 
         outcome: dict[str, Any] = {}
         try:
+            fetch = smbshare.download if isinstance(session, smbshare.Share) else remote.download
             path = await asyncio.to_thread(
-                remote.download,
+                fetch,  # type: ignore[arg-type]
                 session,
                 url,
                 folder,
