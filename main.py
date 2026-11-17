@@ -71,8 +71,8 @@ class Plugin:
     async def cloud_status(self) -> dict[str, Any]:
         return await self.app.cloud_status()
 
-    async def start_signin(self, backend: str = "onedrive") -> dict[str, Any]:
-        return await self.app.start_signin(backend)
+    async def start_signin(self, backend: str = "onedrive", method: str = "phone") -> dict[str, Any]:
+        return await self.app.start_signin(backend, method)
 
     async def cancel_signin(self) -> dict[str, Any]:
         return await self.app.cancel_signin()
@@ -318,6 +318,9 @@ class Plugin:
 
     async def https_test(self) -> dict[str, Any]:
         return await self.app.https_test()
+
+    async def signin_probe(self, action: str = "start") -> dict[str, Any]:
+        return await self.app.signin_probe(action)
 
     async def record_probe_event(self, kind: str, payload: Any) -> int:
         return await self.app.record_probe_event(kind, payload)

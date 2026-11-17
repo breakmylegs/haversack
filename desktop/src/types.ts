@@ -110,3 +110,12 @@ export interface PcResult {
   detail?: string;
   version?: string;
 }
+
+export interface CloudStatus {
+  store: string;
+  name: string;
+  problem: string | null;
+  onedriveSignedIn: boolean;
+  googleSignedIn: boolean;
+  methods?: Record<"onedrive" | "gdrive", { browser: boolean; phone: boolean }>;
+}

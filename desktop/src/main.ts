@@ -4,6 +4,7 @@
 import { ApiError, call, hasToken, initialPage, onEvents } from "./api.js";
 import { h, replace, size, when } from "./dom.js";
 import type {
+  CloudStatus,
   ConflictDetails,
   ConflictEntry,
   HealthCheck,
@@ -258,6 +259,86 @@ function toggle(m: ModuleStatus, main: HTMLElement): HTMLInputElement {
   return input;
 }
 
+// Cloud sign-in: one button, the browser, done (ADR-0044)
+
+const PROVIDERS: { id: "onedrive" | "gdrive"; label: string; page: string }[] = [
+  { id: "onedrive", label: "OneDrive", page: "Microsoft" },
+  { id: "gdrive", label: "Google Drive", page: "Google" },
+];
+
+async function cloud(main: HTMLElement): Promise<void> {
+  const status = await call<CloudStatus>("cloud_status");
+  const signedIn = { onedrive: status.onedriveSignedIn, gdrive: status.googleSignedIn };
+  replace(
+    main,
+    h("h1", {}, "Cloud"),
+    h("p", {}, `Snapshots go to ${status.name}.`),
+    status.problem ? h("p", { class: "warn" }, `Needs attention: ${status.problem}`) : null,
+    h(
+      "ul",
+      { class: "list" },
+      ...PROVIDERS.map((p) =>
+        h(
+          "li",
+          { class: "card" },
+          h("h2", {}, p.label),
+          h("p", {}, signedIn[p.id] ? "Signed in." : `Not signed in. A ${p.page} page opens in a new tab: sign in and allow access for Keepsake.`),
+          h(
+            "div",
+            { class: "actions" },
+            signedIn[p.id]
+              ? button("Sign out", async () => {
+                  await call("sign_out", p.id);
+                  await cloud(main);
+                })
+              : status.methods?.[p.id]?.browser
+                ? signInButton(p.id, p.label, main)
+                : h("span", { class: "small" }, "Sign-in for this service is not set up in this version."),
+            signedIn[p.id] && status.store !== p.id
+              ? button(`Use ${p.label} for snapshots`, async () => {
+                  const checked = await call<{ ok: boolean; error?: string }>("test_cloud", p.id);
+                  if (!checked.ok) {
+                    toast(`${p.label} did not pass the check: ${checked.error ?? "unknown reason"}`);
+                    return;
+                  }
+                  await call("set_setting", "snapshotStore", p.id);
+                  await cloud(main);
+                })
+              : null,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+function signInButton(id: "onedrive" | "gdrive", label: string, main: HTMLElement): HTMLButtonElement {
+  const element = h("button", { type: "button", class: "primary" }, `Sign in with ${label}`) as HTMLButtonElement;
+  element.addEventListener("click", () => {
+    // Opened now, while the click still counts, so the browser does not block it; filled in below.
+    const tab = window.open("", "_blank");
+    void act(element, async () => {
+      try {
+        const shown = await call<{ method?: string; authUrl?: string }>("start_signin", id, "browser");
+        if (!shown.authUrl || !/^https:\/\/(login\.microsoftonline\.com|accounts\.google\.com)\//.test(shown.authUrl)) {
+          throw new ApiError("The sign-in page is not a Microsoft or Google address.");
+        }
+        if (tab) {
+          tab.opener = null; // the sign-in page can never reach this one
+          tab.location.href = shown.authUrl;
+        } else {
+          window.open(shown.authUrl, "_blank", "noopener");
+        }
+        replace(main, h("h1", {}, "Cloud"), h("p", {}, "Finish signing in in the new tab. This page updates when you are done."));
+      } catch (error) {
+        tab?.close();
+        throw error;
+      }
+    });
+  });
+  return element;
+}
+
 // Updates (the PC host updates itself, ADR-0043)
 
 const updateRefusals: Record<string, string> = {
@@ -348,6 +429,7 @@ async function updates(main: HTMLElement, check?: UpdateCheck, installed?: strin
 const PAGES: Page[] = [
   { id: "overview", title: "Overview", render: overview },
   { id: "conflicts", title: "Conflicts", render: conflicts },
+  { id: "cloud", title: "Cloud", render: cloud },
   { id: "history", title: "History", render: history },
   { id: "health", title: "Health", render: health },
   { id: "modules", title: "Modules", render: modules },
@@ -386,6 +468,11 @@ function start(): void {
   );
   onEvents((event, args) => {
     if (event === "keepsake_toast" && typeof args[0] === "string") toast(args[0]);
+    if (event === "keepsake_signin") {
+      const result = args[0] as { status?: string; reason?: string } | undefined;
+      toast(result?.status === "signed-in" ? "Signed in." : `Sign-in did not complete: ${result?.reason ?? "unknown reason"}`);
+      if (document.getElementById("nav-cloud")?.getAttribute("aria-current") === "true") void show("cloud");
+    }
   }, ["keepsake_toast", "keepsake_signin"]);
   void show(initialPage() ?? "overview");
 }

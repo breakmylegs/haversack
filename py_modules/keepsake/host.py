@@ -156,6 +156,7 @@ CALLABLES = frozenset(
         "get_game_processes",
         "https_test",
         "record_probe_event",
+        "signin_probe",
         "export_diagnostics",
         "freeze_test",
     }

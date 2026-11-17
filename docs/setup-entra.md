@@ -16,6 +16,7 @@ A public client ID is not a secret. It identifies the app; it cannot be used to 
    - Select **Register**.
 3. On the app's **Overview** page, copy the **Application (client) ID**. It looks like `00001111-aaaa-2222-bbbb-3333cccc4444`.
 4. Open **Authentication**. Under **Advanced settings**, set **Allow public client flows** to **Yes**, then **Save**.
+   For the browser sign-in (ADR-0044), also choose **Add a platform**, **Mobile and desktop applications**, and enter `http://localhost` as a custom redirect URI. Microsoft ignores the port for `localhost`, so Keepsake can listen on any free one.
 5. Open **API permissions**, then **Add a permission**, **Microsoft Graph**, **Delegated permissions**, and add:
    - `Files.ReadWrite.AppFolder`
    - `offline_access`

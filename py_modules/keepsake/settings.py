@@ -47,7 +47,11 @@ DEFAULTS: dict[str, Any] = {
     "moduleFlags": {},
     # Installer (slice 21): where games are installed; empty means ~/Games.
     "libraryRoot": "",
+    # How each provider signs in from Gaming Mode (ADR-0044): Steam's browser, or the phone (device code).
+    # Google blocks embedded browsers by policy, so it starts on the phone until the device probe says otherwise.
+    "gamingModeSignin": {"onedrive": "browser", "gdrive": "phone"},
 }
+SIGNIN_METHODS = ("browser", "phone")
 MODULE_NAMES = ("saves", "advisor", "replication", "installer", "desktop")
 
 # Keys the frontend may change. deviceId and schemaVersion are managed here.
@@ -69,6 +73,7 @@ USER_KEYS = frozenset(
         "suspendSnapshots",
         "moduleFlags",
         "libraryRoot",
+        "gamingModeSignin",
     }
 )
 IDLE_MINUTES_RANGE = (10, 240)
@@ -150,6 +155,14 @@ def _validate(key: str, value: Any) -> Any:
         if not isinstance(value, str) or (value.strip() and not _GUID.match(value.strip())):
             raise SettingsError("the client ID looks like 00001111-aaaa-2222-bbbb-3333cccc4444")
         return value.strip().lower()
+    if key == "gamingModeSignin":
+        if (
+            not isinstance(value, dict)
+            or set(value) != {"onedrive", "gdrive"}
+            or any(v not in SIGNIN_METHODS for v in value.values())
+        ):
+            raise SettingsError("choose browser or phone for OneDrive and Google Drive")
+        return {"onedrive": value["onedrive"], "gdrive": value["gdrive"]}
     if key == "launchPullTimeout":
         if not isinstance(value, int) or isinstance(value, bool) or not 5 <= value <= 60:
             raise SettingsError("the launch check timeout is 5 to 60 seconds")
