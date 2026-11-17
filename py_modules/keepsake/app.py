@@ -230,7 +230,7 @@ class KeepsakeApp:
                 self._advisor_map_game,
                 fetch_reports=lambda appid, name: deckverified.fetch(appid, name, self._fetch),
                 anticheat_fetch=lambda: anticheat.download(self._fetch),
-                installed_tools=lambda: advisor_compat.installed_ge_proton(discovery.steam_roots(self.home)),
+                installed_tools=lambda: advisor_compat.installed_ge_proton(discovery.steam_roots(self.home, self.host)),
                 ai_key=lambda provider: str(self.credentials.load(provider)["apiKey"]),
                 pcgw_client=self._pcgw_client,
             )
@@ -363,11 +363,11 @@ class KeepsakeApp:
 
     def _advisor_map_game(self, appid: int) -> dict[str, Any]:
         """For Advisor (worker thread): a game's name and, for a shortcut, the Steam app ID of its manifest entry."""
-        games = (self._games or discovery.discover(self.home))["games"]
+        games = (self._games or discovery.discover(self.home, self.host))["games"]
         game = next((g for g in games if g["appid"] == appid), None)
         if game is None and self._games is not None:
             # Installed since the last scan, perhaps: look once more before giving up.
-            game = next((g for g in discovery.discover(self.home)["games"] if g["appid"] == appid), None)
+            game = next((g for g in discovery.discover(self.home, self.host)["games"] if g["appid"] == appid), None)
         if game is None:
             return {"name": "", "kind": "unknown"}  # not in the Games list: general advice only, nothing looked up
         out: dict[str, Any] = {
@@ -389,7 +389,7 @@ class KeepsakeApp:
         return out
 
     def _prefix_for(self, appid: int) -> str | None:
-        for root in discovery.steam_roots(self.home):
+        for root in discovery.steam_roots(self.home, self.host):
             found = discovery.find_compatdata(int(appid), discovery.library_folders(root))
             if found:
                 return found
@@ -474,7 +474,7 @@ class KeepsakeApp:
     async def discover_games(self, refresh: bool = False) -> dict[str, Any]:
         """Scan Steam on this device. Cached until ``refresh``."""
         if self._games is None or refresh:
-            self._games = await asyncio.to_thread(discovery.discover, self.home)
+            self._games = await asyncio.to_thread(discovery.discover, self.home, self.host)
             counts: dict[str, int] = {}
             for game in self._games["games"]:
                 counts[game["kind"]] = counts.get(game["kind"], 0) + 1

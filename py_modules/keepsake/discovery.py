@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import glob
 import os
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -50,13 +51,52 @@ def unsigned_appid(appid: int) -> int:
     return int(appid) & 0xFFFFFFFF
 
 
-def steam_roots(home: str | None = None) -> list[str]:
-    """Return distinct Steam installation folders, most conventional first."""
-    base = real_home(home)
+WINDOWS_HOST = "windows"  # keepsake.hosts: Steam for Windows layout (ADR-0038)
+_WINDOWS_STEAM_KEYS = (
+    ("HKEY_CURRENT_USER", r"Software\Valve\Steam", "SteamPath"),
+    ("HKEY_LOCAL_MACHINE", r"SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath"),
+    ("HKEY_LOCAL_MACHINE", r"SOFTWARE\Valve\Steam", "InstallPath"),
+)
+_WINDOWS_STEAM_FALLBACKS = (("ProgramFiles(x86)", "Steam"), ("ProgramFiles", "Steam"))
+
+
+def windows_steam_paths(env: Mapping[str, str] | None = None) -> list[str]:
+    """Where Steam for Windows says it is (the registry), then its default folders. Read only."""
+    found: list[str] = []
+    try:
+        import winreg  # Windows only, so imported here (ADR-0030 keeps optional modules lazy)
+    except ImportError:
+        winreg = None  # type: ignore[assignment]
+    for hive_name, key, value in _WINDOWS_STEAM_KEYS if winreg is not None else ():
+        try:
+            with winreg.OpenKey(getattr(winreg, hive_name), key) as handle:
+                path, _kind = winreg.QueryValueEx(handle, value)
+        except OSError:
+            continue
+        if isinstance(path, str) and path.strip():
+            found.append(path.strip())
+    env = os.environ if env is None else env
+    for variable, folder in _WINDOWS_STEAM_FALLBACKS:
+        base = env.get(variable)
+        if base:
+            found.append(os.path.join(base, folder))
+    return found
+
+
+def steam_roots(home: str | None = None, host: str = "decky", windows_paths: list[str] | None = None) -> list[str]:
+    """Return distinct Steam installation folders, most conventional first.
+
+    On a Windows host (ADR-0038) they come from Steam for Windows' registry entry
+    and its default folders; elsewhere from the home folder's usual places.
+    """
+    if host == WINDOWS_HOST:
+        candidates = [os.path.realpath(p) for p in (windows_steam_paths() if windows_paths is None else windows_paths)]
+    else:
+        base = real_home(home)
+        candidates = [os.path.realpath(os.path.join(base, *parts)) for parts in STEAM_ROOT_CANDIDATES]
     seen: set[str] = set()
     roots: list[str] = []
-    for parts in STEAM_ROOT_CANDIDATES:
-        candidate = os.path.realpath(os.path.join(base, *parts))
+    for candidate in candidates:
         if candidate in seen:
             continue
         if os.path.isdir(os.path.join(candidate, "steamapps")) or os.path.isdir(os.path.join(candidate, "userdata")):
@@ -317,6 +357,8 @@ class GameEntry:
     compat_tool: str | None = None
     artwork: list[str] = field(default_factory=list)
     icon: str = ""
+    # "windows" for a native Windows game on a Windows host (resolve.platform_of uses it, ADR-0038).
+    os: str = "linux"
 
     def public(self) -> dict[str, Any]:
         return asdict(self)
@@ -345,16 +387,18 @@ def shortcut_base_dir(shortcut: Shortcut) -> str | None:
     return os.path.realpath(os.path.dirname(exe)) if exe else None
 
 
-def discover(home: str | None = None) -> dict[str, Any]:
+def discover(home: str | None = None, host: str = "decky", windows_paths: list[str] | None = None) -> dict[str, Any]:
     """Scan every Steam root on this device and return games and facts.
 
     Shortcuts of every Steam user are included; the most recent user is
-    marked as default and listed first.
+    marked as default and listed first. On a Windows host games run natively:
+    there are no Proton prefixes, and every game is marked ``os: windows``.
     """
     games: list[GameEntry] = []
     roots_info: list[dict[str, Any]] = []
     seen_steam: set[int] = set()
-    for root in steam_roots(home):
+    windows = host == WINDOWS_HOST
+    for root in steam_roots(home, host, windows_paths):
         libraries = library_folders(root)
         compat = compat_tool_mapping(root)
         users = steam_user_ids(root)
@@ -372,9 +416,9 @@ def discover(home: str | None = None) -> dict[str, Any]:
                 games.append(_broken_shortcuts_entry(user, user == default))
                 continue
             for sc in shortcuts:
-                prefix = find_compatdata(sc.appid_unsigned, libraries)
+                prefix = None if windows else find_compatdata(sc.appid_unsigned, libraries)
                 exe = _unquote(sc.exe)
-                notes = [] if prefix else ["no-prefix"]
+                notes = [] if prefix or windows else ["no-prefix"]
                 games.append(
                     GameEntry(
                         key=f"shortcut:{user}:{sc.appid_unsigned}",
@@ -398,6 +442,7 @@ def discover(home: str | None = None) -> dict[str, Any]:
                         compat_tool=compat.get(sc.appid_unsigned),
                         artwork=artwork_files(root, user, sc.appid_unsigned),
                         icon=_unquote(sc.icon),
+                        os="windows" if windows else "linux",
                     )
                 )
 
@@ -406,7 +451,7 @@ def discover(home: str | None = None) -> dict[str, Any]:
                 if app.appid in seen_steam or is_tool(app.appid, app.name):
                     continue
                 seen_steam.add(app.appid)
-                prefix = find_compatdata(app.appid, libraries)
+                prefix = None if windows else find_compatdata(app.appid, libraries)
                 install = os.path.join(library, "steamapps", "common", app.installdir) if app.installdir else None
                 games.append(
                     GameEntry(
@@ -425,6 +470,7 @@ def discover(home: str | None = None) -> dict[str, Any]:
                         steam_root=root,
                         default_user=default,
                         compat_tool=compat.get(app.appid),
+                        os="windows" if windows else "linux",
                     )
                 )
     return {"roots": roots_info, "games": [g.public() for g in games]}
