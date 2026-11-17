@@ -26,11 +26,16 @@ class Module:
     title: str
     description: str
     writes: str
-    available: bool = True  # False until the module is built (later v2 slices)
+    available: bool = True  # False until the module is built (later v2 slices), or where it cannot work
     start: Callable[[], Awaitable[None]] | None = None
     stop: Callable[[], Awaitable[None]] | None = None
     health: Callable[[], Awaitable[list[dict[str, Any]]]] | None = None
     listeners: dict[str, Handler] = field(default_factory=dict)
+    unavailable_reason: str | None = None  # shown on the Modules page when ``available`` is False
+    default: bool | None = None  # overrides DEFAULT_FLAGS for this host (ADR-0038: Advisor off on PCs)
+
+    def default_flag(self) -> bool:
+        return self.default if self.default is not None else DEFAULT_FLAGS.get(self.name, False)
 
 
 @dataclass
@@ -56,7 +61,7 @@ class ModuleRegistry:
         module = self.modules.get(name)
         if module is None or not module.available or self.state[name].failed:
             return False
-        return bool(self.flags().get(name, DEFAULT_FLAGS.get(name, False)))
+        return bool(self.flags().get(name, module.default_flag()))
 
     def running(self, name: str) -> bool:
         return name in self.state and self.state[name].running
@@ -131,7 +136,8 @@ class ModuleRegistry:
                     "description": module.description,
                     "writes": module.writes,
                     "available": module.available,
-                    "flag": bool(self.flags().get(name, DEFAULT_FLAGS.get(name, False))),
+                    "unavailableReason": module.unavailable_reason,
+                    "flag": bool(self.flags().get(name, module.default_flag())),
                     "running": state.running,
                     "failed": state.failed,
                     "health": checks,

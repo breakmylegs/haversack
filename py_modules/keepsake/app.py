@@ -26,6 +26,7 @@ from . import (
     diagnostics,
     discovery,
     health,
+    hosts,
     identity,
     lifecycle,
     manifest,
@@ -136,7 +137,10 @@ class KeepsakeApp:
         google_transport: net.Transport = net.google_request,
         google_api: tuple[str, str] | None = None,
         endpoint_transport: Callable[[str], net.Transport] = net.endpoint_transport,
+        host: str = "decky",
     ) -> None:
+        # Which host runs this core (ADR-0038). Decky's main.py keeps the default; keepsake.host passes its own.
+        self.host = host if host in hosts.HOSTS else "decky"
         self._graph_base_url = graph_base_url
         self._google_transport = google_transport
         self._google_api = google_api  # tests point this at a fake Drive
@@ -263,6 +267,8 @@ class KeepsakeApp:
                 stop=advisor_stop,
                 health=advisor_health,
                 listeners={"game_started": advisor_game_started},
+                # Its advice is built on handheld power and screen profiles: off by default on PCs (ADR-0038).
+                default=None if self.host == "decky" else False,
             )
         )
         for name, title, description, writes in (
@@ -335,6 +341,11 @@ class KeepsakeApp:
                 stop=installer_stop,
                 health=installer_health,
                 listeners={"game_exited": installer_exit},
+                # It creates Steam shortcuts through SteamClient, which only Decky reaches (P15, ADR-0038).
+                available=self.host == "decky",
+                unavailable_reason=None
+                if self.host == "decky"
+                else "The Installer needs Decky: it creates the game's Steam shortcut through Steam itself.",
             )
         )
 
