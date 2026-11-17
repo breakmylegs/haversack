@@ -58,7 +58,52 @@ def repo(tmp_path, monkeypatch):
     monkeypatch.setattr(package, "ROOT", str(root))
     monkeypatch.setattr(release, "ROOT", str(root))
     monkeypatch.delenv("KEEPSAKE_MINISIGN_KEY", raising=False)
+    # Never the laptop's real signing key or pinned key: each test sets what it needs.
+    monkeypatch.setattr(release.signing, "is_set_up", lambda *a: False)
+    monkeypatch.setattr(release, "pinned_key", lambda: "")
     return root
+
+
+def signed_by_test_key(monkeypatch, pin=True):
+    """Sign with a throwaway Ed25519 key from test_signatures, pinning its public key."""
+    from test_signatures import public_text, signature_text
+
+    def fake_sign(path, comment):
+        with open(path, "rb") as handle:
+            data = handle.read()
+        with open(path + ".minisig", "w", encoding="utf-8") as handle:
+            handle.write(signature_text(data))
+        return path + ".minisig"
+
+    monkeypatch.setattr(release.signing, "is_set_up", lambda *a: True)
+    monkeypatch.setattr(release.signing, "sign", fake_sign)
+    if pin:
+        monkeypatch.setattr(release, "pinned_key", lambda: public_text())
+
+
+def test_the_sealed_key_signs_and_the_signature_is_checked_against_the_pin(repo, monkeypatch):
+    signed_by_test_key(monkeypatch)
+    runner = FakeRunner()
+    release.publish(device_tested=True, dry_run=False, runner=runner, check=lambda: 0)
+    (create,) = runner.commands(("gh", "release", "create"))
+    assert any(arg.endswith("SHA256SUMS.minisig") for arg in create)
+
+
+def test_a_pinned_key_refuses_to_publish_unsigned(repo, monkeypatch):
+    monkeypatch.setattr(release, "pinned_key", lambda: "RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3")
+    runner = FakeRunner()
+    with pytest.raises(release.ReleaseError, match="refuse unsigned releases"):
+        release.publish(device_tested=True, dry_run=False, runner=runner, check=lambda: 0)
+    assert not runner.commands(("git", "tag", "-a"))
+
+
+def test_a_signature_from_another_key_is_refused_before_tagging(repo, monkeypatch):
+    signed_by_test_key(monkeypatch, pin=False)
+    monkeypatch.setattr(release, "pinned_key", lambda: "RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3")
+    runner = FakeRunner()
+    with pytest.raises(release.ReleaseError, match="does not verify with the pinned key"):
+        release.publish(device_tested=True, dry_run=False, runner=runner, check=lambda: 0)
+    assert not runner.commands(("git", "tag", "-a"))
 
 
 def test_extract_notes():

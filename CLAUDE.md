@@ -57,7 +57,15 @@ v2 principles (summary; full text in build prompt v2 section 4):
 
 ## 4. Escalation rules
 
-Stop and ask the owner before doing any of the following. Record each decision in an ADR in `docs/adr/`.
+**Standing delegation (ADR-0037, 17 November 2026).** For every item below, decide what is best for the app yourself and record it in an ADR with your reasoning and sources, then carry on. Stop only for what you genuinely cannot do:
+- physical device runs;
+- signing in to the owner's accounts;
+- anything needing the owner's credentials;
+- anything this laptop's security policy blocks.
+
+When you stop, give exact step-by-step commands for the owner to run and report back on.
+
+The items that each need a recorded decision (formerly "stop and ask"):
 
 - Adding the root flag, a bundled binary or a `remote_binary` entry.
 - Loosening any principle above or any safety gate default (build prompt section 9).
@@ -86,8 +94,8 @@ v2 additions (build prompt v2 section 5, ADR-0014):
 
 ## 5. Working conventions
 
-- **One slice at a time** in the order of [docs/plan.md](docs/plan.md) (v1 slices 9 to 12, then v2 slices 13 to 25), each on branch `slice/NN-short-name`. Merge to `main` by pull request only, after the owner confirms the on-device checks.
-- **End of slice:** open a pull request, write `docs/slices/NN-report.md`, and stop. Do not start the next slice until the owner confirms.
+- **One slice at a time** in the order of [docs/plan.md](docs/plan.md), each on its own branch. Merge to `main` by pull request only, once the gate and the change's tests pass (ADR-0037). The on-device checks go in the report for the owner's next device run.
+- **End of slice:** open a pull request, write `docs/slices/NN-report.md`, merge, and continue with the next item that does not need a device (ADR-0037).
 - **Commits:** conventional commits.
 - **Docs every slice:** update `docs/threat-model.md` (new entries, or "no change" with a reason), `docs/assumptions.md`, `CHANGELOG.md`, and add an ADR for any design decision.
 - **Slice report** covers what changed, test results, known gaps and the on-device checklist.
