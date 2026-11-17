@@ -18,7 +18,9 @@ Linux:
 PYTHONPATH=py_modules python3 -m keepsake.host --open
 ```
 
-`--open` opens `http://127.0.0.1:47120/` in your browser. Stop the host with Ctrl+C.
+`--open` opens the desktop interface in your browser, using a one-time link that carries the access token. Stop the host with Ctrl+C.
+
+Build the desktop interface first, once and after every change, with `npx -y pnpm@9.15.9 run build:desktop`. Without it, the page only says Keepsake is running.
 
 ## Where it keeps things
 

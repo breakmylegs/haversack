@@ -146,6 +146,42 @@ def test_events_reach_an_open_stream(running):
     assert status == 401
 
 
+def test_the_desktop_interface_is_served_from_a_fixed_list_only(tmp_path):
+    ui = tmp_path / "desktop"
+    (ui / "dist").mkdir(parents=True)
+    (ui / "index.html").write_text("<p>desktop</p>")
+    (ui / "app.css").write_text("body{}")
+    (ui / "dist" / "main.js").write_text("export {};")
+    (tmp_path / "secret.txt").write_text("not for the page")
+    loop = asyncio.new_event_loop()
+    threading.Thread(target=loop.run_forever, daemon=True).start()
+    api = host_module.Api(FakeApp(), loop, "synthetic-token", host_module.Events(), b"placeholder", str(ui))
+    server = host_module.serve(api, port=0)
+    try:
+        status, body, headers = request(api, "GET", "/")
+        assert (status, body) == (200, b"<p>desktop</p>")
+        status, body, headers = request(api, "GET", "/dist/main.js")
+        assert status == 200 and headers["Content-Type"].startswith("text/javascript") and body == b"export {};"
+        assert request(api, "GET", "/app.css")[2]["Content-Type"].startswith("text/css")
+        for path in (
+            "/dist/../secret.txt",
+            "/dist/%2e%2e%2fsecret.txt",
+            "/../secret.txt",
+            "/dist/Main.JS",
+            "/dist/main.js.map",
+            "/secret.txt",
+            "/dist/sub/main.js",
+            "/index.html",
+        ):
+            assert request(api, "GET", path)[0] == 404, path
+        (ui / "index.html").unlink()
+        assert request(api, "GET", "/")[1] == b"placeholder"  # not built yet: the placeholder page
+    finally:
+        server.shutdown()
+        server.server_close()
+        loop.call_soon_threadsafe(loop.stop)
+
+
 def test_the_callables_match_the_decky_plugin():
     tree = ast.parse((ROOT / "main.py").read_text(encoding="utf-8"))
     plugin = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "Plugin")
