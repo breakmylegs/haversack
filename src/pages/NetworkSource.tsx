@@ -109,7 +109,10 @@ export function NetworkSource({
         setRemember(false);
       }
       const listing = await installerNetBrowse(access(), target);
-      if (listing.redirectHost) return askRedirect(listing.redirectHost);
+      if (listing.redirectHost) {
+        askRedirect(listing.redirectHost);
+        return;
+      }
       setFolder(listing.url);
       setEntries(listing.entries);
       if (!listing.entries.length) toaster.toast({ title: "Keepsake", body: "No folders or ISO files here." });
