@@ -34,6 +34,7 @@ STEPS: list[tuple[str, list[str]]] = [
     ("eslint", [*pnpm(), "run", "lint"]),
     ("tsc", [*pnpm(), "run", "typecheck"]),
     ("build", [*pnpm(), "run", "build"]),
+    ("desktop", [*pnpm(), "run", "build:desktop"]),  # the PC desktop interface (ADR-0040)
     ("versions", [sys.executable, "scripts/check_versions.py"]),
     ("package", [sys.executable, "scripts/package.py"]),
     ("ruff", [*venv_tool("ruff"), "check", "."]),

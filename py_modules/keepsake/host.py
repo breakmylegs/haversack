@@ -28,6 +28,7 @@ import asyncio
 import hmac
 import json
 import os
+import re
 import secrets
 import signal
 import socket
@@ -48,6 +49,7 @@ PORT_TRIES = 10
 MAX_BODY = 1024 * 1024
 CALL_TIMEOUT = 300.0
 STATE_FILE = "host.json"
+UI_SCRIPT = re.compile(r"/dist/[a-z][a-z0-9_-]{0,40}\.js")  # the compiled desktop interface (ADR-0040)
 
 # The KeepsakeApp methods the Decky plugin exposes through main.py; tests/test_host.py keeps them equal.
 CALLABLES = frozenset(
@@ -213,9 +215,36 @@ class Events:
 class Api:
     """What the HTTP handler needs: the app, its loop, the token and the events."""
 
-    def __init__(self, app: Any, loop: asyncio.AbstractEventLoop, token: str, events: Events, page: bytes) -> None:
+    def __init__(
+        self,
+        app: Any,
+        loop: asyncio.AbstractEventLoop,
+        token: str,
+        events: Events,
+        page: bytes,
+        ui_dir: str | None = None,
+    ) -> None:
         self.app, self.loop, self.token, self.events, self.page = app, loop, token, events, page
+        self.ui_dir = ui_dir  # the built desktop interface (ADR-0040); None serves ``page`` only
         self.port = 0
+
+    def ui_file(self, path: str) -> tuple[bytes, str] | None:
+        """A file of the desktop interface, from a fixed list: never a path the request chose."""
+        if self.ui_dir is None:
+            return (self.page, "text/html; charset=utf-8") if path == "/" else None
+        if path == "/":
+            name, kind = "index.html", "text/html; charset=utf-8"
+        elif path == "/app.css":
+            name, kind = "app.css", "text/css; charset=utf-8"
+        elif UI_SCRIPT.fullmatch(path):
+            name, kind = os.path.join("dist", path.rsplit("/", 1)[1]), "text/javascript; charset=utf-8"
+        else:
+            return None
+        try:
+            with open(os.path.join(self.ui_dir, name), "rb") as handle:
+                return handle.read(), kind
+        except OSError:
+            return (self.page, "text/html; charset=utf-8") if path == "/" else None
 
     def allowed_hosts(self) -> set[str]:
         return {f"127.0.0.1:{self.port}", f"localhost:{self.port}"}
@@ -269,17 +298,18 @@ def make_handler(api: Api) -> type[BaseHTTPRequestHandler]:
 
         def do_GET(self) -> None:
             parts = urlsplit(self.path)
-            if parts.path == "/":
-                if self._trusted(None):
-                    self._send(200, api.page, "text/html; charset=utf-8")
-                return
             if parts.path == "/api/events":
                 token = (parse_qs(parts.query).get("token") or [""])[0]
                 if self._trusted(token):
                     self._stream()
                 return
-            if self._trusted(None):
+            if not self._trusted(None):
+                return
+            found = api.ui_file(parts.path)
+            if found is None:
                 self._json(404, {"ok": False, "error": "not found"})
+            else:
+                self._send(200, *found)
 
         def _stream(self) -> None:
             queue = api.events.subscribe()
@@ -392,7 +422,8 @@ async def run(port: int, open_browser: bool) -> None:
     events = Events()
     app = KeepsakeApp(paths, emit=events.emit, host=host)
     await app.start()
-    api = Api(app, asyncio.get_running_loop(), secrets.token_urlsafe(32), events, PLACEHOLDER)
+    ui_dir = os.path.join(paths.plugin_dir, "desktop")
+    api = Api(app, asyncio.get_running_loop(), secrets.token_urlsafe(32), events, PLACEHOLDER, ui_dir)
     server = serve(api, port)
     os.makedirs(paths.runtime_dir, exist_ok=True)
     atomic_write_json(os.path.join(paths.runtime_dir, STATE_FILE), {"port": api.port, "token": api.token})

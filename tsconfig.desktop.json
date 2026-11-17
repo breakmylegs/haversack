@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "outDir": "desktop/dist",
+    "rootDir": "desktop/src",
+    "module": "ES2020",
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "moduleResolution": "node",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noImplicitAny": true,
+    "declaration": false,
+    "sourceMap": false,
+    "skipLibCheck": true
+  },
+  "include": ["desktop/src"]
+}
