@@ -60,6 +60,35 @@ Spec section 10 applies amendments to v1 slices not yet merged, and moves them t
 
 Desktop (23 and 24) stays at the end of the feature queue, as Peter asked. Only the v2 hardening release follows it.
 
+### Re-plan for PCs and laptops (ADR-0038, 17 November 2026)
+
+Keepsake now targets Decky handhelds, Linux PCs with or without Decky, and Windows PCs:
+- **One core, three hosts.** The same `keepsake` package runs inside Decky or as a headless `keepsake.host` on a PC.
+- **One desktop UI.** It is the slice 23 single-page app, served on loopback. Handhelds use it in Desktop Mode, and PCs use it as their main UI.
+
+The device-free work moves ahead of slices 16 to 25 and is built in this order (ADR-0037):
+
+| Item | Scope | Needs a device? |
+|---|---|---|
+| P1 Platform layer | Host detection; Windows known folders; the `windows` save layout; case-insensitive Windows matching; `<osUserName>`; then Steam discovery on Windows (registry `SteamPath`, `libraryfolders.vdf`) and the registry root through `winreg` | No: built and tested on the Windows laptop. Real Steam games need a PC run. |
+| P2 Headless host | `python -m keepsake.host`: `KeepsakeApp` without Decky, with platform settings and state folders (`%APPDATA%\Keepsake`, `$XDG_CONFIG_HOME/keepsake`) and the loopback API with token authentication, DNS-rebinding and CSRF protection (slice 23's server, moved forward) | No |
+| P3 Desktop UI | Slice 23's single-page app (plain React, no `@decky/ui`), served by the host, with parity for Saves first | No for the build, screenshots and tests. Yes for Desktop Mode on a handheld (the A79 probe). |
+| P4 PC lifecycle | A process watcher: push after a game exits, "Sync now" and idle pulls while nothing runs | No for the logic. Yes for real games. |
+| P5 PC package and self-update | `Keepsake-desktop-v<version>.zip` in the signed `SHA256SUMS`, self-update (verify, unpack into a versioned folder, switch, keep the previous one), autostart (Startup folder, XDG autostart or a systemd user unit) | No for the build and tests. Yes for a PC install run. |
+
+What changes in the remaining slices:
+
+| Slice | Change |
+|---|---|
+| 16 to 18 Replication | Unchanged. The protocol stays platform-neutral (canonical paths, P10). |
+| 19 Replication III | Adds endpoint translation for PCs: Proton prefix to and from native Windows folders, the exe mapping, and registry entries from `user.reg` into `HKCU` (with its own ADR). Shortcuts on hosts without Decky are added by the user, following on-screen steps (P15). |
+| 20 Replication IV | Policies for PC peers. |
+| 23 Desktop I | Most of it moves to P2 and P3. What stays is the Desktop Mode check on handhelds and pending Steam operations. |
+| 24 Desktop II | Tray and notifications on all three hosts; autostart moves to P5. |
+| 25 v2 hardening | Adds a clean install on a Windows PC and a Linux PC, as well as SteamOS and Bazzite. |
+
+Advisor is off by default and hidden on PCs. Installer stays Decky only (ADR-0038).
+
 ### After slice 25 (Peter, 17 November 2026)
 
 | Item | Scope | Rule |

@@ -704,8 +704,8 @@ class KeepsakeApp:
 
     async def identity_candidates(self, game: dict[str, Any], index: dict[str, Any] | None) -> list[dict[str, Any]]:
         roots = resolve.logical_roots(game, home=self.home)
-        proton = resolve.platform_of(game) == "proton"
-        probe = identity.probe_for(roots, lambda root: proton and root in resolve.WIN_ROOTS, resolve.expand)
+        windows_paths = resolve.platform_of(game) in resolve.WINDOWS_PLATFORMS  # case-insensitive names
+        probe = identity.probe_for(roots, lambda root: windows_paths and root in resolve.WIN_ROOTS, resolve.expand)
         records = await self._identities()
         device_id = str(self.settings.get("deviceId"))
         return await asyncio.to_thread(
