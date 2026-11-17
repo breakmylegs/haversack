@@ -21,7 +21,7 @@ from typing import Any
 
 from .. import devices
 from ..fsutil import atomic_write_json, read_json
-from . import ai, anticheat, compat, current, deckverified, pcgw, recommend, stack
+from . import ai, anticheat, compat, current, deckverified, pcgw, protondb, recommend, stack
 from .cache import SourceCache
 
 SETTINGS_FILE = "advisor.json"
@@ -32,6 +32,7 @@ DEFAULTS: dict[str, Any] = {
     "sourceDeckVerified": True,
     "sourceAntiCheat": True,
     "sourcePcgw": False,  # optional: needs the user's PCGamingWiki bot password
+    "sourceProtonDb": False,  # optional: downloads Keepsake's ProtonDB index (up to 30 MB) once a month
     "steamIdOverrides": {},  # shortcut app ID (text) -> Steam app ID
     "aiProvider": "",  # opt-in per provider (P18): empty means AI is off
     "aiModel": "",
@@ -62,6 +63,7 @@ class Advisor:
         ai_key: Callable[[str], str] = lambda provider: "",
         ai_transport: ai.Transport | None = None,
         pcgw_client: Callable[[], pcgw.PcgwClient | None] = lambda: None,
+        protondb_fetch: protondb.Downloader = protondb.download,
     ) -> None:
         self._settings_path = os.path.join(settings_dir, SETTINGS_FILE)
         self.cache_dir = cache_dir
@@ -75,6 +77,8 @@ class Advisor:
         self._installed_tools = installed_tools
         self._pcgw_client = pcgw_client
         self.pcgw_state: dict[str, Any] = {"enabled": False, "error": None, "cached": False, "data": None}
+        self.protondb = protondb.ProtonDbIndex(cache_dir, fetch=protondb_fetch)
+        self.protondb_state: dict[str, Any] = {"enabled": False, "error": None, "summary": None}
         self._ai_key = ai_key
         self.ai_providers = {pid: (cls(ai_transport) if ai_transport else cls()) for pid, cls in ai.PROVIDERS.items()}
         self.ai_usage = ai.Usage(cache_dir)
@@ -107,7 +111,7 @@ class Advisor:
             raise AdvisorError("unknown device")
         if "workload" in values and values["workload"] not in recommend.WORKLOADS:
             raise AdvisorError("workload must be light, medium or heavy")
-        for key in ("sourceDeckVerified", "sourceAntiCheat", "sourcePcgw"):
+        for key in ("sourceDeckVerified", "sourceAntiCheat", "sourcePcgw", "sourceProtonDb"):
             if key in values and not isinstance(values[key], bool):
                 raise AdvisorError(f"{key} must be true or false")
         if "stackOverrides" in values:
@@ -140,6 +144,8 @@ class Advisor:
         merged = {**current, **values}
         os.makedirs(os.path.dirname(self._settings_path), exist_ok=True)
         atomic_write_json(self._settings_path, merged)
+        if values.get("sourceProtonDb") is False:
+            self.protondb.clear()  # its own cache file: frees the space when the source is turned off
         if "deviceOverride" in values or "stackOverrides" in values:
             self.detect()
         return merged
@@ -228,9 +234,30 @@ class Advisor:
                 ac["error"] = exc.hint
             ac["entry"] = self.anticheat.lookup(game.get("steamAppid"), "" if game.get("steamAppid") else game["name"])
         wiki = self._load_pcgw(game, settings["sourcePcgw"], force)
+        pdb_reports, pdb = self._load_protondb(game, settings["sourceProtonDb"], force)
         with self._lock:
             if self.game is game:  # the player may have picked another game meanwhile
-                self.reports, self.source_state, self.ac_state, self.pcgw_state = reports, state, ac, wiki
+                self.reports, self.source_state, self.ac_state, self.pcgw_state = reports + pdb_reports, state, ac, wiki
+                self.protondb_state = pdb
+
+    def _load_protondb(
+        self, game: dict[str, Any], enabled: bool, force: bool
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """ProtonDB (optional, off by default): Keepsake's index, looked up locally by Steam app ID."""
+        state: dict[str, Any] = {"enabled": enabled, "error": None, "summary": None}
+        if not enabled:
+            return [], state
+        appid = game.get("steamAppid")
+        if not appid:
+            return [], {**state, "error": "ProtonDB is looked up by Steam app ID; set one for this shortcut."}
+        try:
+            header = self.protondb.ensure(force)
+        except protondb.ProtonDbError as exc:
+            return [], {**state, "error": exc.hint}
+        entry = self.protondb.lookup(int(appid))
+        if entry is None:
+            return [], state
+        return protondb.normalise(entry, int(appid)), {**state, "summary": protondb.summary(entry, header, int(appid))}
 
     def _load_pcgw(self, game: dict[str, Any], enabled: bool, force: bool) -> dict[str, Any]:
         """PCGamingWiki (optional, off by default): cached 7 days, a stale copy kept when it cannot be reached."""
@@ -278,7 +305,7 @@ class Advisor:
         game = self.game or {}
         if not self.game:
             return None
-        reports = [r for r in recs if r.get("source") == "deckverified"]
+        reports = [r for r in recs if r.get("source") in ("deckverified", protondb.SOURCE)]
         return compat.proton_section(
             reports, game.get("compatTool"), bool(game.get("shortcut")), self._installed_tools()
         )
@@ -393,8 +420,10 @@ class Advisor:
             "anticheat": self.ac_state,
             "recommendations": recs,
             "pcgw": self.pcgw_state,
+            "protondb": self.protondb_state,
             "attribution": [deckverified.ATTRIBUTION, anticheat.ATTRIBUTION]
-            + ([pcgw.ATTRIBUTION] if self.pcgw_state.get("data") else []),
+            + ([pcgw.ATTRIBUTION] if self.pcgw_state.get("data") else [])
+            + ([protondb.ATTRIBUTION] if self.protondb_state.get("enabled") else []),
         }
 
     def health(self) -> list[dict[str, Any]]:

@@ -2159,7 +2159,8 @@ class KeepsakeApp:
             await asyncio.to_thread(advisor.save_settings, dict(values))
         except AdvisorError as exc:
             raise ValueError(str(exc)) from exc
-        if advisor.game and set(values) & {"steamIdOverrides", "sourceDeckVerified", "sourceAntiCheat"}:
+        reload = {"steamIdOverrides", "sourceDeckVerified", "sourceAntiCheat", "sourcePcgw", "sourceProtonDb"}
+        if advisor.game and set(values) & reload:
             await asyncio.to_thread(advisor.set_game, int(advisor.game["appid"]))
         return await self.advisor_view()
 

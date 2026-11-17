@@ -54,6 +54,18 @@ Use `pnpm release publish --dry-run` to build the assets into `out/release/` wit
 
 If you choose to publish without running the device tests, use `pnpm release publish --accept-untested` instead of `--device-tested`. The release notes then state that the device tests were not run.
 
+## The ProtonDB index (monthly, separate from plugin releases)
+
+Advisor's optional ProtonDB source reads the `protondb-index.json.gz` asset of the rolling release `protondb-index` (ADR-0035). Refresh it after ProtonDB publishes a new monthly dump (usually on the 1st or 2nd):
+
+1. Find the newest dump: `gh api repos/bdefore/protondb-data/contents/reports --jq ".[].name"`.
+2. Download it into its own empty folder, for example `tmp/pdb-dl/reports_nov1_2026.tar.gz` (about 70 MB). Keep the file name; the build reads the dump name from it.
+3. Build: `python -I scripts/protondb_index.py build tmp/pdb-dl/reports_nov1_2026.tar.gz --out tmp/pdb-out`. It refuses a cut-off dump and an index over 30 MB.
+4. Publish: `python scripts/protondb_index.py publish tmp/pdb-out/protondb-index.json.gz`. It replaces the asset in the same release, keeps the ODbL notes, and never marks the release latest, so the install URL above keeps serving the plugin.
+5. Delete the download and the build folder.
+
+The `protondb-index` tag is not a `v*` tag. The updater ignores it, and `v*` tag protection does not apply (ADR-0005).
+
 ## Pre-releases
 
 Use a version like `0.3.0-beta.1`. It is published as a GitHub pre-release and only offered to devices on the Pre-release channel.
