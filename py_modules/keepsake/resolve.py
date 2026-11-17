@@ -113,14 +113,29 @@ class SkipPath(Exception):
     """The manifest path cannot be resolved safely; the reason is the message."""
 
 
+WINDOWS_PLATFORMS = ("proton", "windows")  # where the manifest's Windows paths apply
+
+
 def platform_of(game: Mapping[str, Any]) -> str:
-    return "proton" if game.get("prefix") else "native"
+    """``proton`` (a Proton prefix), ``windows`` (a native Windows game, ADR-0038) or ``native`` (Linux)."""
+    if game.get("prefix"):
+        return "proton"
+    return "windows" if game.get("os") == "windows" else "native"
 
 
 def logical_roots(
-    game: Mapping[str, Any], home: str | None = None, env: Mapping[str, str] | None = None
+    game: Mapping[str, Any],
+    home: str | None = None,
+    env: Mapping[str, str] | None = None,
+    known: Mapping[str, str | None] | None = None,
 ) -> dict[str, str | None]:
-    """Absolute folder for each logical root on this device, or None when not applicable."""
+    """Absolute folder for each logical root on this device, or None when not applicable.
+
+    On Windows (ADR-0038) the Windows roots are the user's known folders (``known``, by
+    default read from Windows), so a snapshot from a Proton prefix restores into the same
+    logical places: ``winAppData`` is ``%APPDATA%`` here and ``drive_c/users/steamuser/AppData/Roaming``
+    there.
+    """
     env = os.environ if env is None else env
     roots: dict[str, str | None] = dict.fromkeys(ALL_ROOTS)
     prefix = game.get("prefix")
@@ -128,6 +143,13 @@ def logical_roots(
         pfx = os.path.join(str(prefix), "pfx")
         for name, parts in _WIN_PATHS.items():
             roots[name] = os.path.join(pfx, *parts)
+    elif platform_of(game) == "windows":
+        from . import hosts
+
+        folders = hosts.windows_roots() if known is None else known
+        for name in WIN_ROOTS:
+            folder = folders.get(name)
+            roots[name] = os.path.realpath(folder) if folder else None
     else:
         real_home = os.path.realpath(home or env.get("DECKY_USER_HOME") or os.path.expanduser("~"))
         roots["home"] = real_home
@@ -173,17 +195,22 @@ def applies(whens: list[list[str | None]], platform: str) -> bool:
     """
     if not whens:
         return True
-    wanted = "windows" if platform == "proton" else "linux"
+    wanted = "windows" if platform in WINDOWS_PLATFORMS else "linux"
     return any(os_name in (None, wanted) for os_name, _store in whens)
 
 
-def to_logical(path: str, platform: str, game_names: Iterable[str], steam_id: int | None) -> list[tuple[str, str]]:
-    """Turn a manifest path into ``(root, relative glob)`` pairs. Raises :class:`SkipPath`."""
+def to_logical(
+    path: str, platform: str, game_names: Iterable[str], steam_id: int | None, os_user: str | None = None
+) -> list[tuple[str, str]]:
+    """Turn a manifest path into ``(root, relative glob)`` pairs. Raises :class:`SkipPath`.
+
+    ``os_user`` is the Windows account name, used for ``<osUserName>`` on a native Windows game.
+    """
     text = path.replace("\\", "/")
     while "//" in text:
         text = text.replace("//", "/")
     lowered = text.lower()
-    table = _COMMON_PREFIXES + (_WIN_PREFIXES if platform == "proton" else _NATIVE_PREFIXES)
+    table = _COMMON_PREFIXES + (_WIN_PREFIXES if platform in WINDOWS_PLATFORMS else _NATIVE_PREFIXES)
     matched = next(
         (
             (prefix, name)
@@ -209,9 +236,12 @@ def to_logical(path: str, platform: str, game_names: Iterable[str], steam_id: in
             raise SkipPath("store user id inside a name")
         rest = "/".join("*" if seg == "<storeUserId>" else seg for seg in rest.split("/"))
     if "<osUserName>" in rest:
-        if platform != "proton":
+        if platform == "proton":
+            rest = rest.replace("<osUserName>", "steamuser")
+        elif platform == "windows" and os_user and "/" not in os_user and ".." not in os_user:
+            rest = rest.replace("<osUserName>", os_user)
+        else:
             raise SkipPath("needs the OS user name")
-        rest = rest.replace("<osUserName>", "steamuser")
     names = [n for n in game_names if n] or []
     variants = [rest]
     if "<game>" in rest:
@@ -398,7 +428,10 @@ def preview(
                 continue
             result = per_root.setdefault(root_name, ScanResult())
             before = set(result.files)
-            insensitive = platform == "proton" and (root_name in WIN_ROOTS or _inside(root_path, game.get("prefix")))
+            # Windows names match case-insensitively, inside a prefix or on Windows itself.
+            insensitive = platform == "windows" or (
+                platform == "proton" and (root_name in WIN_ROOTS or _inside(root_path, game.get("prefix")))
+            )
             excluded_total += scan(root_path, rel, insensitive, exclusions, result)
             added = sorted(set(result.files) - before)
             entries.append(
@@ -424,7 +457,13 @@ def preview(
             skipped.append({"path": path, "reason": "for another operating system"})
             continue
         try:
-            pairs = to_logical(path, platform, names, steam_id if isinstance(steam_id, int) else None)
+            pairs = to_logical(
+                path,
+                platform,
+                names,
+                steam_id if isinstance(steam_id, int) else None,
+                os_user=os.environ.get("USERNAME") if platform == "windows" else None,
+            )
         except SkipPath as exc:
             skipped.append({"path": path, "reason": str(exc)})
             continue
