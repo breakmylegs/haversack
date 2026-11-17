@@ -492,6 +492,10 @@ export interface CloudStatus {
   name: string;
   onedriveSignedIn: boolean;
   googleSignedIn: boolean;
+  /** ADR-0032: Keepsake's own sign-in client is built in, so no client ID is needed. */
+  builtInClient: { onedrive: boolean; gdrive: boolean };
+  /** The user has saved their own client, which is used instead of the built-in one. */
+  ownClient: { onedrive: boolean; gdrive: boolean };
 }
 
 export interface SignInCode {

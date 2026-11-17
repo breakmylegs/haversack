@@ -307,6 +307,13 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 |---|---|---|---|
 | A154 | Gaming Mode's footer bar overlays the bottom of a plugin's full-screen route. Steam's own `SidebarNavigation` and `Tabs` keep their scrolling content clear of it, a plain scrolling `div` does not, and 96 px of bottom padding clears it at the Legion Go 2's scale | the overlay was seen on Peter's Legion Go 2; Decky Loader's Store uses `marginTop: 40px`, `height: calc(100% - 40px)` and Steam's `Tabs` (`frontend/src/components/store/Store.tsx`); the 96 px value is unverified on other screens | Decky Loader source, Peter's device |
 
+## Built-in sign-in clients (ADR-0032)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A155 | A Microsoft Entra registration for personal accounts with public client flows on lets any personal Microsoft account sign in through the device code flow with no secret and no publisher verification; publisher verification affects only work or school users | verified from Microsoft Learn (device code flow, publisher verification overview), 16 November 2026; unverified with Keepsake's own registration until Peter supplies its ID | Microsoft Learn |
+| A156 | A Google client of type "TVs and Limited Input devices" requesting only `drive.appdata` (non-sensitive), published to Production, has no 100-user cap, no 7-day expiry and no unverified-app warning; its secret is not treated as confidential | verified from Google's limited-input device, Drive scopes and Manage App Audience pages, 16 November 2026; unverified with Keepsake's own client until Peter supplies it | Google documentation |
+
 ## PCGamingWiki (ADR-0031)
 
 | # | Fact | Status | Source |

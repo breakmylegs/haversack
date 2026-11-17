@@ -2,6 +2,12 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
+## [Unreleased]
+
+### Changed
+
+- Cloud sign-in: Keepsake can ship its own OneDrive and Google Drive sign-in, so you pick the service, press Sign in and approve on your phone, with no client ID to enter. OneDrive is listed first and opens by default. The sign-in screen says exactly what you allow: Apps/Keepsake only on OneDrive, Keepsake's own app data only on Google Drive. Your own client ID moves under "Advanced: use my own client ID", and a client ID you already saved keeps working. The built-in clients turn on in the release that carries their IDs (ADR-0032).
+
 ## [0.24.0]
 
 Import every game's save backups at once, games that need your approval at the top of the Games list, setup buttons clear of the Gaming Mode footer, and PCGamingWiki in Advisor.

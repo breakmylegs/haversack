@@ -9,7 +9,7 @@ import pytest
 
 from fake_graph import FakeGraph, http_transport
 from helpers import make_fake_steam, shortcut_entry
-from keepsake import auth, net
+from keepsake import auth, clients, net
 from keepsake.app import KeepsakeApp
 from keepsake.paths import PluginPaths
 
@@ -88,8 +88,9 @@ def setup(tmp_path, monkeypatch):
     fake.close()
 
 
-def test_sign_in_registers_device_and_snapshots_go_to_onedrive(setup):
+def test_sign_in_registers_device_and_snapshots_go_to_onedrive(setup, monkeypatch):
     app, fake, events, paths = setup
+    monkeypatch.setattr(clients, "ONEDRIVE_CLIENT_ID", "")  # no built-in client: the user's own ID is needed
 
     async def run():
         with pytest.raises(auth.AuthError, match="client ID"):
