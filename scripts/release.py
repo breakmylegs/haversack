@@ -128,12 +128,18 @@ def build_assets(out_dir: str, version: str, notes: str) -> list[str]:
     shutil.copyfile(zip_path, stable_path)
     with open(zip_path, "rb") as handle:
         digest = hashlib.sha256(handle.read()).hexdigest()
+    # The PC package (ADR-0038, P5): the same core and the desktop interface, under the same signature.
+    desktop_path = package.build_desktop(out_dir)
+    with open(desktop_path, "rb") as handle:
+        desktop_digest = hashlib.sha256(handle.read()).hexdigest()
     sums_path = os.path.join(out_dir, SUMS_NAME)
     with open(sums_path, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(f"{digest}  {expected}\n{digest}  {stable_zip_name()}\n")
+        handle.write(
+            f"{digest}  {expected}\n{digest}  {stable_zip_name()}\n{desktop_digest}  {os.path.basename(desktop_path)}\n"
+        )
     with open(os.path.join(out_dir, "notes.md"), "w", encoding="utf-8", newline="\n") as handle:
         handle.write(notes)
-    return [zip_path, stable_path, sums_path]
+    return [zip_path, stable_path, desktop_path, sums_path]
 
 
 def pinned_key() -> str:

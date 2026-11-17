@@ -61,7 +61,8 @@ A pinned key that is lost locks every installed device out of in-place updates. 
 |---|---|
 | `Keepsake-v<version>.zip` | The in-plugin updater and the rebuild check below |
 | `Keepsake.zip` | First install: `https://github.com/breakmylegs/keepsake/releases/latest/download/Keepsake.zip` |
-| `SHA256SUMS` | Both zips, one line each, so one signature covers both names |
+| `Keepsake-desktop-v<version>.zip` | The PC package for Windows and Linux PCs (ADR-0042) |
+| `SHA256SUMS` | Every zip, one line each, so one signature covers them all |
 
 First install on a new device: Decky, Settings, Developer, Install Plugin from URL, then paste the URL above. After that, updates come through Keepsake's Updates page.
 

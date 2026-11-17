@@ -133,8 +133,12 @@ def test_publish_dry_run_builds_assets_without_git_changes(repo):
     zip_path = os.path.join(out_dir, "Keepsake-v0.2.1.zip")
     with open(zip_path, "rb") as handle:
         digest = hashlib.sha256(handle.read()).hexdigest()
+    with open(os.path.join(out_dir, "Keepsake-desktop-v0.2.1.zip"), "rb") as handle:
+        desktop = hashlib.sha256(handle.read()).hexdigest()
     with open(os.path.join(out_dir, "SHA256SUMS"), encoding="utf-8") as handle:
-        assert handle.read() == f"{digest}  Keepsake-v0.2.1.zip\n{digest}  Keepsake.zip\n"
+        assert handle.read() == (
+            f"{digest}  Keepsake-v0.2.1.zip\n{digest}  Keepsake.zip\n{desktop}  Keepsake-desktop-v0.2.1.zip\n"
+        )
     with open(os.path.join(out_dir, "notes.md"), encoding="utf-8") as handle:
         assert "Something." in handle.read()
     assert runner.calls == []
@@ -214,6 +218,7 @@ def test_publish_tags_pushes_and_creates_release(repo):
     assert "--prerelease" not in create
     assert any(arg.endswith("Keepsake-v0.2.1.zip") for arg in create)
     assert any(os.path.basename(arg) == "Keepsake.zip" for arg in create)  # the stable "latest" asset
+    assert any(os.path.basename(arg) == "Keepsake-desktop-v0.2.1.zip" for arg in create)  # the PC package
     assert any(arg.endswith("SHA256SUMS") for arg in create)
     # Tag before release, release last.
     assert runner.calls.index(create) == len(runner.calls) - 1

@@ -30,6 +30,13 @@ def make_repo(root, version="1.2.3", changelog=None, plugin_extra=None):
     (root / "package.json").write_text(json.dumps({"version": version}))
     (root / "plugin.json").write_text(json.dumps({"name": "Keepsake", **(plugin_extra or {})}))
     (root / "CHANGELOG.md").write_text(changelog if changelog is not None else f"# Changelog\n\n## [{version}]\n")
+    # The PC package's inputs (ADR-0038, P5).
+    (root / "desktop" / "dist").mkdir(parents=True)
+    for name in ("index.html", "app.css", "install.pyw"):
+        (root / "desktop" / name).write_text(name)
+    (root / "desktop" / "dist" / "main.js").write_text("export {};")
+    (root / "docs").mkdir()
+    (root / "docs" / "pc-host.md").write_text("pc")
 
 
 def test_package_layout_modes_and_determinism(tmp_path, monkeypatch):
@@ -56,6 +63,33 @@ def test_package_layout_modes_and_determinism(tmp_path, monkeypatch):
         assert (gate.external_attr >> 16) & 0o777 == 0o755
         assert archive.read("Keepsake/bin/keepsake-gate") == b'#!/bin/sh\nexec "$@"\n'
         assert (archive.getinfo("Keepsake/main.py").external_attr >> 16) & 0o777 == 0o644
+
+
+def test_the_pc_package_is_deterministic_and_holds_the_core_and_the_desktop_ui(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    make_repo(repo)
+    monkeypatch.setattr(package, "ROOT", str(repo))
+    first = package.build_desktop(str(tmp_path / "out1"))
+    second = package.build_desktop(str(tmp_path / "out2"))
+    assert os.path.basename(first) == "Keepsake-desktop-v1.2.3.zip"
+    with open(first, "rb") as a, open(second, "rb") as b:
+        assert a.read() == b.read()
+    with zipfile.ZipFile(first) as archive:
+        names = set(archive.namelist())
+        assert archive.read("Keepsake-desktop/VERSION") == b"1.2.3\n"
+    assert {
+        "Keepsake-desktop/install.pyw",
+        "Keepsake-desktop/desktop/index.html",
+        "Keepsake-desktop/desktop/dist/main.js",
+        "Keepsake-desktop/py_modules/keepsake/__init__.py",
+        "Keepsake-desktop/README-PC.md",
+        "Keepsake-desktop/LICENSE",
+    } <= names
+    assert not any("__pycache__" in n or n.endswith(".pyc") for n in names)
+    (repo / "desktop" / "dist" / "main.js").unlink()
+    with pytest.raises(SystemExit, match="build:desktop"):
+        package.build_desktop(str(tmp_path / "out3"))
 
 
 def test_package_requires_build(tmp_path, monkeypatch):
