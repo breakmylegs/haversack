@@ -7,6 +7,7 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 ### Added
 
 - PC preview, the desktop interface: `python -m keepsake.host --open` now shows Keepsake in your browser, on this computer only. It has an overview with Sync now, conflicts with the same two-step choices as in Gaming Mode, history, health checks, and the modules page with on and off switches. It follows your light or dark setting. The rest of the screens follow (ADR-0040).
+- PC preview, Steam for Windows: on Windows, Keepsake finds Steam where Steam for Windows records it, and reads its libraries, games and non-Steam shortcuts. Games run natively there, so their saves are found in your Windows folders (ADR-0038).
 
 ## [0.25.0]
 
