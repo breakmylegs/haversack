@@ -15,6 +15,8 @@ from keepsake.update import (
 )
 
 DIGEST = "ab" * 32
+# These tests cover the checksum and release logic; the pinned-key behaviour is in test_signatures.py.
+CHECKSUM_ONLY = ""
 
 
 def release(tag, prerelease=False, draft=False, assets=True, body="Notes"):
@@ -107,7 +109,7 @@ def test_parse_sums():
 
 def test_check_finds_update_and_notifies_once(tmp_path):
     gh = FakeGitHub([release("v0.2.1"), release("v0.2.0")])
-    updater = Updater(str(tmp_path), "0.2.0", gh, clock=Clock())
+    updater = Updater(str(tmp_path), "0.2.0", gh, clock=Clock(), public_key=CHECKSUM_ONLY)
     first = updater.check("stable")
     assert first["updateAvailable"] is True
     assert first["latest"]["version"] == "0.2.1"
@@ -119,7 +121,7 @@ def test_check_finds_update_and_notifies_once(tmp_path):
 def test_check_throttles_to_once_a_day_and_uses_etag(tmp_path):
     gh = FakeGitHub([release("v0.2.0")])
     clock = Clock()
-    updater = Updater(str(tmp_path), "0.2.0", gh, clock=clock)
+    updater = Updater(str(tmp_path), "0.2.0", gh, clock=clock, public_key=CHECKSUM_ONLY)
     updater.check("stable")
     updater.check("stable")
     assert len(gh.calls) == 1
@@ -134,7 +136,7 @@ def test_check_throttles_to_once_a_day_and_uses_etag(tmp_path):
 
 def test_rate_limit_and_offline_fail_quietly_with_cache(tmp_path):
     gh = FakeGitHub([release("v0.2.1")])
-    updater = Updater(str(tmp_path), "0.2.0", gh, clock=Clock())
+    updater = Updater(str(tmp_path), "0.2.0", gh, clock=Clock(), public_key=CHECKSUM_ONLY)
     updater.check("stable")
     gh.status_override = 403
     limited = updater.check("stable", force=True)
@@ -149,14 +151,14 @@ def test_rate_limit_and_offline_fail_quietly_with_cache(tmp_path):
 def test_check_with_no_cache_and_offline(tmp_path):
     gh = FakeGitHub([])
     gh.raise_error = True
-    result = Updater(str(tmp_path), "0.2.0", gh, clock=Clock()).check("stable")
+    result = Updater(str(tmp_path), "0.2.0", gh, clock=Clock(), public_key=CHECKSUM_ONLY).check("stable")
     assert result["error"] == "offline"
     assert result["latest"] is None and result["updateAvailable"] is False
 
 
 def test_cache_drops_unused_fields(tmp_path):
     gh = FakeGitHub([release("v0.2.0")])
-    Updater(str(tmp_path), "0.2.0", gh, clock=Clock()).check("stable")
+    Updater(str(tmp_path), "0.2.0", gh, clock=Clock(), public_key=CHECKSUM_ONLY).check("stable")
     cached = json.loads((tmp_path / "update-state.json").read_text())
     assert "extra_field" not in cached["releases"][0]
 
@@ -169,7 +171,7 @@ def make_ready(tmp_path, current="0.2.0", sums_text=None):
             "https://github.com/r/v0.2.0/sums": f"{'cd' * 32}  Keepsake-v0.2.0.zip\n",
         },
     )
-    updater = Updater(str(tmp_path), current, gh, clock=Clock())
+    updater = Updater(str(tmp_path), current, gh, clock=Clock(), public_key=CHECKSUM_ONLY)
     updater.check("stable")
     return updater, gh
 
@@ -180,7 +182,7 @@ def test_stable_keepsake_zip_asset_does_not_confuse_the_updater(tmp_path):
     payload["assets"].insert(0, {"name": "Keepsake.zip", "browser_download_url": "https://github.com/r/v0.2.1/stable"})
     sums = f"{'cd' * 32}  Keepsake.zip\n{DIGEST}  Keepsake-v0.2.1.zip\n"
     gh = FakeGitHub([payload], sums={"https://github.com/r/v0.2.1/sums": sums})
-    updater = Updater(str(tmp_path), "0.2.0", gh, clock=Clock())
+    updater = Updater(str(tmp_path), "0.2.0", gh, clock=Clock(), public_key=CHECKSUM_ONLY)
     status = updater.check("stable")
     assert status["latest"]["zip_url"] == "https://github.com/r/v0.2.1/zip"
     result = updater.prepare("v0.2.1", busy_reason=None)
@@ -242,7 +244,7 @@ def test_prepare_rejects_zip_on_disallowed_host(tmp_path):
     payload = [release("v0.2.1")]
     payload[0]["assets"][0]["browser_download_url"] = "https://evil.example.com/Keepsake-v0.2.1.zip"
     gh = FakeGitHub(payload, sums={"https://github.com/r/v0.2.1/sums": f"{DIGEST}  Keepsake-v0.2.1.zip\n"})
-    updater = Updater(str(tmp_path), "0.2.0", gh, clock=Clock())
+    updater = Updater(str(tmp_path), "0.2.0", gh, clock=Clock(), public_key=CHECKSUM_ONLY)
     updater.check("stable")
     assert updater.prepare("v0.2.1", busy_reason=None)["reason"] == "disallowed-host"
 
