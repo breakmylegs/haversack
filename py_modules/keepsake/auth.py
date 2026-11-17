@@ -54,9 +54,27 @@ class Provider:
     token_file: str
     refresh_with_scope: bool
     issuer: str
+    # Browser sign-in (ADR-0044): the authorization endpoint, the loopback name in the
+    # redirect address, and extra authorization parameters.
+    authorize_url: str = ""
+    redirect_host: str = "127.0.0.1"
+    authorize_extra: tuple[tuple[str, str], ...] = ()
 
 
-MICROSOFT = Provider("OneDrive", DEVICECODE_URL, TOKEN_URL, SCOPE, VERIFICATION_DOMAINS, TOKEN_FILE, True, "Microsoft")
+MICROSOFT = Provider(
+    "OneDrive",
+    DEVICECODE_URL,
+    TOKEN_URL,
+    SCOPE,
+    VERIFICATION_DOMAINS,
+    TOKEN_FILE,
+    True,
+    "Microsoft",
+    authorize_url=f"{AUTHORITY}/authorize",
+    # The portal accepts http://localhost (any port) with no manifest edit; [::1] is not supported.
+    redirect_host="localhost",
+    authorize_extra=(("response_mode", "query"),),
+)
 GOOGLE = Provider(
     "Google Drive",
     "https://oauth2.googleapis.com/device/code",
@@ -66,6 +84,9 @@ GOOGLE = Provider(
     "google-token.json",
     False,
     "Google",
+    authorize_url="https://accounts.google.com/o/oauth2/v2/auth",
+    # offline plus consent: Google returns a refresh token on every sign-in, not only the first.
+    authorize_extra=(("access_type", "offline"), ("prompt", "consent")),
 )
 
 

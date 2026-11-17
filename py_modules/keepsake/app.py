@@ -59,6 +59,7 @@ from .installer.service import health_checks as installer_health_checks
 from .jobs import JobTracker
 from .locks import GameLocks
 from .log import log_event, setup_logging, tail
+from .loopback_auth import BrowserProbe, LoopbackFlow
 from .modules import Module, ModuleRegistry
 from .paths import PluginPaths
 from .procs import find_game_processes
@@ -179,7 +180,8 @@ class KeepsakeApp:
             transport=transport,
         )
         self._transport = transport
-        self._signin: DeviceCodeFlow | None = None
+        self._signin: DeviceCodeFlow | LoopbackFlow | None = None
+        self._signin_probe: BrowserProbe | None = None
         self._launching: set[str] = set()
         self._identity_cache: tuple[float, list[dict[str, Any]]] | None = None
         self._auth_lock = asyncio.Lock()
@@ -858,6 +860,7 @@ class KeepsakeApp:
             )
             signed_in = await asyncio.to_thread(manager.signed_in)
             problem = manager.last_error
+        onedrive_client = bool(clients.onedrive_client_id(self.settings.get("onedriveClientId")))
         return {
             "clientIdSet": client_set,
             "signedIn": signed_in,
@@ -870,19 +873,48 @@ class KeepsakeApp:
             # ADR-0032: with a built-in client the sign-in screens need no client ID, and
             # "Use my own client ID" moves under Advanced (shown open while one is saved).
             "builtInClient": {"onedrive": clients.onedrive_builtin(), "gdrive": clients.google_builtin()},
+            # Which sign-in methods have a client (ADR-0044). Google needs a different client for each.
+            "methods": {
+                "onedrive": dict.fromkeys(("browser", "phone"), onedrive_client),
+                "gdrive": {
+                    "browser": clients.google_browser_builtin() or self.credentials.configured("gdrive"),
+                    "phone": clients.google_phone_builtin() or self.credentials.configured("gdrive"),
+                },
+            },
             "ownClient": {
                 "onedrive": bool(self.settings.get("onedriveClientId")),
                 "gdrive": self.credentials.configured("gdrive"),
             },
         }
 
-    async def start_signin(self, backend: str = "onedrive") -> dict[str, Any]:
-        """Begin a device code flow. Only ever called from a user action (threat model T2)."""
+    async def start_signin(self, backend: str = "onedrive", method: str = "phone") -> dict[str, Any]:
+        """Begin a sign-in. Only ever called from a user action (threat model T2).
+
+        ``method`` "browser" is the authorization code flow with a loopback redirect, for a
+        browser on this device (ADR-0044); "phone" is the device code flow with a QR code.
+        """
         backend = "gdrive" if backend == "gdrive" else "onedrive"
         async with self._auth_lock:
             if self._signin is not None:
                 self._signin.cancelled.set()
-            if backend == "gdrive":
+            flow: DeviceCodeFlow | LoopbackFlow
+            if method == "browser":
+                if backend == "gdrive":
+                    client_id, secret = clients.google_browser_client(self.credentials.load("gdrive"))
+                    flow = LoopbackFlow(
+                        client_id,
+                        self.google_tokens.store,
+                        transport=self._google_transport,
+                        provider=GOOGLE,
+                        client_secret=secret,
+                    )
+                else:
+                    flow = LoopbackFlow(
+                        clients.onedrive_client_id(self.settings.get("onedriveClientId")),
+                        self.token_store,
+                        transport=self._transport,
+                    )
+            elif backend == "gdrive":
                 client_id, secret = clients.google_client(self.credentials.load("gdrive"))
                 flow = DeviceCodeFlow(
                     client_id,
@@ -899,11 +931,11 @@ class KeepsakeApp:
                 )
             shown = await asyncio.to_thread(flow.start)
             self._signin = flow
-        log_event(logging.INFO, "auth.signin_started", "Sign-in started", backend=backend)
+        log_event(logging.INFO, "auth.signin_started", "Sign-in started", backend=backend, method=method)
         self._background.append(asyncio.create_task(self._finish_signin(flow, backend)))
         return shown
 
-    async def _finish_signin(self, flow: DeviceCodeFlow, backend: str = "onedrive") -> None:
+    async def _finish_signin(self, flow: DeviceCodeFlow | LoopbackFlow, backend: str = "onedrive") -> None:
         try:
             await asyncio.to_thread(flow.poll)
         except AuthError as exc:
@@ -2534,6 +2566,20 @@ class KeepsakeApp:
     async def https_test(self) -> dict[str, Any]:
         result = await asyncio.to_thread(diagnostics.https_test)
         log_event(logging.INFO, "diagnostics.https_test", "HTTPS test finished", ok=result.get("ok"))
+        return result
+
+    async def signin_probe(self, action: str = "start") -> dict[str, Any]:
+        """The Gaming Mode sign-in probe's loopback step (ADR-0044): "start" gives an address
+        for Steam's browser, "result" says whether the browser reached it. Only from a user action."""
+        if action == "start":
+            if self._signin_probe is not None:
+                self._signin_probe.close()
+            self._signin_probe = await asyncio.to_thread(BrowserProbe)
+            return {"url": self._signin_probe.url}
+        if self._signin_probe is None:
+            return {"arrived": False, "error": "not-started"}
+        result = self._signin_probe.result()
+        await asyncio.to_thread(diagnostics.record_probe_event, self.paths.runtime_dir, "signin-loopback", result)
         return result
 
     async def record_probe_event(self, kind: str, payload: Any) -> int:

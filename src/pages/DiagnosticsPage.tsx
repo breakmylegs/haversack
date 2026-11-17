@@ -15,6 +15,7 @@ import {
 import { deckyMechanisms, runningAppDetails } from "../probes";
 import { HealthSection } from "./HealthSection";
 import { JsonBlock } from "./JsonBlock";
+import { SigninProbe } from "./SigninProbe";
 
 type Section = "environment" | "steam" | "processes" | "frontend" | "https" | "steamops" | "export";
 
@@ -145,6 +146,7 @@ export function DiagnosticsPage() {
           <JsonBlock value={results[section]} />
         </Field>
       ))}
+      <SigninProbe />
     </div>
   );
 }

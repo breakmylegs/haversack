@@ -1,6 +1,6 @@
-import { DialogButton, Field, Focusable, TextField, ToggleField } from "@decky/ui";
+import { DialogButton, Field, Focusable, Navigation, TextField, ToggleField } from "@decky/ui";
 import { addEventListener, removeEventListener, toaster } from "@decky/api";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Backend,
   backendConfig,
@@ -13,6 +13,7 @@ import {
   Settings,
   signOut,
   SignInCode,
+  SigninMethod,
   startSignin,
   testCloud,
 } from "../backend";
@@ -51,10 +52,19 @@ const GRANT: Partial<Record<Backend, string>> = {
   gdrive: "Google asks you to allow Keepsake access to its own app data only.",
 };
 
+// Steam's browser re-mounts this page on return and leaves gamepad focus on an invisible
+// panel, so the sign-in button is focused again when the page comes back (ADR-0044).
+let refocusAfterBrowser = false;
+
+const WHY_PHONE: Record<"onedrive" | "gdrive", string> = {
+  onedrive: "Keepsake shows a code to enter on your phone.",
+  gdrive: "Google does not allow sign-in inside Steam's browser, so Keepsake shows a code to enter on your phone.",
+};
+
 const HELP: Record<Backend, string> = {
   local: "Snapshots stay in a test store on this device. Nothing is shared with your other devices.",
-  onedrive: "Sign in with your Microsoft account on your phone. Keepsake can read and write only the Apps/Keepsake folder in your OneDrive, never your other files.",
-  gdrive: "Sign in with your Google account on your phone. Keepsake can use only its own hidden app folder in your Google Drive, never your files.",
+  onedrive: "Sign in with your Microsoft account. Keepsake can read and write only the Apps/Keepsake folder in your OneDrive, never your other files.",
+  gdrive: "Sign in with your Google account. Keepsake can use only its own hidden app folder in your Google Drive, never your files.",
   webdav: "Your own WebDAV server, such as Nextcloud. It must refuse to overwrite files (Keepsake checks).",
   s3: "Amazon S3 or an S3-compatible service. It must support conditional writes (Keepsake checks).",
 };
@@ -68,14 +78,26 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
   const [config, setConfig] = useState<BackendConfig | null>(null);
   const [draft, setDraft] = useState<Record<string, string | boolean>>({});
   const [code, setCode] = useState<SignInCode | null>(null);
+  const [browserFailed, setBrowserFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const buttons = useRef<HTMLDivElement>(null);
 
   const refresh = async () => setStatus(await cloudStatus());
 
   useEffect(() => {
+    if (refocusAfterBrowser) {
+      refocusAfterBrowser = false;
+      setTimeout(() => buttons.current?.querySelector("button")?.focus(), 100);
+    }
+  }, []);
+
+  useEffect(() => {
     void refresh();
     const listener = addEventListener<[{ status: string; reason?: string }]>(SIGNIN_EVENT, (result) => {
-      setCode(null);
+      setCode((shown) => {
+        if (shown?.method === "browser" && result.status !== "signed-in" && result.reason !== "cancelled") setBrowserFailed(true);
+        return null;
+      });
       toaster.toast({
         title: "Keepsake",
         body: result.status === "signed-in" ? "Signed in." : `Sign-in did not complete: ${result.reason}`,
@@ -132,6 +154,30 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
   const showOwn = !builtIn || advanced || own;
   const form = view === "gdrive" && !showOwn ? [] : (FORMS[view] ?? []);
   const canSignIn = view === "onedrive" ? builtIn || Boolean(settings.onedriveClientId) : builtIn || Boolean(config?.configured);
+  const provider = view === "gdrive" ? "gdrive" : "onedrive";
+  const preferred: SigninMethod = settings.gamingModeSignin?.[provider] ?? (provider === "gdrive" ? "phone" : "browser");
+  const available = status?.methods?.[provider];
+  // The preferred method if it has a client, otherwise the other one (ADR-0044).
+  const method: SigninMethod = !available || available[preferred] ? preferred : preferred === "browser" ? "phone" : "browser";
+
+  const signIn = (how: SigninMethod) =>
+    run(async () => {
+      setBrowserFailed(false);
+      const shown = await startSignin(provider, how);
+      setCode(shown);
+      if (shown.method === "browser") {
+        refocusAfterBrowser = true;
+        Navigation.NavigateToExternalWeb(shown.authUrl);
+      }
+      return null;
+    });
+
+  const setPreferred = (browser: boolean) =>
+    void run(async () => {
+      const next = { ...(settings.gamingModeSignin ?? { onedrive: "browser", gdrive: "phone" }), [provider]: browser ? "browser" : "phone" };
+      onSettings(await setSetting("gamingModeSignin", next));
+      return null;
+    });
 
   const useOwnClient = (on: boolean) => {
     setAdvanced(on);
@@ -233,7 +279,44 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
         </DialogButton>
       )}
 
-      {code && (
+      {oauth && !signedIn && available?.browser && available?.phone && (
+        <ToggleField
+          label="Sign in with this device's browser"
+          description={method === "browser" ? "Keepsake opens the sign-in page in Steam's browser." : WHY_PHONE[provider]}
+          checked={method === "browser"}
+          disabled={locked || Boolean(code)}
+          onChange={setPreferred}
+        />
+      )}
+
+      {code?.method === "browser" && (
+        <Field
+          label="Finish signing in in the browser"
+          description={`Sign in on the ${view === "gdrive" ? "Google" : "Microsoft"} page and allow access for Keepsake. ${
+            GRANT[view] ?? ""
+          } Then come back here. This waits ${Math.round(code.expiresIn / 60)} minutes.`}
+          childrenLayout="below"
+        >
+          <Focusable style={{ display: "flex", gap: 8 }}>
+            <DialogButton style={{ width: "auto" }} onClick={() => Navigation.NavigateToExternalWeb(code.authUrl)}>
+              Open the sign-in page again
+            </DialogButton>
+            <DialogButton style={{ width: "auto" }} onClick={() => void cancelSignin().then(() => setCode(null))}>
+              Cancel sign-in
+            </DialogButton>
+          </Focusable>
+        </Field>
+      )}
+
+      {browserFailed && !code && available?.phone && (
+        <Field label="The browser sign-in did not finish" description="You can sign in on your phone with a code instead.">
+          <DialogButton style={{ width: "auto" }} disabled={locked} onClick={() => void signIn("phone")}>
+            Use your phone instead
+          </DialogButton>
+        </Field>
+      )}
+
+      {code && code.method !== "browser" && (
         <Field
           label="Sign in with your phone"
           description={`Open ${code.verificationUri} or scan the code, then enter the code below. Check the page is on ${
@@ -249,14 +332,10 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
         </Field>
       )}
 
-      <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "8px 0" }}>
+      <Focusable ref={buttons} style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "8px 0" }}>
         {oauth && !signedIn && !code && (
-          <DialogButton
-            style={{ width: "auto" }}
-            disabled={locked || !canSignIn}
-            onClick={() => void run(async () => (setCode(await startSignin(view)), null))}
-          >
-            Sign in
+          <DialogButton style={{ width: "auto" }} disabled={locked || !canSignIn} onClick={() => void signIn(method)}>
+            Sign in with {view === "gdrive" ? "Google" : "OneDrive"}
           </DialogButton>
         )}
         {view !== "local" && signedIn && (

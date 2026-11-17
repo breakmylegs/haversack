@@ -22,8 +22,12 @@ export interface Settings {
   steamCloudDetection: boolean;
   suspendSnapshots: boolean;
   libraryRoot: string;
+  /** ADR-0044: how each provider signs in from Gaming Mode. */
+  gamingModeSignin: Record<"onedrive" | "gdrive", SigninMethod>;
   readOnly: boolean;
 }
+
+export type SigninMethod = "browser" | "phone";
 
 export type SteamCloud = "cloud" | "no-cloud" | "unknown" | null;
 
@@ -546,16 +550,17 @@ export interface CloudStatus {
   builtInClient: { onedrive: boolean; gdrive: boolean };
   /** The user has saved their own client, which is used instead of the built-in one. */
   ownClient: { onedrive: boolean; gdrive: boolean };
+  /** ADR-0044: which sign-in methods have a client. */
+  methods: Record<"onedrive" | "gdrive", Record<SigninMethod, boolean>>;
 }
 
-export interface SignInCode {
-  userCode: string;
-  verificationUri: string;
-  expiresIn: number;
-}
+/** The phone (device code) sign-in shows a code; the browser sign-in returns the page to open. */
+export type SignInCode =
+  | { method?: undefined; userCode: string; verificationUri: string; expiresIn: number }
+  | { method: "browser"; authUrl: string; expiresIn: number };
 
 export const cloudStatus = callable<[], CloudStatus>("cloud_status");
-export const startSignin = callable<[backend?: "onedrive" | "gdrive"], SignInCode>("start_signin");
+export const startSignin = callable<[backend: "onedrive" | "gdrive", method: SigninMethod], SignInCode>("start_signin");
 export const cancelSignin = callable<[], { ok: boolean }>("cancel_signin");
 export const signOut = callable<[backend?: "onedrive" | "gdrive"], { ok: boolean }>("sign_out");
 export const testCloud = callable<[backend?: Backend], { ok: boolean; folder?: string; error?: string; registered?: boolean }>(
@@ -664,6 +669,10 @@ export const getSteamProbe = callable<[], Record<string, unknown>>("get_steam_pr
 export const getGameProcesses = callable<[appid: number], Record<string, unknown>[]>("get_game_processes");
 export const httpsTest = callable<[], HttpsTestResult>("https_test");
 export const recordProbeEvent = callable<[kind: string, payload: unknown], number>("record_probe_event");
+/** ADR-0044: the Gaming Mode sign-in probe's loopback step. */
+export const signinProbe = callable<[action: "start" | "result"], { url?: string; arrived?: boolean; ipv6?: boolean; address?: string; userAgent?: string; listening?: string[]; error?: string }>(
+  "signin_probe",
+);
 export const exportDiagnostics = callable<[frontend: Record<string, unknown>], string>("export_diagnostics");
 export const freezeTest = callable<[appid: number, seconds: number], FreezeTestResult>("freeze_test");
 

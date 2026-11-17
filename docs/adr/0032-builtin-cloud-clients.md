@@ -4,6 +4,7 @@
 - Date: 16 November 2026
 - Deciders: Peter (owner)
 - Supersedes: the "bring your own registration" default in ADR-0008 and slice 10, which stays available under Advanced
+- Amended by: ADR-0044 (browser sign-in). Its registration steps replace the ones below; the Google project gains a second client, "Desktop app"
 
 ## Context
 

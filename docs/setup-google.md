@@ -11,7 +11,7 @@ For the built-in client, publish the consent screen to **Production**: `drive.ap
 1. Open the Google Cloud console and create a project, for example "Keepsake".
 2. APIs and services, Library: enable the **Google Drive API**.
 3. APIs and services, OAuth consent screen: choose **External**, give the app a name (for example "Keepsake"), add your own email as a test user. Add the scope `.../auth/drive.appdata`. Leaving the app in testing mode works for your own account, but Google then expires the sign-in after 7 days and you sign in again from Settings. Publishing the app avoids that; check the consent screen page for whether Google asks for verification for this scope (unverified, A116).
-4. APIs and services, Credentials, Create credentials, **OAuth client ID**, application type **TVs and Limited Input devices**.
+4. APIs and services, Credentials, Create credentials, **OAuth client ID**, application type **TVs and Limited Input devices**. This client is for the phone sign-in. For the browser sign-in (ADR-0044), the client must be of type **Desktop app** instead, which needs no redirect URI. Keepsake uses one client of your own for both, so pick the type for the sign-in you use.
 5. Copy the client ID and the client secret.
 
 ## In Keepsake (Gaming Mode)
