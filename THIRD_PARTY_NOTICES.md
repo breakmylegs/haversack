@@ -65,6 +65,10 @@ Copyright © 2021 Starz0r, Curve
 
 Licensed under the MIT licence, with the same terms as above.
 
+## ProtonDB (Keepsake's index, downloaded at run time when switched on, not bundled)
+
+Contains information from ProtonDB, made available under the Open Database License (ODbL) 1.0, https://opendatacommons.org/licenses/odbl/1-0/. Individual contents are under the Database Contents License (DbCL) 1.0. Source: the monthly dumps at https://github.com/bdefore/protondb-data. Keepsake's index (the `protondb-index` release) is a derived database, shared under the ODbL; `scripts/protondb_index.py` builds it.
+
 ## Deck Verified (fetched at run time, not bundled)
 
 Community reports come from Deck Verified by DeckSettings, https://deckverified.games. The report data is GPL-3.0. Keepsake shows it with a link to each report and caches it on the device only. No report data is part of Keepsake.

@@ -33,8 +33,8 @@ Nothing outside its own cache and settings in Keepsake's folders (P16). Never St
 | Steam store endpoints | Exact hosts to verify in slice 14 |
 | `www.pcgamingwiki.com` | Cargo API with the user's bot password (CC BY-NC-SA, attributed) |
 | `raw.githubusercontent.com` | Are We Anti-Cheat Yet `games.json` (MIT) |
-| GitHub release asset downloads | ProtonDB index (ODbL), if adopted (c0-report Q4) |
-| `www.protondb.com` | Allowlisted by the spec. Not used unless Peter decides otherwise (Q4) |
+| GitHub release asset downloads | Keepsake's ProtonDB index (ODbL), release `protondb-index`, monthly and only while the source is on (ADR-0035) |
+| `www.protondb.com` | Allowlisted by the spec but never called (Q4); the page only links to it |
 | `api.anthropic.com`, `api.openai.com`, `generativelanguage.googleapis.com` | Only for the configured provider, from a button press |
 
 ## Data source credits

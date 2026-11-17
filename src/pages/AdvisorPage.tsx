@@ -132,6 +132,7 @@ function PcgwSection({ view, busy, act }: { view: AdvisorView; busy: boolean; ac
   const settings = view.settings;
   if (!settings) return null;
   const wiki = view.pcgw?.data;
+  const pdb = view.protondb?.summary;
 
   const saveLogin = async () => {
     try {
@@ -174,6 +175,25 @@ function PcgwSection({ view, busy, act }: { view: AdvisorView; busy: boolean; ac
               Open the page
             </DialogButton>
           )}
+        </Field>
+      )}
+      <ToggleField
+        label="ProtonDB (optional)"
+        description="Adds ProtonDB reports from handhelds with the same chip families. Downloads Keepsake's ProtonDB index (up to 30 MB) once a month and looks games up on this device, so no game is named to anyone."
+        checked={settings.sourceProtonDb}
+        disabled={busy}
+        onChange={(on) => void act(() => advisorSettings({ sourceProtonDb: on }))}
+      />
+      {view.protondb?.error && <Field label="ProtonDB" description={view.protondb.error} />}
+      {pdb && (
+        <Field
+          label={`ProtonDB: ${pdb.share != null ? `${pdb.share}% of ${pdb.reports} reports say it works` : `${pdb.reports} reports`}`}
+          description={`${pdb.handheld} from handhelds; the newest appear with the reports below. From the ${pdb.dump} dump. ${pdb.attribution}`}
+          childrenLayout="inline"
+        >
+          <DialogButton style={{ width: "auto" }} onClick={() => Navigation.NavigateToExternalWeb(pdb.url)}>
+            Open on ProtonDB
+          </DialogButton>
         </Field>
       )}
     </>

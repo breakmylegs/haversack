@@ -715,6 +715,7 @@ export interface AdvisorView {
     sourceDeckVerified: boolean;
     sourceAntiCheat: boolean;
     sourcePcgw: boolean;
+    sourceProtonDb: boolean;
     steamIdOverrides: Record<string, number>;
     stackOverrides: Record<string, string>;
     aiProvider: "" | "anthropic" | "openai" | "gemini";
@@ -765,6 +766,12 @@ export interface AdvisorView {
     data: { page: string; url: string; upscaling: string[]; frameGen: string[]; hdr: string | null; rayTracing: string | null; attribution: string } | null;
   };
   pcgwLogin?: boolean;
+  /** Keepsake's ProtonDB index (ADR-0035): looked up on the device, never by asking ProtonDB. */
+  protondb?: {
+    enabled: boolean;
+    error: string | null;
+    summary: { reports: number; works: number; handheld: number; share: number | null; dump: string; url: string; attribution: string } | null;
+  };
   recommendations?: AdvisorRecommendation[];
   attribution?: string[];
 }
