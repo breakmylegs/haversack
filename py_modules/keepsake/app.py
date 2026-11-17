@@ -16,7 +16,7 @@ import shutil
 import time
 import uuid
 import zipfile
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Mapping
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -32,6 +32,7 @@ from . import (
     manifest,
     net,
     ordering,
+    pcwatch,
     registry,
     resolve,
     restore,
@@ -168,6 +169,7 @@ class KeepsakeApp:
         self._net_connect: remote.Connector = remote._connect  # tests use a scripted server
         self._smb_connect: smbshare.Connector = smbshare._connect  # and a fake share
         self._net_resolve: remote.Resolver = remote._resolve
+        self._pc_processes: Callable[[], list[str]] = pcwatch.list_processes  # PC hosts only; tests use a fake
         self._manifest_progress: dict[str, Any] = {"stage": "idle", "running": False}
         self._background: list[asyncio.Task[Any]] = []
         self.token_store = TokenStore(paths.settings_dir)
@@ -1150,7 +1152,7 @@ class KeepsakeApp:
         target = self._user_reg(game)
         if not keys or not os.path.isfile(fragment_path) or not os.path.isfile(target):
             return {"status": "skipped"}
-        if find_game_processes(int(game["appid"]), game.get("prefix"), self.proc_root):
+        if self._game_running(game):
             raise SnapshotError("the game is running; registry keys are only written while it is closed")
         with open(fragment_path, encoding="utf-8") as handle:
             fragment = handle.read()
@@ -1320,7 +1322,7 @@ class KeepsakeApp:
                 self._merge_registry(game, reg_keys, ctx["gameKey"])
 
         def processes_running() -> bool:
-            return bool(find_game_processes(int(game["appid"]), game.get("prefix"), self.proc_root))
+            return self._game_running(game)
 
         def identity_record() -> dict[str, Any]:
             return identity.identity_record(
@@ -1369,6 +1371,11 @@ class KeepsakeApp:
                 await self.bus.publish(event, {"gameKey": None, "appid": lifecycle.normalise_appid(raw_id)})
         if not self.registry.enabled("saves"):
             return {"handled": 0}  # Saves switched off: no launch gate, no exit save
+        if self.host != "decky" and kind == "start":
+            # A PC host only learns of a game once it is running (ADR-0038): record it, never pull under it (P6).
+            for game in games:
+                self._background.append(asyncio.create_task(self._pc_started(game)))
+            return {"handled": len(games)}
         for game in games:
             if kind == "start" and game["key"] not in self._launching:
                 self._launching.add(game["key"])
@@ -1376,6 +1383,21 @@ class KeepsakeApp:
             elif kind == "exit":
                 self._background.append(asyncio.create_task(self._exit(game)))
         return {"handled": len(games)}
+
+    async def _pc_started(self, game: dict[str, Any]) -> None:
+        try:
+            ctx = await self._sync_context(game["key"])
+        except (ValueError, SnapshotError) as exc:
+            log_event(logging.WARNING, "lifecycle.pc_start", "Game seen running, not synced", error=str(exc))
+            return
+        self._record_session(ctx.game_key, lastStart=time.time())
+        await self.bus.publish("game_started", {"gameKey": ctx.game_key, "appid": game["appid"]})
+
+    def _game_running(self, game: Mapping[str, Any]) -> bool:
+        """Whether the game runs now. Decky reads /proc; a PC host lists the user's processes (ADR-0038)."""
+        if self.host == "decky":
+            return bool(find_game_processes(int(game["appid"]), game.get("prefix"), self.proc_root))
+        return pcwatch.game_running(game, self._pc_processes(), discovery.real_home(self.home))
 
     async def _launch(self, game: dict[str, Any]) -> dict[str, Any]:
         key = game["key"]
@@ -1477,7 +1499,7 @@ class KeepsakeApp:
         try:
             gone = await asyncio.to_thread(
                 lifecycle.wait_for,
-                lambda: not find_game_processes(int(game["appid"]), game.get("prefix"), self.proc_root),
+                lambda: not self._game_running(game),
                 lifecycle.EXIT_WAIT_SECONDS,
             )
             if not gone:
