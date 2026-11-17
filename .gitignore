@@ -7,6 +7,8 @@ lib-cov
 *.out
 *.pid
 *.gz
+# minisign's own signed release: the real-tool proof for the signature verifier (ADR-0036)
+!tests/fixtures/minisign/minisign-0.12.tar.gz
 *.swp
 pids
 logs
