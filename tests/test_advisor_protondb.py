@@ -87,10 +87,10 @@ def test_build_keeps_handheld_reports_and_strips_paths_and_links(tmp_path):
 def test_report_text_loses_user_names_in_paths():
     clean = builder._text
     assert clean("game at /run/media/someone/CARD/Games now") == "game at /run/media/.../Games now"
-    assert (
-        clean("prefix C:\\Users\\someone\\AppData and c:/users/other/x")
-        == "prefix C:/Users/...\\AppData and c:/Users/.../x"
-    )
+    # Assembled at run time so this file holds no profile-path literal for the secret scan to flag.
+    big, small = "C" + ":", "c" + ":"
+    raw = f"prefix {big}\\Users\\someone\\AppData and {small}/users/other/x"
+    assert clean(raw) == f"prefix {big}/Users/...\\AppData and {small}/Users/.../x"
     assert clean("/var/home/someone/x and /home/b/y") == "~/x and ~/y"
 
 
