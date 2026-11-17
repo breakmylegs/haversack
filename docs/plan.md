@@ -60,6 +60,12 @@ Spec section 10 applies amendments to v1 slices not yet merged, and moves them t
 
 Desktop (23 and 24) stays at the end of the feature queue, as Peter asked. Only the v2 hardening release follows it.
 
+### After slice 25 (Peter, 17 November 2026)
+
+| Item | Scope | Rule |
+|---|---|---|
+| D1 User documentation | Detailed user docs on GitHub with screenshots and diagrams:<br>- Getting started for each device type;<br>- a guide per feature, privacy and an FAQ;<br>- automated screenshots from a frontend harness with sample data, with a personal-data check;<br>- Mermaid or SVG diagrams;<br>- a release-time step that regenerates screenshots and checks links and images.<br>Where it lives and how it is published is decided in its own ADR. | Not started before the items above, unless all of them are blocked. Its own pull request. |
+
 ## Backlog (not scheduled)
 
 - Done: the Advisor data sources deferred from slice 15 (ADR-0029): PCGamingWiki (ADR-0031) and the ProtonDB monthly-dump index (ADR-0035). The index needs a monthly refresh by hand (`docs/releasing.md`).

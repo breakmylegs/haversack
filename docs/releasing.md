@@ -2,15 +2,32 @@
 
 There is no CI (ADR-0004) and `main` only accepts pull requests (ADR-0005), so a release is two local steps. You need `gh` signed in, Python, pnpm and SSH access to a device.
 
-## Once: a signing key (recommended)
+## Once: the signing key (ADR-0036)
 
-Releases can be signed with [minisign](https://jedisct1.github.io/minisign/). Without a key, releases still carry `SHA256SUMS`, but the signature is the control that protects against a compromised GitHub account (threat model T10).
+Releases are signed with [minisign](https://jedisct1.github.io/minisign/). The signature over `SHA256SUMS` is the control that protects devices against a compromised GitHub account (threat model T10).
 
-1. Install minisign (for example `winget install jedisct1.minisign` or `scoop install minisign`).
-2. Generate a key pair outside the repository: `minisign -G -p keepsake.pub -s %USERPROFILE%\.minisign\keepsake.key`.
-3. Keep the secret key and its password safe and offline. Never commit it; `.gitignore` blocks `*.minisign.key` and `minisign.key` as a backstop.
-4. Set `KEEPSAKE_MINISIGN_KEY` to the secret key path in your shell before publishing.
-5. Pin the public key in the plugin: copy the base64 line from `keepsake.pub` (the line after the comment) into `PUBLIC_KEY` in `py_modules/keepsake/release_key.py` and merge that change through a pull request. From the next release, the updater refuses any update without a valid `SHA256SUMS.minisig` made with this key (ADR-0023), so publish that release with `KEEPSAKE_MINISIGN_KEY` set. The public key is not secret; the secret key never leaves your machine.
+The key is encrypted with a long random passphrase. The passphrase is sealed with Windows DPAPI for your account, so releases sign without anyone typing it. Both files live in `%LOCALAPPDATA%\Keepsake\signing`, a folder only your account can open.
+
+1. Install minisign: `winget install --id jedisct1.minisign --exact --scope user`.
+2. Create the key: `python scripts/signing.py setup`. It prints the public key, which is not secret. This laptop's security policy blocks Claude from handling key files, so you run this step.
+3. Back it up (next section) before the key is pinned.
+4. Pin the public key: its base64 line goes into `PUBLIC_KEY` in `py_modules/keepsake/release_key.py`, merged by pull request. From the release that carries it, devices refuse any update without a valid `SHA256SUMS.minisig` from this key. `release.py` refuses to publish unsigned once the key is pinned.
+
+`python scripts/signing.py status` shows the public key, checks the folder is private and signs a test file with the plugin's own verifier, without showing anything secret.
+
+### Back up the signing key
+
+A pinned key that is lost locks every installed device out of in-place updates. The only way back is a reinstall from the first-install URL, so keep two offline copies, in two places.
+
+1. Plug in a USB stick that you keep offline, and run `python scripts/signing.py backup E:\keepsake-signing`, using your stick's drive letter. This copies the encrypted secret key and the public key. The encrypted key is useless without the passphrase.
+2. Run `python scripts/signing.py show-passphrase`, type `SHOW`, and write the passphrase on paper, or store it in your password manager. Keep it apart from the USB stick. Close the window afterwards.
+3. Eject the stick and store it offline. Optionally, repeat on a second stick kept elsewhere.
+
+### Restore it on another laptop
+
+1. Install minisign (step 1 above).
+2. Run `python scripts/signing.py restore E:\keepsake-signing` and type the passphrase when asked. It re-seals the passphrase for this laptop's account, locks the folder and runs a signing check.
+3. Run `python scripts/signing.py status`. The public key must match `release_key.py`.
 
 ## Each release
 
@@ -36,7 +53,7 @@ Releases can be signed with [minisign](https://jedisct1.github.io/minisign/). Wi
    pnpm release publish --device-tested
    ```
 
-   This runs `pnpm run check`, builds `Keepsake-v0.2.1.zip` deterministically, copies it byte for byte to `Keepsake.zip`, writes `SHA256SUMS` with a line for each name, signs it when `KEEPSAKE_MINISIGN_KEY` is set, creates and pushes the tag `v0.2.1`, and creates the GitHub Release with both zips, `SHA256SUMS`, the signature and the changelog notes.
+   This runs `pnpm run check`, builds `Keepsake-v0.2.1.zip` deterministically, copies it byte for byte to `Keepsake.zip`, writes `SHA256SUMS` with a line for each name, signs it with the laptop's key (checked with the plugin's own verifier against the pinned key), creates and pushes the tag `v0.2.1`, and creates the GitHub Release with both zips, `SHA256SUMS`, the signature and the changelog notes.
 
 ## Release assets and the install URL
 

@@ -35,6 +35,8 @@ from collections.abc import Callable, Sequence
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import package
+import signing
+from keepsake import minisign
 
 ROOT = package.ROOT
 SEMVER = re.compile(r"^\d+\.\d+\.\d+(-beta\.\d+)?$")
@@ -134,15 +136,53 @@ def build_assets(out_dir: str, version: str, notes: str) -> list[str]:
     return [zip_path, stable_path, sums_path]
 
 
-def sign(sums_path: str, version: str, runner: Runner) -> str | None:
-    key = os.environ.get("KEEPSAKE_MINISIGN_KEY")
-    if not key:
-        print("warning: KEEPSAKE_MINISIGN_KEY is not set; SHA256SUMS will not be signed", file=sys.stderr)
+def pinned_key() -> str:
+    """The public key the plugin being released will trust (``release_key.PUBLIC_KEY``)."""
+    from keepsake import release_key
+
+    return release_key.PUBLIC_KEY.strip()
+
+
+def sign(
+    sums_path: str,
+    version: str,
+    runner: Runner,
+    signer: Callable[[str, str], str] | None = None,
+) -> str | None:
+    """Sign SHA256SUMS: with the laptop's sealed key (ADR-0036), else an interactive KEEPSAKE_MINISIGN_KEY.
+
+    The signature is then checked with the plugin's own verifier against the pinned key, so a release
+    that installed devices would refuse is never published (and the verifier is re-proved against the
+    real minisign tool every release).
+    """
+    comment = f"Keepsake v{version}"
+    signature: str | None = None
+    if signing.is_set_up():
+        try:
+            signature = (signer or signing.sign)(sums_path, comment)
+        except signing.SigningError as exc:
+            raise ReleaseError(str(exc)) from exc
+    elif os.environ.get("KEEPSAKE_MINISIGN_KEY"):
+        if not shutil.which("minisign"):
+            raise ReleaseError("KEEPSAKE_MINISIGN_KEY is set but minisign is not on PATH")
+        runner(["minisign", "-S", "-s", os.environ["KEEPSAKE_MINISIGN_KEY"], "-m", sums_path, "-t", comment])
+        signature = sums_path + ".minisig"
+    pinned = pinned_key()
+    if signature is None:
+        if pinned:
+            raise ReleaseError(
+                "the release key is pinned, so devices refuse unsigned releases; "
+                "set up the signing key first (python scripts/signing.py status)"
+            )
+        print("warning: no signing key; SHA256SUMS will not be signed", file=sys.stderr)
         return None
-    if not shutil.which("minisign"):
-        raise ReleaseError("KEEPSAKE_MINISIGN_KEY is set but minisign is not on PATH")
-    runner(["minisign", "-S", "-s", key, "-m", sums_path, "-t", f"Keepsake v{version}"])
-    return sums_path + ".minisig"
+    if pinned:
+        with open(sums_path, "rb") as data, open(signature, encoding="utf-8") as sig:
+            try:
+                minisign.verify(pinned, sig.read(), data.read())
+            except minisign.MinisignError as exc:
+                raise ReleaseError(f"the signature does not verify with the pinned key: {exc}") from exc
+    return signature
 
 
 def prepare(version: str, runner: Runner = run) -> None:

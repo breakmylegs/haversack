@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Security
+
+- Releases are signed from the release that pins Keepsake's key. Devices on any earlier version install it with the usual checksum check. From then on, Keepsake refuses any update that is unsigned or signed with another key. The first-install link keeps working. The signature check is proven against the real minisign tool (ADR-0036).
+
 ### Added
 
 - Advisor, ProtonDB (optional, off by default): ProtonDB reports from handhelds join the community reports. Reports from handhelds with your chip, such as the Z1 Extreme or Z2 Extreme, are marked as the same chip. They feed the Proton and launch-option advice, and a summary shows the share of reports that say the game works, with a link to ProtonDB. Keepsake downloads its own ProtonDB index (a few MB) once a month and looks games up on your device, so no game is named to anyone. Contains information from ProtonDB, made available under the ODbL (ADR-0035).
