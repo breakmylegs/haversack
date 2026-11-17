@@ -47,6 +47,7 @@ This is Keepsake's first vendored library. P9 allows vendored pure-Python librar
 
 ## Consequences
 
+- `scripts/secret_scan.py` skips only its email-address rule under `py_modules/keepsake/_vendor/`, because the upstream copyright lines carry the authors' public addresses and the licences forbid removing those notices. Token, key, profile-path and denylist rules still apply there, and `tests/test_scripts.py` proves it.
 - About 0.8 MB more Python in the plugin zip. It is not imported unless SMB is used.
 - `THIRD_PARTY_NOTICES.md` carries the pysmb and pyasn1 licences. The licence files also ship in `_vendor/LICENSES`.
 - Updating a vendored library means editing the pin in `scripts/vendor.py`, running it and reviewing the diff. The tests catch drift either way.

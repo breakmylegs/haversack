@@ -178,6 +178,16 @@ def test_secret_scan_flags_windows_profile_paths():
     assert secret_scan.scan_text("t.py", f"{drive}/Users/Public/Documents", []) == []
 
 
+def test_secret_scan_vendored_code_may_keep_author_emails_but_nothing_else():
+    email = "author" + "@" + "upstream.org"
+    token = "gh" + "p_" + "a" * 36
+    vendored = "py_modules/keepsake/_vendor/lib/x.py"
+    assert secret_scan.scan_text(vendored, f"# Copyright {email}", []) == []
+    assert secret_scan.scan_text(vendored, f"t = '{token}'", []) == [f"{vendored}:1: GitHub token"]
+    assert secret_scan.scan_text(vendored, "My Secret Game", ["secret game"]) == [f"{vendored}:1: denylisted string"]
+    assert secret_scan.scan_text("py_modules/keepsake/x.py", email, []) == ["py_modules/keepsake/x.py:1: email address"]
+
+
 def test_secret_scan_denylist_and_exemption():
     assert secret_scan.scan_text("src/a.ts", "My Secret Game", ["secret game"]) == ["src/a.ts:1: denylisted string"]
     assert secret_scan.scan_text("docs/build-prompt.md", "My Secret Game", ["secret game"]) == []
