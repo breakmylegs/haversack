@@ -314,6 +314,15 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 | A155 | A Microsoft Entra registration for personal accounts with public client flows on lets any personal Microsoft account sign in through the device code flow with no secret and no publisher verification; publisher verification affects only work or school users | verified from Microsoft Learn (device code flow, publisher verification overview), 16 November 2026; unverified with Keepsake's own registration until Peter supplies its ID | Microsoft Learn |
 | A156 | A Google client of type "TVs and Limited Input devices" requesting only `drive.appdata` (non-sensitive), published to Production, has no 100-user cap, no 7-day expiry and no unverified-app warning; its secret is not treated as confidential | verified from Google's limited-input device, Drive scopes and Manage App Audience pages, 16 November 2026; unverified with Keepsake's own client until Peter supplies it | Google documentation |
 
+## Network install (ADR-0033)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A157 | pysmb is pure Python under the zlib/libpng licence, needs only `pyasn1` (BSD-2-Clause), ships its own MD4, and speaks SMB1 and SMB2 but not SMB3. smbprotocol (MIT) speaks SMB 2.0.2 to 3.1.1 but needs `cryptography`, a compiled extension | verified from pysmb's `setup.py`, README and `smb/utils` folder, pyasn1's `LICENSE.rst`, and smbprotocol's PyPI page and `pyproject.toml`, 17 November 2026 | upstream repositories |
+| A158 | udisks' `LoopSetup` takes an open file descriptor, so `udisksctl loop-setup` should work on an ISO inside a FUSE mount that only the user can read | the signature is verified from the UDisks2 Manager API page; whether it works on a gvfs or kio-fuse file is unverified until `network_mount_probe.py --loop-test` runs on a device | UDisks2 documentation |
+| A159 | kio-fuse mounts a URL on request over the session bus: `org.kde.KIOFuse`, `/org/kde/KIOFuse`, `org.kde.KIOFuse.VFS.mountUrl(s) -> s` | verified from the kio-fuse README; unverified in Gaming Mode, where no KDE session runs | kio-fuse README |
+| A160 | `http.client` never follows redirects, and `ipaddress` may be missing from Decky's frozen Python | the first from the Python documentation; the second is unverified (imported lazily, and a missing module means plain http is refused) | Python documentation, ADR-0030 |
+
 ## PCGamingWiki (ADR-0031)
 
 | # | Fact | Status | Source |

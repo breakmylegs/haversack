@@ -20,6 +20,7 @@ import {
   updateGameConfig,
 } from "../backend";
 import { ROUTE_PATH } from "../routes";
+import { NetworkSource } from "./NetworkSource";
 
 // FileSelectionType in @decky/api is a type-only const enum: FILE is 0, FOLDER is 1.
 const FILE = 0 as unknown as Parameters<typeof openFilePicker>[0];
@@ -50,6 +51,7 @@ export function InstallerPage() {
   const [start, setStart] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [apiKey, setApiKey] = useState("");
+  const [network, setNetwork] = useState(false);
   const [matches, setMatches] = useState<Record<number, { id: number; name: string; verified: boolean }[]>>({});
 
   const refresh = () =>
@@ -149,7 +151,7 @@ export function InstallerPage() {
           </Focusable>
         )}
         <div style={{ fontSize: 12, marginTop: 4 }}>
-          Browse from {from}. Network shares appear here once they are mounted, for example from Desktop Mode.
+          Browse from {from}. Network shares appear here once they are mounted, for example from Desktop Mode, or use From a network location.
         </div>
         <Focusable style={{ display: "flex", gap: 8, marginTop: 8 }}>
           <DialogButton style={{ width: "auto" }} disabled={busy || !title.trim() || !status?.udisks} onClick={() => void pick("iso")}>
@@ -158,8 +160,14 @@ export function InstallerPage() {
           <DialogButton style={{ width: "auto" }} disabled={busy || !title.trim()} onClick={() => void pick("folder")}>
             From a folder
           </DialogButton>
+          <DialogButton style={{ width: "auto", opacity: network ? 1 : 0.8 }} disabled={busy || !status?.udisks} onClick={() => setNetwork(!network)}>
+            From a network location
+          </DialogButton>
         </Focusable>
       </Field>
+      {network && status && (
+        <NetworkSource title={title} stagingFree={status.stagingFree} initial={status.download} onChanged={() => void refresh()} />
+      )}
       {status && !status.udisks && <Field label="ISO files are not available" description="udisksctl is missing on this system. Copy the disc to a folder instead." />}
       {status?.artwork && !status.artworkKey && (
         <Field label="SteamGridDB API key" description="Optional. Lets Keepsake add artwork to games you install. Get a key from your SteamGridDB profile, API." childrenLayout="below">

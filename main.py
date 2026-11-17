@@ -137,6 +137,29 @@ class Plugin:
     async def installer_start(self, source: str, title: str) -> dict[str, Any]:
         return await self.app.installer_start(source, title)
 
+    async def installer_net_locations(self) -> list[dict[str, Any]]:
+        return await self.app.installer_net_locations()
+
+    async def installer_net_remember(self, values: dict[str, Any]) -> list[dict[str, Any]]:
+        return await self.app.installer_net_remember(values)
+
+    async def installer_net_forget(self, location_id: str) -> list[dict[str, Any]]:
+        return await self.app.installer_net_forget(location_id)
+
+    async def installer_net_browse(self, access: dict[str, Any], url: str = "") -> dict[str, Any]:
+        return await self.app.installer_net_browse(access, url)
+
+    async def installer_net_download(
+        self, access: dict[str, Any], url: str, title: str, sha256: str = ""
+    ) -> dict[str, Any]:
+        return await self.app.installer_net_download(access, url, title, sha256)
+
+    async def installer_net_cancel(self) -> dict[str, Any]:
+        return await self.app.installer_net_cancel()
+
+    async def installer_net_status(self) -> dict[str, Any]:
+        return await self.app.installer_net_status()
+
     async def installer_create_shortcut(self, job_id: int, installer_rel: str) -> dict[str, Any]:
         return await self.app.installer_create_shortcut(job_id, installer_rel)
 

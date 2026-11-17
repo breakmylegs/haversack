@@ -79,7 +79,57 @@ export interface InstallerStatus {
   artworkKey: boolean;
   sources: { home: string; network: string[]; removable: string[] };
   jobs: InstallJob[];
+  /** Free bytes where network downloads are staged (ADR-0033). */
+  stagingFree: number | null;
+  download: NetDownload;
 }
+
+// Installing from a network location that is not mounted (ADR-0033). Passwords never come back.
+export interface NetLocation {
+  id: string;
+  url: string;
+  username: string;
+  passwordSet: boolean;
+}
+export interface NetAccess {
+  locationId?: string;
+  url?: string;
+  username?: string;
+  password?: string;
+  /** Other hosts the user allowed after a redirect, for this action only. */
+  allowHosts?: string[];
+}
+export interface NetEntry {
+  name: string;
+  url: string;
+  kind: "folder" | "iso";
+}
+export interface NetDownload {
+  running: boolean;
+  name?: string;
+  title?: string;
+  done?: number;
+  total?: number | null;
+  rate?: number;
+  job?: number;
+  cancelled?: boolean;
+  error?: string;
+  redirectHost?: string;
+}
+export const installerNetLocations = callable<[], NetLocation[]>("installer_net_locations");
+export const installerNetRemember = callable<
+  [values: { id?: string; url: string; username: string; password: string }],
+  NetLocation[]
+>("installer_net_remember");
+export const installerNetForget = callable<[id: string], NetLocation[]>("installer_net_forget");
+export const installerNetBrowse = callable<
+  [access: NetAccess, url: string],
+  { url: string; entries: NetEntry[]; redirectHost?: string; error?: string }
+>("installer_net_browse");
+export const installerNetDownload = callable<[access: NetAccess, url: string, title: string, sha256: string], NetDownload>(
+  "installer_net_download",
+);
+export const installerNetCancel = callable<[], NetDownload>("installer_net_cancel");
 
 export const installerStatus = callable<[], InstallerStatus>("installer_status");
 export const installerAddCdDrive = callable<[jobId: number], InstallJob>("installer_add_cd_drive");
