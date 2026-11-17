@@ -56,8 +56,9 @@ def known_folder(root: str) -> str | None:
 
     folder_id = GUID()
     ctypes.memmove(folder_id.data, uuid.UUID(guid).bytes_le, 16)
-    shell32 = ctypes.windll.shell32  # type: ignore[attr-defined]
-    ole32 = ctypes.windll.ole32  # type: ignore[attr-defined]
+    # windll exists only on Windows; mypy on other systems does not know it.
+    shell32 = ctypes.windll.shell32  # type: ignore[attr-defined, unused-ignore]
+    ole32 = ctypes.windll.ole32  # type: ignore[attr-defined, unused-ignore]
     shell32.SHGetKnownFolderPath.argtypes = [
         ctypes.POINTER(GUID),
         wintypes.DWORD,
