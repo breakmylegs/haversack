@@ -85,12 +85,64 @@ def build(out_dir: str) -> str:
     return target
 
 
+DESKTOP_FILES = (  # (source in the repository, path in the PC package)
+    ("desktop/index.html", "desktop/index.html"),
+    ("desktop/app.css", "desktop/app.css"),
+    ("desktop/install.pyw", "install.pyw"),
+    ("LICENSE", "LICENSE"),
+    ("THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md"),
+    ("docs/pc-host.md", "README-PC.md"),
+)
+
+
+def desktop_name() -> str:
+    return f"{plugin_name()}-desktop-v{version()}.zip"
+
+
+def collect_desktop() -> list[tuple[str, str]]:
+    """(source path, archive path) for the PC package (ADR-0038, P5): the same core, the built desktop UI."""
+    entries = [(os.path.join(ROOT, *src.split("/")), dst) for src, dst in DESKTOP_FILES]
+    dist = os.path.join(ROOT, "desktop", "dist")
+    scripts = sorted(n for n in os.listdir(dist) if n.endswith(".js")) if os.path.isdir(dist) else []
+    if "main.js" not in scripts:
+        sys.exit("desktop/dist/main.js is missing. Run pnpm run build:desktop first.")
+    entries += [(os.path.join(dist, n), f"desktop/dist/{n}") for n in scripts]
+    base = os.path.join(ROOT, "py_modules")
+    for folder, dirs, files in os.walk(base):
+        dirs[:] = sorted(d for d in dirs if d not in SKIP_PARTS)
+        for name in files:
+            if not name.endswith((".pyc", ".pyo")):
+                src = os.path.join(folder, name)
+                entries.append((src, os.path.relpath(src, ROOT).replace(os.sep, "/")))
+    return sorted(entries, key=lambda e: e[1])
+
+
+def build_desktop(out_dir: str) -> str:
+    """Build ``Keepsake-desktop-v<version>.zip``, deterministic like the plugin zip."""
+    os.makedirs(out_dir, exist_ok=True)
+    target = os.path.join(out_dir, desktop_name())
+    folder = f"{plugin_name()}-desktop"
+    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for src, rel in collect_desktop():
+            info = zipfile.ZipInfo(f"{folder}/{rel}", date_time=FIXED_TIME)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = (0o100000 | 0o644) << 16
+            with open(src, "rb") as handle:
+                archive.writestr(info, handle.read())
+        info = zipfile.ZipInfo(f"{folder}/VERSION", date_time=FIXED_TIME)
+        info.create_system = 3
+        info.external_attr = (0o100000 | 0o644) << 16
+        archive.writestr(info, version() + "\n")  # read by install.pyw and the self-update
+    return target
+
+
 def main() -> None:
     out_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "out")
-    target = build(out_dir)
-    with open(target, "rb") as handle:
-        digest = hashlib.sha256(handle.read()).hexdigest()
-    print(f"{digest}  {os.path.basename(target)}")
+    for target in (build(out_dir), build_desktop(out_dir)):
+        with open(target, "rb") as handle:
+            digest = hashlib.sha256(handle.read()).hexdigest()
+        print(f"{digest}  {os.path.basename(target)}")
 
 
 if __name__ == "__main__":

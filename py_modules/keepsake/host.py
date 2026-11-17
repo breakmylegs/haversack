@@ -453,6 +453,10 @@ async def run(port: int, open_browser: bool) -> None:
         await watching
         server.shutdown()
         await app.stop()
+        try:
+            os.unlink(os.path.join(paths.runtime_dir, STATE_FILE))  # a stopped host leaves no token behind
+        except OSError:
+            pass
 
 
 def main(argv: list[str] | None = None) -> int:
