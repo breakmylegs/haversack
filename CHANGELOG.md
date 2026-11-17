@@ -2,11 +2,13 @@
 
 All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
-## [Unreleased]
+## [0.25.0]
+
+Install from network locations (web servers, Windows shares and WebDAV), ProtonDB reports in Advisor, the first signed release, and the groundwork for Linux and Windows PCs.
 
 ### Security
 
-- Releases are signed from the release that pins Keepsake's key. Devices on any earlier version install it with the usual checksum check. From then on, Keepsake refuses any update that is unsigned or signed with another key. The first-install link keeps working. The signature check is proven against the real minisign tool (ADR-0036).
+- This release is signed, and it pins Keepsake's release key. Releases are signed from this one on. Devices on any earlier version install it with the usual checksum check. From then on, Keepsake refuses any update that is unsigned or signed with another key. The first-install link keeps working. The signature check is proven against the real minisign tool (ADR-0036).
 
 ### Added
 

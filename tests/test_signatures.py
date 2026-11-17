@@ -143,3 +143,16 @@ def test_with_a_pinned_key_a_valid_signature_is_required(tmp_path):
     assert forged["ok"] is False and forged["reason"] == "bad-signature"
     other_file = prepared(tmp_path / "d", release_payload(), signature_text(b"other file"), public_text())
     assert other_file["reason"] == "bad-signature"
+
+
+def test_the_shipped_updater_pins_the_owners_key_and_refuses_unsigned_releases(tmp_path):
+    from keepsake import release_key
+
+    minisign.parse_public_key(release_key.PUBLIC_KEY)  # a real minisign public key (ADR-0036)
+    updater = Updater(str(tmp_path), "0.11.0", fetcher(release_payload(signed=False), ""))  # the default key
+    assert updater.public_key == release_key.PUBLIC_KEY != ""
+    updater.check("stable")
+    assert updater.prepare("v1.0.0", busy_reason=None) == {"ok": False, "reason": "unsigned-release"}
+    forged = Updater(str(tmp_path / "f"), "0.11.0", fetcher(release_payload(), signature_text(SUMS)))
+    forged.check("stable")  # signed, but by the test key, not the owner's
+    assert forged.prepare("v1.0.0", busy_reason=None)["reason"] == "bad-signature"
