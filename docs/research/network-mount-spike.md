@@ -1,5 +1,7 @@
 # Network mount spike (v2 slice 22)
 
+> **Superseded by [ADR-0033](../adr/0033-network-install.md)** (17 November 2026). Option A stays; HTTP and HTTPS installs are built; SMB goes through a vendored pure-Python client next. The probe now also checks the session bus, the gvfs and kio-fuse services, staging space and, with `--loop-test`, whether udisks can open an ISO on a FUSE mount.
+
 Status: **options for Peter.** Nothing beyond option A is built. The research flagged automated SMB and NFS mounting as a spike, not a feature (replication research section 6.2), and it is an escalation item if it needs root or a binary.
 
 ## The question

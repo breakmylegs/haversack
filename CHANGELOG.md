@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- Install, "From a network location": install from a NAS or web server that is not mounted. Choose Web server, enter the address (and a user name and password if it needs one), Browse its folders and pick an ISO. Keepsake downloads the ISO to this device with progress and a cancel button, resumes after a dropped connection, checks the size and an optional SHA-256, and then installs it like any ISO. The download is deleted when the install ends. "Remember this location" keeps the address, and the password stays on the device. Plain http:// works only on your local network and never with a password. If the server sends you to another host, Keepsake asks first. Windows shares (SMB) come next. NFS shares still need mounting first (ADR-0033).
+
 ### Changed
 
 - Cloud sign-in: Keepsake can ship its own OneDrive and Google Drive sign-in, so you pick the service, press Sign in and approve on your phone, with no client ID to enter. OneDrive is listed first and opens by default. The sign-in screen says exactly what you allow: Apps/Keepsake only on OneDrive, Keepsake's own app data only on Google Drive. Your own client ID moves under "Advanced: use my own client ID", and a client ID you already saved keeps working. The built-in clients turn on in the release that carries their IDs (ADR-0032).

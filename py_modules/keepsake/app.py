@@ -18,6 +18,7 @@ import uuid
 import zipfile
 from collections.abc import Callable, Coroutine
 from typing import Any
+from urllib.parse import urlsplit
 
 from . import (
     clients,
@@ -48,7 +49,7 @@ from .fsutil import atomic_write_json, read_json
 from .gameconfig import DEFAULT as GAME_DEFAULTS
 from .gameconfig import GameConfigStore, custom_path_from_absolute
 from .importers import ludusavi
-from .installer import artwork, udisks
+from .installer import artwork, remote, udisks
 from .installer import files as installer_files
 from .installer.artwork import SteamGridDB
 from .installer.service import Installer, InstallerError
@@ -157,6 +158,10 @@ class KeepsakeApp:
         self._manifest_lock = asyncio.Lock()
         self._import_all: dict[str, Any] = {"running": False, "done": 0, "total": 0, "games": {}, "summary": {}}
         self._import_cancel = False
+        self.net_locations = remote.LocationStore(paths.settings_dir, self.credentials)
+        self._net: dict[str, Any] = {"running": False}
+        self._net_cancel = False
+        self._net_connect: remote.Connector = remote._connect  # tests use a scripted server
         self._manifest_progress: dict[str, Any] = {"stage": "idle", "running": False}
         self._background: list[asyncio.Task[Any]] = []
         self.token_store = TokenStore(paths.settings_dir)
@@ -283,8 +288,12 @@ class KeepsakeApp:
                 work_dir=os.path.join(self.paths.runtime_dir, "installer"),
                 art=SteamGridDB(lambda: str(self.credentials.load("steamgriddb")["apiKey"])),
             )
+            removed = await asyncio.to_thread(self.installer.clean_downloads)
+            if removed:
+                log_event(logging.INFO, "installer.net_cleaned", "Left-over downloads removed", count=len(removed))
 
         async def installer_stop() -> None:
+            self._net_cancel = True
             self.installer = None
 
         async def installer_exit(payload: dict[str, Any]) -> None:
@@ -2168,7 +2177,18 @@ class KeepsakeApp:
             "artworkKey": self.credentials.configured("steamgriddb"),
             "sources": await asyncio.to_thread(self._install_sources),
             "jobs": await asyncio.to_thread(self.installer.jobs) if self.installer else [],
+            "stagingFree": await asyncio.to_thread(self._staging_free),
+            "download": dict(self._net),
         }
+
+    def _staging_free(self) -> int | None:
+        """Free bytes where network downloads are staged (ADR-0033), or None before the Installer starts."""
+        if self.installer is None:
+            return None
+        try:
+            return int(shutil.disk_usage(self.installer.downloads_dir()).free)
+        except (OSError, InstallerError):
+            return None
 
     def _install_sources(self) -> dict[str, Any]:
         """Places to start the file picker: home, the library, removable drives and network shares already mounted."""
@@ -2228,6 +2248,134 @@ class KeepsakeApp:
             raise ValueError(str(exc)) from exc
         log_event(logging.INFO, "installer.start", "Install prepared", job=job["id"], kind=job["kind"])
         return job
+
+    # Installing from a network location that is not mounted (ADR-0033)
+
+    NET_PROGRESS_EVENT = "keepsake_netinstall_progress"
+
+    def _net_session(self, access: dict[str, Any]) -> remote.Session:
+        """A session for one user action: a remembered location, or an address typed just now."""
+        access = access if isinstance(access, dict) else {}
+        allowed = {str(h) for h in access.get("allowHosts") or [] if isinstance(h, str)}
+        if access.get("locationId"):
+            loc, password = self.net_locations.get(str(access["locationId"]))
+            url, username = loc["url"], loc["username"]
+        else:
+            url, username, password = (str(access.get(k) or "") for k in ("url", "username", "password"))
+        return remote.Session(url, username, password, allowed=allowed, connect=self._net_connect)
+
+    async def installer_net_locations(self) -> list[dict[str, Any]]:
+        return await asyncio.to_thread(self.net_locations.public)
+
+    async def installer_net_remember(self, values: dict[str, Any]) -> list[dict[str, Any]]:
+        values = values if isinstance(values, dict) else {}
+        try:
+            return await asyncio.to_thread(
+                self.net_locations.save,
+                str(values.get("url") or ""),
+                str(values.get("username") or ""),
+                str(values.get("password") or ""),
+                str(values["id"]) if values.get("id") else None,
+            )
+        except remote.RemoteError as exc:
+            raise ValueError(str(exc)) from exc
+
+    async def installer_net_forget(self, location_id: str) -> list[dict[str, Any]]:
+        return await asyncio.to_thread(self.net_locations.forget, str(location_id))
+
+    async def installer_net_browse(self, access: dict[str, Any], url: str = "") -> dict[str, Any]:
+        """User action: list folders and ISO files at ``url`` (default: the location's own address)."""
+        self._installer()
+        try:
+            session = self._net_session(access)
+            target = remote.check_location(url or session.url)
+            if (urlsplit(target).hostname or "").lower() != session.home:
+                raise remote.RemoteError("browse within the location you chose")
+            entries = await asyncio.to_thread(remote.list_folder, session, target)
+        except remote.RedirectElsewhere as exc:
+            return {"url": url, "entries": [], "redirectHost": exc.host, "error": str(exc)}
+        except remote.RemoteError as exc:
+            raise ValueError(str(exc)) from exc
+        return {"url": target if target.endswith("/") else target + "/", "entries": entries}
+
+    async def installer_net_status(self) -> dict[str, Any]:
+        return dict(self._net)
+
+    async def installer_net_cancel(self) -> dict[str, Any]:
+        if self._net.get("running"):
+            self._net_cancel = True
+        return dict(self._net)
+
+    async def installer_net_download(
+        self, access: dict[str, Any], url: str, title: str, sha256: str = ""
+    ) -> dict[str, Any]:
+        """User action: download one ISO into staging, then prepare the install from it."""
+        installer = self._installer()
+        if self._net.get("running"):
+            raise ValueError("a download is already running; cancel it first")
+        try:
+            session = self._net_session(access)
+            url = remote.check_location(url)
+            name = remote.file_name(url)
+            remote.check_sha256(sha256)
+            if (urlsplit(url).hostname or "").lower() != session.home:
+                raise remote.RemoteError("download from the location you chose")
+            folder = await asyncio.to_thread(installer.downloads_dir)
+        except (remote.RemoteError, InstallerError) as exc:
+            raise ValueError(str(exc)) from exc
+        self._net_cancel = False
+        self._net = {
+            "running": True,
+            "name": name,
+            "title": title,
+            "done": 0,
+            "total": None,
+            "rate": 0,
+            "started": time.time(),
+        }
+        self._background.append(
+            asyncio.create_task(self._run_net_download(installer, session, url, folder, str(title), sha256))
+        )
+        return dict(self._net)
+
+    async def _run_net_download(
+        self, installer: Installer, session: remote.Session, url: str, folder: str, title: str, sha256: str
+    ) -> None:
+        loop = asyncio.get_running_loop()
+        last = [0.0]
+
+        def progress(done: int, total: int | None) -> None:
+            now = time.time()
+            if now - last[0] < 0.5 and done != total:
+                return
+            last[0] = now
+            elapsed = max(now - float(self._net.get("started") or now), 0.001)
+            self._net.update(done=done, total=total, rate=int(done / elapsed))
+            asyncio.run_coroutine_threadsafe(self.emit(self.NET_PROGRESS_EVENT, dict(self._net)), loop)
+
+        outcome: dict[str, Any] = {}
+        try:
+            path = await asyncio.to_thread(
+                remote.download,
+                session,
+                url,
+                folder,
+                sha256=sha256 or None,
+                progress=progress,
+                cancelled=lambda: self._net_cancel,
+            )
+            job = await asyncio.to_thread(installer.start, path, title, True)
+            outcome = {"job": job["id"]}
+            log_event(logging.INFO, "installer.net_downloaded", "Network download finished", job=job["id"])
+        except remote.Cancelled:
+            outcome = {"cancelled": True}
+        except remote.RedirectElsewhere as exc:
+            outcome = {"error": str(exc), "redirectHost": exc.host}
+        except (remote.RemoteError, InstallerError, udisks.UdisksError, OSError) as exc:
+            outcome = {"error": str(exc)}
+            log_event(logging.WARNING, "installer.net_failed", "Network download failed", reason=type(exc).__name__)
+        self._net = {**self._net, **outcome, "running": False}
+        await self.emit(self.NET_PROGRESS_EVENT, dict(self._net))
 
     async def installer_create_shortcut(self, job_id: int, installer_rel: str) -> dict[str, Any]:
         try:

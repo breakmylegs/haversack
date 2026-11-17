@@ -195,13 +195,53 @@ class Installer:
 
     # Steps
 
-    def start(self, source: str, title: str) -> dict[str, Any]:
-        """Prepare an install from an ISO or a folder; mounts an ISO read-only."""
+    def downloads_dir(self) -> str:
+        """Where network downloads are staged (ADR-0033); everything in it belongs to Keepsake."""
+        folder = os.path.join(self._staging(), "net")
+        os.makedirs(folder, exist_ok=True)
+        return folder
+
+    def clean_downloads(self) -> list[str]:
+        """Delete staged downloads no active install uses, and any partial file. Returns the names removed."""
+        folder = self.downloads_dir()
+        in_use = {os.path.realpath(j["staged"]) for j in self.jobs() if j["state"] in ACTIVE and j.get("staged")}
+        removed = []
+        for name in sorted(os.listdir(folder)):
+            path = os.path.join(folder, name)
+            if os.path.isfile(path) and not os.path.islink(path) and os.path.realpath(path) not in in_use:
+                os.unlink(path)
+                removed.append(name)
+        return removed
+
+    def _drop_staged(self, data: dict[str, Any]) -> None:
+        staged = data.get("staged")
+        if staged and os.path.dirname(os.path.realpath(staged)) == os.path.realpath(self.downloads_dir()):
+            try:
+                os.unlink(staged)
+            except FileNotFoundError:
+                pass
+            data["stagedRemoved"] = True
+
+    def start(self, source: str, title: str, staged: bool = False) -> dict[str, Any]:
+        """Prepare an install from an ISO or a folder; mounts an ISO read-only.
+
+        ``staged`` marks a downloaded ISO in :meth:`downloads_dir`, deleted when the install ends.
+        """
+        try:
+            return self._start(source, title, staged)
+        except Exception:
+            if staged:
+                self._drop_staged({"staged": source})
+            raise
+
+    def _start(self, source: str, title: str, staged: bool) -> dict[str, Any]:
         title = " ".join(str(title).split())
         if not _TITLE.match(title):
             raise InstallerError('the title is 1 to 80 characters without / \\ : * ? " < > |')
         source = os.path.realpath(str(source)).replace(os.sep, "/")
         data: dict[str, Any] = {"source": source, "ops": {}}
+        if staged:
+            data["staged"] = source
         target = posixpath.join(self.library_root(), title)
         if os.path.isfile(source) and source.lower().endswith(".iso"):
             if not self.has_udisks():
@@ -425,4 +465,5 @@ class Installer:
         if data.get("device"):
             udisks.detach(data["device"], self.runner)
             data["unmounted"] = True
+        self._drop_staged(data)
         self._save(job_id, state, data)

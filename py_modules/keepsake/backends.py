@@ -27,6 +27,7 @@ FILES = {
     "gemini": "ai-gemini.json",
     "pcgw": "pcgw.json",
 }
+KEYED_FILES = {"netinstall": "netinstall-secrets.json"}
 FIELDS: dict[str, dict[str, str]] = {
     "webdav": {"url": "text", "username": "text", "password": "secret"},
     "s3": {
@@ -181,3 +182,35 @@ class CredentialStore:
     def configured(self, kind: str) -> bool:
         data = self.load(kind)
         return all(data.get(name) for name in REQUIRED[kind])
+
+    # Keyed secrets: one secret per remembered item, such as a network location's password (ADR-0033).
+
+    def _keyed_path(self, kind: str) -> str:
+        if kind not in KEYED_FILES:
+            raise BackendConfigError(f"unknown secret store {kind}")
+        return os.path.join(self._dir, KEYED_FILES[kind])
+
+    def _keyed(self, kind: str) -> dict[str, str]:
+        try:
+            data = read_json(self._keyed_path(kind), default={})
+        except (OSError, ValueError):
+            data = {}
+        if not isinstance(data, dict):
+            return {}
+        return {str(k): v for k, v in data.items() if isinstance(v, str)}
+
+    def keyed_get(self, kind: str, key: str) -> str:
+        with self._lock:
+            return self._keyed(kind).get(str(key), "")
+
+    def keyed_set(self, kind: str, key: str, value: str | None) -> None:
+        """Store ``value`` for ``key``; None or "" removes it."""
+        if value is not None and (not isinstance(value, str) or len(value) > MAX_TEXT or "\x00" in value):
+            raise BackendConfigError("the password is not valid text")
+        with self._lock:
+            data = self._keyed(kind)
+            if value:
+                data[str(key)] = value
+            else:
+                data.pop(str(key), None)
+            atomic_write_json(self._keyed_path(kind), data, mode=0o600)
