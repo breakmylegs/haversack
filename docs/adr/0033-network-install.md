@@ -1,6 +1,6 @@
 # ADR-0033: Installing from a network location that is not mounted
 
-- Status: accepted for HTTP and HTTPS (built). SMB recommended through a vendored pure-Python client, to build next. NFS, WebDAV and SFTP as below. Peter's owner decision, 16 November 2026.
+- Status: accepted. Built: HTTP and HTTPS, then SMB 2 through vendored pysmb (ADR-0034), then WebDAV (17 November 2026). NFS and SFTP as below. Peter's owner decision, 16 November 2026.
 - Date: 17 November 2026
 - Deciders: Peter (owner)
 - Supersedes: the recommendation in `docs/research/network-mount-spike.md` (option A, already mounted shares, stays)
@@ -35,6 +35,19 @@ A useful fact for every route: the Installer opens ISOs with `udisksctl loop-set
    - **Browsing:** the listing pages that NAS and web servers generate (`autoindex` style) are read for links one level down, without following them, then shown as folders and `.iso` files.
 2. **SMB is next**, as vendored pysmb. It is a separate change because the vendoring, hashes and packaging need their own review. It does not depend on the probe, because it mounts nothing. The gvfs and kio-fuse routes stay open, but not chosen: they need register entries and Gaming Mode session facts that only the probe can show.
 3. **Option A stays.** Shares that are already mounted are still offered.
+
+## WebDAV (built after SMB)
+
+WebDAV addresses use the `davs://` and `dav://` forms that file managers use. They map to `https://` and `http://`, so every HTTP rule above applies unchanged, and a remembered location keeps its protocol.
+
+- **Listing:** `PROPFIND` with `Depth: 1`, asking only for `resourcetype` and `getcontentlength`. The answer is parsed with the stdlib XML parser:
+  - any DTD or entity declaration is refused;
+  - the answer is capped at 2 MiB;
+  - only children one level down on the same host are kept.
+- **Download:** the same `GET` download as HTTP.
+- **Read-only:** the session sends only `GET` and `PROPFIND`, so nothing on the server can change.
+- **Not a WebDAV folder:** a server that answers `200`, `405` or `501` gets a plain message pointing to Web server.
+- **Missing `xml`:** if Decky's Python lacks `xml` (ADR-0030), WebDAV says so and Web server still works.
 
 ## Terms for user-entered addresses (Peter approves user-entered locations on these terms)
 

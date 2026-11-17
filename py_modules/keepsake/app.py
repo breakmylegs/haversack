@@ -49,7 +49,7 @@ from .fsutil import atomic_write_json, read_json
 from .gameconfig import DEFAULT as GAME_DEFAULTS
 from .gameconfig import GameConfigStore, custom_path_from_absolute
 from .importers import ludusavi
-from .installer import artwork, remote, smbshare, udisks
+from .installer import artwork, remote, smbshare, udisks, webdav
 from .installer import files as installer_files
 from .installer.artwork import SteamGridDB
 from .installer.service import Installer, InstallerError
@@ -2258,7 +2258,8 @@ class KeepsakeApp:
     def _net_session(self, access: dict[str, Any]) -> remote.Session | smbshare.Share:
         """A session for one user action: a remembered location, or an address typed just now.
 
-        ``smb://`` addresses are Windows shares (ADR-0034); everything else is HTTP or HTTPS.
+        ``smb://`` addresses are Windows shares (ADR-0034), ``davs://`` and ``dav://`` are WebDAV
+        folders (HTTP rules, ``PROPFIND`` listings); everything else is HTTP or HTTPS.
         """
         access = access if isinstance(access, dict) else {}
         allowed = {str(h) for h in access.get("allowHosts") or [] if isinstance(h, str)}
@@ -2269,6 +2270,15 @@ class KeepsakeApp:
             url, username, password = (str(access.get(k) or "") for k in ("url", "username", "password"))
         if url.strip().lower().startswith("smb://"):
             return smbshare.Share(url, username, password, connect=self._smb_connect, resolve=self._net_resolve)
+        if webdav.is_dav(url):
+            return webdav.DavSession(
+                webdav.to_http(url),
+                username,
+                password,
+                allowed=allowed,
+                connect=self._net_connect,
+                resolve=self._net_resolve,
+            )
         return remote.Session(
             url, username, password, allowed=allowed, connect=self._net_connect, resolve=self._net_resolve
         )
@@ -2281,7 +2291,7 @@ class KeepsakeApp:
             same = (address.host, address.port) == (session.home, session.address.port)
             target = address.url(folder=what == "browse")
         else:
-            target = remote.check_location(url)
+            target = remote.check_location(webdav.to_http(url) if webdav.is_dav(url) else url)
             same = (urlsplit(target).hostname or "").lower() == session.home
         if not same:
             raise remote.RemoteError(f"{what} within the location you chose")
@@ -2312,13 +2322,19 @@ class KeepsakeApp:
         try:
             session = self._net_session(access)
             target = self._net_target(session, url or session.url, "browse")
-            lister = smbshare.list_folder if isinstance(session, smbshare.Share) else remote.list_folder
-            entries = await asyncio.to_thread(lister, session, target)  # type: ignore[arg-type]
+            if isinstance(session, smbshare.Share):
+                lister: Callable[..., list[dict[str, Any]]] = smbshare.list_folder
+            elif isinstance(session, webdav.DavSession):
+                lister = webdav.list_folder
+            else:
+                lister = remote.list_folder
+            entries = await asyncio.to_thread(lister, session, target)
         except remote.RedirectElsewhere as exc:
             return {"url": url, "entries": [], "redirectHost": exc.host, "error": str(exc)}
         except remote.RemoteError as exc:
             raise ValueError(str(exc)) from exc
-        return {"url": target if target.endswith("/") else target + "/", "entries": entries}
+        folder = target if target.endswith("/") else target + "/"
+        return {"url": webdav.to_dav(folder) if isinstance(session, webdav.DavSession) else folder, "entries": entries}
 
     async def installer_net_status(self) -> dict[str, Any]:
         return dict(self._net)

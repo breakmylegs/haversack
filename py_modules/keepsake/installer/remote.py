@@ -192,8 +192,15 @@ class Session:
         if parts.scheme == "http" and not host_is_private(host, self.resolve):
             raise RemoteError(f"{host} is not on your local network, so Keepsake only connects to it with https://")
 
-    def open(self, url: str, headers: dict[str, str] | None = None) -> tuple[http.client.HTTPResponse, str]:
-        """GET ``url``, following permitted redirects. Returns the response and the final address."""
+    def open(
+        self, url: str, headers: dict[str, str] | None = None, method: str = "GET", body: bytes | None = None
+    ) -> tuple[http.client.HTTPResponse, str]:
+        """GET ``url`` (or a WebDAV ``PROPFIND``), following permitted redirects.
+
+        Returns the response and the final address.
+        """
+        if method not in ("GET", "PROPFIND"):
+            raise RemoteError("Keepsake only reads from network locations")
         current = url
         for _ in range(MAX_REDIRECTS + 1):
             self._check_hop(current)
@@ -207,7 +214,7 @@ class Session:
             target = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
             try:
                 conn = self.connect(parts.scheme, parts.hostname or host, port)
-                conn.request("GET", target, headers=send)
+                conn.request(method, target, body=body, headers=send)
                 response = conn.getresponse()
             except (OSError, http.client.HTTPException) as exc:
                 raise RemoteError(f"could not reach {host}: {type(exc).__name__}") from exc
@@ -435,11 +442,14 @@ class LocationStore:
 
     def save(self, url: str, username: str, password: str, location_id: str | None = None) -> list[dict[str, Any]]:
         """Remember a location. An empty password keeps the stored one."""
-        smb = str(url).strip().lower().startswith("smb://")
-        if smb:
-            from . import smbshare  # imports this module; the vendored pysmb itself loads only on use
+        from . import smbshare, webdav  # both import this module; pysmb itself loads only on use
 
+        smb = str(url).strip().lower().startswith("smb://")
+        dav = webdav.is_dav(url)
+        if smb:
             url = smbshare.parse(url).url()
+        elif dav:
+            url = webdav.to_dav(check_location(webdav.to_http(url)))
         else:
             url = check_location(url)
         username = str(username or "").strip()
@@ -449,7 +459,8 @@ class LocationStore:
         existing = next((loc for loc in items if loc["id"] == location_id), None) if location_id else None
         kept = self.credentials.keyed_get(SECRETS, existing["id"]) if existing else ""
         if not smb:
-            Session(url, username, password or kept)  # refuses a password over plain http
+            # Refuses a password over plain http or dav://, including one kept from before.
+            Session(webdav.to_http(url) if dav else url, username, password or kept)
         if existing is None:
             if len(items) >= LOCATIONS_MAX:
                 raise RemoteError(f"Keepsake remembers up to {LOCATIONS_MAX} locations; forget one first")

@@ -18,7 +18,7 @@ const PROGRESS_EVENT = "keepsake_netinstall_progress";
 const GIB = 1024 ** 3;
 const LOW_SPACE = 8 * GIB;
 
-type Protocol = "http" | "smb" | "nfs";
+type Protocol = "http" | "smb" | "webdav" | "nfs";
 
 function gib(bytes: number): string {
   return `${(bytes / GIB).toFixed(1)} GiB`;
@@ -50,7 +50,7 @@ function folderLabel(url: string): string {
   }
 }
 
-const HINTS: Record<"http" | "smb", { scheme: string; address: string; password: string }> = {
+const HINTS: Record<Exclude<Protocol, "nfs">, { scheme: string; address: string; password: string }> = {
   http: {
     scheme: "https://",
     address: "For example https://nas.local/games/. Plain http:// works only on your local network, without a password.",
@@ -62,7 +62,18 @@ const HINTS: Record<"http" | "smb", { scheme: string; address: string; password:
       "For example smb://nas.local/Games/, or smb://nas.local/ to list its shares. Only servers on your local network, using SMB 2 or 3.",
     password: "Sent only to this server, protected by the sign-in protocol (NTLMv2). Kept on this device.",
   },
+  webdav: {
+    scheme: "davs://",
+    address:
+      "For example davs://cloud.example/remote.php/dav/files/me/Games/ (Nextcloud) or davs://nas.local/dav/. dav:// without the s works only on your local network, without a password.",
+    password: "Sent only over davs://, only to this server. Kept on this device.",
+  },
 };
+
+function protocolOf(url: string): Exclude<Protocol, "nfs"> {
+  const scheme = url.toLowerCase().split("://", 1)[0];
+  return scheme === "smb" ? "smb" : scheme === "dav" || scheme === "davs" ? "webdav" : "http";
+}
 
 /** Install → "From a network location": browse an HTTP or HTTPS server and download one ISO (ADR-0033). */
 export function NetworkSource({
@@ -109,7 +120,7 @@ export function NetworkSource({
   // "nas.local/Games" is taken to mean the chosen protocol's scheme.
   const fullUrl = () => {
     const text = url.trim();
-    return text && !text.includes("://") ? `${protocol === "smb" ? "smb://" : "https://"}${text}` : text;
+    return text && !text.includes("://") && protocol !== "nfs" ? `${HINTS[protocol].scheme}${text}` : text;
   };
 
   const access = (extra: string[] = allowHosts): NetAccess =>
@@ -197,7 +208,7 @@ export function NetworkSource({
 
   const location = locations.find((l) => l.id === chosen);
   const form = protocol === "nfs" ? null : HINTS[protocol];
-  const mine = locations.filter((l) => (protocol === "smb") === l.url.toLowerCase().startsWith("smb://"));
+  const mine = locations.filter((l) => protocolOf(l.url) === protocol);
 
   return (
     <div>
@@ -206,6 +217,7 @@ export function NetworkSource({
           [
             ["http", "Web server (HTTP or HTTPS)"],
             ["smb", "Windows share (SMB)"],
+            ["webdav", "WebDAV"],
             ["nfs", "NFS"],
           ] as [Protocol, string][]
         ).map(([p, label]) => (

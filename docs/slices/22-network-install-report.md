@@ -70,6 +70,30 @@ Peter's owner decision (16 November 2026): install from a network location that 
 - Staging uses the plugin's runtime folder on the internal drive. Downloading straight to the SD card library would be a new write location, which is an escalation item.
 - `ipaddress` in Decky's frozen Python is unproven. If it is missing, plain http is refused, and https still works.
 
+## Follow-on: WebDAV (17 November 2026)
+
+**What changed**
+- `keepsake/installer/webdav.py` maps `davs://` and `dav://` to `https://` and `http://`, so the HTTP rules apply unchanged.
+  - `DavSession` lists folders with `PROPFIND` (`Depth: 1`) and downloads with the HTTP `GET` download.
+  - Multi-status parsing refuses DTDs, caps the answer at 2 MiB and keeps only children one level down on the same host.
+  - A server that answers like a plain web server gets a message pointing to Web server.
+- `Session.open` accepts only `GET` and `PROPFIND`.
+- Remembered locations keep the `davs://` form.
+- The Install page has a WebDAV option, and locations are listed per protocol.
+- Docs: ADR-0033 (WebDAV section, status), T93, A163, the changelog.
+
+**Tests**
+- `tests/test_installer_webdav.py` (210) runs against a real local server answering `PROPFIND` and `GET`. It covers:
+  - address mapping;
+  - one-level listing and download;
+  - plain errors, and plain web servers told apart;
+  - hostile XML;
+  - 200 fuzzed `href` sets;
+  - the method allowlist;
+  - locations, and a password refused over `dav://`;
+  - the app flow.
+- Mutations: 8 run, 7 caught. The survivor showed a plain web server got an unclear message, which is now explicit and tested.
+
 ## On-device checklist
 
 1. Run the probe in both modes from the laptop (PowerShell):

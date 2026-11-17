@@ -163,14 +163,15 @@ class Reply:
 
 class Script:
     def __init__(self, replies):
-        self.replies, self.calls = dict(replies), []
+        self.replies, self.calls, self.methods = dict(replies), [], []
 
     def __call__(self, scheme, host, port):
         script = self
 
         class Conn:
-            def request(self, method, target, headers):
+            def request(self, method, target, body=None, headers=None):
                 script.calls.append((f"{scheme}://{host}{target}", headers))
+                script.methods.append(method)
                 self.key = f"{scheme}://{host}{target}"
 
             def getresponse(self):
