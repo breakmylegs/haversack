@@ -14,6 +14,8 @@ import json
 import os
 from typing import Any
 
+from . import power
+
 DATA_FILE = os.path.join(os.path.dirname(__file__), "data", "devices.json")
 DMI_FIELDS = ("sys_vendor", "product_name", "product_version", "product_family", "board_name", "board_vendor")
 GPU_VENDORS = {"0x1002": "amd", "0x8086": "intel", "0x10de": "nvidia"}
@@ -57,6 +59,8 @@ def read_facts(root: str = "/") -> dict[str, Any]:
         if vendor and vendor not in vendors:
             vendors.append(vendor)
     facts["gpu_vendor"] = vendors[0] if vendors else ""
+    # False on mains-only devices (ADR-0049). A captured dump (tests) is always read as Linux.
+    facts["battery"] = power.battery_present() if root == "/" else power.linux_battery(root)
     return facts
 
 

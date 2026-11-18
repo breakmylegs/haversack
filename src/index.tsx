@@ -2,13 +2,23 @@ import { ButtonItem, Navigation, PanelSection, PanelSectionRow, staticClasses } 
 import { addEventListener, definePlugin, removeEventListener, routerHook, toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { FaSave } from "react-icons/fa";
-import { checkForUpdates, getStatus, qamSummary, QamSummary, syncNow, takeStartupNotice, UpdateStatus } from "./backend";
-import { agoText, BACKEND_LABELS, HEALTH_COLOURS, HEALTH_LABELS, SYNC_LABELS } from "./format";
+import {
+  checkForUpdates,
+  getStatus,
+  qamSummary,
+  QamSummary,
+  setSetting,
+  syncNow,
+  takeStartupNotice,
+  UpdateStatus,
+} from "./backend";
+import { agoText, BACKEND_LABELS, HEALTH_COLOURS, HEALTH_LABELS, newerText, SYNC_LABELS } from "./format";
 import { startLifecycle } from "./lifecycle";
 import { startProbes } from "./probes";
 import { startSteamOps } from "./steamops";
 import { AdvisorQam } from "./pages/AdvisorQam";
 import { openCheckpointModal } from "./pages/CheckpointModal";
+import { openWhatsNew } from "./pages/WhatsNewModal";
 import { KeepsakeRoute } from "./pages/KeepsakeRoute";
 import { SetupWizard } from "./pages/SetupWizard";
 import { ROUTE_PATH, SETUP_PATH } from "./routes";
@@ -120,6 +130,31 @@ function Content() {
           </ButtonItem>
         </PanelSectionRow>
       )}
+      {(summary?.newer ?? []).map((n) => (
+        <PanelSectionRow key={n.key}>
+          <ButtonItem
+            layout="below"
+            description="Brought in when you start the game, or now from Games."
+            onClick={() => openRoute(`${ROUTE_PATH}/games`)}
+          >
+            {n.name}: {newerText(n)}
+          </ButtonItem>
+        </PanelSectionRow>
+      ))}
+      {summary?.setupComplete && !summary.tipsDismissed && (
+        <PanelSectionRow>
+          <div style={{ fontSize: 12, marginBottom: 4 }}>
+            Tip: while you play, Save checkpoint keeps a named copy of your save. In a game&apos;s History you can bring back
+            older saves, even single files.
+          </div>
+          <ButtonItem
+            layout="below"
+            onClick={() => void setSetting("tipsDismissed", true).then(() => setSummary({ ...summary, tipsDismissed: true }))}
+          >
+            Got it
+          </ButtonItem>
+        </PanelSectionRow>
+      )}
       {summary && summary.conflicts > 0 && (
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={() => openRoute(`${ROUTE_PATH}/conflicts`)}>
@@ -162,7 +197,8 @@ function Content() {
 async function announce() {
   try {
     const notice = await takeStartupNotice();
-    if (notice) toaster.toast({ title: "Keepsake", body: `Updated to v${notice.to}` });
+    if (notice?.notes) openWhatsNew(notice.to, notice.notes);
+    else if (notice) toaster.toast({ title: "Keepsake", body: `Updated to v${notice.to}` });
     const update = await checkForUpdates(false);
     if (update.notify && update.latest) {
       toaster.toast({ title: "Keepsake", body: `Update available: v${update.latest.version}` });

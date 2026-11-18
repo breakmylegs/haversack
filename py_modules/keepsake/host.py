@@ -128,6 +128,8 @@ CALLABLES = frozenset(
         "strict_unwrap",
         "sync_pull",
         "sync_push",
+        "bring_newer",
+        "game_playtime",
         "resolve_conflict",
         "sync_status",
         "idle_pass",

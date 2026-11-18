@@ -6,7 +6,7 @@ Keepsake has no server and no account. It collects nothing about you, sends no a
 
 | Where | What |
 |---|---|
-| Your cloud storage | Snapshots of the save files of the games you sync. Each snapshot also records the device name you chose, the time, a name for the game taken from its title, Keepsake's version, and each file's name within its save location. A small record per device holds that device's name and Keepsake version. |
+| Your cloud storage | Snapshots of the save files of the games you sync. Each snapshot also records the device name you chose, the time, a name for the game taken from its title, Keepsake's version, and each file's name within its save location. A small record per device holds that device's name and Keepsake version. Each play session is recorded with its start, end and length, and which of your devices it was on, for the combined playtime. |
 | Each device | Settings, sign-in tokens (readable only by your user), the list of games, logs, the copies taken before each restore, and any snapshot held back for checking. |
 
 Cloud data never contains paths from your devices, your user name, Proton prefix numbers or SD card labels. Save files are stored under neutral names such as "Documents" or "AppData", so one device's paths never leak to another.

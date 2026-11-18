@@ -8,6 +8,8 @@ Open **Updates** in Keepsake. When a new version is available, the Quick Access 
 
 The **Channel** setting chooses between stable releases only, or test releases too.
 
+After an update, Keepsake shows **What's new** once, from that version's release notes.
+
 ## On a PC
 
 ![The Updates page on a PC](images/desktop-updates.png)

@@ -5,10 +5,12 @@ import {
   addCustomPath,
   GameConfig,
   GameEntry,
+  gamePlaytime,
   getGame,
   IdentitySuggestion,
   MatchInfo,
   MatchProposal,
+  Playtime,
   Preview,
   previewGame,
   searchTitles,
@@ -41,6 +43,12 @@ function sizeText(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function durationText(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.round((seconds % 3600) / 60);
+  return hours ? `${hours} h ${minutes} min` : `${minutes} min`;
+}
+
 export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () => void }) {
   const [game, setGame] = useState<GameEntry | null>(null);
   const [config, setConfig] = useState<GameConfig | null>(null);
@@ -54,6 +62,7 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
   const [busy, setBusy] = useState(false);
   const [hasRegistry, setHasRegistry] = useState(false);
   const [steamCloud, setSteamCloud] = useState<SteamCloud>(null);
+  const [played, setPlayed] = useState<Playtime | null>(null);
 
   const load = async () => {
     const data = await getGame(gameKey);
@@ -80,6 +89,9 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
   };
 
   useEffect(() => {
+    gamePlaytime(gameKey)
+      .then(setPlayed)
+      .catch(() => setPlayed(null)); // offline or not synced: simply not shown
     load()
       .then(runPreview)
       .catch((err) => toaster.toast({ title: "Keepsake", body: String(err) }));
@@ -123,6 +135,13 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
         </DialogButton>
       </Focusable>
       <Field label={game.name} description={`${METHOD_TEXT[match.method]}${match.title ? `: ${match.title}` : ""}`} />
+      {played && played.totalSeconds > 0 && (
+        <Field
+          focusable
+          label={`Played ${durationText(played.totalSeconds)} on your devices`}
+          description={played.byDevice.map((d) => `${d.device}: ${durationText(d.seconds)}`).join("; ")}
+        />
+      )}
       {proposal && (
         <ProposalCard
           gameKey={gameKey}

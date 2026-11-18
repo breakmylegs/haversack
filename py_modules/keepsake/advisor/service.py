@@ -156,6 +156,8 @@ class Advisor:
         """Blocking. Reads DMI, cpuinfo, os-release and plugin manifests only."""
         self.facts = devices.read_facts(self.root)
         self.device, self.device_how = devices.resolve(self.profiles, self.facts, self.settings()["deviceOverride"])
+        if self.facts.get("battery") is False:
+            self.device = {**self.device, "mains_only": True}  # a Steam Machine or desktop (ADR-0049)
         self.detected = stack.detect(self.tools, self.decky_home, self.user_home, self.user, self.device, self.root)
 
     def selected(self) -> dict[str, str]:

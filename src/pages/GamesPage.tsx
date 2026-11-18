@@ -18,8 +18,9 @@ import {
   refreshManifest,
   SyncWord,
   updateGameConfig,
+  bringNewer,
 } from "../backend";
-import { SYNC_LABELS } from "../format";
+import { newerText, SYNC_LABELS } from "../format";
 import { GameDetail } from "./GameDetail";
 import { askApproveMatch } from "../matchApproval";
 
@@ -251,6 +252,30 @@ export function GamesPage() {
   };
   const waiting = order.filter((key) => matches[key]?.proposal);
 
+  // "Get it now" (ADR-0049): the same safe decision as at launch, without starting the game.
+  const getNewer = async (key: string, name: string) => {
+    setBulkBusy(true);
+    try {
+      const r = await bringNewer(key);
+      const body =
+        r.action === "restored"
+          ? `${name}: the newer save is in place. The one it replaced can be brought back from History.`
+          : r.action === "conflict"
+            ? `${name} changed here too, so nothing was replaced. Open Conflicts to choose.`
+            : r.action === "offline"
+              ? "The cloud could not be reached. Try again later."
+              : r.pending
+                ? `Quit ${name} first, then try again.`
+                : `${name} is already up to date.`;
+      toaster.toast({ title: "Keepsake", body });
+    } catch (err) {
+      toaster.toast({ title: "Keepsake", body: String(err) });
+    } finally {
+      setBulkBusy(false);
+      void scan(false);
+    }
+  };
+
   const crossCheck = async (game: GameEntry) => {
     const outcome = await checkRunningPrefix(game.key);
     const body =
@@ -359,10 +384,15 @@ export function GamesPage() {
                 {STATUS_ICONS[matches[game.key]?.sync ?? "off"]} {game.name}
               </span>
             }
-            description={`${SYNC_LABELS[matches[game.key]?.sync ?? "off"]}. ${matchText(matches[game.key])}. ${prefixText(game)}.${flags.length ? `  ${flags.join(", ")}` : ""}`}
+            description={`${SYNC_LABELS[matches[game.key]?.sync ?? "off"]}. ${matchText(matches[game.key])}. ${prefixText(game)}.${flags.length ? `  ${flags.join(", ")}` : ""}${matches[game.key]?.newer ? `  ${newerText(matches[game.key]!.newer!)}.` : ""}`}
             childrenLayout="inline"
           >
             <Focusable style={{ display: "flex", gap: 8 }}>
+              {matches[game.key]?.newer && !running && (
+                <DialogButton style={{ width: "auto" }} disabled={bulkBusy} onClick={() => void getNewer(game.key, game.name)}>
+                  Get it now
+                </DialogButton>
+              )}
               {matches[game.key]?.proposal && (
                 <DialogButton
                   style={{ width: "auto" }}
