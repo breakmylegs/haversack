@@ -12,8 +12,9 @@ Released up to v0.24.0. Merged since, not yet released (the next release waits f
 | 13 Module framework, 14 and 15 Advisor, 21 and 22 Installer | merged and released |
 | P1 to P5, S1, S2, D1, R0, R1 to R6 | merged; device checks in each slice report |
 | R6b Dropbox | waits for Peter's Dropbox app registration |
-| 16 Replication spike | waits for the device measurements (`docs/slices/s2-report.md`) |
-| 17 to 20 Replication | blocked on slice 16's results and ADR-0025 |
+| 16 Replication spike | no longer a gate (ADR-0054): its figures become tuning input from the device runs |
+| 17 Replication I | 17a (link, pairing, peers) built; 17b (discovery, Wake-on-LAN, pages) next |
+| 18 to 20 Replication, R7 direct save sync | after 17b, in order |
 | 23 Desktop I | step 0 (A79 probe) waits for device runs |
 | 24 Desktop II | after 23 |
 | 25 v2 hardening | parser fuzzing done; the rest after the other slices |
@@ -49,7 +50,7 @@ Spec section 10 applies amendments to v1 slices not yet merged, and moves them t
 | 13 Module framework | `slice/13-module-framework` | Registry, flags, Modules page, per-module health, namespaced migrations, lifecycle bus, per-game lock, Steam Operations Executor with probes, the deferred slice 3 and 8 amendments | Disabling a module removes its listeners, jobs and UI; a forced failure in a stub module leaves Saves working | |
 | 14 Advisor I | `slice/14-advisor-1` | Licence-cleared port: detection, device registry in Core, stack detection, data sources with caching, game mapping, QAM and full route | Recommendations for a Steam game and a shortcut on both devices, differing correctly; Advisor writes nothing (test) | |
 | 15 Advisor II | `slice/15-advisor-2` | Proton recommendation, lsfg-vk advice, upscaling advice, copy launch options, optional AI | AI payloads hold only P18 fields (test); offline rule-based advice | minor (v1.1.0) |
-| 16 Replication spike | `slice/16-replication-spike` | On-device measurements: Python and TLS-PSK, `openssl`, stdlib mDNS, Wi-Fi throughput with SHA-256, CPU and battery, suspend; plus (ADR-0045) throughput with and without TLS at 256 KiB and 4 MiB reads, hashing speed, one versus parallel streams, a Tailscale direct and relayed link, and the logind sleep inhibitor as `deck` | ADR selecting the transport; figures recorded; stop if throughput is unacceptable | |
+| 16 Replication spike (no longer a gate, ADR-0054) | `slice/16-replication-spike` | On-device measurements: Python and TLS-PSK, `openssl`, stdlib mDNS, Wi-Fi throughput with SHA-256, CPU and battery, suspend; plus (ADR-0045) throughput with and without TLS at 256 KiB and 4 MiB reads, hashing speed, one versus parallel streams, a Tailscale direct and relayed link, and the logind sleep inhibitor as `deck` | ADR selecting the transport; figures recorded; stop if throughput is unacceptable | |
 | 17 Replication I | `slice/17-replication-1` | Listener (off by default), discovery, manual address, pairing, pinning, revoke, firewall guidance, peer UI | Pair, reconnect after reboot, reject an unpaired client; no socket when off; a manual or VPN address works; TLS compression off and checked (ADR-0045) | |
 | 18 Replication II | `slice/18-replication-2` | Manifests, chunk pull, journal, staging, verification, promote, rollback, pause, resume, bandwidth cap, power policy, exclusions | Fault injection passes (kill mid-chunk, power loss with unsynced writes, network drop, reload, disk full, corrupt chunk, peer restart, suspend, a stop at every phase leaving no files); durable journal; resume re-verifies only possibly incomplete chunks; "Stop and remove" separate from Pause; free-space check and preallocation; sleep inhibitor; no cloud and no compression (ADR-0045). **Protocol frozen** | |
 | 19 Replication III | `slice/19-replication-3` | Send a game end to end, source checkpoint, registration, app ID re-keying, compatibility tool copy, Saves adoption | An ISO game installed on one device launches on the other with the same tool, artwork and options; saves adopt silently; both directions; a stop removes every shortcut, registration, compatdata and tool copy the job made; progress, MB/s and ETA in the QAM and game page (ADR-0045) | |
@@ -120,6 +121,7 @@ R1 to R3 need no device, so they are built now, while slices 16 to 25 wait for d
 | R5 Storage | Per-game disk use, clear shader cache, reset prefix and keep saves. Built (ADR-0052, `docs/slices/r5-report.md`); waits for the device checks | Yes, at the end |
 | R6 Installer III | Multi-disc swap, install queue, runtime check. Built (ADR-0053, `docs/slices/r6-report.md`); waits for the device checks | Yes, at the end |
 | R6b Dropbox | Dropbox with PKCE and an app folder | Needs Peter's app registration |
+| R7 Direct save sync (ADR-0054, Peter's option C) | Saves go device to device over Replication's link with no cloud account, under Saves' own snapshot and conflict rules; its own ADR. After slice 18 | Yes, at the end |
 
 Also: Wake-on-LAN joins slice 17, and the Steam LAN transfer explanation joins slice 19.
 

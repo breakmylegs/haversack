@@ -1,6 +1,6 @@
 # ADR-0025: Replication transport and pairing (spike)
 
-- Status: proposed (slice 16). The choice depends on device measurements not yet taken; see `docs/slices/16-report.md`.
+- Status: superseded by ADR-0054 (18 November 2026): TLS-PSK with a confirmed comparison code, no `openssl`, and no measurement gate.
 - Date: 16 November 2026
 - Deciders: Peter (owner)
 - Sources: `docs/build-prompt-v2.md` sections 4 (P9, P17), 6.4 and 8.2; ADR-0016; research sections 4.4 and 4.9
