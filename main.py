@@ -194,6 +194,9 @@ class Plugin:
     async def replication_decline(self, offer_id: str) -> dict[str, Any]:
         return await self.app.replication_decline(offer_id)
 
+    async def replication_dismiss(self, offer_id: str) -> dict[str, Any]:
+        return await self.app.replication_dismiss(offer_id)
+
     async def replication_withdraw(self, offer_id: str) -> dict[str, Any]:
         return await self.app.replication_withdraw(offer_id)
 

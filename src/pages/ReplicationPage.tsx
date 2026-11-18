@@ -24,6 +24,15 @@ import {
   replicationTransfers,
   TransferJob,
   TransfersStatus,
+  IncomingOffer,
+  OffersStatus,
+  replicationAccept,
+  replicationDecline,
+  replicationDismiss,
+  replicationOfferCheck,
+  replicationOffers,
+  replicationRemoveGame,
+  replicationWithdraw,
 } from "../backend";
 
 const REPLICATION_EVENT = "keepsake_replication";
@@ -95,6 +104,7 @@ export function ReplicationPage() {
         description="Keepsake links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once by checking that both screens show the same code."
       />
 
+      <OffersSection />
       <TransfersSection />
 
       {pairings.map((p) => (
@@ -363,6 +373,131 @@ function TransfersSection() {
               Stop and remove
             </DialogButton>
           </Focusable>
+        </Field>
+      ))}
+    </>
+  );
+}
+
+const OFFER_TEXT: Record<string, string> = {
+  offered: "Waiting for your answer",
+  transferring: "Copying",
+  registering: "Adding it to Steam",
+  done: "Ready in your library",
+  failed: "Stopped with a problem",
+};
+
+// Games offered to this device, and games this device offered (ADR-0059).
+function OffersSection() {
+  const [status, setStatus] = useState<OffersStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const refresh = () => replicationOffers().then(setStatus).catch(() => undefined);
+  useEffect(() => {
+    void refresh();
+    const listener = addEventListener(REPLICATION_EVENT, () => void refresh());
+    return () => removeEventListener(REPLICATION_EVENT, listener);
+  }, []);
+  if (!status) return null;
+  const sending = Object.values(status.sending).filter((s) => s.state !== "sent");
+  if (!status.incoming.length && !status.outgoing.length && !sending.length) return null;
+
+  const act = async (work: () => Promise<unknown>, done?: string) => {
+    setBusy(true);
+    try {
+      await work();
+      if (done) toaster.toast({ title: "Keepsake", body: done });
+    } catch (err) {
+      toaster.toast({ title: "Keepsake", body: String(err) });
+    } finally {
+      setBusy(false);
+      await refresh();
+    }
+  };
+
+  const accept = async (offer: IncomingOffer) => {
+    const check = await replicationOfferCheck(offer.id, false);
+    const start = (copyTool: boolean) =>
+      act(() => replicationAccept(offer.id, copyTool), `Copying ${offer.title} from ${offer.from}.`);
+    if (!check.problem) return start(false);
+    if (offer.toolOffered && check.problem.includes("copy it")) {
+      showModal(
+        <ConfirmModal
+          strTitle={`Copy ${offer.compatTool} too?`}
+          strDescription={`This device does not have ${offer.compatTool}, which ${offer.title} uses. Keepsake can copy it from ${offer.from}. Steam finds it after a restart.`}
+          strOKButtonText="Copy it too"
+          strCancelButtonText="Cancel"
+          onOK={() => void start(true)}
+        />,
+      );
+      return;
+    }
+    toaster.toast({ title: "Keepsake", body: check.problem });
+  };
+
+  const removeGame = (offer: IncomingOffer) =>
+    showModal(
+      <ConfirmModal
+        strTitle={`Stop and remove ${offer.title}?`}
+        strDescription="Everything this copy made on this device is deleted: the game's folder, its prefix, a copied compatibility tool and its Steam shortcut. Nothing else is touched."
+        strOKButtonText="Stop and remove"
+        strCancelButtonText="Cancel"
+        onOK={() => void act(() => replicationRemoveGame(offer.id), `${offer.title} removed.`)}
+      />,
+    );
+
+  return (
+    <>
+      <Field label="Games between devices" />
+      {sending.map((s) => (
+        <Field
+          key={`sending-${s.title}`}
+          label={`${s.title}: ${s.state === "preparing" ? "preparing to send" : "not sent"}`}
+          description={s.reason ?? s.warning ?? "Keepsake is checking every file. A large game takes a few minutes."}
+        />
+      ))}
+      {status.incoming.map((offer) => (
+        <Field
+          key={offer.id}
+          label={`${offer.title} from ${offer.from}: ${OFFER_TEXT[offer.state] ?? offer.state}`}
+          description={[
+            size(offer.bytes),
+            offer.compatTool ? `uses ${offer.compatTool}` : "",
+            offer.droppedOptions.length ? `launch options left on the other device: ${offer.droppedOptions.join(" ")}` : "",
+            offer.reason ?? "",
+          ]
+            .filter(Boolean)
+            .join(". ")}
+          childrenLayout="below"
+        >
+          <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {offer.state === "offered" && (
+              <>
+                <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void accept(offer)}>
+                  Accept
+                </DialogButton>
+                <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void act(() => replicationDecline(offer.id))}>
+                  Decline
+                </DialogButton>
+              </>
+            )}
+            {(offer.state === "transferring" || offer.state === "registering" || offer.state === "failed") && (
+              <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => removeGame(offer)}>
+                Stop and remove
+              </DialogButton>
+            )}
+            {offer.state === "done" && (
+              <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void act(() => replicationDismiss(offer.id))}>
+                Clear from this list
+              </DialogButton>
+            )}
+          </Focusable>
+        </Field>
+      ))}
+      {status.outgoing.map((offer) => (
+        <Field key={offer.id} label={`${offer.title}: offered`} description="Waiting for the other device. Withdraw it once it has arrived." childrenLayout="below">
+          <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void act(() => replicationWithdraw(offer.id))}>
+            Withdraw
+          </DialogButton>
         </Field>
       ))}
     </>

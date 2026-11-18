@@ -510,3 +510,19 @@ def test_artwork_outside_its_folder_is_never_served(tmp_path):
         }
         with pytest.raises(offers.OfferError):
             incoming.staged_file(claimed)
+
+
+def test_clearing_a_finished_game_from_the_list_keeps_the_game(tmp_path):
+    _game, _where, wire, incoming, manager, ops, places, _ = setup_pair(tmp_path)
+    deliver(incoming, wire)
+    with pytest.raises(offers.OfferError, match="finished"):
+        incoming.dismiss(wire["id"])  # still only an offer: decline it instead
+    run_accept(incoming, manager, wire["id"])
+    incoming.op_finished(1, True, {"appid": NEW_APPID})
+    for op_id in range(2, len(ops.queued) + 1):
+        incoming.op_finished(op_id, True, {})
+    incoming.dismiss(wire["id"])
+    assert incoming.list() == []
+    assert os.path.isfile(os.path.join(places["library"], "Test Game", "bin", "game.exe"))
+    assert os.path.isdir(os.path.join(places["compatdata"], str(NEW_APPID)))
+    assert not [k for k, _ in ops.queued if k == "remove-shortcut"]

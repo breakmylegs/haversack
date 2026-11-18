@@ -72,3 +72,7 @@ Slice 18 froze the protocol (ADR-0058), but an offer needs one new message. Slic
   - T117: offer abuse and removing too much;
   - A195: whether Steam accepts the copied prefix and a tool copied while it runs.
 - **Device checks:** the acceptance run from the spec, in both directions, in `docs/slices/19a-report.md`.
+
+## Addendum (19b)
+
+A finished offer can be cleared from the list (`dismiss`). This forgets the record and keeps the game: removing a game Keepsake installed stays Steam's own Uninstall, or "Stop and remove" while the copy is still under way.

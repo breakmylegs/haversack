@@ -26,6 +26,8 @@ import type {
   Settings,
   TransferJob,
   TransfersStatus,
+  IncomingOffer,
+  OffersStatus,
   UpdateCheck,
 } from "./types.js";
 
@@ -366,6 +368,8 @@ const matchText: Record<string, string> = {
 
 async function games(main: HTMLElement, filter = ""): Promise<void> {
   const all = await call<GameMatch[]>("match_games");
+  // Paired devices, for "Send to" on non-Steam games (ADR-0059). None while Replication is off.
+  const peers = await call<ReplicationStatus>("replication_status").then((s) => s.peers, () => [] as PairedDevice[]);
   const shown = all.filter((g) => g.name.toLowerCase().includes(filter.toLowerCase()));
   const search = h("input", { type: "search", placeholder: "Find a game", value: filter, "aria-label": "Find a game" }) as HTMLInputElement;
   search.addEventListener("change", () => void games(main, search.value));
@@ -393,12 +397,31 @@ async function games(main: HTMLElement, filter = ""): Promise<void> {
     h("p", {}, "Turn sync on for the games whose saves should follow you. Keepsake finds each game's saves from the Ludusavi manifest."),
     h("div", { class: "actions" }, search, syncable.length ? bulk(true) : null, syncable.length ? bulk(false) : null),
     shown.length
-      ? h("ul", { class: "list" }, ...shown.map((g) => h("li", {}, gameCard(g, main, filter))))
+      ? h("ul", { class: "list" }, ...shown.map((g) => h("li", {}, gameCard(g, main, filter, peers))))
       : h("p", { class: "empty" }, filter ? "No game matches that name." : "No games found yet."),
   );
 }
 
-function gameCard(g: GameMatch, main: HTMLElement, filter: string): HTMLElement {
+function sendButtons(g: GameMatch, peers: PairedDevice[]): HTMLElement | null {
+  if (g.kind !== "shortcut" || !peers.length) return null;
+  return h(
+    "div",
+    { class: "actions" },
+    ...peers.map((peer) =>
+      button(`Send to ${peer.name}`, async () => {
+        const ok = window.confirm(
+          `Send ${g.name} to ${peer.name}? Keepsake offers the game, its prefix, its compatibility tool and its artwork. Nothing is copied until it is accepted there.`,
+        );
+        if (!ok) return;
+        const r = await call<{ title: string; droppedOptions: string[] }>("replication_send", g.key, peer.id);
+        const dropped = r.droppedOptions.length ? ` These launch options stay here: ${r.droppedOptions.join(" ")}.` : "";
+        toast(`Preparing ${r.title} for ${peer.name}.${dropped}`);
+      }),
+    ),
+  );
+}
+
+function gameCard(g: GameMatch, main: HTMLElement, filter: string, peers: PairedDevice[] = []): HTMLElement {
   const toggle = h("input", { type: "checkbox", checked: g.enabled, "aria-label": `Sync ${g.name}` }) as HTMLInputElement;
   toggle.addEventListener("change", () => {
     toggle.disabled = true;
@@ -423,6 +446,7 @@ function gameCard(g: GameMatch, main: HTMLElement, filter: string): HTMLElement 
       }${matchText[g.method] ?? g.method}.`,
     ),
     h("label", { class: "switch" }, toggle, " Sync this game"),
+    sendButtons(g, peers),
     g.newer
       ? h(
           "div",
@@ -839,6 +863,7 @@ function pairingActive(p: Pairing): boolean {
 async function devices(main: HTMLElement, found: FoundDevice[] | null = null): Promise<void> {
   const status = await call<ReplicationStatus>("replication_status");
   const transfers = await call<TransfersStatus>("replication_transfers");
+  const offered = await call<OffersStatus>("replication_offers");
   const again = (list: FoundDevice[] | null = found) => devices(main, list);
   if (!status.available) {
     replace(main, h("h1", {}, "Devices"), h("p", { class: "warn" }, "This device's Python cannot make Replication's encrypted link, so Replication stays off."));
@@ -884,6 +909,7 @@ async function devices(main: HTMLElement, found: FoundDevice[] | null = null): P
     main,
     h("h1", {}, "Devices"),
     h("p", {}, "Keepsake links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once by checking that both screens show the same code."),
+    offersCard(offered, main),
     transfers.jobs.length ? transfersCard(transfers, main) : null,
     pairingCards.length ? h("ul", { class: "list" }, ...pairingCards) : null,
     h(
@@ -961,6 +987,85 @@ async function devices(main: HTMLElement, found: FoundDevice[] | null = null): P
       if (document.getElementById("nav-devices")?.getAttribute("aria-current") === "true") void again().catch(() => undefined);
     }, 1000);
   }
+}
+
+const offerStateText: Record<string, string> = {
+  offered: "waiting for your answer",
+  transferring: "copying",
+  registering: "adding it to Steam",
+  done: "ready in your library",
+  failed: "stopped with a problem",
+};
+
+async function acceptOffer(offer: IncomingOffer, main: HTMLElement): Promise<void> {
+  const check = await call<{ problem?: string }>("replication_offer_check", offer.id, false);
+  let copyTool = false;
+  if (check.problem) {
+    if (!(offer.toolOffered && check.problem.includes("copy it"))) {
+      toast(check.problem);
+      return;
+    }
+    if (!window.confirm(`This device does not have ${offer.compatTool ?? "its tool"}. Copy it from ${offer.from} too? Steam finds it after a restart.`)) return;
+    copyTool = true;
+  }
+  await call("replication_accept", offer.id, copyTool);
+  toast(`Copying ${offer.title} from ${offer.from}.`);
+  await devices(main);
+}
+
+function offersCard(offered: OffersStatus, main: HTMLElement): HTMLElement | null {
+  const sending = Object.values(offered.sending).filter((s) => s.state !== "sent");
+  if (!offered.incoming.length && !offered.outgoing.length && !sending.length) return null;
+  const again = () => devices(main);
+  return h(
+    "section",
+    { class: "card" },
+    h("h2", {}, "Games between devices"),
+    h(
+      "ul",
+      { class: "list" },
+      ...sending.map((s) =>
+        h("li", {}, h("strong", {}, `${s.title}: ${s.state === "preparing" ? "preparing to send" : "not sent"}`), h("p", {}, s.reason ?? s.warning ?? "Keepsake is checking every file.")),
+      ),
+      ...offered.incoming.map((offer) =>
+        h(
+          "li",
+          {},
+          h("strong", {}, `${offer.title} from ${offer.from}: ${offerStateText[offer.state] ?? offer.state}`),
+          h(
+            "p",
+            {},
+            [size(offer.bytes), offer.compatTool ? `uses ${offer.compatTool}` : "", offer.droppedOptions.length ? `launch options left on the other device: ${offer.droppedOptions.join(" ")}` : "", offer.reason ?? ""]
+              .filter(Boolean)
+              .join(". "),
+          ),
+          h(
+            "div",
+            { class: "actions" },
+            offer.state === "offered" ? button("Accept", () => acceptOffer(offer, main), "primary") : null,
+            offer.state === "offered" ? button("Decline", async () => (await call("replication_decline", offer.id), await again())) : null,
+            ["transferring", "registering", "failed"].includes(offer.state)
+              ? button("Stop and remove", async () => {
+                  if (!window.confirm(`Stop and remove ${offer.title}? Everything this copy made here is deleted: its folder, prefix, a copied tool and its Steam shortcut.`)) return;
+                  await call("replication_remove_game", offer.id);
+                  await again();
+                })
+              : null,
+            offer.state === "done" ? button("Clear from this list", async () => (await call("replication_dismiss", offer.id), await again())) : null,
+          ),
+        ),
+      ),
+      ...offered.outgoing.map((offer) =>
+        h(
+          "li",
+          {},
+          h("strong", {}, `${offer.title}: offered`),
+          h("p", {}, "Waiting for the other device. Withdraw it once it has arrived."),
+          h("div", { class: "actions" }, button("Withdraw", async () => (await call("replication_withdraw", offer.id), await again()))),
+        ),
+      ),
+    ),
+  );
 }
 
 function transferText(job: TransferJob): string {

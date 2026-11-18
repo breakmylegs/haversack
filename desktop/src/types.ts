@@ -230,3 +230,19 @@ export interface TransfersStatus {
   sleepProblem: string | null;
   waitingFor: string | null;
 }
+export interface IncomingOffer {
+  id: string;
+  title: string;
+  from: string;
+  state: string;
+  reason: string | null;
+  bytes: number;
+  compatTool: string | null;
+  toolOffered: boolean;
+  droppedOptions: string[];
+}
+export interface OffersStatus {
+  incoming: IncomingOffer[];
+  outgoing: { id: string; title: string; peer: string; created: number }[];
+  sending: Record<string, { state: string; title: string; peer: string; reason?: string; warning?: string | null }>;
+}

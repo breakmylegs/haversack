@@ -255,6 +255,7 @@ export const replicationOfferCheck = callable<
 export const replicationAccept = callable<[offerId: string, copyTool: boolean], IncomingOffer>("replication_accept");
 export const replicationDecline = callable<[offerId: string], OffersStatus>("replication_decline");
 export const replicationWithdraw = callable<[offerId: string], OffersStatus>("replication_withdraw");
+export const replicationDismiss = callable<[offerId: string], OffersStatus>("replication_dismiss");
 export const replicationRemoveGame = callable<[offerId: string], OffersStatus>("replication_remove_game");
 
 export const installerStatus = callable<[], InstallerStatus>("installer_status");

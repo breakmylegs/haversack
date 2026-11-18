@@ -115,6 +115,7 @@ CALLABLES = frozenset(
         "replication_accept",
         "replication_decline",
         "replication_withdraw",
+        "replication_dismiss",
         "replication_remove_game",
         "installer_status",
         "installer_start",
