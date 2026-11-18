@@ -53,6 +53,10 @@ class LinkError(Exception):
     pass
 
 
+class Refused(LinkError):
+    """The other device answered, and said no: retrying will not help."""
+
+
 def available() -> bool:
     """Whether this Python's ``ssl`` can do TLS-PSK. Without it Replication stays off (fail closed)."""
     return bool(getattr(ssl, "HAS_PSK", False)) and hasattr(ssl.SSLContext, "set_psk_client_callback")
@@ -124,7 +128,7 @@ async def read_frame(reader: asyncio.StreamReader, timeout: float = FRAME_TIMEOU
     if not isinstance(message, dict) or not isinstance(message.get("type"), str):
         raise LinkError("a message was not valid")
     if message["type"] == "error":
-        raise LinkError(str(message.get("reason") or "the other device refused")[:200])
+        raise Refused(str(message.get("reason") or "the other device refused")[:200])
     return message
 
 
@@ -319,7 +323,14 @@ async def _close(writer: asyncio.StreamWriter | None) -> None:
         await asyncio.wait_for(writer.wait_closed(), 2)
 
 
-Handler = Callable[["Session", dict[str, Any]], Awaitable[dict[str, Any]]]
+# A handler answers with a frame, or with a frame and raw bytes that follow it (ADR-0057).
+Reply = dict[str, Any] | tuple[dict[str, Any], bytes]
+Handler = Callable[["Session", dict[str, Any]], Awaitable[Reply]]
+MAX_BLOB = 64 * 1024 * 1024  # a manifest or one chunk
+
+
+class ServeError(Exception):
+    """A refusal a handler may show the other device. Its text must hold no local path (P10)."""
 
 
 @dataclass(eq=False)
@@ -511,13 +522,25 @@ class Listener:
                 message = await read_frame(session.reader, timeout=300)
                 if self.store.key(session.peer_id) is None:
                     break  # revoked while connected
+                reply: Reply
                 if message["type"] == "ping":
-                    reply: dict[str, Any] = {"type": "pong"}
+                    reply = {"type": "pong"}
                 elif message["type"] in self.handlers:
-                    reply = await self.handlers[message["type"]](session, message)
+                    try:
+                        reply = await self.handlers[message["type"]](session, message)
+                    except ServeError as exc:
+                        reply = {"type": "error", "reason": str(exc)[:200]}
+                    except (OSError, ValueError):
+                        reply = {"type": "error", "reason": "the other device could not read that file"}
                 else:
                     reply = {"type": "error", "reason": f"unknown request {message['type'][:40]}"}
-                await send_frame(session.writer, reply)
+                if isinstance(reply, tuple):
+                    header, data = reply
+                    await send_frame(session.writer, {**header, "type": "blob", "size": len(data)})
+                    session.writer.write(data)
+                    await session.writer.drain()
+                else:
+                    await send_frame(session.writer, reply)
         except (LinkError, OSError, ssl.SSLError):
             pass
         finally:
@@ -544,6 +567,24 @@ class Connection:
             return await read_frame(self.reader, timeout)
         except (OSError, ssl.SSLError) as exc:
             raise LinkError("the connection to the other device dropped") from exc
+
+    async def request_blob(
+        self, message: dict[str, Any], max_size: int = MAX_BLOB, timeout: float = FRAME_TIMEOUT
+    ) -> tuple[dict[str, Any], bytes]:
+        """A request answered by a frame and raw bytes, such as a manifest or a chunk."""
+        header = await self.request(message, timeout)
+        size = header.get("size")
+        if header["type"] != "blob" or not isinstance(size, int) or not 0 <= size <= max_size:
+            raise LinkError("the other device sent an unexpected answer")
+        try:
+            data = await asyncio.wait_for(self.reader.readexactly(size), timeout)
+        except asyncio.IncompleteReadError as exc:
+            raise LinkError("the other device closed the connection") from exc
+        except TimeoutError as exc:
+            raise LinkError("the other device stopped sending") from exc
+        except (OSError, ssl.SSLError) as exc:
+            raise LinkError("the connection to the other device dropped") from exc
+        return header, data
 
     async def ping(self) -> float:
         """Round trip in milliseconds."""
