@@ -46,8 +46,9 @@ def chunk_sizes(size: int) -> list[int]:
     return [CHUNK] * full + ([rest] if rest else [])
 
 
-def hash_file(path: str, read: int = CHUNK) -> tuple[str, list[str]]:
+def hash_file(path: str, read: int | None = None) -> tuple[str, list[str]]:
     """The whole-file SHA-256 and the SHA-256 of each chunk."""
+    read = read or CHUNK
     whole = hashlib.sha256()
     chunks = []
     with open(path, "rb") as handle:

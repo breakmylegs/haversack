@@ -1,6 +1,6 @@
 # Replication protocol
 
-Version 1. It freezes at the end of slice 18 (ADR-0057); after that, changes are an escalation item (CLAUDE.md, v2 additions).
+Version 1, **frozen** at the end of slice 18 (ADR-0058). `tests/test_replication_protocol.py` pins the values below. A change needs a new version and an ADR; it is an escalation item (CLAUDE.md, v2 additions).
 
 ## Transport (ADR-0054)
 
@@ -67,3 +67,8 @@ Both are refused unless the share is offered to the asking device. A chunk is re
 
 - **The root:** `root` is the SHA-256 of the canonical JSON without `root` (sorted keys, no spaces, ASCII).
 - **Chunks:** a file's chunks are 4 MiB, the last one shorter. A chunk whose hash is that of all zeros of its length is never requested.
+
+## Pulling
+
+- **Streams:** a receiver opens up to 4 connections, each with one request in flight. Streams may go to several devices offering the same root hash (ADR-0058).
+- **Order:** chunks may be requested in any order. A sender answers each one on its own, so a receiver may ask again after any failure.

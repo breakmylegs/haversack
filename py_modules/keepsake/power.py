@@ -65,6 +65,59 @@ def from_battery_flag(flag: int | None) -> bool | None:
     return flag != 128
 
 
+def linux_battery_state(root: str = "/") -> tuple[int | None, bool | None]:
+    """(percent, on mains power) from the first system battery and any mains supply."""
+    base = os.path.join(root, "sys", "class", "power_supply")
+    percent: int | None = None
+    charging: bool | None = None
+    mains = False
+    for supply in sorted(glob.glob(os.path.join(base, "*"))):
+        kind = _read(os.path.join(supply, "type"))
+        if kind == "Battery" and _read(os.path.join(supply, "scope")) != "Device" and percent is None:
+            text = _read(os.path.join(supply, "capacity"))
+            percent = int(text) if text.isdigit() else None
+            status = _read(os.path.join(supply, "status"))
+            if status in ("Charging", "Full", "Not charging"):
+                charging = True
+            elif status == "Discharging":
+                charging = False
+        elif kind in ("Mains", "USB") and _read(os.path.join(supply, "online")) == "1":
+            mains = True
+    return percent, True if mains else charging  # a charger that is plugged in wins over a battery's status
+
+
+def windows_battery_state() -> tuple[int | None, bool | None]:
+    import ctypes  # Windows only
+
+    class SystemPowerStatus(ctypes.Structure):
+        _fields_ = [  # noqa: RUF012 - the ctypes structure layout, read by ctypes itself
+            ("ACLineStatus", ctypes.c_ubyte),
+            ("BatteryFlag", ctypes.c_ubyte),
+            ("BatteryLifePercent", ctypes.c_ubyte),
+            ("SystemStatusFlag", ctypes.c_ubyte),
+            ("BatteryLifeTime", ctypes.c_ulong),
+            ("BatteryFullLifeTime", ctypes.c_ulong),
+        ]
+
+    status = SystemPowerStatus()
+    kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined, unused-ignore]
+    if not kernel32.GetSystemPowerStatus(ctypes.byref(status)):
+        return None, None
+    percent = None if status.BatteryLifePercent == 255 else int(status.BatteryLifePercent)
+    mains = {0: False, 1: True}.get(int(status.ACLineStatus))
+    return percent, mains
+
+
+def battery_state(root: str = "/", platform: str = sys.platform) -> tuple[int | None, bool | None]:
+    """Charge and mains power, or None for each part it cannot tell (Replication's battery rule)."""
+    if platform.startswith("win"):
+        try:
+            return windows_battery_state()
+        except (OSError, AttributeError):
+            return None, None
+    return linux_battery_state(root)
+
+
 def battery_present(
     root: str = "/", platform: str = sys.platform, flag_reader: Callable[[], int | None] | None = None
 ) -> bool | None:

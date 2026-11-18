@@ -204,6 +204,30 @@ export const replicationFind = callable<[], FoundDevice[]>("replication_find");
 export const replicationCheck = callable<[peerId: string], LinkCheck>("replication_check");
 export const replicationRemove = callable<[peerId: string], ReplicationStatus>("replication_remove");
 export const replicationWake = callable<[peerId: string], { sent: number }>("replication_wake");
+export interface TransferJob {
+  id: string;
+  peer: string;
+  peers: string[];
+  target: string;
+  state: "running" | "waiting" | "paused" | "verifying" | "promoting" | "done" | "failed" | "stopped";
+  reason: string | null;
+  held: boolean;
+  total: number;
+  received: number;
+  megabytesPerSecond: number;
+  secondsLeft: number | null;
+  streams: number;
+}
+export interface TransfersStatus {
+  jobs: TransferJob[];
+  awake: boolean;
+  sleepProblem: string | null;
+  waitingFor: string | null;
+}
+export const replicationTransfers = callable<[], TransfersStatus>("replication_transfers");
+export const replicationPause = callable<[jobId: string], TransfersStatus>("replication_pause");
+export const replicationResume = callable<[jobId: string], TransfersStatus>("replication_resume");
+export const replicationStop = callable<[jobId: string], TransfersStatus>("replication_stop");
 
 export const installerStatus = callable<[], InstallerStatus>("installer_status");
 export const installerAddCdDrive = callable<[jobId: number], InstallJob>("installer_add_cd_drive");

@@ -37,6 +37,7 @@ from . import (
     ordering,
     pcwatch,
     playtime,
+    power,
     procs,
     registry,
     resolve,
@@ -71,9 +72,10 @@ from .modules import Module, ModuleRegistry
 from .paths import PluginPaths
 from .procs import find_game_processes
 from .replication import link as replication_link
-from .replication import netinfo
+from .replication import netinfo, transfer
+from .replication.jobs import Transfers, hold_reason
 from .replication.peers import PeerStore
-from .replication.service import Links, ReplicationError
+from .replication.service import Links, ReplicationError, parse_address
 from .replication.service import health_checks as replication_health_checks
 from .resolve import ALL_ROOTS
 from .safepath import PathEscapeError, validate_relative
@@ -411,7 +413,10 @@ class KeepsakeApp:
             )
         )
         self.links: Links | None = None
+        self.transfers: Transfers | None = None
         self.sys_root = "/sys"
+        self.power_root = "/"  # where /sys/class/power_supply is read (tests point it elsewhere)
+        self._games_running: set[int] = set()
         self.replication_port = replication_link.DEFAULT_PORT
 
         async def replication_start() -> None:
@@ -435,11 +440,31 @@ class KeepsakeApp:
                     await self.links.set_listener(True)
                 except (ReplicationError, replication_link.LinkError, OSError) as exc:
                     log_event(logging.WARNING, "replication.listener_failed", "Listener not started", error=str(exc))
+            self.transfers = Transfers(
+                os.path.join(self.paths.runtime_dir, "replication-jobs.json"),
+                self._replication_connect_for,
+                conditions=self._replication_hold,
+                on_change=self._replication_changed,
+            )
+            resumed = await self.transfers.start_up()
+            if resumed:
+                log_event(logging.INFO, "replication.resumed", "Transfers resumed after a restart", count=len(resumed))
 
         async def replication_stop() -> None:
+            transfers, self.transfers = self.transfers, None
+            if transfers is not None:
+                await transfers.shut_down()
             links, self.links = self.links, None
             if links is not None:
                 await links.close()
+
+        async def replication_game_started(payload: dict[str, Any]) -> None:
+            self._games_running.add(int(payload.get("appid") or 0))
+
+        async def replication_game_exited(payload: dict[str, Any]) -> None:
+            self._games_running.discard(int(payload.get("appid") or 0))
+            if self.transfers is not None:
+                self.transfers.check_holds()  # a transfer that waited for the game carries on now
 
         async def replication_health() -> list[dict[str, Any]]:
             return replication_health_checks(self.links, self.host, self.proc_root)
@@ -455,6 +480,7 @@ class KeepsakeApp:
                 start=replication_start,
                 stop=replication_stop,
                 health=replication_health,
+                listeners={"game_started": replication_game_started, "game_exited": replication_game_exited},
             )
         )
         self.registry.register(
@@ -2936,6 +2962,57 @@ class KeepsakeApp:
         await self._replication(lambda links: links.remove(str(peer_id)))
         log_event(logging.INFO, "replication.removed", "Paired device removed")
         return await self.replication_status()
+
+    def _replication_hold(self) -> str | None:
+        percent, mains = power.battery_state(self.power_root)
+        return hold_reason(percent, mains, bool(self._games_running))
+
+    def _replication_connect_for(self, peer_id: str) -> transfer.Connect:
+        """A connection maker for a paired device, at the address it was last seen on."""
+
+        async def connect() -> replication_link.Connection:
+            links = self._links()
+            peer = links.store.get(peer_id)
+            if peer is None:
+                raise replication_link.LinkError("that device is no longer paired")
+            try:
+                host, port = parse_address(peer["address"] or "")
+            except ReplicationError as exc:
+                raise replication_link.LinkError("the device's address is not known; check it in Devices") from exc
+            return await replication_link.connect(links.me, links.store, peer_id, host, port)
+
+        return connect
+
+    def _transfers(self) -> Transfers:
+        if self.transfers is None:
+            raise ValueError("Replication is off; switch it on in Settings, Modules")
+        return self.transfers
+
+    async def replication_transfers(self) -> dict[str, Any]:
+        return self._transfers().status()
+
+    async def replication_pause(self, job_id: str) -> dict[str, Any]:
+        try:
+            await self._transfers().pause(str(job_id))
+        except transfer.TransferError as exc:
+            raise ValueError(str(exc)) from exc
+        return self._transfers().status()
+
+    async def replication_resume(self, job_id: str) -> dict[str, Any]:
+        try:
+            await self._transfers().resume(str(job_id))
+        except transfer.TransferError as exc:
+            raise ValueError(str(exc)) from exc
+        return self._transfers().status()
+
+    async def replication_stop(self, job_id: str) -> dict[str, Any]:
+        """ "Stop and remove": only after the user confirmed it on the page."""
+        try:
+            await self._transfers().stop(str(job_id))
+        except transfer.TransferError as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(logging.INFO, "replication.stopped", "Transfer stopped and removed")
+        return self._transfers().status()
 
     async def replication_wake(self, peer_id: str) -> dict[str, Any]:
         sent: int = await self._replication(lambda links: asyncio.to_thread(links.wake, str(peer_id)))

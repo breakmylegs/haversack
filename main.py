@@ -167,6 +167,18 @@ class Plugin:
     async def replication_wake(self, peer_id: str) -> dict[str, Any]:
         return await self.app.replication_wake(peer_id)
 
+    async def replication_transfers(self) -> dict[str, Any]:
+        return await self.app.replication_transfers()
+
+    async def replication_pause(self, job_id: str) -> dict[str, Any]:
+        return await self.app.replication_pause(job_id)
+
+    async def replication_resume(self, job_id: str) -> dict[str, Any]:
+        return await self.app.replication_resume(job_id)
+
+    async def replication_stop(self, job_id: str) -> dict[str, Any]:
+        return await self.app.replication_stop(job_id)
+
     async def installer_status(self) -> dict[str, Any]:
         return await self.app.installer_status()
 

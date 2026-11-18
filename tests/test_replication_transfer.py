@@ -239,10 +239,10 @@ def test_power_loss_with_unsynced_writes_is_caught_before_promote(tmp_path, monk
     calls = []
     real_commit = transfer.Receiver._commit
 
-    def no_commit_after_first(self, paths):
+    def no_commit_after_first(self, paths, listed=None):
         calls.append(paths)
         if len(calls) == 1:
-            return real_commit(self, paths)
+            return real_commit(self, paths, listed)
         raise asyncio.CancelledError  # power is lost before the data is made durable
 
     job = job_for(share, target)
@@ -278,7 +278,7 @@ def test_a_damaged_journaled_chunk_is_caught_by_the_final_check(tmp_path, monkey
     job, connections = receive(job_for(share, target), shares)
     assert job.state == "done", job.reason
     assert tree_of(target) == tree_of(source)
-    asked = [c["path"] for c in connections[0].calls if c["type"] == "chunk"]
+    asked = [c["path"] for conn in connections for c in conn.calls if c["type"] == "chunk"]
     assert asked.count("data/levels/one.pak") == 2  # fetched again after the whole-file check failed
 
 
@@ -386,8 +386,8 @@ def test_stop_and_remove_leaves_nothing_at_every_phase(tmp_path, monkeypatch, ph
     seen = []
     real_save = transfer.save_journal
 
-    def stop_at_phase(job):
-        real_save(job)
+    def stop_at_phase(job, done=None):
+        real_save(job, done)
         if job.state == phase and not seen:
             seen.append(phase)
             raise asyncio.CancelledError
@@ -602,14 +602,14 @@ def test_data_is_made_durable_before_the_journal_lists_it(tmp_path, monkeypatch)
         flushed.add(os.path.basename(path))
         real_fsync(path)
 
-    def save(job):
-        for rel, chunks in job.done.items():
+    def save(job, done=None):
+        for rel, chunks in (job.done if done is None else done).items():
             if len(chunks) > listed.get(rel, 0):  # this journal lists new chunks of rel ...
                 assert rel.rsplit("/", 1)[-1] in flushed, f"{rel} journaled before it was flushed"
                 checked.append(rel)
             listed[rel] = len(chunks)
         flushed.clear()  # ... and each journal needs its own flushes
-        real_save(job)
+        real_save(job, done)
 
     monkeypatch.setattr(transfer, "_fsync", fsync)
     monkeypatch.setattr(transfer, "save_journal", save)
