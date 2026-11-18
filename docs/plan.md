@@ -103,9 +103,37 @@ These two come before R0. S1 is next after the PC self-update change. Each is re
 | Item | Scope | Rule |
 |---|---|---|
 | D1 User documentation | Detailed user docs on GitHub with screenshots and diagrams:<br>- Getting started for each device type;<br>- a guide per feature, privacy and an FAQ;<br>- automated screenshots from a frontend harness with sample data, with a personal-data check;<br>- Mermaid or SVG diagrams;<br>- a release-time step that regenerates screenshots and checks links and images.<br>Where it lives and how it is published is decided in its own ADR. | Built (ADR-0046, `docs/slices/d1-report.md`). Screenshots are regenerated at each release. |
-| R0 Post-v2 roadmap (Peter, 17 November 2026) | A candidate backlog of 32 items from market research, not a spec:<br>- A: save sync and safety;<br>- B: coverage;<br>- C: storage and prefixes;<br>- D: multi-device;<br>- E: Advisor;<br>- F: Installer;<br>- G: UX and accessibility;<br>- H: distribution and security.<br>For each item: check the code (skip or shrink what exists), the principles (P7, P9, P18) and the threat model; research primary sources; decide build, defer or reject in one ADR, "Post-v2 roadmap". Accepted items become new slices here, and anything that changes a principle gets its own ADR. The full list is in the request of 17 November 2026, recorded in that ADR. | After D1. Started only when everything ahead is done or blocked. Peter gets a table of item, decision and slice, then building carries on. |
+| R0 Post-v2 roadmap (Peter, 17 November 2026) | A candidate backlog of 32 items from market research, not a spec:<br>- A: save sync and safety;<br>- B: coverage;<br>- C: storage and prefixes;<br>- D: multi-device;<br>- E: Advisor;<br>- F: Installer;<br>- G: UX and accessibility;<br>- H: distribution and security.<br>For each item: check the code (skip or shrink what exists), the principles (P7, P9, P18) and the threat model; research primary sources; decide build, defer or reject in one ADR, "Post-v2 roadmap". Accepted items become new slices here, and anything that changes a principle gets its own ADR. The full list is in the request of 17 November 2026, recorded in that ADR. | Decided (ADR-0047): the slices below. |
+
+### Post-v2 roadmap slices (ADR-0047)
+
+R1 to R3 need no device, so they are built now, while slices 16 to 25 wait for device runs. R4 to R6 follow, with device checks.
+
+| Slice | Items | Device? |
+|---|---|---|
+| R1 Save safety and control | Better conflict screen (times, devices, per-file changes), named checkpoints from the QAM, partial restore with preview, search and bulk actions on Games, Activity list | No |
+| R2 Everyday polish | Newer save from another device shown before launch, combined playtime (own layout ADR), no-battery devices, accessibility (icon plus text, larger text, controller hints), What's new and first-run tips | No |
+| R3 Trust and distribution | Cloud integrity scrub, zip export to a chosen folder, Decky store readiness, SBOM and key runbooks, performance budget in the gate | No |
+| R4 Coverage | Emulator saves (RetroArch, EmuDeck), Heroic, Lutris and Bottles games | Yes, at the end |
+| R5 Storage | Per-game disk use, clear shader cache, reset prefix and keep saves | Yes, at the end |
+| R6 Installer III | Multi-disc swap, install queue, runtime check | Yes, at the end |
+| R6b Dropbox | Dropbox with PKCE and an app folder | Needs Peter's app registration |
+
+Also: Wake-on-LAN joins slice 17, and the Steam LAN transfer explanation joins slice 19.
 
 ## Backlog (not scheduled)
+
+- Deferred by ADR-0047, each with the condition that brings it back:
+  - end-to-end encryption (its own ADR after v2.0.0);
+  - Steam screenshot sync;
+  - offload and rehydrate (after slice 20);
+  - the Playnite extension and Heroic hooks;
+  - learning from MangoHud;
+  - an i18n framework;
+  - battery- and network-aware sync (after the D-Bus client);
+  - the Ludusavi-layout export;
+  - whole-prefix backups.
+- Rejected by ADR-0047: pCloud, Optional Apply, Redump verification.
 
 - Done: the Advisor data sources deferred from slice 15 (ADR-0029): PCGamingWiki (ADR-0031) and the ProtonDB monthly-dump index (ADR-0035). The index needs a monthly refresh by hand (`docs/releasing.md`).
 From spec section 15: home lab hub peer, offload and rehydrate, offline USB bundles, content-defined chunking, USB4 direct link preference, `.reg` path rewriting, consented VDF fallback and CEF DevTools executors, optional uninstall propagation.
