@@ -1,5 +1,8 @@
 # Questions and answers
 
+**Does Keepsake work with emulators, Heroic, Lutris or Bottles?**
+Yes, on a handheld or a Linux PC. See [How syncing works](how-sync-works.md#heroic-lutris-bottles-and-emulators).
+
 **Does Keepsake replace Steam Cloud?**
 No. Steam games that use Steam Cloud are left to Steam, and hidden in Keepsake's list by default. Keepsake is for everything Steam Cloud does not cover: non-Steam games, and Steam games without cloud saves.
 

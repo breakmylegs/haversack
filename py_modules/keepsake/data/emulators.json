@@ -1,0 +1,58 @@
+{
+  "_comment": "Save folders of the emulator builds EmuDeck installs on SteamOS and Bazzite (Flatpak, or AppImage where noted), relative to the home folder. Battery and memory-card saves only by default; save states are optional because they break across emulator versions (ADR-0051). Unverified on a device until the R4 device run (A184).",
+  "emulators": [
+    {
+      "id": "retroarch",
+      "name": "RetroArch",
+      "flatpak": "org.libretro.RetroArch",
+      "saves": [{"root": "home", "rel": ".var/app/org.libretro.RetroArch/config/retroarch/saves"}],
+      "states": [{"root": "home", "rel": ".var/app/org.libretro.RetroArch/config/retroarch/states"}]
+    },
+    {
+      "id": "dolphin",
+      "name": "Dolphin (GameCube and Wii)",
+      "flatpak": "org.DolphinEmu.dolphin-emu",
+      "saves": [
+        {"root": "home", "rel": ".var/app/org.DolphinEmu.dolphin-emu/data/dolphin-emu/GC"},
+        {"root": "home", "rel": ".var/app/org.DolphinEmu.dolphin-emu/data/dolphin-emu/Wii/title"}
+      ],
+      "states": [{"root": "home", "rel": ".var/app/org.DolphinEmu.dolphin-emu/data/dolphin-emu/StateSaves"}]
+    },
+    {
+      "id": "pcsx2",
+      "name": "PCSX2 (PlayStation 2)",
+      "flatpak": "net.pcsx2.PCSX2",
+      "saves": [{"root": "home", "rel": ".var/app/net.pcsx2.PCSX2/config/PCSX2/memcards"}],
+      "states": [{"root": "home", "rel": ".var/app/net.pcsx2.PCSX2/config/PCSX2/sstates"}]
+    },
+    {
+      "id": "duckstation",
+      "name": "DuckStation (PlayStation)",
+      "flatpak": "org.duckstation.DuckStation",
+      "saves": [{"root": "home", "rel": ".var/app/org.duckstation.DuckStation/data/duckstation/memcards"}],
+      "states": [{"root": "home", "rel": ".var/app/org.duckstation.DuckStation/data/duckstation/savestates"}]
+    },
+    {
+      "id": "ppsspp",
+      "name": "PPSSPP (PSP)",
+      "flatpak": "org.ppsspp.PPSSPP",
+      "saves": [{"root": "home", "rel": ".var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/SAVEDATA"}],
+      "states": [{"root": "home", "rel": ".var/app/org.ppsspp.PPSSPP/config/ppsspp/PSP/PPSSPP_STATE"}]
+    },
+    {
+      "id": "rpcs3",
+      "name": "RPCS3 (PlayStation 3)",
+      "process_names": ["rpcs3"],
+      "saves": [{"root": "home", "rel": ".config/rpcs3/dev_hdd0/home/00000001/savedata"}],
+      "states": []
+    },
+    {
+      "id": "cemu",
+      "name": "Cemu (Wii U)",
+      "flatpak": "info.cemu.Cemu",
+      "process_names": ["Cemu", "cemu"],
+      "saves": [{"root": "home", "rel": ".local/share/Cemu/mlc01/usr/save"}],
+      "states": []
+    }
+  ]
+}

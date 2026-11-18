@@ -136,6 +136,13 @@ export function SettingsPage() {
         disabled={locked}
         onChange={(on) => void save("suspendSnapshots", on, on ? "Sleep snapshots on." : "Sleep snapshots off.")}
       />
+      <ToggleField
+        label="Show other launchers"
+        description="List Heroic, Lutris and Bottles games and emulator saves in Games. Each one still syncs only when you turn it on."
+        checked={settings?.otherLaunchers ?? true}
+        disabled={locked}
+        onChange={(on) => void save("otherLaunchers", on, on ? "Other launchers shown. Rescan Games to see them." : "Other launchers hidden.")}
+      />
       {settings && <CloudSection settings={settings} onSettings={setSettings} />}
       <ExportSection />
       <Field label="Updates" description="Check for updates, read release notes or go back to an earlier version." childrenLayout="inline">

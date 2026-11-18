@@ -24,14 +24,18 @@ import { newerText, SYNC_LABELS } from "../format";
 import { GameDetail } from "./GameDetail";
 import { askApproveMatch } from "../matchApproval";
 
-type Filter = "enabled" | "shortcuts" | "steam" | "all";
+type Filter = "enabled" | "shortcuts" | "steam" | "launchers" | "emulators" | "all";
 
 const FILTER_LABELS: Record<Filter, string> = {
   enabled: "Synced games",
   shortcuts: "Non-Steam shortcuts",
   steam: "Steam games",
+  launchers: "Heroic, Lutris, Bottles",
+  emulators: "Emulators",
   all: "All",
 };
+
+const LAUNCHER_KINDS = ["heroic", "lutris", "bottles"];
 
 const STATUS_ICONS: Record<SyncWord, ReactElement> = {
   off: <FaMinusCircle style={{ opacity: 0.5 }} />,
@@ -43,6 +47,9 @@ const STATUS_ICONS: Record<SyncWord, ReactElement> = {
 };
 
 function prefixText(game: GameEntry): string {
+  if (game.kind === "emulator") return "Emulator save folders";
+  if (game.wine_prefix) return `Wine prefix of ${game.kind === "heroic" ? "Heroic" : game.kind === "lutris" ? "Lutris" : "Bottles"}`;
+  if (LAUNCHER_KINDS.includes(game.kind)) return "No Wine prefix found";
   if (!game.prefix) return game.kind === "steam" ? "No Proton prefix (native or never run)" : "No prefix found";
   const id = game.prefix.split("/").pop();
   const where = game.prefix_library_index === 0 ? "internal library" : `library ${game.prefix_library_index}`;
@@ -197,7 +204,7 @@ export function GamesPage() {
   const runningAppId = SteamUIStore?.MainRunningAppID;
   // Steam apps are off by default because Steam Cloud covers them (build prompt section 14).
   const filters = (Object.keys(FILTER_LABELS) as Filter[]).filter((f) => showSteam || f !== "steam");
-  const visible = (result?.games ?? []).filter((g) => showSteam || g.kind === "shortcut");
+  const visible = (result?.games ?? []).filter((g) => showSteam || g.kind !== "steam");
   // Needs approval first, then prefix mismatch, conflict, quarantined, then by name: the backend's order,
   // kept under every filter. Games not matched yet go last.
   const rank = new Map(order.map((key, i) => [key, i]));
@@ -206,6 +213,8 @@ export function GamesPage() {
       if (filter === "enabled") return matches[g.key]?.enabled;
       if (filter === "shortcuts") return g.kind === "shortcut";
       if (filter === "steam") return g.kind === "steam";
+      if (filter === "launchers") return LAUNCHER_KINDS.includes(g.kind);
+      if (filter === "emulators") return g.kind === "emulator";
       return true;
     })
     .filter((g) => !search.trim() || g.name.toLowerCase().includes(search.trim().toLowerCase()))

@@ -180,6 +180,18 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
         </Field>
       ))}
 
+      {game.kind === "emulator" && (game.states_paths ?? []).length > 0 && (
+        <ToggleField
+          label="Include save states"
+          description="Off by default: save states often do not load in another version of the emulator. Battery and memory-card saves always sync."
+          checked={(game.states_paths ?? []).every((s) => config.customPaths.some((c) => c.root === s.root && c.rel === s.rel))}
+          onChange={(on) => {
+            const states = game.states_paths ?? [];
+            const others = config.customPaths.filter((c) => !states.some((s) => s.root === c.root && s.rel === c.rel));
+            void change({ customPaths: on ? [...others, ...states] : others }, on ? "Save states included." : "Save states left out.");
+          }}
+        />
+      )}
       <ToggleField
         label="Include config files"
         description="Off by default: config files often hold screen and graphics settings that differ between devices."
@@ -249,7 +261,7 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
           onEnabled={() => void load().then(runPreview)}
         />
       )}
-      {match.gameKey && (
+      {match.gameKey && (game.kind === "steam" || game.kind === "shortcut") && (
         <LaunchGatePanel
           gameKey={gameKey}
           appid={game.appid}

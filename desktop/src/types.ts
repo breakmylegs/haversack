@@ -125,7 +125,7 @@ export interface CloudStatus {
 export interface GameMatch {
   key: string;
   name: string;
-  kind: "steam" | "shortcut";
+  kind: string;
   method: string;
   title: string | null;
   gameKey: string | null;

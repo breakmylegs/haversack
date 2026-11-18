@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from typing import Any
 
-ENV_KEYS = ("STEAM_COMPAT_DATA_PATH", "SteamGameId", "SteamAppId", "SteamOverlayGameId")
+# WINEPREFIX and FLATPAK_ID tell games from other launchers and emulators apart (ADR-0051).
+ENV_KEYS = ("STEAM_COMPAT_DATA_PATH", "SteamGameId", "SteamAppId", "SteamOverlayGameId", "WINEPREFIX", "FLATPAK_ID")
 SHORTCUT_GAMEID_FLAG = 0x02000000
 
 
@@ -115,6 +117,37 @@ def match_reason(info: ProcInfo, appid: int, compat_path: str | None = None) -> 
     if info.env.get("SteamAppId", "") == str(appid):
         return "steam-app-id"
     return ""
+
+
+def launcher_running(
+    game: dict[str, Any], proc_root: str = "/proc", uid: int | None = None, self_pid: int | None = None
+) -> bool:
+    """Whether a game from another launcher, or an emulator, runs now (ADR-0051).
+
+    - a Wine game: any process whose ``WINEPREFIX`` or ``STEAM_COMPAT_DATA_PATH`` is its prefix
+      (a prefix shared by several games counts for all of them: fail closed, P6);
+    - an emulator: a process with its Flatpak ``FLATPAK_ID``, or with one of its program names.
+    """
+    if uid is None:
+        uid = os.getuid() if hasattr(os, "getuid") else -1
+    if self_pid is None:
+        self_pid = os.getpid()
+    prefixes = {os.path.realpath(str(p)) for p in (game.get("wine_prefix"), game.get("prefix")) if p}
+    flatpak = game.get("flatpak_id")
+    names = {str(n) for n in game.get("process_names") or []}
+    for info in list_procs(proc_root, uid=uid):
+        if info.pid == self_pid:
+            continue
+        for variable in ("WINEPREFIX", "STEAM_COMPAT_DATA_PATH"):
+            value = info.env.get(variable, "").rstrip("/")
+            if value and os.path.realpath(value) in prefixes:
+                return True
+        if flatpak and info.env.get("FLATPAK_ID") == flatpak:
+            return True
+        program = os.path.basename(info.cmdline.split(" ", 1)[0]) if info.cmdline else ""
+        if names and (info.comm in names or program in names):
+            return True
+    return False
 
 
 def find_game_processes(

@@ -1,7 +1,16 @@
 import { DialogButton, Field, Focusable, ToggleField } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
-import { ConfigSyncInfo, gameConfigSync, SyncStatus, syncPull, syncPush, syncStatus, updateGameConfig } from "../backend";
+import {
+  ConfigSyncInfo,
+  GameKind,
+  gameConfigSync,
+  SyncStatus,
+  syncPull,
+  syncPush,
+  syncStatus,
+  updateGameConfig,
+} from "../backend";
 import { agoText, CONFLICT_TEXT } from "../format";
 import { openConflictModal } from "./ConflictModal";
 
@@ -20,7 +29,7 @@ export function SyncPanel({
 }: {
   gameKey: string;
   enabled: boolean;
-  kind: "steam" | "shortcut";
+  kind: GameKind;
   onEnabled: (on: boolean) => void;
 }) {
   const [status, setStatus] = useState<SyncStatus | null>(null);

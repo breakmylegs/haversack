@@ -52,6 +52,8 @@ DEFAULTS: dict[str, Any] = {
     "gamingModeSignin": {"onedrive": "browser", "gdrive": "phone"},
     # First-run tips in the Quick Access Menu, until the user dismisses them (ADR-0049).
     "tipsDismissed": False,
+    # Heroic, Lutris and Bottles games and emulator saves, on Linux devices (ADR-0051). Each still opts in.
+    "otherLaunchers": True,
 }
 SIGNIN_METHODS = ("browser", "phone")
 MODULE_NAMES = ("saves", "advisor", "replication", "installer", "desktop")
@@ -77,6 +79,7 @@ USER_KEYS = frozenset(
         "libraryRoot",
         "gamingModeSignin",
         "tipsDismissed",
+        "otherLaunchers",
     }
 )
 IDLE_MINUTES_RANGE = (10, 240)
@@ -196,6 +199,7 @@ def _validate(key: str, value: Any) -> Any:
         "steamCloudDetection",
         "suspendSnapshots",
         "tipsDismissed",
+        "otherLaunchers",
     ):
         if not isinstance(value, bool):
             raise SettingsError("must be true or false")
