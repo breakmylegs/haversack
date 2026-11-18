@@ -72,7 +72,7 @@ The device-free work moves ahead of slices 16 to 25 and is built in this order (
 |---|---|---|
 | P1 Platform layer | Host detection; Windows known folders; the `windows` save layout; case-insensitive Windows matching; `<osUserName>`; then Steam discovery on Windows (registry `SteamPath`, `libraryfolders.vdf`) and the registry root through `winreg` | No: built and tested on the Windows laptop. Real Steam games need a PC run. |
 | P2 Headless host | `python -m keepsake.host`: `KeepsakeApp` without Decky, with platform settings and state folders (`%APPDATA%\Keepsake`, `$XDG_CONFIG_HOME/keepsake`) and the loopback API with token authentication, DNS-rebinding and CSRF protection (slice 23's server, moved forward) | No |
-| P3 Desktop UI | Slice 23's single-page app (plain React, no `@decky/ui`), served by the host, with parity for Saves first | No for the build, screenshots and tests. Yes for Desktop Mode on a handheld (the A79 probe). |
+| P3 Desktop UI | Slice 23's single-page app (plain TypeScript, ADR-0040), served by the host, with parity for Saves first. Built: Overview, Conflicts, Games, Cloud, Import, History, Health, Modules, Updates and Settings (`docs/slices/p3-report.md`) | No for the build, screenshots and tests. Yes for Desktop Mode on a handheld (the A79 probe). |
 | P4 PC lifecycle | A process watcher: push after a game exits, "Sync now" and idle pulls while nothing runs | No for the logic. Yes for real games. |
 | P5 PC package and self-update | `Keepsake-desktop-v<version>.zip` in the signed `SHA256SUMS`, self-update (verify, unpack into a versioned folder, switch, keep the previous one), autostart (Startup folder, XDG autostart or a systemd user unit) | No for the build and tests. Yes for a PC install run. |
 

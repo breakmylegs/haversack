@@ -7,12 +7,16 @@ import type {
   CloudStatus,
   ConflictDetails,
   ConflictEntry,
+  GameMatch,
+  ImportAllStatus,
+  LudusaviGame,
   HealthCheck,
   HistoryItem,
   ModuleStatus,
   PcResult,
   PcUpdateStatus,
   QamSummary,
+  Settings,
   UpdateCheck,
 } from "./types.js";
 
@@ -259,6 +263,263 @@ function toggle(m: ModuleStatus, main: HTMLElement): HTMLInputElement {
   return input;
 }
 
+// Games: which games sync, and which save data each one is (the same choices as in Gaming Mode)
+
+const syncText: Record<string, string> = {
+  off: "Not synced",
+  "not-synced": "Not synced yet",
+  synced: "Synced",
+  pending: "Waiting to sync",
+  conflict: "Conflict",
+  quarantined: "Held back for checking",
+};
+
+const matchText: Record<string, string> = {
+  manual: "chosen by you",
+  "manual-key": "linked by you",
+  "steam-id": "matched by Steam ID",
+  title: "matched by title",
+  ambiguous: "several possible matches",
+  none: "no save data found",
+  "no-save-data": "no save data in the manifest",
+  "no-manifest": "save database not downloaded yet",
+};
+
+async function games(main: HTMLElement, filter = ""): Promise<void> {
+  const all = await call<GameMatch[]>("match_games");
+  const shown = all.filter((g) => g.name.toLowerCase().includes(filter.toLowerCase()));
+  const search = h("input", { type: "search", placeholder: "Find a game", value: filter, "aria-label": "Find a game" }) as HTMLInputElement;
+  search.addEventListener("change", () => void games(main, search.value));
+  replace(
+    main,
+    h("h1", {}, "Games"),
+    h("p", {}, "Turn sync on for the games whose saves should follow you. Keepsake finds each game's saves from the Ludusavi manifest."),
+    h("div", { class: "actions" }, search),
+    shown.length
+      ? h("ul", { class: "list" }, ...shown.map((g) => h("li", {}, gameCard(g, main, filter))))
+      : h("p", { class: "empty" }, filter ? "No game matches that name." : "No games found yet."),
+  );
+}
+
+function gameCard(g: GameMatch, main: HTMLElement, filter: string): HTMLElement {
+  const toggle = h("input", { type: "checkbox", checked: g.enabled, "aria-label": `Sync ${g.name}` }) as HTMLInputElement;
+  toggle.addEventListener("change", () => {
+    toggle.disabled = true;
+    call("update_game_config", g.key, { enabled: toggle.checked })
+      .then(() => toast(toggle.checked ? `${g.name} now syncs.` : `${g.name} no longer syncs.`))
+      .catch((error: unknown) => {
+        toggle.checked = !toggle.checked;
+        toast(error instanceof ApiError ? error.message : "Could not change the game");
+      })
+      .finally(() => (toggle.disabled = false));
+  });
+  const proposal = g.proposal?.candidate;
+  return h(
+    "div",
+    {},
+    h("h2", {}, g.name),
+    h(
+      "p",
+      { class: "small" },
+      `${g.kind === "steam" ? "Steam game" : "Non-Steam game"}. ${syncText[g.sync] ?? g.sync}. Save data: ${
+        g.title ? `${g.title}, ` : ""
+      }${matchText[g.method] ?? g.method}.`,
+    ),
+    h("label", { class: "switch" }, toggle, " Sync this game"),
+    proposal
+      ? h(
+          "div",
+          { class: "actions" },
+          h("span", {}, `Another device has this as ${proposal.title ?? proposal.gameKey}.`),
+          button("Same game", async () => {
+            await call("approve_match", g.key);
+            await games(main, filter);
+          }),
+          button("A different game", async () => {
+            await call("reject_match", g.key);
+            await games(main, filter);
+          }),
+        )
+      : null,
+    g.method === "ambiguous" || g.method === "none" ? titlePicker(g, main, filter) : null,
+  );
+}
+
+function titlePicker(g: GameMatch, main: HTMLElement, filter: string): HTMLElement {
+  const input = h("input", { type: "search", placeholder: "Search the save database", "aria-label": `Save data for ${g.name}` }) as HTMLInputElement;
+  const results = h("div", { class: "actions" });
+  const pick = (title: string) =>
+    button(title, async () => {
+      await call("update_game_config", g.key, { matchTitle: title });
+      toast(`${g.name} uses the save data of ${title}.`);
+      await games(main, filter);
+    });
+  const searchButton = button("Search", async () => {
+    const titles = await call<string[]>("search_titles", input.value);
+    replace(results, ...(titles.length ? titles.slice(0, 8).map(pick) : [h("span", { class: "small" }, "Nothing found.")]));
+  });
+  return h(
+    "div",
+    {},
+    h("div", { class: "actions" }, ...g.candidates.slice(0, 5).map(pick), input, searchButton),
+    results,
+  );
+}
+
+// Settings
+
+async function settingsPage(main: HTMLElement): Promise<void> {
+  const s = await call<Settings>("get_settings");
+  const save = async (key: string, value: unknown, done: string) => {
+    await call("set_setting", key, value);
+    toast(done);
+    await settingsPage(main);
+  };
+  const name = h("input", { type: "text", value: s.deviceName, maxlength: "40", "aria-label": "Device name" }) as HTMLInputElement;
+  const idle = h("input", { type: "number", min: "10", max: "240", value: String(s.idleSyncMinutes), "aria-label": "Minutes between syncs" }) as HTMLInputElement;
+  const channel = h(
+    "select",
+    { "aria-label": "Update channel" },
+    h("option", { value: "stable", selected: s.updateChannel === "stable" }, "Stable releases"),
+    h("option", { value: "prerelease", selected: s.updateChannel === "prerelease" }, "Test releases too"),
+  ) as HTMLSelectElement;
+  const toasts = h("input", { type: "checkbox", checked: s.toastOnSync, "aria-label": "Notify after each sync" }) as HTMLInputElement;
+  toasts.addEventListener("change", () => void save("toastOnSync", toasts.checked, "Saved.").catch(fail));
+  channel.addEventListener("change", () => void save("updateChannel", channel.value, "Saved.").catch(fail));
+  replace(
+    main,
+    h("h1", {}, "Settings"),
+    s.readOnly ? h("p", { class: "warn" }, "A newer Keepsake wrote these settings, so they are read-only here. Update Keepsake.") : null,
+    h(
+      "div",
+      { class: "card" },
+      h("h2", {}, "This device"),
+      h("p", { class: "small" }, "Shown on your other devices, in History and in conflicts."),
+      h(
+        "div",
+        { class: "actions" },
+        name,
+        button("Save name", async () => save("deviceName", name.value, "Device name saved.")),
+      ),
+    ),
+    h(
+      "div",
+      { class: "card" },
+      h("h2", {}, "Syncing"),
+      h("p", { class: "small" }, "While no game runs, Keepsake checks for saves from your other devices this often (10 to 240 minutes)."),
+      h(
+        "div",
+        { class: "actions" },
+        idle,
+        button("Save", async () => save("idleSyncMinutes", Number(idle.value), "Saved.")),
+      ),
+      h("label", { class: "switch" }, toasts, " Notify after each sync"),
+    ),
+    h(
+      "div",
+      { class: "card" },
+      h("h2", {}, "Updates"),
+      h("label", {}, "Channel ", channel),
+    ),
+    h(
+      "div",
+      { class: "card" },
+      h("h2", {}, "Safety checks"),
+      h(
+        "p",
+        { class: "small" },
+        `A sync stops and asks you when it would remove more than ${s.gateMaxRemovedPercent}% of a game's save files, or shrink them by more than ${s.gateMaxSizeDropPercent}%. These limits can only be made stricter, in Gaming Mode's Settings.`,
+      ),
+    ),
+  );
+}
+
+function fail(error: unknown): void {
+  toast(error instanceof ApiError ? error.message : "Something went wrong");
+}
+
+// Import from Ludusavi
+
+let importTimer: number | undefined;
+
+async function importPage(main: HTMLElement): Promise<void> {
+  window.clearTimeout(importTimer);
+  const status = await call<ImportAllStatus>("ludusavi_import_status");
+  const root = h("input", { type: "text", value: "~/ludusavi-backup", "aria-label": "Ludusavi backup folder", size: "40" }) as HTMLInputElement;
+  const found = h("div", {});
+  replace(
+    main,
+    h("h1", {}, "Import from Ludusavi"),
+    h("p", {}, "Brings your Ludusavi backups into Keepsake's history, so nothing from before is lost. Your Ludusavi backups are only read, never changed."),
+    status.running || status.total ? importProgress(status, main) : null,
+    h(
+      "div",
+      { class: "actions" },
+      root,
+      button("Find backups", async () => {
+        const result = await call<{ root: string; games: LudusaviGame[] }>("ludusavi_scan", root.value);
+        replace(
+          found,
+          h("p", {}, `${result.games.length} games with backups in ${result.root}.`),
+          result.games.length
+            ? h(
+                "table",
+                {},
+                h("tr", {}, h("th", {}, "Game"), h("th", {}, "Backups"), h("th", {}, "Note")),
+                ...result.games.map((g) =>
+                  h("tr", {}, h("td", {}, g.name), h("td", {}, String(g.backups.length)), h("td", {}, g.error ?? (g.inManifest ? "" : "not in the save database"))),
+                ),
+              )
+            : null,
+          result.games.length
+            ? h(
+                "div",
+                { class: "actions" },
+                button(
+                  "Import the latest backup of each game",
+                  async () => {
+                    await call("ludusavi_import_all", result.root, "latest");
+                    await importPage(main);
+                  },
+                  "primary",
+                ),
+                button("Import every backup", async () => {
+                  await call("ludusavi_import_all", result.root, "all");
+                  await importPage(main);
+                }),
+              )
+            : null,
+        );
+      }),
+    ),
+    found,
+  );
+  if (status.running) {
+    importTimer = window.setTimeout(() => {
+      if (document.getElementById("nav-import")?.getAttribute("aria-current") === "true") void importPage(main);
+    }, 2000);
+  }
+}
+
+function importProgress(status: ImportAllStatus, main: HTMLElement): HTMLElement {
+  const summary = Object.entries(status.summary)
+    .map(([verdict, count]) => `${count} ${verdict}`)
+    .join(", ");
+  return h(
+    "div",
+    { class: "card" },
+    h("h2", {}, status.running ? "Importing" : status.cancelled ? "Import stopped" : "Import finished"),
+    h("p", {}, `${status.done} of ${status.total} games${status.current ? `, now ${status.current}` : ""}.`),
+    summary ? h("p", { class: "small" }, summary) : null,
+    status.running
+      ? button("Stop importing", async () => {
+          await call("ludusavi_import_cancel");
+          await importPage(main);
+        })
+      : null,
+  );
+}
+
 // Cloud sign-in: one button, the browser, done (ADR-0044)
 
 const PROVIDERS: { id: "onedrive" | "gdrive"; label: string; page: string }[] = [
@@ -282,7 +543,15 @@ async function cloud(main: HTMLElement): Promise<void> {
           "li",
           { class: "card" },
           h("h2", {}, p.label),
-          h("p", {}, signedIn[p.id] ? "Signed in." : `Not signed in. A ${p.page} page opens in a new tab: sign in and allow access for Keepsake.`),
+          h(
+            "p",
+            {},
+            signedIn[p.id]
+              ? "Signed in."
+              : status.methods?.[p.id]?.browser
+                ? `Not signed in. A ${p.page} page opens in a new tab: sign in and allow access for Keepsake.`
+                : "Not signed in.",
+          ),
           h(
             "div",
             { class: "actions" },
@@ -429,11 +698,14 @@ async function updates(main: HTMLElement, check?: UpdateCheck, installed?: strin
 const PAGES: Page[] = [
   { id: "overview", title: "Overview", render: overview },
   { id: "conflicts", title: "Conflicts", render: conflicts },
+  { id: "games", title: "Games", render: (main) => games(main) },
   { id: "cloud", title: "Cloud", render: cloud },
+  { id: "import", title: "Import", render: importPage },
   { id: "history", title: "History", render: history },
   { id: "health", title: "Health", render: health },
   { id: "modules", title: "Modules", render: modules },
   { id: "updates", title: "Updates", render: (main) => updates(main) },
+  { id: "settings", title: "Settings", render: settingsPage },
 ];
 
 async function show(id: string): Promise<void> {
