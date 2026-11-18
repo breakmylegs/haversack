@@ -12,6 +12,7 @@ undo exactly that and nothing else.
 
 from __future__ import annotations
 
+import builtins
 import json
 import os
 import re
@@ -25,7 +26,7 @@ from typing import Any
 
 from ..fsutil import atomic_write_json, read_json
 from . import manifest as mf
-from . import policy, sendgame, transfer
+from . import ongoing, policy, sendgame, transfer
 from .jobs import Transfers
 from .link import ServeError, Session
 from .peers import clean_name
@@ -72,8 +73,24 @@ def validate(offer: Any) -> dict[str, Any]:
         shares[scope] = {"share": share["share"], "root": share["root"], "bytes": share["bytes"]}
     if "install" not in shares and "prefix" not in shares:
         raise OfferError("the offer holds no game")
+    update = None
+    if offer.get("update") is not None:  # an update to a game already linked (ADR-0060)
+        raw = offer["update"]
+        base = raw.get("base") if isinstance(raw, dict) else None
+        if (
+            not isinstance(raw, dict)
+            or not OFFER_ID.match(str(raw.get("link", "")))
+            or not isinstance(base, dict)
+            or set(base) - {"install", "prefix"}
+            or not all(HEX64.match(str(v)) for v in base.values())
+            or set(shares) - {"install", "prefix"}
+        ):
+            raise OfferError("the update is not valid")
+        update = {"link": raw["link"], "base": dict(base)}
     refs = {}
     for name in ("exe", "startDir"):
+        if update is not None:
+            break  # an update changes files only: the shortcut stays as it is
         ref = offer.get(name)
         if not isinstance(ref, dict) or ref.get("scope") not in ("install", "prefix") or ref["scope"] not in shares:
             raise OfferError("the offer is not valid")
@@ -103,8 +120,9 @@ def validate(offer: Any) -> dict[str, Any]:
         "title": title,
         "from": clean_name((offer.get("from") or {}).get("name") if isinstance(offer.get("from"), dict) else None),
         "shares": shares,
-        "exe": refs["exe"],
-        "startDir": refs["startDir"],
+        "exe": refs.get("exe"),
+        "startDir": refs.get("startDir"),
+        "update": update,
         "launchOptions": options,
         "droppedOptions": [str(x)[:200] for x in offer.get("droppedOptions") or []][:10],
         "compatTool": tool,
@@ -211,6 +229,45 @@ class Outgoing:
         self._save(offers)
         return wire
 
+    def prepare_update(
+        self,
+        link_id: str,
+        title: str,
+        scopes: dict[str, str],
+        keep: dict[str, builtins.list[str]],
+        base: dict[str, str],
+        peer_id: str,
+        extra: dict[str, Any],
+    ) -> tuple[dict[str, Any], dict[str, str]]:
+        """Offer a linked game's changed files. Returns the offer and the roots it carries."""
+        offers = self._load()
+        if len(offers) >= MAX_OFFERS:
+            raise OfferError(f"at most {MAX_OFFERS} games can be on offer; withdraw one first")
+        offer_id = sendgame.new_offer_id()
+        folder = os.path.join(self.work_dir, offer_id)
+        os.makedirs(folder, exist_ok=True)
+        manifests = ongoing.scan(scopes, keep)
+        changed = {s: m for s, m in manifests.items() if base.get(s) != m["root"]}
+        if not changed:
+            raise OfferError("nothing has changed since the last sync")
+        record_shares, wire_shares = {}, {}
+        for scope, manifest in changed.items():
+            manifest_file = os.path.join(folder, f"{scope}.json")
+            atomic_write_json(manifest_file, manifest)
+            share = self.shares.add(scopes[scope], manifest, {peer_id})
+            record_shares[scope] = {"share": share.id, "root": scopes[scope], "manifestFile": manifest_file}
+            wire_shares[scope] = {"share": share.id, "root": manifest["root"], "bytes": mf.total_bytes(manifest)}
+        wire = {
+            "id": offer_id,
+            "title": title,
+            "shares": wire_shares,
+            "update": {"link": link_id, "base": {s: base[s] for s in changed if s in base}},
+            **extra,
+        }
+        offers[offer_id] = {"peer": peer_id, "title": title, "shares": record_shares, "created": time.time()}
+        self._save(offers)
+        return wire, {s: m["root"] for s, m in manifests.items()}
+
     def list(self) -> list[dict[str, Any]]:
         return [
             {"id": k, "title": v.get("title"), "peer": v.get("peer"), "created": v.get("created")}
@@ -242,6 +299,7 @@ class Incoming:
         places: Callable[[], dict[str, str]],
         on_done: Callable[[dict[str, Any]], None] | None = None,
         on_change: Callable[[], None] | None = None,
+        on_offer: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         self.path = path
         self.transfers = transfers
@@ -249,6 +307,7 @@ class Incoming:
         self.places = places  # libraryRoot, compatdata, tools, art and home on this device
         self.on_done = on_done
         self.on_change = on_change
+        self.on_offer = on_offer  # told about each new offer, so a game set to auto can take its update
         self._lock = threading.Lock()
 
     def _load(self) -> dict[str, Any]:
@@ -289,8 +348,11 @@ class Incoming:
         offers.setdefault(
             offer["id"], {"offer": offer, "peer": session.peer_id, "state": "offered", "received": time.time()}
         )
+        new = offer["id"] not in self._load()
         self._save(offers)
         self._changed()
+        if new and self.on_offer:
+            self.on_offer(offer)
         return {"type": "offer-received", "id": offer["id"]}
 
     # The user's choices
@@ -313,6 +375,8 @@ class Incoming:
                     "droppedOptions": offer["droppedOptions"],
                     "appid": record.get("appid"),
                     "jobs": record.get("jobs", {}),
+                    "update": bool(offer.get("update")),
+                    "link": (offer.get("update") or {}).get("link"),
                 }
             )
         return out
@@ -412,6 +476,46 @@ class Incoming:
     def _public(self, offer_id: str) -> dict[str, Any]:
         return next(o for o in self.list() if o["id"] == offer_id)
 
+    def accept_update(
+        self, offer_id: str, scopes: dict[str, str], keep: dict[str, builtins.list[str]]
+    ) -> dict[str, Any]:
+        """Apply an update into the game's existing folders, keeping this device's saves and settings.
+
+        The folders are the game's own, not this offer's: "Stop and remove" never deletes them, it
+        only stops the copy, and a stopped update leaves the game exactly as it was.
+        """
+        record = self._load().get(offer_id)
+        if record is None or record["state"] != "offered" or not record["offer"].get("update"):
+            raise OfferError("that update is not waiting for an answer")
+        offer = record["offer"]
+        targets = {}
+        for scope in offer["shares"]:
+            target = scopes.get(scope)
+            if not target or not os.path.isdir(target):
+                raise OfferError(f"the game's {scope} folder was not found on this device")
+            targets[scope] = target
+        for scope, target in targets.items():
+            needed = policy.space_needed(offer["shares"][scope]["bytes"])
+            if shutil.disk_usage(os.path.dirname(target)).free < needed:
+                raise OfferError(f"not enough space beside {target} for the update")
+        self._update(offer_id, state="transferring", updateTargets=targets, jobs={})
+        jobs = {}
+        for scope, target in targets.items():
+            share = offer["shares"][scope]
+            job = transfer.Job(
+                id=f"{offer_id}-{scope}",
+                peer_id=record["peer"],
+                share=share["share"],
+                root=share["root"],
+                target=target,
+                peers=[record["peer"]],
+                keep=list(keep.get(scope, [])),
+            )
+            self.transfers.start(job)
+            jobs[scope] = job.id
+        self._update(offer_id, jobs=jobs)
+        return self._public(offer_id)
+
     # As the copy and the Steam operations finish
 
     def job_finished(self, job: transfer.Job) -> None:
@@ -423,9 +527,14 @@ class Incoming:
                     self._update(offer_id, reason=job.reason)
                 return
             done = set(record.get("doneScopes", [])) | {next(s for s, j in record["jobs"].items() if j == job.id)}
-            self._update(offer_id, doneScopes=sorted(done))
+            record = self._update(offer_id, doneScopes=sorted(done))
             if done >= set(record["jobs"]):
-                self._register(offer_id)
+                if record["offer"].get("update"):
+                    record = self._update(offer_id, state="done")  # files only: the shortcut stays as it is
+                    if self.on_done:
+                        self.on_done(record)
+                else:
+                    self._register(offer_id)
 
     def _resolve(self, record: dict[str, Any], ref: dict[str, str], prefix_final: str | None = None) -> str:
         targets = record["targets"]

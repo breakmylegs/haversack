@@ -7,6 +7,11 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 ### Added
 
 - One-button cloud sign-in: OneDrive and Google Drive now work out of the box. Pick one, press **Sign in** and approve with your account. No client ID or app registration is needed; your own client is still available under Advanced (ADR-0055).
+- Games you sent stay in step between devices (the controls come in the next update):
+  - when a game changes on one device, for example a patch, Keepsake offers the update to the other;
+  - set to Auto, the update goes in by itself;
+  - if both devices changed the game, Keepsake asks you which copy to keep;
+  - your saves and settings on each device are never replaced by an update (ADR-0060).
 - Send a game to another device: **Send to <device>** on a non-Steam game, then **Accept** on the other device, under Devices:
   - Keepsake copies a non-Steam game, its Proton prefix, its compatibility tool if needed, and its artwork to the other device;
   - it adds the game to Steam there with the same name, program, launch options and tool;
