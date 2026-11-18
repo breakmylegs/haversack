@@ -74,9 +74,13 @@ from .procs import find_game_processes
 from .replication import link as replication_link
 from .replication import netinfo, transfer
 from .replication.jobs import Transfers, hold_reason
+from .replication.offers import Incoming, OfferError, Outgoing, send_offer
 from .replication.peers import PeerStore
+from .replication.sendgame import SendError
+from .replication.sendgame import plan as send_plan
 from .replication.service import Links, ReplicationError, parse_address
 from .replication.service import health_checks as replication_health_checks
+from .replication.source import Shares
 from .resolve import ALL_ROOTS
 from .safepath import PathEscapeError, validate_relative
 from .settings import SettingsStore
@@ -414,6 +418,9 @@ class KeepsakeApp:
         )
         self.links: Links | None = None
         self.transfers: Transfers | None = None
+        self.incoming: Incoming | None = None
+        self.outgoing: Outgoing | None = None
+        self._sending: dict[str, dict[str, Any]] = {}  # games being prepared to send, by game key
         self.sys_root = "/sys"
         self.power_root = "/"  # where /sys/class/power_supply is read (tests point it elsewhere)
         self._games_running: set[int] = set()
@@ -445,12 +452,31 @@ class KeepsakeApp:
                 self._replication_connect_for,
                 conditions=self._replication_hold,
                 on_change=self._replication_changed,
+                on_finished=lambda job: self.incoming.job_finished(job) if self.incoming else None,
             )
+            shares = Shares()
+            self.outgoing = Outgoing(
+                os.path.join(self.paths.runtime_dir, "replication-outgoing.json"),
+                os.path.join(self.paths.runtime_dir, "replication-outgoing"),
+                shares,
+            )
+            self.incoming = Incoming(
+                os.path.join(self.paths.runtime_dir, "replication-incoming.json"),
+                self.transfers,
+                lambda kind, payload: self._ops().enqueue("replication", kind, payload),
+                self._replication_places,
+                on_change=self._replication_changed,
+            )
+            restored = await asyncio.to_thread(self.outgoing.restore)
+            self.links.handlers.update({**shares.handlers(), "offer": self.incoming.handle_offer})
+            if restored:
+                log_event(logging.INFO, "replication.offers_restored", "Offered games available again", count=restored)
             resumed = await self.transfers.start_up()
             if resumed:
                 log_event(logging.INFO, "replication.resumed", "Transfers resumed after a restart", count=len(resumed))
 
         async def replication_stop() -> None:
+            self.incoming = self.outgoing = None
             transfers, self.transfers = self.transfers, None
             if transfers is not None:
                 await transfers.shut_down()
@@ -2798,6 +2824,10 @@ class KeepsakeApp:
         await asyncio.to_thread(self._ops().finish, int(op_id), bool(ok), dict(result))
         log_event(logging.INFO, "steamops.finished", "Steam operation finished", id=int(op_id), ok=bool(ok))
         op = await asyncio.to_thread(self._ops().get, int(op_id))
+        if op and op["module"] == "replication" and self.incoming:
+            offer = await asyncio.to_thread(self.incoming.op_finished, int(op_id), bool(ok), dict(result))
+            if offer and offer["state"] == "done":
+                await self._replication_adopt(offer)
         if op and op["module"] == "installer" and self.installer:
             job = await asyncio.to_thread(self.installer.op_finished, int(op_id), bool(ok), dict(result))
             if job and job["state"] == "done" and op["kind"] in RETARGET_KINDS:
@@ -2811,12 +2841,15 @@ class KeepsakeApp:
     async def steam_ops_file(self, op_id: int) -> dict[str, Any]:
         """The staged image for a claimed artwork operation, base64-encoded for ``SetCustomArtworkForApp``."""
         op = await asyncio.to_thread(self._ops().get, int(op_id))
-        if not op or op["module"] != "installer":
+        if not op or op["module"] not in ("installer", "replication"):
             raise ValueError("that operation has no staged file")
         try:
-            path = self._installer().staged_file(op)
+            if op["module"] == "replication":
+                path = self._incoming().staged_file(op)
+            else:
+                path = self._installer().staged_file(op)
             data = await asyncio.to_thread(_read_bytes, path)
-        except (InstallerError, OSError) as exc:
+        except (InstallerError, OfferError, ValueError, OSError) as exc:
             raise ValueError("the staged image is missing") from exc
         return {"base64": base64.b64encode(data).decode("ascii")}
 
@@ -2879,7 +2912,16 @@ class KeepsakeApp:
         return self.links
 
     def _replication_changed(self) -> None:
-        """A pairing request arrived or changed: tell the open pages, and say so once in a toast."""
+        """Something changed (a pairing request, an offer, a transfer): tell the open pages.
+
+        Offers and transfers report from worker threads too, so this hands over to the event loop.
+        """
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            if self._loop is not None:
+                self._loop.call_soon_threadsafe(self._replication_changed)
+            return
         links = self.links
         if links is None:
             return
@@ -3013,6 +3055,141 @@ class KeepsakeApp:
             raise ValueError(str(exc)) from exc
         log_event(logging.INFO, "replication.stopped", "Transfer stopped and removed")
         return self._transfers().status()
+
+    # Sending and receiving games (slice 19, ADR-0059)
+
+    def _replication_places(self) -> dict[str, str]:
+        """Where a received game may go on this device: the library, Steam's folders, Keepsake's own."""
+        home = discovery.real_home(self.home)
+        roots = discovery.steam_roots(self.home, self.host)
+        steam = roots[0] if roots else os.path.join(home, ".local", "share", "Steam")
+        return {
+            "library": self._library_root(),
+            "compatdata": os.path.join(steam, "steamapps", "compatdata"),
+            "tools": os.path.join(steam, "compatibilitytools.d"),
+            "art": os.path.join(self.paths.runtime_dir, "replication-art"),
+            "home": home,
+        }
+
+    def _incoming(self) -> Incoming:
+        if self.incoming is None:
+            raise ValueError("Replication is off; switch it on in Settings, Modules")
+        return self.incoming
+
+    def _outgoing(self) -> Outgoing:
+        if self.outgoing is None:
+            raise ValueError("Replication is off; switch it on in Settings, Modules")
+        return self.outgoing
+
+    async def replication_send(self, key: str, peer_id: str) -> dict[str, Any]:
+        """Offer a non-Steam game to a paired device. Only from a user action.
+
+        Saves first: a game Saves manages is pushed, so the copy carries the newest saves and the
+        other device adopts them silently (spec 8.2, Send a game, step 1).
+        """
+        links = self._links()
+        if links.store.get(str(peer_id)) is None:
+            raise ValueError("that device is not paired")
+        game = await self._game(str(key))
+        places = self._replication_places()
+        try:
+            plan = await asyncio.to_thread(send_plan, dict(game), places["home"], places["library"], places["tools"])
+        except SendError as exc:
+            raise ValueError(str(exc)) from exc
+        config = self.game_configs.get(str(key))
+        warning = None
+        if config.get("enabled"):
+            try:
+                pushed = await self.sync_push(str(key))
+            except Exception as exc:  # noqa: BLE001 - offline: warn and send what is here (spec step 1)
+                pushed, warning = (
+                    {},
+                    f"Saves could not be pushed first ({type(exc).__name__}); the copy has the saves on this device.",
+                )
+            if pushed.get("status") == "conflict":
+                raise ValueError("this game has a save conflict; resolve it in Keepsake first, then send it")
+        extra = {
+            "from": {"name": str(self.settings.get("deviceName") or "Unnamed device")},
+            "gameKey": config.get("gameKey"),
+            "savesEnabled": bool(config.get("enabled")),
+        }
+        self._sending[str(key)] = {"state": "preparing", "title": plan.title, "peer": str(peer_id), "warning": warning}
+        self._background.append(asyncio.create_task(self._send_game(str(key), plan, str(peer_id), extra)))
+        return self._sending[str(key)] | {"droppedOptions": plan.dropped_options}
+
+    async def _send_game(self, key: str, plan: Any, peer_id: str, extra: dict[str, Any]) -> None:
+        state = self._sending[key]
+        try:
+            wire = await asyncio.to_thread(self._outgoing().prepare, plan, peer_id, extra)
+            connection = await self._replication_connect_for(peer_id)()
+            try:
+                await send_offer(connection, wire)
+            finally:
+                await connection.close()
+            state.update(state="sent", offer=wire["id"])
+            await self.emit("keepsake_toast", f"{plan.title} is offered. Accept it on the other device, in Devices.")
+        except (OfferError, replication_link.LinkError, OSError, ValueError) as exc:
+            state.update(state="failed", reason=str(exc))
+            await self.emit("keepsake_toast", f"{plan.title} was not offered: {exc}")
+        self._replication_changed()
+
+    async def replication_offers(self) -> dict[str, Any]:
+        return {
+            "incoming": await asyncio.to_thread(self._incoming().list),
+            "outgoing": await asyncio.to_thread(self._outgoing().list),
+            "sending": self._sending,
+        }
+
+    async def replication_offer_check(self, offer_id: str, copy_tool: bool = False) -> dict[str, Any]:
+        """Where an offered game would go, and what is missing, before the user accepts."""
+        try:
+            return await asyncio.to_thread(self._incoming().preflight, str(offer_id), bool(copy_tool))
+        except (OfferError, OSError) as exc:
+            return {"problem": str(exc)}
+
+    async def replication_accept(self, offer_id: str, copy_tool: bool = False) -> dict[str, Any]:
+        try:
+            offer = await asyncio.to_thread(self._incoming().accept, str(offer_id), bool(copy_tool))
+        except (OfferError, transfer.TransferError, OSError) as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(logging.INFO, "replication.accepted", "Offered game accepted", copyTool=bool(copy_tool))
+        return offer
+
+    async def replication_decline(self, offer_id: str) -> dict[str, Any]:
+        try:
+            await asyncio.to_thread(self._incoming().decline, str(offer_id))
+        except OfferError as exc:
+            raise ValueError(str(exc)) from exc
+        return await self.replication_offers()
+
+    async def replication_withdraw(self, offer_id: str) -> dict[str, Any]:
+        try:
+            await asyncio.to_thread(self._outgoing().withdraw, str(offer_id))
+        except OfferError as exc:
+            raise ValueError(str(exc)) from exc
+        return await self.replication_offers()
+
+    async def replication_remove_game(self, offer_id: str) -> dict[str, Any]:
+        """ "Stop and remove" for a game being received: undo everything it made. Confirmed on the page."""
+        try:
+            await self._incoming().stop(str(offer_id))
+        except (OfferError, transfer.TransferError, OSError) as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(logging.INFO, "replication.removed_game", "Received game stopped and removed")
+        return await self.replication_offers()
+
+    async def _replication_adopt(self, offer: dict[str, Any]) -> None:
+        """The new shortcut gets the sending device's game key, so Saves adopts the copied saves silently."""
+        record = (await asyncio.to_thread(self._incoming()._load)).get(offer["id"], {})
+        sent = record.get("offer", {})
+        games = (await self.discover_games(refresh=True))["games"]
+        game = next((g for g in games if g.get("kind") == "shortcut" and g.get("appid") == offer.get("appid")), None)
+        if game is not None and sent.get("gameKey"):
+            await self.set_game_key(game["key"], sent["gameKey"])
+            if sent.get("savesEnabled"):
+                await self.update_game_config(game["key"], {"enabled": True})
+        text = f"{offer['title']} is ready on this device."
+        await self.emit("keepsake_toast", text + (f" {offer['reason']}" if offer.get("reason") else ""))
 
     async def replication_wake(self, peer_id: str) -> dict[str, Any]:
         sent: int = await self._replication(lambda links: asyncio.to_thread(links.wake, str(peer_id)))

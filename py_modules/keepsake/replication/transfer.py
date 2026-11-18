@@ -599,6 +599,22 @@ class Receiver:
                 os.chmod(self._staged(entry["path"]), (entry["mode"] & 0o7777) | stat.S_IRWXU)
 
 
+RENAME_ATTEMPTS = 20
+RENAME_PAUSE = 0.1
+
+
+def _rename_settled(src: str, dst: str) -> None:
+    """Rename, waiting out Windows' brief sharing violations (a scanner holding a just-written file)."""
+    for attempt in range(RENAME_ATTEMPTS):
+        try:
+            _rename(src, dst)
+            return
+        except PermissionError:
+            if os.name != "nt" or attempt == RENAME_ATTEMPTS - 1:
+                raise
+            time.sleep(RENAME_PAUSE)
+
+
 def promote(job: Job) -> None:
     """Swap the copy into place. A target that exists is moved aside first and put back on any error."""
     tree = os.path.join(job.staging, "tree")
@@ -606,9 +622,9 @@ def promote(job: Job) -> None:
     moved_aside = False
     try:
         if os.path.lexists(job.target):
-            _rename(job.target, previous)
+            _rename_settled(job.target, previous)
             moved_aside = True
-        _rename(tree, job.target)
+        _rename_settled(tree, job.target)
     except OSError as exc:
         if moved_aside and not os.path.lexists(job.target):
             os.replace(previous, job.target)

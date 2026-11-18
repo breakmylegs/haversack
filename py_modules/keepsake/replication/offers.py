@@ -1,0 +1,540 @@
+"""Offers: one device says "here is a game", the other accepts it (slice 19a, ADR-0059).
+
+The sending device prepares the game's shares and sends one ``offer`` message. The receiving
+device keeps the offer until its user accepts or declines; nothing is written before that.
+
+Accepting runs the copy, then registers the game in Steam through the Steam Operations
+Executor (ADR-0015), moves the prefix into ``compatdata/<new appid>``, sets the program,
+start folder, launch options, compatibility tool and artwork, and reads each one back. Every
+folder and shortcut it will make is recorded before it is made, so "Stop and remove" can
+undo exactly that and nothing else.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import stat
+import sys
+import threading
+import time
+from collections.abc import Callable
+from typing import Any
+
+from ..fsutil import atomic_write_json, read_json
+from . import manifest as mf
+from . import policy, sendgame, transfer
+from .jobs import Transfers
+from .link import ServeError, Session
+from .peers import clean_name
+from .source import Shares
+
+SCOPES = ("install", "prefix", "tool", "art")
+HEX64 = re.compile(r"^[0-9a-f]{64}$")
+HEX32 = re.compile(r"^[0-9a-f]{32}$")
+OFFER_ID = re.compile(r"^[0-9a-f]{16}$")
+GAME_KEY = re.compile(r"^[A-Za-z0-9._:\- ]{1,200}$")
+MAX_OFFERS = 16
+PREFIX_PLACEHOLDER = ".keepsake-prefix-"
+BUILT_IN_TOOLS = re.compile(r"^(proton_\w+|steamlinuxruntime\w*)$")
+
+
+class OfferError(Exception):
+    pass
+
+
+# The wire format
+
+
+def validate(offer: Any) -> dict[str, Any]:
+    """An offer from another device, checked field by field. Unknown fields are dropped."""
+    if not isinstance(offer, dict):
+        raise OfferError("the offer is not valid")
+    offer_id = str(offer.get("id", ""))
+    title = " ".join(str(offer.get("title", "")).split())
+    if not OFFER_ID.match(offer_id) or not sendgame.TITLE.match(title):
+        raise OfferError("the offer is not valid")
+    shares_in = offer.get("shares")
+    if not isinstance(shares_in, dict) or not shares_in or set(shares_in) - set(SCOPES):
+        raise OfferError("the offer is not valid")
+    shares = {}
+    for scope, share in shares_in.items():
+        if not (
+            isinstance(share, dict)
+            and HEX32.match(str(share.get("share", "")))
+            and HEX64.match(str(share.get("root", "")))
+            and isinstance(share.get("bytes"), int)
+            and share["bytes"] >= 0
+        ):
+            raise OfferError("the offer is not valid")
+        shares[scope] = {"share": share["share"], "root": share["root"], "bytes": share["bytes"]}
+    if "install" not in shares and "prefix" not in shares:
+        raise OfferError("the offer holds no game")
+    refs = {}
+    for name in ("exe", "startDir"):
+        ref = offer.get(name)
+        if not isinstance(ref, dict) or ref.get("scope") not in ("install", "prefix") or ref["scope"] not in shares:
+            raise OfferError("the offer is not valid")
+        path = str(ref.get("path", ""))
+        refs[name] = {"scope": ref["scope"], "path": path if path == "." else mf.check_path(path)}
+    options = str(offer.get("launchOptions") or "")
+    if len(options) > sendgame.MAX_OPTIONS or any(ch in options for ch in "\r\n\x00"):
+        raise OfferError("the offer's launch options are not valid")
+    if re.search(r"\{(?!install\}|prefix\}|home\})[a-z]+\}", options):
+        raise OfferError("the offer's launch options are not valid")
+    tool = offer.get("compatTool")
+    if tool is not None and not sendgame.TOOL_NAME.match(str(tool)):
+        raise OfferError("the offer's compatibility tool is not valid")
+    art = []
+    for item in offer.get("art") or []:
+        if not isinstance(item, dict) or item.get("assetType") not in (0, 1, 2, 3) or "art" not in shares:
+            raise OfferError("the offer's artwork is not valid")
+        name = str(item.get("file", ""))
+        if not re.fullmatch(r"(capsule|hero|logo|header)\.(png|jpg|jpeg)", name):
+            raise OfferError("the offer's artwork is not valid")
+        art.append({"assetType": item["assetType"], "file": name})
+    game_key = offer.get("gameKey")
+    if game_key is not None and not GAME_KEY.match(str(game_key)):
+        raise OfferError("the offer's game key is not valid")
+    return {
+        "id": offer_id,
+        "title": title,
+        "from": clean_name((offer.get("from") or {}).get("name") if isinstance(offer.get("from"), dict) else None),
+        "shares": shares,
+        "exe": refs["exe"],
+        "startDir": refs["startDir"],
+        "launchOptions": options,
+        "droppedOptions": [str(x)[:200] for x in offer.get("droppedOptions") or []][:10],
+        "compatTool": tool,
+        "art": art,
+        "gameKey": game_key,
+        "savesEnabled": bool(offer.get("savesEnabled")),
+    }
+
+
+def safe_folder(title: str) -> str:
+    name = re.sub(r"[^\w .,'()&+-]", "", title).strip(" .")
+    return name[:80] or "Game"
+
+
+def _remove_tree(path: str) -> None:
+    def writable(func: Any, target: str, _exc: Any) -> None:
+        os.chmod(target, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
+        func(target)
+
+    if not os.path.lexists(path):
+        return
+    if os.path.islink(path) or not os.path.isdir(path):
+        os.unlink(path)
+    elif sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=writable)
+    else:  # pragma: no cover - Python 3.11
+        shutil.rmtree(path, onerror=writable)
+
+
+# The sending side
+
+
+async def send_offer(connection: Any, wire: dict[str, Any]) -> None:
+    """Tell a paired device about a game on offer (the ``offer`` request, ADR-0059)."""
+    reply = await connection.request({"type": "offer", "offer": wire})
+    if reply.get("type") != "offer-received" or reply.get("id") != wire["id"]:
+        raise OfferError("the other device did not take the offer")
+
+
+class Outgoing:
+    """Offers this device made: their shares, kept across a restart so a transfer can resume."""
+
+    def __init__(self, path: str, work_dir: str, shares: Shares) -> None:
+        self.path = path
+        self.work_dir = work_dir
+        self.shares = shares
+        self._lock = threading.Lock()
+
+    def _load(self) -> dict[str, Any]:
+        with self._lock:
+            data = read_json(self.path, default={})
+        offers = data.get("offers") if isinstance(data, dict) else None
+        return offers if isinstance(offers, dict) else {}
+
+    def _save(self, offers: dict[str, Any]) -> None:
+        with self._lock:
+            atomic_write_json(self.path, {"version": 1, "offers": offers})
+
+    def restore(self) -> int:
+        """Offer again, after a restart, every share this device had offered."""
+        count = 0
+        for record in self._load().values():
+            for scope in record.get("shares", {}).values():
+                try:
+                    with open(scope["manifestFile"], encoding="utf-8") as handle:
+                        manifest = json.load(handle)
+                except (OSError, ValueError, KeyError):
+                    continue
+                self.shares.add(scope["root"], manifest, {record["peer"]}, share_id=scope["share"])
+                count += 1
+        return count
+
+    def prepare(self, plan: sendgame.Plan, peer_id: str, extra: dict[str, Any]) -> dict[str, Any]:
+        """Hash the game and offer its shares to ``peer_id``. Slow for a large game: run in a thread."""
+        offers = self._load()
+        if len(offers) >= MAX_OFFERS:
+            raise OfferError(f"at most {MAX_OFFERS} games can be on offer; withdraw one first")
+        offer_id = sendgame.new_offer_id()
+        folder = os.path.join(self.work_dir, offer_id)
+        os.makedirs(folder, exist_ok=True)
+        art_folder = sendgame.stage_art(plan, os.path.join(folder, "art"))
+        manifests = sendgame.build_manifests(plan, art_folder)
+        roots = {**plan.roots, **({"art": art_folder} if art_folder else {})}
+        record_shares, wire_shares = {}, {}
+        for scope, manifest in manifests.items():
+            manifest_file = os.path.join(folder, f"{scope}.json")
+            atomic_write_json(manifest_file, manifest)
+            share = self.shares.add(roots[scope], manifest, {peer_id})
+            record_shares[scope] = {"share": share.id, "root": roots[scope], "manifestFile": manifest_file}
+            wire_shares[scope] = {"share": share.id, "root": manifest["root"], "bytes": mf.total_bytes(manifest)}
+        wire = {
+            "id": offer_id,
+            "title": plan.title,
+            "shares": wire_shares,
+            "exe": plan.exe,
+            "startDir": plan.start_dir,
+            "launchOptions": plan.launch_options,
+            "droppedOptions": plan.dropped_options,
+            "compatTool": plan.compat_tool,
+            "art": [{"assetType": a["assetType"], "file": a["file"]} for a in plan.art],
+            **extra,
+        }
+        offers[offer_id] = {"peer": peer_id, "title": plan.title, "shares": record_shares, "created": time.time()}
+        self._save(offers)
+        return wire
+
+    def list(self) -> list[dict[str, Any]]:
+        return [
+            {"id": k, "title": v.get("title"), "peer": v.get("peer"), "created": v.get("created")}
+            for k, v in sorted(self._load().items(), key=lambda kv: -float(kv[1].get("created") or 0))
+        ]
+
+    def withdraw(self, offer_id: str) -> None:
+        offers = self._load()
+        record = offers.pop(offer_id, None)
+        if record is None:
+            raise OfferError("that offer has gone")
+        for scope in record.get("shares", {}).values():
+            self.shares.remove(scope["share"])
+        self._save(offers)
+        _remove_tree(os.path.join(self.work_dir, offer_id))  # the manifests and the artwork copies only
+
+
+# The receiving side
+
+
+class Incoming:
+    """Offers this device received, and accepting them through to a game in Steam."""
+
+    def __init__(
+        self,
+        path: str,
+        transfers: Transfers,
+        enqueue_op: Callable[[str, dict[str, Any]], int],
+        places: Callable[[], dict[str, str]],
+        on_done: Callable[[dict[str, Any]], None] | None = None,
+        on_change: Callable[[], None] | None = None,
+    ) -> None:
+        self.path = path
+        self.transfers = transfers
+        self.enqueue_op = enqueue_op
+        self.places = places  # libraryRoot, compatdata, tools, art and home on this device
+        self.on_done = on_done
+        self.on_change = on_change
+        self._lock = threading.Lock()
+
+    def _load(self) -> dict[str, Any]:
+        with self._lock:
+            data = read_json(self.path, default={})
+        offers = data.get("offers") if isinstance(data, dict) else None
+        return offers if isinstance(offers, dict) else {}
+
+    def _save(self, offers: dict[str, Any]) -> None:
+        with self._lock:
+            atomic_write_json(self.path, {"version": 1, "offers": offers})
+
+    def _update(self, offer_id: str, **changes: Any) -> dict[str, Any]:
+        offers = self._load()
+        record: dict[str, Any] | None = offers.get(offer_id)
+        if record is None:
+            raise OfferError("that offer has gone")
+        record.update(changes)
+        self._save(offers)
+        self._changed()
+        return record
+
+    def _changed(self) -> None:
+        if self.on_change:
+            self.on_change()
+
+    # From the other device
+
+    async def handle_offer(self, session: Session, message: dict[str, Any]) -> dict[str, Any]:
+        """The ``offer`` request from a paired device (ADR-0059). Nothing is written but the offer itself."""
+        try:
+            offer = validate(message.get("offer"))
+        except (OfferError, mf.ManifestError) as exc:
+            raise ServeError(str(exc)) from exc
+        offers = self._load()
+        if offer["id"] not in offers and sum(1 for r in offers.values() if r["state"] == "offered") >= MAX_OFFERS:
+            raise ServeError("that device already has too many offers waiting")
+        offers.setdefault(
+            offer["id"], {"offer": offer, "peer": session.peer_id, "state": "offered", "received": time.time()}
+        )
+        self._save(offers)
+        self._changed()
+        return {"type": "offer-received", "id": offer["id"]}
+
+    # The user's choices
+
+    def list(self) -> list[dict[str, Any]]:
+        out = []
+        for offer_id, record in sorted(self._load().items(), key=lambda kv: -float(kv[1].get("received") or 0)):
+            offer = record["offer"]
+            out.append(
+                {
+                    "id": offer_id,
+                    "title": offer["title"],
+                    "from": offer["from"],
+                    "peer": record["peer"],
+                    "state": record["state"],
+                    "reason": record.get("reason"),
+                    "bytes": sum(s["bytes"] for s in offer["shares"].values()),
+                    "compatTool": offer["compatTool"],
+                    "toolOffered": "tool" in offer["shares"],
+                    "droppedOptions": offer["droppedOptions"],
+                    "appid": record.get("appid"),
+                    "jobs": record.get("jobs", {}),
+                }
+            )
+        return out
+
+    def decline(self, offer_id: str) -> None:
+        offers = self._load()
+        record = offers.get(offer_id)
+        if record is None or record["state"] != "offered":
+            raise OfferError("only an offer you have not accepted can be declined")
+        offers.pop(offer_id)
+        self._save(offers)
+        self._changed()
+
+    def preflight(self, offer_id: str, copy_tool: bool) -> dict[str, Any]:
+        """Where everything would go, and whether it fits. Raises OfferError when it cannot start."""
+        record = self._load().get(offer_id)
+        if record is None:
+            raise OfferError("that offer has gone")
+        offer, places = record["offer"], self.places()
+        targets: dict[str, str] = {}
+        if "install" in offer["shares"]:
+            if not places.get("library") or not os.path.isdir(places["library"]):
+                raise OfferError("choose where games are installed first (Settings, Install)")
+            targets["install"] = os.path.join(places["library"], safe_folder(offer["title"]))
+            if os.path.lexists(targets["install"]):
+                raise OfferError(f"{targets['install']} already exists; rename or remove it first")
+        if "prefix" in offer["shares"]:
+            if not places.get("compatdata") or not os.path.isdir(places["compatdata"]):
+                raise OfferError("Steam's compatdata folder was not found on this device")
+            targets["prefix"] = os.path.join(places["compatdata"], f"{PREFIX_PLACEHOLDER}{offer_id}")
+        tool = offer["compatTool"]
+        tool_missing = (
+            bool(tool)
+            and not BUILT_IN_TOOLS.match(str(tool))
+            and not os.path.isdir(os.path.join(places.get("tools", ""), str(tool)))
+        )
+        if tool_missing:
+            if copy_tool and "tool" in offer["shares"]:
+                targets["tool"] = os.path.join(places["tools"], str(tool))
+            elif "tool" in offer["shares"]:
+                raise OfferError(f"this device does not have {tool}; choose to copy it from the other device")
+            else:
+                raise OfferError(f"this device does not have {tool}, and the other device cannot send it; install it")
+        if offer["art"] and "art" in offer["shares"]:
+            targets["art"] = os.path.join(places["art"], offer_id)
+        by_device: dict[int, tuple[str, int]] = {}
+        for scope, target in targets.items():
+            parent = os.path.dirname(target)
+            os.makedirs(parent, exist_ok=True)
+            device = os.stat(parent).st_dev
+            known = by_device.get(device, (parent, 0))
+            by_device[device] = (known[0], known[1] + offer["shares"][scope]["bytes"])
+        for parent, size in by_device.values():
+            free = shutil.disk_usage(parent).free
+            if free < policy.space_needed(size):
+                raise OfferError(
+                    f"not enough space in {parent}: {policy.space_needed(size) // 2**30} GiB needed with margin, "
+                    f"{free // 2**30} GiB free"
+                )
+        return {"targets": targets, "toolMissing": tool_missing}
+
+    def accept(self, offer_id: str, copy_tool: bool = False) -> dict[str, Any]:
+        """Start the copy. Only from a user action."""
+        record = self._load().get(offer_id)
+        if record is None or record["state"] != "offered":
+            raise OfferError("that offer is not waiting for an answer")
+        checked = self.preflight(offer_id, copy_tool)
+        offer = record["offer"]
+        # Everything this offer will make is recorded first (ADR-0045 rule 4).
+        record = self._update(offer_id, state="transferring", targets=checked["targets"], created=[], jobs={})
+        jobs = {}
+        for scope, target in checked["targets"].items():
+            share = offer["shares"][scope]
+            job = transfer.Job(
+                id=f"{offer_id}-{scope}",
+                peer_id=record["peer"],
+                share=share["share"],
+                root=share["root"],
+                target=target,
+                peers=[record["peer"]],
+            )
+            self.transfers.start(job)
+            jobs[scope] = job.id
+        self._update(offer_id, jobs=jobs)
+        return self._public(offer_id)
+
+    def _public(self, offer_id: str) -> dict[str, Any]:
+        return next(o for o in self.list() if o["id"] == offer_id)
+
+    # As the copy and the Steam operations finish
+
+    def job_finished(self, job: transfer.Job) -> None:
+        for offer_id, record in self._load().items():
+            if job.id not in record.get("jobs", {}).values() or record["state"] != "transferring":
+                continue
+            if job.state != "done":
+                if job.state == "failed":
+                    self._update(offer_id, reason=job.reason)
+                return
+            done = set(record.get("doneScopes", [])) | {next(s for s, j in record["jobs"].items() if j == job.id)}
+            self._update(offer_id, doneScopes=sorted(done))
+            if done >= set(record["jobs"]):
+                self._register(offer_id)
+
+    def _resolve(self, record: dict[str, Any], ref: dict[str, str], prefix_final: str | None = None) -> str:
+        targets = record["targets"]
+        base = (prefix_final or targets["prefix"]) if ref["scope"] == "prefix" else targets["install"]
+        return base if ref["path"] == "." else os.path.join(base, *ref["path"].split("/"))
+
+    def _roots(self, record: dict[str, Any], prefix_final: str | None = None) -> dict[str, str]:
+        targets = record["targets"]
+        return {
+            "{install}": targets.get("install", ""),
+            "{prefix}": prefix_final or targets.get("prefix", ""),
+            "{home}": self.places().get("home", ""),
+        }
+
+    def _register(self, offer_id: str) -> None:
+        record = self._load()[offer_id]
+        offer = record["offer"]
+        payload = {
+            "name": offer["title"],
+            "exe": self._resolve(record, offer["exe"]),
+            "startDir": self._resolve(record, offer["startDir"]),
+            "launchOptions": sendgame.local_options(offer["launchOptions"], self._roots(record)),
+        }
+        if offer["compatTool"]:
+            payload["compatTool"] = offer["compatTool"]
+        op_id = self.enqueue_op("add-shortcut", payload)
+        self._update(offer_id, state="registering", ops={str(op_id): "add"})
+
+    def op_finished(self, op_id: int, ok: bool, result: dict[str, Any]) -> dict[str, Any] | None:
+        for offer_id, record in self._load().items():
+            role = record.get("ops", {}).get(str(op_id))
+            if role is None:
+                continue
+            if role == "add":
+                if not ok or not isinstance(result.get("appid"), int):
+                    self._update(offer_id, state="failed", reason=str(result.get("error") or "Steam did not add it"))
+                    return self._public(offer_id)
+                self._added(offer_id, int(result["appid"]), str(op_id))
+            else:
+                done = set(record.get("opsDone", [])) | {str(op_id)}
+                failed = list(record.get("opsFailed", [])) + ([role] if not ok else [])
+                record = self._update(offer_id, opsDone=sorted(done), opsFailed=failed)
+                if set(record["ops"]) <= done:
+                    self._finish(offer_id)
+            return self._public(offer_id)
+        return None
+
+    def _added(self, offer_id: str, appid: int, add_op: str) -> None:
+        record = self._update(offer_id, appid=appid, created=["shortcut"])
+        offer, targets = record["offer"], record["targets"]
+        final = None
+        if "prefix" in targets:
+            final = os.path.join(os.path.dirname(targets["prefix"]), str(appid))
+            if os.path.isdir(final) and not os.listdir(final):
+                os.rmdir(final)  # an empty folder Steam may have made already
+            if os.path.lexists(final):
+                self._update(offer_id, state="failed", reason=f"{final} already exists; Keepsake will not replace it")
+                return
+            record = self._update(offer_id, prefixFinal=final)
+            os.replace(targets["prefix"], final)
+        ops: dict[str, str] = {k: v for k, v in record["ops"].items()}
+        fields = (
+            ("set-shortcut-exe", self._resolve(record, offer["exe"], final)),
+            ("set-shortcut-start-dir", self._resolve(record, offer["startDir"], final)),
+            ("set-launch-options", sendgame.local_options(offer["launchOptions"], self._roots(record, final))),
+        )
+        for kind, value in fields:
+            ops[str(self.enqueue_op(kind, {"appid": appid, "value": value}))] = kind
+        if offer["compatTool"]:
+            ops[str(self.enqueue_op("set-compat-tool", {"appid": appid, "value": offer["compatTool"]}))] = "tool"
+        for item in offer["art"]:
+            payload = {
+                "appid": appid,
+                "assetType": item["assetType"],
+                "imageType": "jpg" if "jp" in item["file"] else "png",
+            }
+            ops[str(self.enqueue_op("set-artwork", payload | {"file": item["file"]}))] = f"art:{item['file']}"
+        self._update(offer_id, ops=ops, opsDone=[add_op])
+
+    def _finish(self, offer_id: str) -> None:
+        record = self._load()[offer_id]
+        failed = record.get("opsFailed", [])
+        reason = None
+        if "tool" in failed and "tool" in record["targets"]:
+            reason = "Restart Steam so it finds the compatibility tool, then choose it in the game's properties."
+        elif failed:
+            reason = f"Steam did not keep: {', '.join(failed)}. Check the game's properties."
+        record = self._update(offer_id, state="done", reason=reason)
+        if self.on_done:
+            self.on_done(record)
+
+    def staged_file(self, op: dict[str, Any]) -> str:
+        """The copied artwork for a claimed ``set-artwork`` operation this module queued."""
+        if op.get("module") != "replication" or op.get("kind") != "set-artwork" or op.get("state") != "claimed":
+            raise OfferError("that operation has no staged file")
+        for record in self._load().values():
+            if str(op["id"]) in record.get("ops", {}) and "art" in record.get("targets", {}):
+                path = os.path.join(record["targets"]["art"], str(op["payload"]["file"]))
+                if os.path.dirname(os.path.realpath(path)) == os.path.realpath(record["targets"]["art"]):
+                    return path
+        raise OfferError("that operation has no staged file")
+
+    async def stop(self, offer_id: str) -> None:
+        """ "Stop and remove" for an accepted game: undo exactly what this offer made."""
+        record = self._load().get(offer_id)
+        if record is None:
+            raise OfferError("that offer has gone")
+        for job_id in record.get("jobs", {}).values():
+            if job_id in self.transfers.jobs:
+                await self.transfers.stop(job_id)
+        places = self.places()
+        # Only a folder this offer recorded, and only directly inside one of the places it may write.
+        allowed = {os.path.realpath(places[k]) for k in ("library", "compatdata", "tools", "art") if places.get(k)}
+        for path in [*record.get("targets", {}).values(), record.get("prefixFinal")]:
+            if path and os.path.realpath(os.path.dirname(path)) in allowed:
+                _remove_tree(path)
+        if record.get("appid") and "shortcut" in record.get("created", []):
+            self.enqueue_op("remove-shortcut", {"appid": int(record["appid"])})
+        offers = self._load()
+        offers.pop(offer_id, None)
+        self._save(offers)
+        self._changed()

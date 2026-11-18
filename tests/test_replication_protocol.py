@@ -71,3 +71,12 @@ def test_the_request_names_and_the_discovery_query():
     assert hashlib.sha256(discovery.build_query(0)).hexdigest() == (
         "230809dc1101ae7ffac304a842c3aff267a518fea31f27c9a74aa08d50ede123"
     )
+
+
+def test_the_offer_is_an_addition_and_changes_nothing_else():
+    """ADR-0059: new request types may be added under version 1; existing ones stay as they are."""
+    from keepsake.replication import offers
+
+    assert set(Shares().handlers()) == {"manifest", "chunk"}
+    assert offers.SCOPES == ("install", "prefix", "tool", "art")
+    assert link.PROTOCOL == 1

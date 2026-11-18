@@ -85,6 +85,7 @@ class Links:
         self.discovery = discovery  # answer mDNS queries while the listener is on (ADR-0056)
         self.on_change = on_change
         self.listener: link.Listener | None = None
+        self.handlers: dict[str, link.Handler] = {}  # requests paired devices may make: shares and offers
         self.responder: asyncio.DatagramTransport | None = None
         self.discovery_problem: str | None = None
         self.initiated: dict[str, link.Pairing] = {}
@@ -100,7 +101,9 @@ class Links:
                 raise ReplicationError(
                     "this device has no home network or VPN address to listen on; connect to a network first"
                 )
-            listener = link.Listener(self.me, self.store, hosts if len(hosts) > 1 else hosts[0], self.port)
+            listener = link.Listener(
+                self.me, self.store, hosts if len(hosts) > 1 else hosts[0], self.port, handlers=self.handlers
+            )
             listener.on_change = self.on_change
             await listener.start()
             self.listener = listener

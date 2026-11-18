@@ -48,6 +48,7 @@ class Transfers:
         guard: SleepGuard | None = None,
         on_change: Callable[[], None] | None = None,
         retries: int | None = None,
+        on_finished: Callable[[transfer.Job], None] | None = None,
     ) -> None:
         self.registry_path = registry_path
         self.connect_for = connect_for
@@ -55,6 +56,7 @@ class Transfers:
         self.guard = guard or SleepGuard()
         self.on_change = on_change
         self.retries = retries
+        self.on_finished = on_finished  # told about every job that ends: done, failed or paused
         self.jobs: dict[str, transfer.Job] = {}
         self.tasks: dict[str, asyncio.Task[transfer.Job]] = {}
         self._lock = threading.Lock()
@@ -142,6 +144,8 @@ class Transfers:
     def _finished(self, job_id: str) -> None:
         self.tasks.pop(job_id, None)
         job = self.jobs.get(job_id)
+        if job is not None and self.on_finished:
+            self.on_finished(job)
         if job is not None and job.state == "done":
             self.jobs.pop(job_id, None)
             self._forget(job_id)

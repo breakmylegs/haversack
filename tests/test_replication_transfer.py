@@ -453,7 +453,7 @@ def test_a_promote_that_failed_cleanly_keeps_the_old_target(tmp_path, monkeypatc
     def fail_second(src, dst):
         count.append(1)
         if len(count) == 2:
-            raise PermissionError(13, "Permission denied")
+            raise OSError(5, "Input/output error")  # not a passing Windows sharing violation: never retried
         return real_replace(src, dst)
 
     monkeypatch.setattr(transfer, "_rename", fail_second)
@@ -657,3 +657,23 @@ def test_an_error_frame_is_a_refusal_not_a_dropped_connection():
             await link.read_frame(reader, timeout=1)
 
     asyncio.run(scenario())
+
+
+def test_promote_waits_out_a_brief_windows_sharing_violation(tmp_path, monkeypatch):
+    calls = []
+
+    def busy_twice(src, dst):
+        calls.append(src)
+        if len(calls) <= 2:
+            raise PermissionError(32, "The process cannot access the file")
+
+    monkeypatch.setattr(transfer, "_rename", busy_twice)
+    monkeypatch.setattr(transfer, "RENAME_PAUSE", 0.0)
+    monkeypatch.setattr(transfer.os, "name", "nt")
+    transfer._rename_settled("a", "b")
+    assert len(calls) == 3
+    calls.clear()
+    monkeypatch.setattr(transfer.os, "name", "posix")  # elsewhere a refusal is real: no waiting
+    with pytest.raises(PermissionError):
+        transfer._rename_settled("a", "b")
+    assert len(calls) == 1

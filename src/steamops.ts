@@ -61,7 +61,7 @@ async function applyAndReadBack(
 // start dir and launch options may be ignored (A70, A71). The compatibility tool is the newest
 // installed GE-Proton, else Proton Experimental (Advisor will recommend one in a later version).
 async function addShortcut(op: SteamOp): Promise<Outcome> {
-  const { name, exe, startDir, launchOptions } = op.payload as Record<string, string>;
+  const { name, exe, startDir, launchOptions, compatTool } = op.payload as Record<string, string>;
   const appid = await SteamClient.Apps.AddShortcut(name, exe, startDir, launchOptions);
   if (!appid) return { ok: false, result: { error: "Steam did not create the shortcut" } };
   await sleep(SETTLE_MS);
@@ -74,7 +74,9 @@ async function addShortcut(op: SteamOp): Promise<Outcome> {
   const ge = tools
     .filter((t) => t.startsWith("GE-Proton"))
     .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-  const tool = ge[0] ?? (tools.includes("proton_experimental") ? "proton_experimental" : tools[0]);
+  // A game sent from another device asks for the tool it used there (ADR-0059), when Steam has it.
+  const wanted = compatTool && tools.includes(compatTool) ? compatTool : undefined;
+  const tool = wanted ?? ge[0] ?? (tools.includes("proton_experimental") ? "proton_experimental" : tools[0]);
   if (tool) SteamClient.Apps.SpecifyCompatTool(appid, tool);
   await sleep(SETTLE_MS);
   const d = details(appid);
