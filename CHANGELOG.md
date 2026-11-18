@@ -6,6 +6,7 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ### Added
 
+- Save sync with no cloud account: on the Cloud page, **Directly between my devices** keeps your saves in step between your paired devices. Each device keeps the history, and they fetch what they are missing from each other whenever they can reach each other. Conflicts and history work as with a cloud store. There is no copy away from your devices (ADR-0061).
 - One-button cloud sign-in: OneDrive and Google Drive now work out of the box. Pick one, press **Sign in** and approve with your account. No client ID or app registration is needed; your own client is still available under Advanced (ADR-0055).
 - Games you sent stay in step between devices. On the game's page, **Updates** is Ask me, Take them by themselves, or Off, with **Check now** and **Send update**. On Devices, **Apply update**, **Keep mine** and **Stop update**:
   - when a game changes on one device, for example a patch, Keepsake offers the update to the other;

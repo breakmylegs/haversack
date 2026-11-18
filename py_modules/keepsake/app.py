@@ -26,6 +26,7 @@ from . import (
     clients,
     configrev,
     diagnostics,
+    directsync,
     discovery,
     health,
     hosts,
@@ -110,6 +111,7 @@ BACKEND_NAMES = {
     "gdrive": "Google Drive",
     "webdav": "WebDAV",
     "s3": "S3",
+    "direct": "Directly between my devices",
 }
 IMPORT_STAGING = "import-staging"
 UNRESOLVED_METHODS = ("none", "ambiguous", "no-save-data", "no-manifest")
@@ -428,6 +430,7 @@ class KeepsakeApp:
         self.sys_root = "/sys"
         self.power_root = "/"  # where /sys/class/power_supply is read (tests point it elsewhere)
         self._games_running: set[int] = set()
+        self._direct_last: dict[str, Any] | None = None
         self.replication_port = replication_link.DEFAULT_PORT
 
         async def replication_start() -> None:
@@ -475,7 +478,13 @@ class KeepsakeApp:
             )
             self.game_links = GameLinks(os.path.join(self.paths.runtime_dir, "replication-games.json"))
             restored = await asyncio.to_thread(self.outgoing.restore)
-            self.links.handlers.update({**shares.handlers(), "offer": self.incoming.handle_offer})
+            self.links.handlers.update(
+                {
+                    **shares.handlers(),
+                    "offer": self.incoming.handle_offer,
+                    **directsync.handlers(self._direct_store, on_changed=self._direct_peer_changed),
+                }
+            )
             if restored:
                 log_event(logging.INFO, "replication.offers_restored", "Offered games available again", count=restored)
             resumed = await self.transfers.start_up()
@@ -1133,6 +1142,13 @@ class KeepsakeApp:
         if store in ("webdav", "s3"):
             configured = self.credentials.configured(store)
             client_set, signed_in, problem = configured, configured, None
+        elif store == "direct":
+            # No account: "signed in" means a paired device to sync with (ADR-0061).
+            paired = bool(self.links and self.links.store.list())
+            client_set, signed_in = True, paired
+            problem = (
+                None if paired else "Switch on Replication in Settings, Modules, and pair your other device in Devices."
+            )
         else:
             manager = self._token_manager(store)
             client_set = bool(
@@ -1152,6 +1168,8 @@ class KeepsakeApp:
             "name": BACKEND_NAMES.get(store, store),
             "onedriveSignedIn": await asyncio.to_thread(self.tokens.signed_in),
             "googleSignedIn": await asyncio.to_thread(self.google_tokens.signed_in),
+            "direct": self._direct_last,
+            "directReady": bool(self.links and self.links.store.list()),
             # ADR-0032: with a built-in client the sign-in screens need no client ID, and
             # "Use my own client ID" moves under Advanced (shown open while one is saved).
             "builtInClient": {"onedrive": clients.onedrive_builtin(), "gdrive": clients.google_builtin()},
@@ -1350,6 +1368,8 @@ class KeepsakeApp:
             return self._webdav()
         if backend == "s3":
             return self._s3()
+        if backend == "direct":
+            return LocalFolderStore(self._direct_root())  # this device's own copy of the history (ADR-0061)
         return LocalFolderStore(os.path.join(self.paths.runtime_dir, "local-test-store"))
 
     def _engine(self) -> SnapshotEngine:
@@ -1813,6 +1833,7 @@ class KeepsakeApp:
                 running: Callable[[], bool] = abort.is_set
             else:
                 running = lambda: True  # noqa: E731 - could not hold the game: never restore under it
+            await self._direct_exchange(timeout / 2)  # direct sync: fetch the other device's newest first
             ctx = await self._sync_context(key, running=running)
             async with self.locks.hold(ctx.game_key, "saves"):
                 with self.jobs.job("sync"):
@@ -1891,6 +1912,7 @@ class KeepsakeApp:
             async with self.locks.hold(ctx.game_key, "saves"):
                 with self.jobs.job("sync"):
                     result = await asyncio.to_thread(self._sync().push, ctx)
+            self._direct_pushed()
             session = self._sessions().get(ctx.game_key, {})
             now = time.time()
             self._record_session(ctx.game_key, lastEnd=now)
@@ -1971,6 +1993,7 @@ class KeepsakeApp:
         async with self.locks.hold(ctx.game_key, "saves"):
             with self.jobs.job("sync"):
                 result = await asyncio.to_thread(self._sync().push, ctx)
+        self._direct_pushed()
         log_event(
             logging.INFO,
             "sync.push",
@@ -1997,6 +2020,7 @@ class KeepsakeApp:
 
     async def idle_pass(self) -> list[dict[str, Any]]:
         """Prefetch and push for every enabled game with no open session (section 9)."""
+        await self._direct_exchange()
         outcomes = []
         for game in (await self.discover_games())["games"]:
             if not self.game_configs.get(game["key"]).get("enabled"):
@@ -3225,6 +3249,78 @@ class KeepsakeApp:
             self._link_game(offer["id"], offer["title"], record["peer"], int(game["appid"]), scopes, dict(game))
         text = f"{offer['title']} is ready on this device."
         await self.emit("keepsake_toast", text + (f" {offer['reason']}" if offer.get("reason") else ""))
+
+    # Direct save sync between paired devices, no cloud account (R7, ADR-0061)
+
+    def _direct_root(self) -> str:
+        return os.path.join(self.paths.runtime_dir, "direct-store")
+
+    def _direct_store(self) -> LocalFolderStore | None:
+        """This device's store, only while it syncs saves directly. Otherwise peers are refused."""
+        if self.settings.get("snapshotStore") != "direct":
+            return None
+        return LocalFolderStore(self._direct_root())
+
+    async def _direct_exchange(self, timeout: float = 60.0, only: str | None = None) -> dict[str, Any]:
+        """Fetch from each reachable paired device the save objects this one lacks. Never blocks a game:
+        an unreachable device is noted and play carries on with what is here (principle 5)."""
+        store = self._direct_store()
+        links = self.links
+        if store is None or links is None:
+            return {"peers": 0, "copied": 0, "unreachable": []}
+        summary: dict[str, Any] = {"peers": 0, "copied": 0, "removed": 0, "unreachable": []}
+        for peer in links.store.list():
+            if only and peer["id"] != only:
+                continue
+            try:
+                connection = await asyncio.wait_for(self._replication_connect_for(peer["id"])(), 10)
+                try:
+                    result = await asyncio.wait_for(directsync.exchange(store, connection), timeout)
+                finally:
+                    await connection.close()
+                summary["peers"] += 1
+                summary["copied"] += result["copied"]
+                summary["removed"] += result["removed"]
+            except (replication_link.LinkError, StoreError, TimeoutError, OSError) as exc:
+                summary["unreachable"].append(peer["name"])
+                log_event(
+                    logging.INFO, "direct.unreachable", "Direct save sync skipped a device", reason=type(exc).__name__
+                )
+        self._direct_last = summary | {"at": time.time()}
+        if summary["copied"]:
+            log_event(
+                logging.INFO, "direct.exchanged", "Saves fetched from your other devices", count=summary["copied"]
+            )
+        return summary
+
+    def _direct_pushed(self) -> None:
+        """After a push: tell paired devices there is something new, so they fetch it soon."""
+        if self._direct_store() is None or self.links is None:
+            return
+
+        async def tell() -> None:
+            for peer in self.links.store.list() if self.links else []:
+                try:
+                    connection = await asyncio.wait_for(self._replication_connect_for(peer["id"])(), 10)
+                    try:
+                        await directsync.tell_changed(connection)
+                    finally:
+                        await connection.close()
+                except (replication_link.LinkError, TimeoutError, OSError):
+                    pass  # it fetches at its next launch or idle pass
+
+        self._background.append(asyncio.create_task(tell()))
+
+    def _direct_peer_changed(self, peer_id: str) -> None:
+        self._background.append(asyncio.create_task(self._direct_exchange(only=peer_id or None)))
+
+    async def direct_sync_now(self) -> dict[str, Any]:
+        """Fetch saves from paired devices now (Cloud settings, Direct between my devices)."""
+        if self._direct_store() is None:
+            raise ValueError("choose Direct between my devices in Cloud settings first")
+        if self.links is None:
+            raise ValueError("switch on Replication in Settings, Modules, and pair your devices")
+        return await self._direct_exchange()
 
     # Keeping games in step (slice 20, ADR-0060)
 

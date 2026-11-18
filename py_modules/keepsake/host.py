@@ -117,6 +117,7 @@ CALLABLES = frozenset(
         "replication_withdraw",
         "replication_dismiss",
         "replication_games",
+        "direct_sync_now",
         "replication_set_policy",
         "replication_check_game",
         "replication_send_update",

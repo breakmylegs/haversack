@@ -194,6 +194,9 @@ class Plugin:
     async def replication_decline(self, offer_id: str) -> dict[str, Any]:
         return await self.app.replication_decline(offer_id)
 
+    async def direct_sync_now(self) -> dict[str, Any]:
+        return await self.app.direct_sync_now()
+
     async def replication_games(self) -> list[dict[str, Any]]:
         return await self.app.replication_games()
 

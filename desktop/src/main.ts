@@ -34,7 +34,14 @@ import type {
 
 type Page = { id: string; title: string; render: (main: HTMLElement) => Promise<void> };
 
-const storeNames: Record<string, string> = { local: "Test store on this device", onedrive: "OneDrive", gdrive: "Google Drive", webdav: "WebDAV", s3: "S3" };
+const storeNames: Record<string, string> = {
+  local: "Test store on this device",
+  onedrive: "OneDrive",
+  gdrive: "Google Drive",
+  webdav: "WebDAV",
+  s3: "S3",
+  direct: "Directly between my devices",
+};
 
 const statusText: Record<string, string> = { ok: "All good", info: "Note", warn: "Needs attention", fail: "Problem" };
 
@@ -739,6 +746,42 @@ async function cloud(main: HTMLElement): Promise<void> {
           ),
         ),
       ),
+    ),
+    directCard(status, main),
+  );
+}
+
+// Direct save sync between paired devices, with no cloud account (ADR-0061).
+function directCard(status: CloudStatus, main: HTMLElement): HTMLElement {
+  const inUse = status.store === "direct";
+  const last = status.direct;
+  return h(
+    "section",
+    { class: "card" },
+    h("h2", {}, "Directly between my devices"),
+    h(
+      "p",
+      {},
+      "No account and no cloud: each device keeps its own copy of your saves' history, and paired devices fetch what they lack from each other. There is no copy away from your devices.",
+    ),
+    status.directReady ? null : h("p", { class: "warn" }, "Switch on Replication in Modules and pair your other device in Devices first."),
+    inUse && last ? h("p", { class: "small" }, `Last sync: ${when(last.at)}, ${last.copied} new from ${last.peers} device(s).`) : null,
+    h(
+      "div",
+      { class: "actions" },
+      !inUse && status.directReady
+        ? button("Use direct sync for snapshots", async () => {
+            await call("set_setting", "snapshotStore", "direct");
+            await cloud(main);
+          })
+        : null,
+      inUse
+        ? button("Sync now", async () => {
+            const r = await call<{ copied: number; peers: number; unreachable: string[] }>("direct_sync_now");
+            toast(`Fetched ${r.copied} new from ${r.peers} device(s).${r.unreachable.length ? ` Not reachable: ${r.unreachable.join(", ")}.` : ""}`);
+            await cloud(main);
+          })
+        : null,
     ),
   );
 }

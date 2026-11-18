@@ -120,6 +120,8 @@ export interface CloudStatus {
   onedriveSignedIn: boolean;
   googleSignedIn: boolean;
   methods?: Record<"onedrive" | "gdrive", { browser: boolean; phone: boolean }>;
+  directReady?: boolean;
+  direct?: { peers: number; copied: number; unreachable: string[]; at: number } | null;
 }
 
 export interface GameMatch {

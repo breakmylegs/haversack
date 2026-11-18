@@ -7,6 +7,7 @@ export const BACKEND_LABELS: Record<Backend, string> = {
   gdrive: "Google Drive",
   webdav: "WebDAV",
   s3: "S3",
+  direct: "Directly between my devices",
 };
 
 export function sizeText(bytes: number): string {

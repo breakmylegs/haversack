@@ -268,6 +268,7 @@ export interface GameLink {
   checked: number;
 }
 export const replicationGames = callable<[], GameLink[]>("replication_games");
+export const directSyncNow = callable<[], { peers: number; copied: number; removed: number; unreachable: string[] }>("direct_sync_now");
 export const replicationSetPolicy = callable<[linkId: string, policy: string], GameLink[]>("replication_set_policy");
 export const replicationCheckGame = callable<[linkId: string], GameLink>("replication_check_game");
 export const replicationSendUpdate = callable<[linkId: string], GameLink[]>("replication_send_update");
@@ -310,7 +311,7 @@ export const steamOpsList = callable<[], (SteamOp & { state: string; result: Rec
 export const onSuspend = callable<[], { started: number }>("on_suspend");
 export const enableSteamWithoutCloud = callable<[], { enabled: string[] }>("enable_steam_without_cloud");
 
-export type Backend = "local" | "onedrive" | "gdrive" | "webdav" | "s3";
+export type Backend = "local" | "onedrive" | "gdrive" | "webdav" | "s3" | "direct";
 
 export interface BackendConfig {
   configured: boolean;
@@ -724,6 +725,8 @@ export interface CloudStatus {
   name: string;
   onedriveSignedIn: boolean;
   googleSignedIn: boolean;
+  directReady?: boolean;
+  direct?: { peers: number; copied: number; unreachable: string[]; at: number } | null;
   /** ADR-0032: Keepsake's own sign-in client is built in, so no client ID is needed. */
   builtInClient: { onedrive: boolean; gdrive: boolean };
   /** The user has saved their own client, which is used instead of the built-in one. */

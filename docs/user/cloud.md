@@ -30,6 +30,23 @@ Releases up to and including 0.25.0 do not yet include Keepsake's own sign-in, s
 
 Enter the address, user name and password (or access keys) on the Cloud page in Gaming Mode. The server must refuse to overwrite existing files, which Keepsake checks before using it. See [WebDAV and S3 set-up](../setup-backends.md).
 
+## Directly between my devices (no cloud account)
+
+If you would rather not use a cloud account, your devices can keep your saves in step with each other directly.
+
+1. Switch on **Replication** in Settings, **Modules**, and pair your devices in **Devices**. See [Replication](replication.md).
+2. On each device, open the Cloud page, choose **Directly between my devices**, and press **Use Directly between my devices for snapshots**.
+
+Each device then keeps its own copy of your saves' history. When your devices can reach each other, each one fetches what it is missing:
+- before a game starts;
+- when the other device has just saved;
+- now and then while Keepsake is idle;
+- whenever you press **Sync now**.
+
+If the other device is off or away, you play on with the saves this device has, and they meet the next time both are on. If you played on both in between, Keepsake shows a conflict and you choose, as with a cloud store.
+
+There is no copy away from your devices. If you lose all of them, the history goes too. A cloud store gives you that off-site copy.
+
 ## Choosing where snapshots go
 
 After signing in, choose **Use ... for snapshots**. Keepsake tests the connection first. Until then, snapshots stay in a test store on the device.
