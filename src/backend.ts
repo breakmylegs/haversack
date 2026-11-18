@@ -24,6 +24,8 @@ export interface Settings {
   libraryRoot: string;
   /** ADR-0044: how each provider signs in from Gaming Mode. */
   gamingModeSignin: Record<"onedrive" | "gdrive", SigninMethod>;
+  /** ADR-0051: Heroic, Lutris, Bottles and emulators in Games. */
+  otherLaunchers?: boolean;
   readOnly: boolean;
 }
 
@@ -389,9 +391,11 @@ export interface HttpsTestResult {
   error?: string;
 }
 
+export type GameKind = "steam" | "shortcut" | "heroic" | "lutris" | "bottles" | "emulator";
+
 export interface GameEntry {
   key: string;
-  kind: "steam" | "shortcut";
+  kind: GameKind;
   appid: number;
   name: string;
   user_id: string | null;
@@ -402,6 +406,10 @@ export interface GameEntry {
   exe_inside_prefix: boolean;
   last_played: number;
   notes: string[];
+  /** ADR-0051: a plain Wine prefix (Heroic, Lutris, Bottles), and an emulator's optional save-state folders. */
+  wine_prefix?: string | null;
+  emulator?: string;
+  states_paths?: CustomPath[];
 }
 
 export interface DiscoveryResult {
@@ -438,7 +446,7 @@ export interface MatchInfo {
 export interface GameMatch extends MatchInfo {
   key: string;
   name: string;
-  kind: "steam" | "shortcut";
+  kind: GameKind;
   proposal?: { candidate: { gameKey: string; title: string | null } } | null;
   enabled: boolean;
   sync: SyncWord;

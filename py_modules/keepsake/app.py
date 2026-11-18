@@ -30,12 +30,14 @@ from . import (
     health,
     hosts,
     identity,
+    launchers,
     lifecycle,
     manifest,
     net,
     ordering,
     pcwatch,
     playtime,
+    procs,
     registry,
     resolve,
     restore,
@@ -124,6 +126,8 @@ async def _no_emit(event: str, *args: Any) -> None:
     return None
 
 
+# Games whose launch Keepsake cannot see: newer saves come in from the idle pass (ADR-0051).
+AUTO_PULL_KINDS = ("heroic", "lutris", "bottles", "emulator")
 SCRUB_FILE = "integrity.json"
 SCRUB_INTERVAL = 7 * 24 * 3600
 EXPORT_README = """Keepsake export
@@ -608,12 +612,33 @@ class KeepsakeApp:
         """Scan Steam on this device. Cached until ``refresh``."""
         if self._games is None or refresh:
             self._games = await asyncio.to_thread(discovery.discover, self.home, self.host)
+            if self.host != "windows" and self.settings.get("otherLaunchers"):
+                found = await asyncio.to_thread(launchers.discover_all, discovery.real_home(self.home))
+                self._games = {**self._games, "games": [*self._games["games"], *found]}
+                await asyncio.to_thread(self._emulator_defaults, found)
             counts: dict[str, int] = {}
             for game in self._games["games"]:
                 counts[game["kind"]] = counts.get(game["kind"], 0) + 1
             log_event(logging.INFO, "discovery.scan", "Scanned games", roots=len(self._games["roots"]), **counts)
         mismatches = await asyncio.to_thread(discovery.load_mismatches, self.paths.runtime_dir)
         return {**self._games, "mismatches": mismatches}
+
+    def _emulator_defaults(self, games: list[dict[str, Any]]) -> None:
+        """An emulator found for the first time gets its save folders and a game key shared by every device.
+
+        Written once, off by default; the user can change them like any game's settings (ADR-0051).
+        """
+        for game in games:
+            if game.get("kind") != launchers.EMULATOR_KIND or self.game_configs.get(game["key"]).get("gameKey"):
+                continue
+            self.game_configs.update(
+                game["key"],
+                {
+                    "gameKey": launchers.emulator_game_key(game),
+                    "gameKeySource": "auto",
+                    "customPaths": list(game.get("emulator_paths") or []),
+                },
+            )
 
     async def check_running_prefix(self, key: str) -> dict[str, Any]:
         """Cross-check a running game's ``STEAM_COMPAT_DATA_PATH`` with its discovered prefix."""
@@ -1269,13 +1294,13 @@ class KeepsakeApp:
             exported = await asyncio.to_thread(self._export_registry, game, reg_keys, match["gameKey"])
             if exported:
                 files["registry"] = exported
-        procs = await asyncio.to_thread(find_game_processes, int(game["appid"]), game.get("prefix"), self.proc_root)
+        running = await asyncio.to_thread(self._game_running, game)
         return {
             "game": game,
             "gameKey": match["gameKey"],
             "files": files,
             "roots": roots,
-            "running": bool(procs),
+            "running": running,
             "registryKeys": reg_keys,
         }
 
@@ -1607,6 +1632,8 @@ class KeepsakeApp:
 
     def _game_running(self, game: Mapping[str, Any]) -> bool:
         """Whether the game runs now. Decky reads /proc; a PC host lists the user's processes (ADR-0038)."""
+        if game.get("kind") in (*launchers.LAUNCHER_KINDS, launchers.EMULATOR_KIND):
+            return procs.launcher_running(dict(game), self.proc_root)  # by Wine prefix or emulator (ADR-0051)
         if self.host == "decky":
             return bool(find_game_processes(int(game["appid"]), game.get("prefix"), self.proc_root))
         return pcwatch.game_running(game, self._pc_processes(), discovery.real_home(self.home))
@@ -1841,6 +1868,14 @@ class KeepsakeApp:
                         sync = self._sync()
                         recovered = await asyncio.to_thread(sync.recover_session, ctx)
                         outcome = await asyncio.to_thread(sync.idle, ctx)
+                        state = sync.state.get(ctx.game_key)
+                        if game["kind"] in AUTO_PULL_KINDS and (newer_save(state) or not state.get("base")):
+                            # Keepsake cannot see these games start, so a newer save from another device (or
+                            # the first copy, on a device that never synced it) is brought in here, by the
+                            # launch decision table: only if nothing changed here and the game is not running;
+                            # anything else is a conflict for the user (P1, P6; ADR-0051).
+                            pulled = await asyncio.to_thread(sync.fetch_newer, ctx)
+                            outcome = {**outcome, "pulled": pulled.get("action")}
                 if recovered:
                     await self.emit("keepsake_toast", f"Recovered missed exit backup for {game['name']}")
                 session = self._sessions().get(ctx.game_key, {})

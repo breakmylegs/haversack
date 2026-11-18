@@ -118,8 +118,8 @@ WINDOWS_PLATFORMS = ("proton", "windows")  # where the manifest's Windows paths 
 
 def platform_of(game: Mapping[str, Any]) -> str:
     """``proton`` (a Proton prefix), ``windows`` (a native Windows game, ADR-0038) or ``native`` (Linux)."""
-    if game.get("prefix"):
-        return "proton"
+    if game.get("prefix") or game.get("wine_prefix"):
+        return "proton"  # a Wine prefix from Heroic, Lutris or Bottles lays out saves the same way (ADR-0051)
     return "windows" if game.get("os") == "windows" else "native"
 
 
@@ -139,10 +139,20 @@ def logical_roots(
     env = os.environ if env is None else env
     roots: dict[str, str | None] = dict.fromkeys(ALL_ROOTS)
     prefix = game.get("prefix")
+    wine = game.get("wine_prefix")
     if prefix:
         pfx = os.path.join(str(prefix), "pfx")
         for name, parts in _WIN_PATHS.items():
             roots[name] = os.path.join(pfx, *parts)
+    elif wine:
+        # A plain Wine prefix (ADR-0051): drive_c at the top, and the Linux user's name for steamuser.
+        # Without a single known user, the user folders stay unavailable (fail closed).
+        user = game.get("wine_user")
+        for name, parts in _WIN_PATHS.items():
+            if parts[:3] == _STEAMUSER:
+                roots[name] = os.path.join(str(wine), "drive_c", "users", str(user), *parts[3:]) if user else None
+            else:
+                roots[name] = os.path.join(str(wine), *parts)
     elif platform_of(game) == "windows":
         from . import hosts
 
@@ -179,6 +189,8 @@ def safe_base(base: str, game: Mapping[str, Any], home: str) -> bool:
         protected.append(str(game["steam_root"]))
     if game.get("prefix"):
         protected.append(os.path.join(str(game["prefix"]), "pfx", "drive_c"))
+    if game.get("wine_prefix"):
+        protected.append(os.path.join(str(game["wine_prefix"]), "drive_c"))
     for folder in protected:
         # Base must not be the protected folder itself or one of its ancestors.
         if is_within(real, folder):
@@ -430,7 +442,12 @@ def preview(
             before = set(result.files)
             # Windows names match case-insensitively, inside a prefix or on Windows itself.
             insensitive = platform == "windows" or (
-                platform == "proton" and (root_name in WIN_ROOTS or _inside(root_path, game.get("prefix")))
+                platform == "proton"
+                and (
+                    root_name in WIN_ROOTS
+                    or _inside(root_path, game.get("prefix"))
+                    or _inside(root_path, game.get("wine_prefix"))
+                )
             )
             excluded_total += scan(root_path, rel, insensitive, exclusions, result)
             added = sorted(set(result.files) - before)

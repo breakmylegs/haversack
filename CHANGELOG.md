@@ -6,6 +6,8 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ### Added
 
+- Heroic, Lutris and Bottles games: on a handheld or a Linux PC, Games lists your Heroic (GOG and Epic), Lutris and Bottles games, and syncs their saves like any other game. Newer saves from your other devices come in while the game is closed, and only if you have not played on since (ADR-0051).
+- Emulator saves: one entry each for RetroArch, Dolphin, PCSX2, DuckStation, PPSSPP, RPCS3 and Cemu, with battery and memory-card saves. Save states can be added per emulator, but are off by default (ADR-0051).
 - Cloud integrity: once a week Keepsake checks that the cloud copies of each game's important snapshots are intact, and **Check cloud integrity** checks them all. A damaged copy shows in Health and in the game's History, where **Repair** saves a fresh copy from this device (ADR-0050).
 - Export snapshots: copy your saves out as plain zip files, with a list of their contents, to a folder you choose, such as an SD card. There is no lock-in, and nothing in that folder is overwritten (ADR-0050).
 - Releases now include a software bill of materials, covered by the release signature. The release instructions include signing-key rotation and compromise runbooks, and private vulnerability reporting is on (ADR-0050).
@@ -34,6 +36,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 - The PC interface's text now follows your browser's text size setting (ADR-0049).
 - Snapshot clean-up plans are about four times faster for games with long histories (ADR-0050).
+
+### Fixed
+
+- A device that had never synced a game and had no save files for it no longer reports a conflict; the cloud save is simply brought in (ADR-0051).
 
 ## [0.25.0]
 

@@ -226,10 +226,14 @@ class SyncEngine:
         base_id = record.get("base")
         by_id, heads = self._cloud(gk)
         base = by_id.get(base_id) if base_id else None
-        local_hash, _ = self._local_hash(ctx)
+        local_hash, local_files = self._local_hash(ctx)
         if base is not None and local_hash == base["contentHash"]:
             self.state.update(gk, pending=False)
             return {"status": "no-change"}
+        if base is None and heads and local_files == 0:
+            # Never synced here and no save files: nothing to protect, so no conflict. The next pull
+            # brings the cloud save in (the launch decision table restores into an empty folder).
+            return {"status": "nothing-to-save"}
         if base is None and heads:
             # Never synced but the cloud has history: do not guess a parent.
             if any(by_id[h]["contentHash"] == local_hash for h in heads):

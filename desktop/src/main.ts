@@ -337,6 +337,15 @@ const syncText: Record<string, string> = {
   quarantined: "Held back for checking",
 };
 
+const kindText: Record<string, string> = {
+  steam: "Steam game",
+  shortcut: "Non-Steam game",
+  heroic: "Heroic game",
+  lutris: "Lutris game",
+  bottles: "Bottles program",
+  emulator: "Emulator",
+};
+
 const matchText: Record<string, string> = {
   manual: "chosen by you",
   "manual-key": "linked by you",
@@ -402,7 +411,7 @@ function gameCard(g: GameMatch, main: HTMLElement, filter: string): HTMLElement 
     h(
       "p",
       { class: "small" },
-      `${g.kind === "steam" ? "Steam game" : "Non-Steam game"}. ${syncText[g.sync] ?? g.sync}. Save data: ${
+      `${kindText[g.kind] ?? "Game"}. ${syncText[g.sync] ?? g.sync}. Save data: ${
         g.title ? `${g.title}, ` : ""
       }${matchText[g.method] ?? g.method}.`,
     ),

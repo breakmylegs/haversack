@@ -45,6 +45,15 @@ flowchart LR
 
 A PC cannot pause a game the way Steam on a handheld lets Keepsake do, so Keepsake never touches a game's saves while it runs.
 
+## Heroic, Lutris, Bottles and emulators
+
+On a handheld or a Linux PC, **Games** also lists your Heroic (GOG and Epic), Lutris and Bottles games, and one entry for each emulator whose saves Keepsake knows: RetroArch, Dolphin, PCSX2, DuckStation, PPSSPP, RPCS3 and Cemu. Use the filters **Heroic, Lutris, Bottles** and **Emulators** to find them, then turn sync on like any other game.
+
+- Keepsake cannot see these games start, so it saves after you play and brings in newer saves from your other devices in the background. It only does so while the game or emulator is closed, and only when you have not played on since. Otherwise it asks you.
+- Emulator entries sync battery and memory-card saves. **Include save states** on the game page adds save states too. They are off by default, because a save state often does not load in another version of the emulator.
+- Heroic can sync GOG and Epic saves itself. Use either Heroic's sync or Keepsake's for a game, not both.
+- **Settings, Show other launchers** turns these entries off.
+
 ## Newer save from another device
 
 When another device has saved a game since this one last synced it, the game's row, the Quick Access Menu and the PC Overview say so: "Newer save from Handheld B, 10 minutes ago". On a handheld it is brought in automatically when you start the game. **Get it now** on the game's row brings it in straight away, on a handheld or a PC. It only does so when you have not played on since; otherwise it tells you there is a conflict, and nothing is replaced.
