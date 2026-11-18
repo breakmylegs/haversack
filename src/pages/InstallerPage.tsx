@@ -12,6 +12,7 @@ import {
   installerRemoveShortcut,
   installerRetarget,
   installerStart,
+  installerSwapDisc,
   installerStatus,
   InstallerStatus,
   InstallJob,
@@ -27,6 +28,7 @@ const FILE = 0 as unknown as Parameters<typeof openFilePicker>[0];
 const FOLDER = 1 as unknown as Parameters<typeof openFilePicker>[0];
 
 const STEP_TEXT: Record<InstallJob["state"], string> = {
+  queued: "Waiting in the queue. It starts by itself when the install before it ends.",
   "choose-installer": "Choose the installer program.",
   "creating-shortcut": "Creating the installer shortcut in Steam.",
   "run-installer": "Open your library, start the installer shortcut and install. Then quit it and come back here.",
@@ -84,7 +86,14 @@ export function InstallerPage() {
         kind === "iso"
           ? await openFilePicker(FILE, from, true, true, undefined, ["iso"])
           : await openFilePicker(FOLDER, from, false, true);
-      await act(() => installerStart(picked.realpath || picked.path, title), "Ready. Choose the installer program.");
+      const busyInstall = (status?.jobs ?? []).some((j) =>
+        ["choose-installer", "creating-shortcut", "run-installer", "choose-game", "retargeting"].includes(j.state),
+      );
+      // While another install is under way, a new one joins the queue (ADR-0053).
+      await act(
+        () => installerStart(picked.realpath || picked.path, title, busyInstall),
+        busyInstall ? "Added to the queue. It starts when the current install ends." : "Ready. Choose the installer program.",
+      );
     } catch (err) {
       toaster.toast({ title: "Keepsake", body: `Nothing chosen: ${err}` });
     }
@@ -183,7 +192,7 @@ export function InstallerPage() {
       )}
 
       {(status?.jobs ?? []).map((job) => (
-        <Field key={job.id} label={`${job.title} (${job.kind === "iso" ? "ISO" : "folder"})`} description={`${STEP_TEXT[job.state]}${job.error ? ` ${job.error}` : ""}`} childrenLayout="below">
+        <Field key={job.id} label={`${job.title} (${job.state === "queued" ? "queued" : job.kind === "iso" ? "ISO" : "folder"})`} description={`${STEP_TEXT[job.state]}${job.error ? ` ${job.error}` : ""}`} childrenLayout="below">
           {job.state === "choose-installer" && (
             <>
               <div style={{ fontSize: 12, marginBottom: 4 }}>When the installer asks where to install, enter: {job.windowsTarget}</div>
@@ -205,7 +214,21 @@ export function InstallerPage() {
               <div style={{ fontSize: 12, marginBottom: 4 }}>Install to: {job.windowsTarget}</div>
               {job.kind === "iso" &&
                 (job.cdDrive ? (
-                  <div style={{ fontSize: 12, marginBottom: 4 }}>The disc is drive {job.cdDrive.letter.toUpperCase()}: in the installer.</div>
+                  <>
+                    <div style={{ fontSize: 12, marginBottom: 4 }}>The disc is drive {job.cdDrive.letter.toUpperCase()}: in the installer.</div>
+                    {(job.otherDiscs ?? []).map((disc) => (
+                      <DialogButton
+                        key={disc}
+                        style={{ width: "auto", marginBottom: 4 }}
+                        disabled={busy}
+                        onClick={() =>
+                          void act(() => installerSwapDisc(job.id, disc), `${disc} is now in the drive. Continue in the installer.`)
+                        }
+                      >
+                        Swap to {disc}
+                      </DialogButton>
+                    ))}
+                  </>
                 ) : (
                   <DialogButton
                     style={{ width: "auto", marginBottom: 4 }}
@@ -219,6 +242,13 @@ export function InstallerPage() {
                 I have finished installing
               </DialogButton>
             </>
+          )}
+          {job.state === "choose-game" && (job.runtimes ?? []).length > 0 && (
+            <div style={{ fontSize: 12, marginBottom: 4 }}>
+              The game also ships {Array.from(new Set((job.runtimes ?? []).map((r) => r.runtime))).join(", ")}. Proton already
+              provides most of these. Only if the game will not start, run the one it needs once, through this shortcut:{" "}
+              {(job.runtimes ?? []).slice(0, 3).map((r) => lastPart(r.path)).join(", ")}.
+            </div>
           )}
           {job.state === "choose-game" &&
             (job.candidates ?? []).map((c) => (
@@ -274,7 +304,7 @@ export function InstallerPage() {
               Remove the installer shortcut
             </DialogButton>
           )}
-          {["choose-installer", "creating-shortcut", "run-installer", "choose-game"].includes(job.state) && (
+          {["queued", "choose-installer", "creating-shortcut", "run-installer", "choose-game"].includes(job.state) && (
             <DialogButton style={{ width: "auto", marginTop: 4 }} disabled={busy} onClick={() => void act(() => installerCancel(job.id), "Install cancelled.")}>
               Cancel
             </DialogButton>

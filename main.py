@@ -134,8 +134,11 @@ class Plugin:
     async def installer_status(self) -> dict[str, Any]:
         return await self.app.installer_status()
 
-    async def installer_start(self, source: str, title: str) -> dict[str, Any]:
-        return await self.app.installer_start(source, title)
+    async def installer_start(self, source: str, title: str, queue: bool = False) -> dict[str, Any]:
+        return await self.app.installer_start(source, title, queue)
+
+    async def installer_swap_disc(self, job_id: int, disc: str) -> dict[str, Any]:
+        return await self.app.installer_swap_disc(job_id, disc)
 
     async def installer_net_locations(self) -> list[dict[str, Any]]:
         return await self.app.installer_net_locations()

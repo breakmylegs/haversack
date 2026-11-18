@@ -222,11 +222,15 @@ class Installer:
                 pass
             data["stagedRemoved"] = True
 
-    def start(self, source: str, title: str, staged: bool = False) -> dict[str, Any]:
+    def start(self, source: str, title: str, staged: bool = False, queue: bool = False) -> dict[str, Any]:
         """Prepare an install from an ISO or a folder; mounts an ISO read-only.
 
         ``staged`` marks a downloaded ISO in :meth:`downloads_dir`, deleted when the install ends.
+        ``queue`` (ADR-0053) adds it to the install queue instead: it starts by itself when no other
+        install is active, and the queue survives a restart.
         """
+        if queue:
+            return self._enqueue(source, title, staged)
         try:
             return self._start(source, title, staged)
         except Exception:
@@ -234,7 +238,40 @@ class Installer:
                 self._drop_staged({"staged": source})
             raise
 
-    def _start(self, source: str, title: str, staged: bool) -> dict[str, Any]:
+    def _enqueue(self, source: str, title: str, staged: bool) -> dict[str, Any]:
+        title = " ".join(str(title).split())
+        if not _TITLE.match(title):
+            raise InstallerError('the title is 1 to 80 characters without / \\ : * ? " < > |')
+        source = os.path.realpath(str(source)).replace(os.sep, "/")
+        if not (os.path.isdir(source) or (os.path.isfile(source) and source.lower().endswith(".iso"))):
+            raise InstallerError("choose an .iso file or a folder")
+        data = {"source": source, "ops": {}, "queuedStaged": bool(staged)}
+        now = self.clock()
+        self.db.execute(
+            "INSERT INTO installer_jobs (title, state, data, created, updated) VALUES (?, 'queued', ?, ?, ?)",
+            (title, json.dumps(data, sort_keys=True), now, now),
+        )
+        job_id = int(self.db.execute("SELECT max(id) FROM installer_jobs")[0][0])
+        self.promote()
+        return self.get(job_id)
+
+    def promote(self) -> dict[str, Any] | None:
+        """Start the oldest queued install when none is active. A queued install that cannot start fails, and
+        the next one is tried."""
+        while not any(j["state"] in ACTIVE for j in self.jobs()):
+            rows = self.db.execute("SELECT id FROM installer_jobs WHERE state = 'queued' ORDER BY id LIMIT 1")
+            if not rows:
+                return None
+            job = self.get(int(rows[0][0]))
+            try:
+                return self._start(job["source"], job["title"], bool(job.get("queuedStaged")), job_id=job["id"])
+            except (InstallerError, udisks.UdisksError, OSError) as exc:
+                data = _data(job)
+                data["error"] = str(exc)
+                self._save(job["id"], "failed", data)
+        return None
+
+    def _start(self, source: str, title: str, staged: bool, job_id: int | None = None) -> dict[str, Any]:
         title = " ".join(str(title).split())
         if not _TITLE.match(title):
             raise InstallerError('the title is 1 to 80 characters without / \\ : * ? " < > |')
@@ -250,13 +287,17 @@ class Installer:
                 )
             device, mount = udisks.mount_iso(source, self.runner)
             data.update(kind="iso", device=device, mount=mount, contents=mount)
+            # A set of discs (ADR-0053): the other ISOs beside this one can be swapped in later.
+            data["otherDiscs"] = [] if staged else files.sibling_discs(source)
         elif os.path.isdir(source):
             data.update(kind="folder", contents=source)
         else:
             raise InstallerError("choose an .iso file or a folder")
         try:
             # The Steam runtime container only sees the home folder; anything else is passed in.
-            data["compatMounts"] = files.compat_mounts([data["contents"], target], self.home().replace(os.sep, "/"))
+            # For a disc, the folder discs are mounted under, so a disc swapped in later is visible too (ADR-0053).
+            visible = posixpath.dirname(data["mount"]) if data.get("kind") == "iso" else data["contents"]
+            data["compatMounts"] = files.compat_mounts([visible, target], self.home().replace(os.sep, "/"))
         except ValueError as exc:
             if data.get("device"):
                 udisks.detach(data["device"], self.runner)
@@ -268,6 +309,9 @@ class Installer:
             before=files.file_list(target),
         )
         now = self.clock()
+        if job_id is not None:  # a queued install starting
+            self._save(job_id, "choose-installer", data)
+            return self.get(job_id)
         self.db.execute(
             "INSERT INTO installer_jobs (title, state, data, created, updated) VALUES (?, 'choose-installer', ?, ?, ?)",
             (title, json.dumps(data, sort_keys=True), now, now),
@@ -353,6 +397,8 @@ class Installer:
                     candidates.append((posixpath.join(drive_c.replace(os.sep, "/"), rel), size))
         data = _data(job)
         data["candidates"] = files.rank_game_exes(candidates, job["title"])[:15]
+        # Runtime installers shipped with the game or on the disc (ADR-0053): guidance only, nothing is run.
+        data["runtimes"] = files.find_runtimes(after, files.file_list(job["contents"]) if job.get("contents") else {})
         self._save(job["id"], "choose-game", data)
         return self.get(job["id"])
 
@@ -376,6 +422,9 @@ class Installer:
 
     def cancel(self, job_id: int) -> dict[str, Any]:
         job = self.get(job_id)
+        if job["state"] == "queued":
+            self._save(job_id, "cancelled", _data(job))  # nothing was mounted yet
+            return self.get(job_id)
         if job["state"] not in ACTIVE:
             raise InstallerError("that install has already finished")
         self._finish(job_id, _data(job), "cancelled")
@@ -407,6 +456,73 @@ class Installer:
         data["cdDrive"] = {"letter": made["letter"], "links": links, "targets": targets}
         self._save(job_id, job["state"], data)
         return self.get(job_id)
+
+    def swap_disc(self, job_id: int, disc: str) -> dict[str, Any]:
+        """User action, while the installer asks for the next disc: put another ISO of the set in the drive.
+
+        The drive's links are repointed in one step each (a new link renamed over the old one), the way a
+        real disc swap changes what is in the drive. This is the one change made to a prefix while its
+        installer runs; nothing else in the prefix is touched (ADR-0053).
+        """
+        job = self.get(job_id)
+        drive = job.get("cdDrive") or {}
+        if job.get("kind") != "iso" or job["state"] != "run-installer" or not drive.get("links"):
+            raise InstallerError("add the disc drive first; discs can be swapped while the installer runs")
+        if disc not in job.get("otherDiscs", []):
+            raise InstallerError("choose one of the other discs in the same folder")
+        new_source = posixpath.join(posixpath.dirname(job["source"]), disc)
+        device, mount = udisks.mount_iso(new_source, self.runner)
+        targets = dict(drive.get("targets", {}))
+        try:
+            targets.update(
+                cdrom.repoint(
+                    list(drive["links"]),
+                    targets,
+                    lambda link: device if link.endswith("::") else mount,
+                    self.symlink,
+                )
+            )
+        except (cdrom.CdromError, OSError) as exc:
+            udisks.detach(device, self.runner)
+            raise InstallerError(str(exc)) from exc
+        old_device = job.get("device")
+        data = _data(job)
+        data["otherDiscs"] = [d for d in job["otherDiscs"] if d != disc] + [posixpath.basename(job["source"])]
+        data.setdefault("discs", []).append(posixpath.basename(job["source"]))
+        data.update(source=new_source, device=device, mount=mount, contents=mount)
+        data["cdDrive"] = {**drive, "targets": targets}
+        self._save(job_id, job["state"], data)
+        if old_device:
+            udisks.detach(old_device, self.runner)  # the installer asked for the next disc, so the old one is done
+        return self.get(job_id)
+
+    def resume(self) -> list[dict[str, Any]]:
+        """After a restart: mount the discs of active installs again, then start the next queued install.
+
+        If a disc comes back at a different place after its installer shortcut was made, the shortcut
+        would point at a folder that no longer exists, so that install fails with a plain reason.
+        """
+        resumed = []
+        for job in self.jobs():
+            if job["state"] not in ACTIVE or job.get("kind") != "iso" or os.path.isdir(job.get("mount") or ""):
+                continue
+            data = _data(job)
+            try:
+                device, mount = udisks.mount_iso(job["source"], self.runner)
+            except (udisks.UdisksError, OSError) as exc:
+                data["error"] = f"the disc could not be opened again after a restart: {exc}"
+                self._finish(job["id"], data, "failed")
+                continue
+            if mount != job["mount"] and job["state"] != "choose-installer":
+                data["error"] = "the disc came back at a different place after a restart; start this install again"
+                data["device"] = device
+                self._finish(job["id"], data, "failed")
+                continue
+            data.update(device=device, mount=mount, contents=mount)
+            self._save(job["id"], job["state"], data)
+            resumed.append(self.get(job["id"]))
+        self.promote()
+        return resumed
 
     def remove_shortcut(self, job_id: int) -> dict[str, Any]:
         """User action: remove the ``Install:`` shortcut a failed or cancelled install left in Steam."""
@@ -467,3 +583,4 @@ class Installer:
             data["unmounted"] = True
         self._drop_staged(data)
         self._save(job_id, state, data)
+        self.promote()  # the next queued install, if any (ADR-0053)

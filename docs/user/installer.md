@@ -15,6 +15,18 @@ On a handheld, Keepsake's **Install** page installs a Windows game into its own 
 
 If an installer asks for the disc, press **Installer wants a disc drive** and start the installer again. Keepsake gives the prefix a CD drive pointing at the mounted ISO.
 
+### Games on several discs
+
+Keep the discs' ISO files together in one folder and start with disc 1. When the installer asks for the next disc, press **Swap to <disc>** on the Install page, then carry on in the installer. Keepsake puts that disc in the drive without stopping the installer.
+
+### Several installs in a row
+
+Start another install while one is under way, and it joins the queue. Each queued install starts by itself when the one before it ends, and the queue carries on after a restart.
+
+### Runtimes the game ships
+
+If the game comes with runtime installers, such as Visual C++, DirectX or .NET, the Install page lists them when you choose the game's program. Proton already provides most of these, so only run one if the game will not start.
+
 ## From a network location
 
 Choose **From a network location** to install from a NAS or server that is not mounted:

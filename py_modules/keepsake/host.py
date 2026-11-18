@@ -107,6 +107,7 @@ CALLABLES = frozenset(
         "installer_retarget",
         "installer_cancel",
         "installer_add_cd_drive",
+        "installer_swap_disc",
         "installer_remove_shortcut",
         "installer_artwork_search",
         "installer_artwork_apply",
