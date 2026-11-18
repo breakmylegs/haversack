@@ -660,6 +660,31 @@ export interface ScrubReport {
   full: boolean;
   games: Record<string, { name: string; checked: number; bad: string[]; missing: string[]; error?: string }>;
 }
+export interface StoragePart {
+  bytes: number;
+  files: number;
+  partial: boolean;
+  present: boolean;
+  insidePrefix?: boolean;
+}
+export interface StorageRow {
+  key: string;
+  name: string;
+  install: StoragePart;
+  prefix: StoragePart;
+  shaderCache: StoragePart;
+  saves: { bytes: number };
+  totalBytes: number;
+  partial: boolean;
+  canClearShaderCache: boolean;
+  canResetPrefix: boolean;
+  reset?: { stage: "waiting" | "restored"; started: number } | null;
+}
+export const storageUsage = callable<[key: string | null], { games: StorageRow[]; notMeasured: number }>("storage_usage");
+export const clearShaderCache = callable<[key: string], { ok: boolean; freed: number }>("clear_shader_cache");
+export const resetPrefix = callable<[key: string], { ok: boolean; stage: string }>("reset_prefix");
+export const cancelPrefixReset = callable<[key: string], { ok: boolean }>("cancel_prefix_reset");
+export const deleteOldPrefix = callable<[key: string], { ok: boolean; freed: number }>("delete_old_prefix");
 export const scrubCloud = callable<[full: boolean], ScrubReport>("scrub_cloud");
 export const repairSnapshot = callable<[key: string], SnapshotResult>("repair_snapshot");
 export const exportSnapshots = callable<

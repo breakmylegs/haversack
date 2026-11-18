@@ -43,6 +43,7 @@ from . import (
     restore,
     retention,
     steamcloud,
+    storage,
 )
 from .advisor import anticheat, deckverified
 from .advisor import compat as advisor_compat
@@ -1599,8 +1600,21 @@ class KeepsakeApp:
         """Frontend lifetime events. Returns at once; the work runs as a task."""
         try:
             games = await self._games_for_appid(raw_id)
+            appid = lifecycle.normalise_appid(raw_id)
         except (ValueError, TypeError):
             return {"handled": 0}
+        # A game waiting for its prefix reset to finish (ADR-0052): no launch gate and no exit
+        # save on the fresh, empty prefix; on exit the kept saves go back instead.
+        waiting = {
+            k
+            for k, r in storage.resets(self.paths.runtime_dir).items()
+            if r.get("stage") == "waiting" and r.get("appid") == appid
+        }
+        if waiting:
+            if kind == "exit":
+                for key in sorted(waiting):
+                    self._background.append(asyncio.create_task(self._finish_prefix_reset(key)))
+            games = [g for g in games if g["key"] not in waiting]
         if not games:
             # Apps Saves does not sync (an installer shortcut, or any game for Advisor) still reach other modules.
             event = {"start": "game_started", "exit": "game_exited"}.get(kind)
@@ -2128,6 +2142,166 @@ class KeepsakeApp:
             "integrity": await asyncio.to_thread(read_json, os.path.join(self.paths.runtime_dir, SCRUB_FILE), {}),
         }
         return health.run(facts)
+
+    # Storage (R5, ADR-0052): disk use, shader cache, reset prefix and keep saves
+
+    def _saves_bytes(self, game: dict[str, Any]) -> int:
+        try:
+            config = self.game_configs.get(game["key"])
+            index = self.manifest.load()
+            match = manifest.match_game(index, game, config)
+            record = index["games"].get(match["title"]) if index and match.get("title") else None
+            if record is None and not config.get("customPaths"):
+                return 0
+            preview = resolve.preview(game, match.get("title"), record, config, self.home, 0, False)
+            return int(preview.get("totalBytes") or preview.get("bytes") or 0)
+        except (OSError, ValueError, KeyError):
+            return 0
+
+    async def storage_usage(self, key: str | None = None) -> dict[str, Any]:
+        """Disk use per game: install, prefix, shader cache and saves. Biggest first; stops after a minute."""
+        games = [g for g in (await self.discover_games())["games"] if key is None or g["key"] == key]
+        deadline = time.monotonic() + (storage.SIZE_SECONDS if key else 60.0)
+        rows, skipped = [], 0
+        for game in games:
+            if time.monotonic() > deadline:
+                skipped += 1
+                continue
+            saves = await asyncio.to_thread(self._saves_bytes, game)
+            left = max(1.0, min(storage.SIZE_SECONDS, deadline - time.monotonic()))
+            row = await asyncio.to_thread(storage.usage, game, saves, left, discovery.real_home(self.home))
+            row["reset"] = storage.resets(self.paths.runtime_dir).get(game["key"])
+            rows.append(row)
+        rows.sort(key=lambda r: -r["totalBytes"])
+        return {"games": rows, "notMeasured": skipped}
+
+    async def _storage_game(self, key: str) -> dict[str, Any]:
+        game = await self._game(key)
+        if await asyncio.to_thread(self._game_running, game):
+            raise ValueError("quit the game first")
+        return game
+
+    async def clear_shader_cache(self, key: str) -> dict[str, Any]:
+        """Remove the game's shader cache. Steam rebuilds it at the next launch (ADR-0052)."""
+        game = await self._storage_game(key)
+        try:
+            freed = await asyncio.to_thread(storage.clear_shader_cache, game)
+        except storage.StorageError as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(logging.INFO, "storage.shader_cache", "Shader cache cleared", key=key, freed=freed)
+        return {"ok": True, "freed": freed}
+
+    async def reset_prefix(self, key: str) -> dict[str, Any]:
+        """Move the game's Proton prefix aside after keeping a verified copy of its saves (ADR-0052)."""
+        if key in storage.resets(self.paths.runtime_dir):
+            raise ValueError("a reset is already waiting for this game")
+        game = await self._storage_game(key)
+        if game.get("exe_inside_prefix"):
+            raise ValueError("this game is installed inside its prefix, so resetting it would remove the game")
+        prefix = storage.compat_prefix(game)
+        if prefix is None:
+            raise ValueError("only a game in its own Steam Proton prefix can be reset")
+        ctx = await self._snapshot_context(key)
+        if ctx["running"]:
+            raise ValueError("quit the game first")
+        folder = os.path.join(self.paths.runtime_dir, "prefix-resets")
+        await asyncio.to_thread(os.makedirs, folder, exist_ok=True)
+        blob = os.path.join(folder, f"{uuid.uuid4().hex[:12]}.zip")
+        eng = self._engine()
+        async with self.locks.hold(ctx["gameKey"], "saves"):
+            with self.jobs.job("snapshot"):
+                try:
+                    meta = await asyncio.to_thread(eng.keep_copy, ctx["gameKey"], ctx["files"], ctx["roots"], blob)
+                except BaseException:
+                    if os.path.exists(blob):
+                        os.unlink(blob)  # never leave a half-made or unverified copy behind
+                    raise
+                try:
+                    old = await asyncio.to_thread(storage.move_prefix_aside, prefix)
+                except (OSError, storage.StorageError) as exc:
+                    os.unlink(blob)
+                    raise ValueError(f"the prefix could not be moved: {exc}") from exc
+        record = {
+            "stage": "waiting",
+            "prefix": prefix,
+            "old": old,
+            "gameKey": ctx["gameKey"],
+            "blob": blob,
+            "meta": meta,
+            "started": time.time(),
+            "appid": game["appid"],
+        }
+        data = storage.resets(self.paths.runtime_dir)
+        data[key] = record
+        await asyncio.to_thread(storage.save_resets, self.paths.runtime_dir, data)
+        log_event(logging.WARNING, "storage.prefix_reset", "Prefix moved aside; saves kept", key=key)
+        return {"ok": True, "stage": "waiting"}
+
+    async def cancel_prefix_reset(self, key: str) -> dict[str, Any]:
+        """Put the old prefix back, before the saves were restored into a fresh one."""
+        record = storage.resets(self.paths.runtime_dir).get(key)
+        if not record or record.get("stage") != "waiting":
+            raise ValueError("there is no waiting reset for this game")
+        await self._storage_game(key)
+        try:
+            await asyncio.to_thread(storage.put_prefix_back, record["prefix"], record["old"])
+        except (OSError, storage.StorageError) as exc:
+            raise ValueError(f"the old prefix could not be put back: {exc}") from exc
+        await asyncio.to_thread(self._forget_reset, key)
+        log_event(logging.INFO, "storage.prefix_reset_cancelled", "Old prefix put back", key=key)
+        return {"ok": True}
+
+    async def delete_old_prefix(self, key: str) -> dict[str, Any]:
+        """Free the space of a prefix a finished reset moved aside."""
+        record = storage.resets(self.paths.runtime_dir).get(key)
+        if not record or record.get("stage") != "restored":
+            raise ValueError("the reset has not finished yet")
+        try:
+            freed = await asyncio.to_thread(storage.delete_old_prefix, record["old"], record["prefix"])
+        except (OSError, storage.StorageError) as exc:
+            raise ValueError(str(exc)) from exc
+        await asyncio.to_thread(self._forget_reset, key)
+        log_event(logging.INFO, "storage.old_prefix_deleted", "Old prefix deleted", key=key, freed=freed)
+        return {"ok": True, "freed": freed}
+
+    def _forget_reset(self, key: str) -> None:
+        data = storage.resets(self.paths.runtime_dir)
+        record = data.pop(key, None)
+        storage.save_resets(self.paths.runtime_dir, data)
+        if record and record.get("blob") and os.path.exists(record["blob"]):
+            os.unlink(record["blob"])
+
+    async def _finish_prefix_reset(self, key: str) -> dict[str, Any]:
+        """After the first launch on a fresh prefix: put the kept saves back (with a pre-restore snapshot)."""
+        record = storage.resets(self.paths.runtime_dir).get(key)
+        if not record or record.get("stage") != "waiting":
+            return {"status": "none"}
+        game = await self._game(key)
+        gone = await asyncio.to_thread(
+            lifecycle.wait_for, lambda: not self._game_running(game), lifecycle.EXIT_WAIT_SECONDS
+        )
+        if not gone or not os.path.isdir(os.path.join(record["prefix"], "pfx", "drive_c")):
+            return {"status": "waiting"}  # still running, or Proton has not built the new prefix yet
+        await self.discover_games(refresh=True)
+        ctx = await self._snapshot_context(key)
+        eng = self._engine()
+        async with self.locks.hold(record["gameKey"], "saves"):
+            with self.jobs.job("restore"):
+                result = await asyncio.to_thread(
+                    eng.restore_copy,
+                    record["gameKey"],
+                    record["blob"],
+                    record["meta"],
+                    ctx["files"],
+                    ctx["roots"],
+                    ctx["running"],
+                )
+        data = storage.resets(self.paths.runtime_dir)
+        data[key] = {**record, "stage": "restored", "restored": time.time()}
+        await asyncio.to_thread(storage.save_resets, self.paths.runtime_dir, data)
+        await self.emit("keepsake_toast", f"{game['name']}: your saves are back in the fresh prefix.")
+        log_event(logging.INFO, "storage.prefix_reset_done", "Saves put back after a prefix reset", key=key)
+        return {"status": "restored", **{k: v for k, v in result.items() if k in ("status", "prerestore")}}
 
     # Trust (R3, ADR-0050): cloud integrity and export
 
