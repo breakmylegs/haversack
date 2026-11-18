@@ -27,7 +27,7 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
-FILES = ("main.py", "package.json", "plugin.json", "LICENSE", "README.md", "THIRD_PARTY_NOTICES.md")
+FILES = ("main.py", "package.json", "plugin.json", "LICENSE", "README.md", "THIRD_PARTY_NOTICES.md", "CHANGELOG.md")
 TREES = ("dist", "py_modules", "bin")
 EXECUTABLE_TREES = ("bin",)
 SKIP_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache"}
@@ -91,6 +91,7 @@ DESKTOP_FILES = (  # (source in the repository, path in the PC package)
     ("desktop/install.pyw", "install.pyw"),
     ("LICENSE", "LICENSE"),
     ("THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md"),
+    ("CHANGELOG.md", "CHANGELOG.md"),  # "What's new" after an update (ADR-0049)
     ("docs/pc-host.md", "README-PC.md"),
 )
 

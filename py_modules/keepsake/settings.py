@@ -50,6 +50,8 @@ DEFAULTS: dict[str, Any] = {
     # How each provider signs in from Gaming Mode (ADR-0044): Steam's browser, or the phone (device code).
     # Google blocks embedded browsers by policy, so it starts on the phone until the device probe says otherwise.
     "gamingModeSignin": {"onedrive": "browser", "gdrive": "phone"},
+    # First-run tips in the Quick Access Menu, until the user dismisses them (ADR-0049).
+    "tipsDismissed": False,
 }
 SIGNIN_METHODS = ("browser", "phone")
 MODULE_NAMES = ("saves", "advisor", "replication", "installer", "desktop")
@@ -74,6 +76,7 @@ USER_KEYS = frozenset(
         "moduleFlags",
         "libraryRoot",
         "gamingModeSignin",
+        "tipsDismissed",
     }
 )
 IDLE_MINUTES_RANGE = (10, 240)
@@ -192,6 +195,7 @@ def _validate(key: str, value: Any) -> Any:
         "registrySync",
         "steamCloudDetection",
         "suspendSnapshots",
+        "tipsDismissed",
     ):
         if not isinstance(value, bool):
             raise SettingsError("must be true or false")

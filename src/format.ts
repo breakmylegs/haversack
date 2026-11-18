@@ -18,6 +18,12 @@ export function isoText(iso: string | null | undefined): string {
   return iso ? iso.replace("T", " ").replace("Z", "") : "unknown time";
 }
 
+/** "Newer save from <device>, 10 minutes ago" (ADR-0049). */
+export function newerText(newer: { device: string | null; created: string | null }): string {
+  const when = newer.created ? agoText(Date.parse(newer.created) / 1000) : "";
+  return `Newer save from ${newer.device ?? "another device"}${when ? `, ${when}` : ""}`;
+}
+
 export function agoText(seconds: number | null | undefined, now: number = Date.now() / 1000): string {
   if (!seconds) return "never";
   const age = Math.max(0, now - seconds);

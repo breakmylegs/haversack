@@ -13,6 +13,8 @@ It is on by default on a handheld. On a PC it starts switched off, because its a
 - **Scaling:** the game's own upscaler first, then the gamescope filter. Frame generation (lsfg-vk) only when the base frame rate is high enough.
 - **The game's own preset**, plus the Proton version and launch options.
 
+On a machine without a battery, such as a Steam Machine or a desktop, Advisor leaves out battery estimates. If it has no profile for the machine, it suggests no TDP, because the machine's power limits are unknown.
+
 Advisor recognises your device from its hardware (for example the Legion Go and Legion Go 2) and the tools you have installed, such as TDP tools, lsfg-vk and OptiScaler. It only reads them.
 
 ## Where its advice comes from

@@ -55,6 +55,13 @@ function button(label: string, onClick: (self: HTMLButtonElement) => Promise<voi
 
 // Overview
 
+// "Newer save from <device>, 10 minutes ago" (ADR-0049).
+function newerText(newer: { device: string | null; created: string | null }): string {
+  const when = newer.created ? new Date(newer.created).toLocaleString() : "";
+  return `Newer save from ${newer.device ?? "another device"}${when ? ` (${when})` : ""}`;
+}
+const getItText = "Get it now from Games.";
+
 async function overview(main: HTMLElement): Promise<void> {
   const summary = await call<QamSummary>("qam_summary");
   const rows: [string, string][] = [
@@ -71,6 +78,7 @@ async function overview(main: HTMLElement): Promise<void> {
     summary.problems.length ? h("ul", { class: "problems" }, ...summary.problems.map((p) => h("li", {}, p))) : null,
     h("dl", { class: "facts" }, ...rows.flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])),
     summary.currentGame ? h("p", {}, `Playing ${summary.currentGame.name} (${summary.currentGame.status})`) : null,
+    ...(summary.newer ?? []).map((n) => h("p", { class: "newer" }, `${n.name}: ${newerText(n)}. ${getItText}`)),
     summary.busy ? h("p", { class: "busy" }, `Working: ${summary.busy}`) : null,
     h(
       "div",
@@ -389,6 +397,28 @@ function gameCard(g: GameMatch, main: HTMLElement, filter: string): HTMLElement 
       }${matchText[g.method] ?? g.method}.`,
     ),
     h("label", { class: "switch" }, toggle, " Sync this game"),
+    g.newer
+      ? h(
+          "div",
+          { class: "actions" },
+          h("span", { class: "newer" }, `${newerText(g.newer)}.`),
+          button("Get it now", async () => {
+            const r = await call<{ action: string; pending?: boolean }>("bring_newer", g.key);
+            toast(
+              r.action === "restored"
+                ? `${g.name}: the newer save is in place. The one it replaced is kept in History.`
+                : r.action === "conflict"
+                  ? `${g.name} changed here too, so nothing was replaced. Open Conflicts to choose.`
+                  : r.action === "offline"
+                    ? "The cloud could not be reached. Try again later."
+                    : r.pending
+                      ? `Quit ${g.name} first, then try again.`
+                      : `${g.name} is already up to date.`,
+            );
+            await games(main, filter);
+          }),
+        )
+      : null,
     proposal
       ? h(
           "div",

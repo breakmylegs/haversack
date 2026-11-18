@@ -35,6 +35,7 @@ from . import (
     net,
     ordering,
     pcwatch,
+    playtime,
     registry,
     resolve,
     restore,
@@ -148,6 +149,34 @@ def restore_paths(paths: Any) -> set[tuple[str, str]]:
             raise ValueError(f"not a file from this snapshot: {item}") from exc
         chosen.add((root, rel))
     return chosen
+
+
+WHATS_NEW_MAX = 4000
+
+
+def whats_new(changelog: str, version: str) -> str:
+    """The ``## [version]`` section of the changelog, without its heading, at most 4000 characters."""
+    lines = changelog.splitlines()
+    heading = f"## [{version}]"
+    try:
+        start = next(i for i, line in enumerate(lines) if line.strip().startswith(heading))
+    except StopIteration:
+        return ""
+    section = []
+    for line in lines[start + 1 :]:
+        if line.startswith("## "):
+            break
+        section.append(line)
+    text = "\n".join(section).strip()
+    return text if len(text) <= WHATS_NEW_MAX else text[: WHATS_NEW_MAX - 1].rstrip() + "…"
+
+
+def _read_text(path: str) -> str:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            return handle.read(512 * 1024)
+    except OSError:
+        return ""
 
 
 def _read_bytes(path: str) -> bytes:
@@ -480,7 +509,12 @@ class KeepsakeApp:
         }
 
     async def take_startup_notice(self) -> dict[str, Any] | None:
+        """Once after an update: the versions and that version's changelog section ("What's new", ADR-0049)."""
         notice, self._notice = self._notice, None
+        if notice:
+            path = os.path.join(self.paths.plugin_dir, "CHANGELOG.md")
+            text = await asyncio.to_thread(_read_text, path)
+            notice = {**notice, "notes": whats_new(text, str(notice.get("to", "")))}
         return notice
 
     async def check_for_updates(self, force: bool = False) -> dict[str, Any]:
@@ -617,6 +651,7 @@ class KeepsakeApp:
                     "proposal": proposal,
                     "enabled": bool(config.get("enabled")),
                     "sync": status_word(state) if config.get("enabled") else "off",
+                    "newer": newer_save(state) if config.get("enabled") else None,
                     "steamCloud": self._steam_cloud(game),
                     "hasRegistry": bool(
                         index and match.get("title") and index["games"].get(match["title"], {}).get("r")
@@ -1114,6 +1149,28 @@ class KeepsakeApp:
             settings=self.settings.all,
         )
 
+    def _playtime(self) -> playtime.Recorder:
+        eng = self._engine()
+        return playtime.Recorder(self.paths.runtime_dir, self._store, eng.device_id, eng.seq.next)
+
+    async def game_playtime(self, key: str) -> dict[str, Any]:
+        """Time played across your devices, by device name (ADR-0049). Informational only (P4)."""
+        game_key = (await self._snapshot_context(key))["gameKey"]
+        eng = self._engine()
+        found = await asyncio.to_thread(playtime.totals, eng.store, game_key)
+        names = {
+            str(m.get("deviceId")): str(m.get("deviceName")) for m in await asyncio.to_thread(eng.list_metas, game_key)
+        }
+        names[eng.device_id] = str(self.settings.get("deviceName") or "This device")
+        return {
+            "totalSeconds": found["totalSeconds"],
+            "sessions": found["sessions"],
+            "byDevice": sorted(
+                ({"device": names.get(d, "Another device"), "seconds": s} for d, s in found["byDevice"].items()),
+                key=lambda item: -item["seconds"],
+            ),
+        }
+
     def _bases(self) -> dict[str, str]:
         data = read_json(os.path.join(self.paths.runtime_dir, "snapshot-bases.json"), default={})
         return data if isinstance(data, dict) else {}
@@ -1600,7 +1657,12 @@ class KeepsakeApp:
             async with self.locks.hold(ctx.game_key, "saves"):
                 with self.jobs.job("sync"):
                     result = await asyncio.to_thread(self._sync().push, ctx)
-            self._record_session(ctx.game_key, lastEnd=time.time())
+            session = self._sessions().get(ctx.game_key, {})
+            now = time.time()
+            self._record_session(ctx.game_key, lastEnd=now)
+            start = float(session.get("lastStart") or 0)
+            if start > float(session.get("lastEnd") or 0):
+                await self._record_playtime(ctx.game_key, start, now)
         except (ValueError, SnapshotError, StoreError) as exc:
             log_event(logging.WARNING, "lifecycle.exit_failed", "Exit save failed", key=key, error=str(exc))
             return {"status": "error", "error": str(exc)}
@@ -1615,6 +1677,12 @@ class KeepsakeApp:
             )
         log_event(logging.INFO, "lifecycle.exit", "Exit save finished", key=key, status=status)
         return result
+
+    async def _record_playtime(self, game_key: str, start: float, end: float) -> None:
+        try:
+            await asyncio.to_thread(self._playtime().record, game_key, start, end)
+        except (OSError, StoreError, SnapshotError) as exc:
+            log_event(logging.INFO, "playtime.failed", "Playtime not recorded", error=str(exc))
 
     # Strict wrapper: the frontend reads and writes launch options; the backend keeps the originals.
 
@@ -1650,6 +1718,17 @@ class KeepsakeApp:
             gameKey=ctx.game_key,
             action=result.get("action"),
             reason=result.get("reason"),
+        )
+        return result
+
+    async def bring_newer(self, key: str) -> dict[str, Any]:
+        """The "Get it now" button: bring in the newer save from another device, outside a launch (ADR-0049)."""
+        ctx = await self._sync_context(key)
+        async with self.locks.hold(ctx.game_key, "saves"):
+            with self.jobs.job("sync"):
+                result = await asyncio.to_thread(self._sync().fetch_newer, ctx)
+        log_event(
+            logging.INFO, "sync.pull", "Brought in a newer save", gameKey=ctx.game_key, action=result.get("action")
         )
         return result
 
@@ -1719,6 +1798,10 @@ class KeepsakeApp:
                 outcomes.append({"key": game["key"], **outcome})
             except (ValueError, SnapshotError, StoreError) as exc:
                 outcomes.append({"key": game["key"], "status": "error", "error": str(exc)})
+        try:
+            await asyncio.to_thread(self._playtime().flush)  # sessions recorded while offline
+        except (OSError, StoreError, SnapshotError):
+            pass
         await self._warn_signin()
         log_event(logging.INFO, "sync.idle", "Idle pass finished", games=len(outcomes))
         return outcomes
@@ -1778,6 +1861,11 @@ class KeepsakeApp:
             if state.get("sessionOpen"):
                 current = {"key": game["key"], "name": game["name"], "status": status_word(state)}
                 break
+        newer = [
+            {"key": game["key"], "name": game["name"], **found}
+            for game, gk in enabled
+            if (found := newer_save(states.get(gk) or {}))
+        ]
         cloud = await self.cloud_status()
         checks = await self._health(probe=False)
         return {
@@ -1790,7 +1878,9 @@ class KeepsakeApp:
             "conflicts": sum(1 for _, gk in enabled if (states.get(gk) or {}).get("conflict")),
             "enabledGames": len(enabled),
             "currentGame": current,
+            "newer": newer[:3],  # "Newer save from <device>" before you play (ADR-0049)
             "setupComplete": bool(self.settings.get("setupComplete")),
+            "tipsDismissed": bool(self.settings.get("tipsDismissed")),
             "busy": self.jobs.busy_reason(),
         }
 
@@ -2701,6 +2791,14 @@ def status_word(state: dict[str, Any]) -> str:
     if state.get("base"):
         return "synced"
     return "not-synced"
+
+
+def newer_save(state: dict[str, Any]) -> dict[str, Any] | None:
+    """A newer save from another device that this device has not taken in yet (ADR-0049)."""
+    newer = state.get("newer")
+    if not isinstance(newer, dict) or newer.get("snapId") == state.get("base") or state.get("conflict"):
+        return None
+    return {"snapId": newer.get("snapId"), "device": newer.get("device"), "created": newer.get("created")}
 
 
 def _skips(extracted: dict[str, Any]) -> dict[str, Any]:

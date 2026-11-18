@@ -235,6 +235,12 @@ class Plugin:
     async def sync_pull(self, key: str) -> dict[str, Any]:
         return await self.app.sync_pull(key)
 
+    async def game_playtime(self, key: str) -> dict[str, Any]:
+        return await self.app.game_playtime(key)
+
+    async def bring_newer(self, key: str) -> dict[str, Any]:
+        return await self.app.bring_newer(key)
+
     async def sync_push(self, key: str) -> dict[str, Any]:
         return await self.app.sync_push(key)
 

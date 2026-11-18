@@ -257,7 +257,10 @@ def translate(rec: dict[str, Any], tools: Tools, device: dict[str, Any], selecte
     in_game = rec.get("in_game") or {}
     if in_game.get("preset"):
         lines["in_game"].append(f"Graphics preset: {in_game['preset']}.")
-    lines["battery"] = battery_lines(rec, device)
+    lines["battery"] = [] if device.get("mains_only") else battery_lines(rec, device)
+    if device.get("mains_only") and device.get("generic"):
+        # A mains-powered machine with no profile: its power limits are unknown, so no TDP is suggested (ADR-0049).
+        lines["power"] = [MAINS_POWER_LINE]
     out = copy.deepcopy(rec)
     out["lines"] = lines
     out["matchLabel"] = MATCH_LABELS.get(rec["device_match"], rec["device_match"])
@@ -266,6 +269,7 @@ def translate(rec: dict[str, Any], tools: Tools, device: dict[str, Any], selecte
 
 # Battery
 
+MAINS_POWER_LINE = "This device runs on mains power and has no profile here, so no TDP is suggested."
 NEAR_MATCHES = ("exact", "variant", "family")
 
 

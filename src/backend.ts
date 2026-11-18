@@ -242,6 +242,8 @@ export interface QamSummary {
   conflicts: number;
   enabledGames: number;
   currentGame: { key: string; name: string; status: SyncWord } | null;
+  newer?: (NewerSave & { key: string; name: string })[];
+  tipsDismissed?: boolean;
   setupComplete: boolean;
   busy: string | null;
 }
@@ -359,6 +361,8 @@ export type PreparedUpdate =
 export interface StartupNotice {
   from: string;
   to: string;
+  /** The changelog section for `to` (ADR-0049). */
+  notes?: string;
 }
 
 export interface LogRecord {
@@ -440,6 +444,14 @@ export interface GameMatch extends MatchInfo {
   sync: SyncWord;
   steamCloud: SteamCloud;
   hasRegistry: boolean;
+  /** ADR-0049: a newer save from another device, not taken in yet. */
+  newer?: NewerSave | null;
+}
+
+export interface NewerSave {
+  snapId: string;
+  device: string | null;
+  created: string | null;
 }
 
 export interface CustomPath {
@@ -628,6 +640,13 @@ export const syncStatus = callable<[key: string], SyncStatus>("sync_status");
 export const snapshotGame = callable<[key: string, label?: string], SnapshotResult>("snapshot_game");
 export const listSnapshots = callable<[key: string], SnapshotListing>("list_snapshots");
 export const restoreSnapshot = callable<[key: string, snapId: string, paths?: string[]], SnapshotResult>("restore_snapshot");
+export interface Playtime {
+  totalSeconds: number;
+  sessions: number;
+  byDevice: { device: string; seconds: number }[];
+}
+export const gamePlaytime = callable<[key: string], Playtime>("game_playtime");
+export const bringNewer = callable<[key: string], { action: string; reason?: string; pending?: boolean }>("bring_newer");
 export const restorePreview = callable<[key: string, snapId: string], { snapId: string; changes: RestoreChange[] }>("restore_preview");
 export const activity = callable<[limit: number], ActivityEntry[]>("activity");
 export const undoRestore = callable<[key: string, prerestoreId: string], SnapshotResult>("undo_restore");

@@ -6,6 +6,11 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ### Added
 
+- Newer save from another device: the game's row, the Quick Access Menu and the PC Overview say when another device has a newer save, for example "Newer save from Handheld B, 10 minutes ago". **Get it now** brings it in straight away, but only if you have not played on since; otherwise nothing is replaced (ADR-0049).
+- Playtime across your devices: each game's page shows how long you have played it in all, and on each device (ADR-0049).
+- What's new: after an update, Keepsake shows that version's release notes once. A short tip in the Quick Access Menu introduces checkpoints and restoring single files (ADR-0049).
+- Machines without a battery, such as a Steam Machine or a desktop: Advisor leaves out battery estimates, and suggests no TDP when it has no profile for the machine (ADR-0049).
+
 - Checkpoints: **Save checkpoint** keeps a named copy of a game's save, for example "Before the final boss". It is in the Quick Access Menu while you play and in each game's History. Checkpoints are kept until you remove them (ADR-0048).
 - Restore some files: see what restoring an older save would change, file by file, and restore only the files you choose. It can be undone like any restore (ADR-0048).
 - A clearer conflict screen: it shows when this device's save last changed (not "now"), and lists the files that are new, gone or changed on each side. Keepsake still never chooses for you (ADR-0048).
@@ -21,6 +26,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 - Diagnostics, "Sign-in browser test": three steps that check which sign-ins work in Steam's browser on your device (ADR-0044).
 - PC preview, more of the desktop interface: Games (turn sync on per game, choose a game's save data, confirm a link another device proposes), Import from Ludusavi with progress, and Settings (device name, sync interval, notifications, update channel).
 - PC preview, updates: the desktop interface has an Updates page. Check, Install, then Restart. Keepsake installs a new version only when the release signature and checksum prove it is Keepsake's own. It keeps the version you had, so "Go back" returns to it. Your settings, saves and start-up choice are left as they are (ADR-0043).
+
+### Changed
+
+- The PC interface's text now follows your browser's text size setting (ADR-0049).
 
 ## [0.25.0]
 

@@ -354,7 +354,40 @@ class SyncEngine:
         for name in os.listdir(folder):
             if name.endswith(".zip") and name[:-4] not in heads:
                 os.unlink(os.path.join(folder, name))  # local cache only
+        self.state.update(gk, newer=self._newer_elsewhere(base, heads, by_id))
         return fetched
+
+    def _newer_elsewhere(
+        self, base: str | None, heads: list[str], by_id: Mapping[str, Mapping[str, Any]]
+    ) -> dict[str, Any] | None:
+        """A single cloud head from another device that moved on from this device's base (ADR-0049).
+
+        Shown as "Newer save from <device>" before launch. A fork is a conflict, not this.
+        """
+        if not base or base not in by_id or len(heads) != 1 or heads[0] == base:
+            return None
+        meta = by_id[heads[0]]
+        if meta.get("deviceId") == self.engine.device_id:
+            return None
+        return {"snapId": heads[0], "device": meta.get("deviceName"), "created": meta.get("created")}
+
+    def fetch_newer(self, ctx: GameContext) -> dict[str, Any]:
+        """Bring in a newer save now, outside a launch: the normal decision table, no session opened.
+
+        It restores only when this device's save has not changed since the base, and never
+        while the game runs (P6); otherwise it reports a conflict or a pending pull.
+        """
+        gk = ctx.game_key
+        try:
+            result = self._pull(ctx, self.state.get(gk))
+        except NewerSchemaError:
+            return {"action": "blocked", "reason": "newer-schema"}
+        except StoreUnavailable:
+            return {"action": "offline"}
+        record = self.state.get(gk)
+        if (record.get("newer") or {}).get("snapId") == record.get("base"):
+            self.state.update(gk, newer=None)  # brought in, or converged
+        return result
 
     def idle(self, ctx: GameContext) -> dict[str, Any]:
         """The 30-minute pass: prefetch heads and push changes made with no session open."""

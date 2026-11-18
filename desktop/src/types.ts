@@ -13,6 +13,7 @@ export interface QamSummary {
   conflicts: number;
   enabledGames: number;
   currentGame: { key: string; name: string; status: string } | null;
+  newer?: (NewerSave & { key: string; name: string })[];
   setupComplete: boolean;
   busy: string | null;
 }
@@ -132,6 +133,13 @@ export interface GameMatch {
   proposal?: { candidate: { gameKey: string; title: string | null } } | null;
   enabled: boolean;
   sync: string;
+  newer?: NewerSave | null;
+}
+
+export interface NewerSave {
+  snapId: string;
+  device: string | null;
+  created: string | null;
 }
 
 export interface Settings {

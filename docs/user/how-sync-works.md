@@ -43,7 +43,15 @@ flowchart LR
     F --> G[Newer saves from other devices put in place]
 ```
 
-A PC cannot pause a game the way Steam on a handheld lets Keepsake do, so Keepsake never touches a game's saves while it runs. Saves from your other devices arrive when Keepsake syncs while the game is closed. Press **Sync now** on the Overview before you play, to be sure you have the newest save.
+A PC cannot pause a game the way Steam on a handheld lets Keepsake do, so Keepsake never touches a game's saves while it runs.
+
+## Newer save from another device
+
+When another device has saved a game since this one last synced it, the game's row, the Quick Access Menu and the PC Overview say so: "Newer save from Handheld B, 10 minutes ago". On a handheld it is brought in automatically when you start the game. **Get it now** on the game's row brings it in straight away, on a handheld or a PC. It only does so when you have not played on since; otherwise it tells you there is a conflict, and nothing is replaced.
+
+## Playtime
+
+Each game's page shows how long you have played it across your devices, for example "Played 12 h 30 min on your devices", with the time on each one. Sessions under a minute and over a day are not counted. Playtime is shown for your information only, and never decides which save is kept.
 
 ## What Keepsake will never do
 

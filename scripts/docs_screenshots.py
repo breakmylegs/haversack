@@ -42,6 +42,7 @@ NOW = 1_794_000_000.0  # a fixed moment, so screenshots do not change from run t
 SIZE = "1100,820"
 
 # Synthetic names only: no real games, devices, accounts or paths (P12).
+NEWER = {"snapId": "000007-bbbbbb-0badc0de", "device": "Handheld B", "created": "2026-11-06T20:55:00Z"}
 GAMES = [
     {
         "key": "shortcut:7:3000000101",
@@ -54,6 +55,7 @@ GAMES = [
         "proposal": None,
         "enabled": True,
         "sync": "synced",
+        "newer": NEWER,
     },
     {
         "key": "shortcut:7:3000000102",
@@ -221,6 +223,7 @@ class SampleApp:
             "conflicts": 1,
             "enabledGames": 2,
             "currentGame": None,
+            "newer": [{"key": "shortcut:7:3000000101", "name": "Example Quest", **NEWER}],
             "busy": None,
         }
 
