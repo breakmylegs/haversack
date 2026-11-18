@@ -350,15 +350,17 @@ def test_sources_outside_home_are_passed_to_the_runtime(env, monkeypatch):
     monkeypatch.setattr(service.os.path, "isfile", lambda p: str(p).endswith(".iso"))
     monkeypatch.setattr(service.os.path, "realpath", lambda p: p)
     job = installer.start("/home/deck/Downloads/disc.iso", "Disc Game")
-    assert job["compatMounts"] == "/run/media/deck/DISC:/run/media/deck/SD/Games/Disc Game"
+    assert job["compatMounts"] == "/run/media/deck:/run/media/deck/SD/Games/Disc Game"
     installer.create_shortcut(job["id"], "setup.exe")
     options = ops.claim()["payload"]["launchOptions"]
-    assert options == 'STEAM_COMPAT_MOUNTS="/run/media/deck/DISC:/run/media/deck/SD/Games/Disc Game" %command%'
+    assert options == 'STEAM_COMPAT_MOUNTS="/run/media/deck:/run/media/deck/SD/Games/Disc Game" %command%'
     assert files.compat_mounts(["/home/deck/Games/X", "/home/deck"], "/home/deck") == ""
     assert files.compat_mounts(["/home/deckard/X"], "/home/deck") == "/home/deckard/X"  # not a prefix match
     with pytest.raises(ValueError):
         files.compat_mounts(["/mnt/a:b"], "/home/deck")
-    installer.runner = FakeUdisks("/run/media/deck/BAD:NAME")
+    # Only the folder discs are mounted under goes into the launch option (ADR-0053), so a colon in a disc's
+    # own name is harmless; a colon in the library folder still cannot be carried, so that is refused.
+    installer.library_root = lambda: "/run/media/deck/SD:X/Games"
     with pytest.raises(InstallerError):
         installer.start("/home/deck/Downloads/disc.iso", "Disc Game")
     assert installer.runner.calls[-2:] == ["unmount", "loop-delete"]  # refused, and the disc released

@@ -132,3 +132,50 @@ def find_installers(source: str) -> list[str]:
         score -= 1 if name.lower().startswith("autorun") else 0
         found.append((score, path))
     return [path for _score, path in sorted(found, key=lambda f: (-f[0], f[1]))]
+
+
+# Installer III (ADR-0053): the other discs of a set, and runtime installers shipped with a game
+
+RUNTIMES = (
+    ("Visual C++ runtime", ("vcredist", "vc_redist")),
+    ("DirectX", ("dxsetup",)),
+    (".NET Framework", ("dotnetfx", "ndp4", "ndp3", "ndp2")),
+    ("PhysX", ("physx",)),
+    ("XNA Framework", ("xnafx",)),
+    ("OpenAL", ("oalinst",)),
+)
+
+
+def sibling_discs(source: str) -> list[str]:
+    """The other ``.iso`` files in the same folder as ``source``, in name order (disc 2, disc 3...)."""
+    folder = os.path.dirname(source)
+    try:
+        names = sorted(os.listdir(folder), key=str.lower)
+    except OSError:
+        return []
+    own = os.path.basename(source)
+    return [n for n in names if n.lower().endswith(".iso") and n != own and os.path.isfile(os.path.join(folder, n))][
+        :10
+    ]
+
+
+def find_runtimes(*listings: dict[str, tuple[int, float]]) -> list[dict[str, str]]:
+    """Runtime installers a game ships (``_CommonRedist`` and the like): name and relative path, at most 20.
+
+    Guidance only: Proton already provides most of these, so they are run only if the game will not start.
+    """
+    found: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for listing in listings:
+        for rel in sorted(listing):
+            name = os.path.basename(rel).lower()
+            if not name.endswith((".exe", ".msi")) or rel in seen:
+                continue
+            for label, needles in RUNTIMES:
+                if any(name.startswith(n) or n in name for n in needles):
+                    found.append({"runtime": label, "path": rel})
+                    seen.add(rel)
+                    break
+            if len(found) >= 20:
+                return found
+    return found

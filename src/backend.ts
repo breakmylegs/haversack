@@ -62,8 +62,17 @@ export interface ModulesStatus {
 export interface InstallJob {
   id: number;
   title: string;
-  state: "choose-installer" | "creating-shortcut" | "run-installer" | "choose-game" | "retargeting" | "done" | "failed" | "cancelled";
-  kind: "iso" | "folder";
+  state:
+    | "queued"
+    | "choose-installer"
+    | "creating-shortcut"
+    | "run-installer"
+    | "choose-game"
+    | "retargeting"
+    | "done"
+    | "failed"
+    | "cancelled";
+  kind?: "iso" | "folder";
   source: string;
   target: string;
   windowsTarget: string;
@@ -75,6 +84,9 @@ export interface InstallJob {
   shortcutRemoved?: boolean;
   gameExe?: string;
   artwork?: Record<string, boolean>;
+  /** ADR-0053: the other ISOs of a disc set, and runtime installers found with the game. */
+  otherDiscs?: string[];
+  runtimes?: { runtime: string; path: string }[];
 }
 
 export interface InstallerStatus {
@@ -150,7 +162,8 @@ export const steamOpsFile = callable<[id: number], { base64: string }>("steam_op
 export const saveSteamGridDbKey = callable<[kind: "steamgriddb", values: { apiKey: string }], { configured: boolean }>(
   "set_backend_config",
 );
-export const installerStart = callable<[source: string, title: string], InstallJob>("installer_start");
+export const installerStart = callable<[source: string, title: string, queue?: boolean], InstallJob>("installer_start");
+export const installerSwapDisc = callable<[jobId: number, disc: string], InstallJob>("installer_swap_disc");
 export const installerCreateShortcut = callable<[jobId: number, installer: string], InstallJob>("installer_create_shortcut");
 export const installerFinishedInstalling = callable<[jobId: number], InstallJob>("installer_finished_installing");
 export const installerRetarget = callable<[jobId: number, exe: string], InstallJob>("installer_retarget");

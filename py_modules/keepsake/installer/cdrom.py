@@ -73,3 +73,29 @@ def remove_links(links: list[str], targets: dict[str, str]) -> list[str]:
             os.unlink(link)
             removed.append(link)
     return removed
+
+
+def repoint(
+    links: list[str],
+    targets: dict[str, str],
+    new_target_for: Callable[[str], str],
+    symlink: Callable[[str, str], None] = os.symlink,
+) -> dict[str, str]:
+    """Point each of Keepsake's drive links at a new disc, one rename each (ADR-0053).
+
+    Every link is checked first, so a link changed outside Keepsake stops the swap before anything moves.
+    Returns the new targets.
+    """
+    for link in links:
+        if not os.path.islink(link) or os.readlink(link) != targets.get(link):
+            raise CdromError("the disc drive was changed outside Keepsake; swap the disc by hand")
+    new: dict[str, str] = {}
+    for link in links:
+        target = new_target_for(link)
+        temporary = link + ".keepsake-swap"
+        if os.path.lexists(temporary):
+            os.unlink(temporary)
+        symlink(target, temporary)
+        os.replace(temporary, link)
+        new[link] = target
+    return new

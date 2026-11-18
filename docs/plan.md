@@ -116,7 +116,7 @@ R1 to R3 need no device, so they are built now, while slices 16 to 25 wait for d
 | R3 Trust and distribution | Cloud integrity scrub, zip export to a chosen folder, Decky store readiness, SBOM and key runbooks, performance budget in the gate. Built (ADR-0050, `docs/slices/r3-report.md`); the store submission needs Peter | No |
 | R4 Coverage | Emulator saves (RetroArch, EmuDeck), Heroic, Lutris and Bottles games. Built (ADR-0051, `docs/slices/r4-report.md`); waits for the device checks | Yes, at the end |
 | R5 Storage | Per-game disk use, clear shader cache, reset prefix and keep saves. Built (ADR-0052, `docs/slices/r5-report.md`); waits for the device checks | Yes, at the end |
-| R6 Installer III | Multi-disc swap, install queue, runtime check | Yes, at the end |
+| R6 Installer III | Multi-disc swap, install queue, runtime check. Built (ADR-0053, `docs/slices/r6-report.md`); waits for the device checks | Yes, at the end |
 | R6b Dropbox | Dropbox with PKCE and an app folder | Needs Peter's app registration |
 
 Also: Wake-on-LAN joins slice 17, and the Steam LAN transfer explanation joins slice 19.

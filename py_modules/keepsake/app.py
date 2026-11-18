@@ -432,6 +432,13 @@ class KeepsakeApp:
             removed = await asyncio.to_thread(self.installer.clean_downloads)
             if removed:
                 log_event(logging.INFO, "installer.net_cleaned", "Left-over downloads removed", count=len(removed))
+            try:
+                resumed = await asyncio.to_thread(self.installer.resume)  # discs after a restart, then the queue
+            except (InstallerError, udisks.UdisksError, OSError) as exc:
+                log_event(logging.WARNING, "installer.resume_failed", "Installs not resumed", error=str(exc))
+            else:
+                if resumed:
+                    log_event(logging.INFO, "installer.resumed", "Installs resumed after a restart", count=len(resumed))
 
         async def installer_stop() -> None:
             self._net_cancel = True
@@ -2866,12 +2873,21 @@ class KeepsakeApp:
             raise ValueError("Keepsake cannot see the new shortcut yet; try again in a moment")
         return {"key": game["key"], "replication": self.registry.enabled("replication")}
 
-    async def installer_start(self, source: str, title: str) -> dict[str, Any]:
+    async def installer_swap_disc(self, job_id: int, disc: str) -> dict[str, Any]:
+        """Put the next disc of a set in the emulated drive while the installer waits for it (ADR-0053)."""
         try:
-            job = await asyncio.to_thread(self._installer().start, str(source), str(title))
+            job = await asyncio.to_thread(self._installer().swap_disc, int(job_id), str(disc))
         except (InstallerError, udisks.UdisksError) as exc:
             raise ValueError(str(exc)) from exc
-        log_event(logging.INFO, "installer.start", "Install prepared", job=job["id"], kind=job["kind"])
+        log_event(logging.INFO, "installer.disc_swapped", "Disc swapped", job=int(job_id))
+        return job
+
+    async def installer_start(self, source: str, title: str, queue: bool = False) -> dict[str, Any]:
+        try:
+            job = await asyncio.to_thread(self._installer().start, str(source), str(title), False, bool(queue))
+        except (InstallerError, udisks.UdisksError) as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(logging.INFO, "installer.start", "Install prepared", job=job["id"], kind=job.get("kind", "queued"))
         return job
 
     # Installing from a network location that is not mounted (ADR-0033)
