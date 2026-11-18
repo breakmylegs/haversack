@@ -6,6 +6,9 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ### Added
 
+- Cloud integrity: once a week Keepsake checks that the cloud copies of each game's important snapshots are intact, and **Check cloud integrity** checks them all. A damaged copy shows in Health and in the game's History, where **Repair** saves a fresh copy from this device (ADR-0050).
+- Export snapshots: copy your saves out as plain zip files, with a list of their contents, to a folder you choose, such as an SD card. There is no lock-in, and nothing in that folder is overwritten (ADR-0050).
+- Releases now include a software bill of materials, covered by the release signature. The release instructions include signing-key rotation and compromise runbooks, and private vulnerability reporting is on (ADR-0050).
 - Newer save from another device: the game's row, the Quick Access Menu and the PC Overview say when another device has a newer save, for example "Newer save from Handheld B, 10 minutes ago". **Get it now** brings it in straight away, but only if you have not played on since; otherwise nothing is replaced (ADR-0049).
 - Playtime across your devices: each game's page shows how long you have played it in all, and on each device (ADR-0049).
 - What's new: after an update, Keepsake shows that version's release notes once. A short tip in the Quick Access Menu introduces checkpoints and restoring single files (ADR-0049).
@@ -30,6 +33,7 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 ### Changed
 
 - The PC interface's text now follows your browser's text size setting (ADR-0049).
+- Snapshot clean-up plans are about four times faster for games with long histories (ADR-0050).
 
 ## [0.25.0]
 

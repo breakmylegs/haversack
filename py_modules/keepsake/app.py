@@ -39,6 +39,7 @@ from . import (
     registry,
     resolve,
     restore,
+    retention,
     steamcloud,
 )
 from .advisor import anticheat, deckverified
@@ -121,6 +122,68 @@ def import_verdict(results: list[dict[str, Any]], error: str | None) -> str:
 
 async def _no_emit(event: str, *args: Any) -> None:
     return None
+
+
+SCRUB_FILE = "integrity.json"
+SCRUB_INTERVAL = 7 * 24 * 3600
+EXPORT_README = """Keepsake export
+
+Each folder holds one game. Each zip is one snapshot of that game's save files, named by
+date and snapshot id, and checked against Keepsake's records when it was exported.
+
+Inside a zip, files sit under neutral folder names rather than paths from one device:
+  winLocalAppData  Windows %LOCALAPPDATA% (in a Proton prefix: AppData/Local)
+  winAppData       Windows %APPDATA% (AppData/Roaming)
+  winLocalAppDataLow  AppData/LocalLow
+  winDocuments     Documents
+  winSavedGames    Saved Games
+  winPublic        C:/Users/Public
+  winProgramData   C:/ProgramData
+  base             the game's install folder
+  home, xdgConfig, xdgData  Linux home, ~/.config and ~/.local/share
+  steamUserdata    the game's folder in Steam's userdata
+  registry         the game's registry keys, as a user.reg fragment
+To use a save elsewhere, copy the files from that folder to the same place for the game.
+
+index.json lists every snapshot, its game, device, time and files.
+"""
+WINDOWS_NAME_CHARS = set('<>:"/\\|?*')
+
+
+def export_folder(folder: Any) -> str:
+    """The folder an export goes into: an existing, absolute, writable folder the user chose."""
+    path = str(folder or "").strip()
+    if not path or not os.path.isabs(path) or "\x00" in path:
+        raise ValueError("choose a folder to export to")
+    path = os.path.realpath(path)
+    if not os.path.isdir(path):
+        raise ValueError("that folder does not exist")
+    if not os.access(path, os.W_OK):
+        raise ValueError("Keepsake cannot write to that folder")
+    return path
+
+
+def safe_name(name: Any) -> str:
+    """A folder name that works on FAT, exFAT, NTFS and ext4: no reserved characters, no trailing dot."""
+    text = "".join("_" if ch in WINDOWS_NAME_CHARS or ord(ch) < 32 else ch for ch in str(name)).strip(" .")
+    return text[:80] or "Unnamed game"
+
+
+def _new_folder(parent: str, name: str) -> str:
+    """Create a new folder ``name`` in ``parent``, numbered if one already exists; never reuses one."""
+    for attempt in range(1, 100):
+        path = os.path.join(parent, name if attempt == 1 else f"{name} ({attempt})")
+        try:
+            os.makedirs(path)
+            return path
+        except FileExistsError:
+            continue
+    raise ValueError("too many exports in that folder this minute")
+
+
+def _write_new(path: str, text: str) -> None:
+    with open(path, "x", encoding="utf-8", newline="\n") as handle:  # never overwrites
+        handle.write(text)
 
 
 CHECKPOINT_LABEL_MAX = 60
@@ -1335,7 +1398,11 @@ class KeepsakeApp:
             if device not in latest or meta["created"] > latest[device]["created"]:
                 latest[device] = meta
 
+        scrub = await asyncio.to_thread(read_json, os.path.join(self.paths.runtime_dir, SCRUB_FILE), {})
+        found = ((scrub.get("games") or {}).get(game_key) or {}) if isinstance(scrub, dict) else {}
         return {
+            # Snapshots the integrity check found damaged or missing in the cloud (ADR-0050).
+            "damaged": sorted(set(found.get("bad") or []) | set(found.get("missing") or [])),
             "lastByDevice": [
                 {"device": m.get("deviceName"), "created": m["created"], "kind": m["kind"], "snapId": m["snapId"]}
                 for m in sorted(latest.values(), key=lambda m: m["created"], reverse=True)
@@ -1802,6 +1869,7 @@ class KeepsakeApp:
             await asyncio.to_thread(self._playtime().flush)  # sessions recorded while offline
         except (OSError, StoreError, SnapshotError):
             pass
+        await self._weekly_scrub()
         await self._warn_signin()
         log_event(logging.INFO, "sync.idle", "Idle pass finished", games=len(outcomes))
         return outcomes
@@ -2022,8 +2090,139 @@ class KeepsakeApp:
             "ludusavi": await asyncio.to_thread(health.detect_decky_plugin, os.environ.get("DECKY_HOME"), "ludusavi"),
             "pythonModules": {"xml": httpcall.xml_available(), "sqlite3": statedb_sqlite_available()},
             "store": self.settings.get("snapshotStore"),
+            "integrity": await asyncio.to_thread(read_json, os.path.join(self.paths.runtime_dir, SCRUB_FILE), {}),
         }
         return health.run(facts)
+
+    # Trust (R3, ADR-0050): cloud integrity and export
+
+    async def scrub_cloud(self, full: bool = False) -> dict[str, Any]:
+        """Verify the cloud snapshots of every synced game. Changes nothing.
+
+        The weekly check covers heads, pins and every device's base (what restores rely on);
+        ``full`` checks every snapshot whose files are kept.
+        """
+        eng = self._engine()
+        report: dict[str, Any] = {"lastRun": time.time(), "full": bool(full), "games": {}}
+        seen: set[str] = set()
+        with self.jobs.job("scrub"):
+            for game, config, gk in await self._matched():
+                if not gk or gk in seen or not config.get("enabled"):
+                    continue
+                seen.add(gk)
+                try:
+                    only: set[str] | None = None
+                    if not full:
+                        metas = await asyncio.to_thread(eng.list_metas, gk)
+                        pins = {p["snapId"] for p in await asyncio.to_thread(eng.pins, gk)}
+                        bases = set((await asyncio.to_thread(eng.cloud_bases, gk)).values())
+                        only = retention.heads(metas) | pins | bases
+                    result = await asyncio.to_thread(eng.scrub, gk, only)
+                except StoreError as exc:
+                    result = {"checked": 0, "bad": [], "missing": [], "error": str(exc)}
+                report["games"][gk] = {"name": game["name"], "key": game["key"], **result}
+        await asyncio.to_thread(atomic_write_json, os.path.join(self.paths.runtime_dir, SCRUB_FILE), report)
+        damaged = sum(len(g["bad"]) + len(g["missing"]) for g in report["games"].values())
+        log_event(
+            logging.WARNING if damaged else logging.INFO,
+            "integrity.scrub",
+            "Cloud integrity checked",
+            games=len(report["games"]),
+            damaged=damaged,
+        )
+        return report
+
+    async def _weekly_scrub(self) -> None:
+        last = float(
+            (await asyncio.to_thread(read_json, os.path.join(self.paths.runtime_dir, SCRUB_FILE), {})).get("lastRun")
+            or 0
+        )
+        if time.time() - last >= SCRUB_INTERVAL:
+            try:
+                await self.scrub_cloud(full=False)
+            except (StoreError, SnapshotError, OSError) as exc:
+                log_event(logging.INFO, "integrity.scrub_failed", "Integrity check skipped", error=str(exc))
+
+    async def repair_snapshot(self, key: str) -> dict[str, Any]:
+        """Repair after a damaged cloud copy: save a fresh snapshot of this device's files under a new id.
+
+        Write-once objects are never fixed in place (P2); the new snapshot becomes this device's base.
+        """
+        ctx = await self._snapshot_context(key)
+        eng = self._engine()
+        async with self.locks.hold(ctx["gameKey"], "saves"):
+            with self.jobs.job("snapshot"):
+                base_id = self._bases().get(ctx["gameKey"])
+                base = await asyncio.to_thread(eng.get_meta, ctx["gameKey"], base_id) if base_id else None
+                result = await asyncio.to_thread(
+                    functools.partial(
+                        eng.take,
+                        ctx["gameKey"],
+                        ctx["files"],
+                        ctx["roots"],
+                        "manual",
+                        base,
+                        force=True,
+                        flags=["repair"],
+                    )
+                )
+        if result["status"] == "published":
+            self._set_base(ctx["gameKey"], result["snapId"])
+        log_event(
+            logging.INFO, "snapshot.repair", "Fresh snapshot saved", gameKey=ctx["gameKey"], status=result["status"]
+        )
+        result.pop("meta", None)
+        return result
+
+    async def export_snapshots(self, folder: str, scope: str = "latest", key: str | None = None) -> dict[str, Any]:
+        """Export snapshots as plain zips to a folder the user chose (a USB drive, an SD card): no lock-in.
+
+        Creates ``Keepsake export <date>`` inside ``folder`` with one folder per game, each zip
+        verified against its metadata, an ``index.json`` and a ``README.txt``. Only new files are
+        written; nothing is ever overwritten. ``scope`` is ``latest`` or ``all``.
+        """
+        target_root = export_folder(folder)
+        if scope not in ("latest", "all"):
+            raise ValueError("choose the latest snapshot of each game, or all of them")
+        eng = self._engine()
+        chosen: list[tuple[dict[str, Any], str]] = []
+        seen: set[str] = set()
+        for game, config, gk in await self._matched():
+            if not gk or gk in seen or (key is None and not config.get("enabled")) or (key and game["key"] != key):
+                continue
+            seen.add(gk)
+            chosen.append((game, gk))
+        if not chosen:
+            raise ValueError("there is nothing to export: no synced game was found")
+        stamp = time.strftime("%Y-%m-%d %H%M", time.localtime())
+        out_dir = await asyncio.to_thread(_new_folder, target_root, f"Keepsake export {stamp}")
+        index: list[dict[str, Any]] = []
+        with self.jobs.job("export"):
+            for game, gk in chosen:
+                metas = await asyncio.to_thread(eng.list_metas, gk)
+                pruned = await asyncio.to_thread(eng.pruned, gk)
+                kept = [m for m in metas if m["snapId"] not in pruned]
+                picked = kept[-1:] if scope == "latest" else kept
+                game_dir = os.path.join(out_dir, safe_name(game["name"]))
+                await asyncio.to_thread(os.makedirs, game_dir, exist_ok=True)
+                for meta in picked:
+                    name = f"{meta['created'][:10]} {meta['snapId']}.zip"
+                    await asyncio.to_thread(eng.download_verified, gk, meta["snapId"], os.path.join(game_dir, name))
+                    index.append(
+                        {
+                            "game": game["name"],
+                            "gameKey": gk,
+                            "snapId": meta["snapId"],
+                            "created": meta["created"],
+                            "device": meta.get("deviceName"),
+                            "zip": f"{safe_name(game['name'])}/{name}",
+                            "files": [f"{f['root']}/{f['rel']}" for f in meta["files"]],
+                        }
+                    )
+        await asyncio.to_thread(_write_new, os.path.join(out_dir, "index.json"), json.dumps(index, indent=2) + "\n")
+        await asyncio.to_thread(_write_new, os.path.join(out_dir, "README.txt"), EXPORT_README)
+        log_event(logging.INFO, "export.snapshots", "Snapshots exported", games=len(chosen), snapshots=len(index))
+        return {"ok": True, "folder": out_dir, "games": len(chosen), "snapshots": len(index)}
 
     # Shared game settings (config revisions in the cloud)
 

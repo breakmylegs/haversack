@@ -1,6 +1,6 @@
 # Updates
 
-Every Keepsake release is signed. Before installing an update, Keepsake checks the signature against Keepsake's own key, which is built in, and checks the download against the signed list of checksums. An update that fails either check is refused.
+Every Keepsake release is signed, and lists every third-party component it contains in a software bill of materials. Before installing an update, Keepsake checks the signature against Keepsake's own key, which is built in, and checks the download against the signed list of checksums. An update that fails either check is refused.
 
 ## On a handheld
 

@@ -161,10 +161,35 @@ def run(facts: Mapping[str, Any]) -> list[dict[str, Any]]:
             unseen,
         )
     )
+    checks.append(_integrity(facts.get("integrity") or {}, now))
     checks.append(_manifest(facts.get("manifest") or {}, now))
     checks.append(_ludusavi(facts.get("ludusavi") or {}, bool(games)))
     checks.append(_python_modules(facts.get("pythonModules") or {}, str(facts.get("store") or "")))
     return checks
+
+
+def _integrity(scrub: Mapping[str, Any], now: float) -> dict[str, Any]:
+    """The cloud integrity check (ADR-0050): snapshots whose files are damaged or missing."""
+    last = float(scrub.get("lastRun") or 0)
+    if not last:
+        return _check("integrity", "Cloud integrity", INFO, "Not checked yet. Keepsake checks once a week.")
+    damaged = [
+        f"{game.get('name', key)}: {len(game.get('bad', [])) + len(game.get('missing', []))} snapshots"
+        for key, game in sorted((scrub.get("games") or {}).items())
+        if game.get("bad") or game.get("missing")
+    ]
+    if damaged:
+        return _check(
+            "integrity",
+            "Cloud integrity",
+            WARN,
+            "Some snapshots in the cloud are damaged or missing, so they cannot be restored. Your current saves are "
+            "fine. Open the game and choose Repair to save a fresh copy from this device.",
+            damaged,
+        )
+    return _check(
+        "integrity", "Cloud integrity", OK, f"Every checked snapshot is intact (checked {_age_text(now - last)})."
+    )
 
 
 def _python_modules(modules: Mapping[str, Any], store: str) -> dict[str, Any]:

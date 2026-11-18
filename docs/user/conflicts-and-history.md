@@ -33,6 +33,14 @@ On a handheld, open a game in **Games** to see its snapshots and:
 
 ![The Activity page on a PC](images/desktop-activity.png)
 
+## Checking the cloud copies
+
+Once a week, Keepsake checks that the cloud copies of each game's important snapshots are intact: the newest ones, the pinned ones, and the ones each device synced from. **Check cloud integrity** in Diagnostics (handheld) or on the Health page (PC) checks every snapshot at once. If a copy is damaged or missing, Health says so and the game's History offers **Repair**, which saves a fresh copy of your current save. Your save on the device is never affected.
+
+## Exporting your saves
+
+You can take your saves out of Keepsake at any time. In **Settings**, **Export snapshots** copies them as plain zip files to a folder you choose, such as an SD card or a USB drive: either the latest snapshot of each game, or every snapshot. The export folder also holds a list of what each zip contains, and a short note explaining the folder names inside the zips. Nothing already in that folder is overwritten.
+
 ## Clean-up
 
 Keepsake thins out old snapshots over time. It always keeps:

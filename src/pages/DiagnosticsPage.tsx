@@ -8,6 +8,7 @@ import {
   getGameProcesses,
   getSteamProbe,
   httpsTest,
+  scrubCloud,
   simulateSyncJob,
   steamOpsList,
   steamProbe,
@@ -17,7 +18,7 @@ import { HealthSection } from "./HealthSection";
 import { JsonBlock } from "./JsonBlock";
 import { SigninProbe } from "./SigninProbe";
 
-type Section = "environment" | "steam" | "processes" | "frontend" | "https" | "steamops" | "export";
+type Section = "environment" | "steam" | "processes" | "frontend" | "https" | "steamops" | "export" | "integrity";
 
 const FREEZE_SECONDS = 5;
 // Long enough to open Updates and try to install while it runs.
@@ -117,6 +118,23 @@ export function DiagnosticsPage() {
           }
         >
           Probe Steam APIs
+        </DialogButton>
+        <DialogButton
+          style={{ width: "auto" }}
+          disabled={!!busy}
+          onClick={() =>
+            run("integrity", async () => {
+              const report = await scrubCloud(true);
+              return Object.values(report.games).map((g) => ({
+                game: g.name,
+                checked: g.checked,
+                damaged: g.bad.length + g.missing.length,
+                error: g.error,
+              }));
+            })
+          }
+        >
+          Check cloud integrity
         </DialogButton>
         <DialogButton style={{ width: "auto" }} disabled={!!busy} onClick={confirmFreeze}>
           Freeze test

@@ -550,6 +550,8 @@ export interface ActivityEntry {
 
 export interface SnapshotListing {
   gameKey?: string;
+  /** ADR-0050: snapshots the integrity check found damaged or missing in the cloud. */
+  damaged?: string[];
   lastByDevice?: { device: string | null; created: string; kind: string; snapId: string }[];
   snapshots: SnapshotSummary[];
   quarantine: SnapshotSummary[];
@@ -645,6 +647,17 @@ export interface Playtime {
   sessions: number;
   byDevice: { device: string; seconds: number }[];
 }
+export interface ScrubReport {
+  lastRun: number;
+  full: boolean;
+  games: Record<string, { name: string; checked: number; bad: string[]; missing: string[]; error?: string }>;
+}
+export const scrubCloud = callable<[full: boolean], ScrubReport>("scrub_cloud");
+export const repairSnapshot = callable<[key: string], SnapshotResult>("repair_snapshot");
+export const exportSnapshots = callable<
+  [folder: string, scope: "latest" | "all", key?: string | null],
+  { ok: boolean; folder: string; games: number; snapshots: number }
+>("export_snapshots");
 export const gamePlaytime = callable<[key: string], Playtime>("game_playtime");
 export const bringNewer = callable<[key: string], { action: string; reason?: string; pending?: boolean }>("bring_newer");
 export const restorePreview = callable<[key: string, snapId: string], { snapId: string; changes: RestoreChange[] }>("restore_preview");

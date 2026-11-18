@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getSettings, setSetting, Settings } from "../backend";
 import { ROUTE_PATH, SETUP_PATH } from "../routes";
 import { CloudSection } from "./CloudSection";
+import { ExportSection } from "./ExportSection";
 import { ModulesSection } from "./ModulesSection";
 
 export function SettingsPage() {
@@ -136,6 +137,7 @@ export function SettingsPage() {
         onChange={(on) => void save("suspendSnapshots", on, on ? "Sleep snapshots on." : "Sleep snapshots off.")}
       />
       {settings && <CloudSection settings={settings} onSettings={setSettings} />}
+      <ExportSection />
       <Field label="Updates" description="Check for updates, read release notes or go back to an earlier version." childrenLayout="inline">
         <DialogButton style={{ width: "auto" }} onClick={() => Navigation.Navigate(`${ROUTE_PATH}/updates`)}>
           Open Updates

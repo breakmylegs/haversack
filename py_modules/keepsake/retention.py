@@ -82,12 +82,13 @@ def plan(
         protect(snap_id, "pinned")
     for snap_id in bases & set(by_id):
         protect(snap_id, "device base")
-    ordered = sorted(metas, key=lambda m: (created_epoch(m), m["snapId"]), reverse=True)
+    epoch_of = {m["snapId"]: created_epoch(m) for m in metas}  # parse each time once (performance budget)
+    ordered = sorted(metas, key=lambda m: (epoch_of[m["snapId"]], m["snapId"]), reverse=True)
     passed = [m for m in ordered if m.get("kind") != "provisional" and "quarantined" not in m.get("flags", [])]
     if passed:
         protect(passed[0]["snapId"], "newest that passed the gates")
     for meta in ordered:
-        if now - created_epoch(meta) < MIN_AGE_SECONDS:
+        if now - epoch_of[meta["snapId"]] < MIN_AGE_SECONDS:
             protect(meta["snapId"], "younger than 7 days")
         if meta.get("kind") in ALWAYS_KEPT_KINDS:
             protect(meta["snapId"], f"{meta.get('kind')} snapshots are kept")
@@ -98,7 +99,7 @@ def plan(
     days_seen: set[str] = set()
     months_seen: set[str] = set()
     for meta in automatic:
-        epoch = created_epoch(meta)
+        epoch = epoch_of[meta["snapId"]]
         age_days = (now - epoch) / 86400
         day = time.strftime("%Y-%m-%d", time.gmtime(epoch))
         month = day[:7]

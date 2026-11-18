@@ -257,6 +257,16 @@ async function health(main: HTMLElement): Promise<void> {
     main,
     h("h1", {}, "Health"),
     h(
+      "div",
+      { class: "actions" },
+      button("Check cloud integrity now", async () => {
+        const report = await call<{ games: Record<string, { bad: string[]; missing: string[] }> }>("scrub_cloud", true);
+        const damaged = Object.values(report.games).reduce((n, g) => n + g.bad.length + g.missing.length, 0);
+        toast(damaged ? `${damaged} snapshots are damaged or missing. See Cloud integrity below.` : "Every snapshot is intact.");
+        await health(main);
+      }),
+    ),
+    h(
       "ul",
       { class: "list" },
       ...result.checks.map((c) =>
@@ -514,6 +524,7 @@ async function settingsPage(main: HTMLElement): Promise<void> {
       h("h2", {}, "Updates"),
       h("label", {}, "Channel ", channel),
     ),
+    exportCard(),
     h(
       "div",
       { class: "card" },
@@ -524,6 +535,23 @@ async function settingsPage(main: HTMLElement): Promise<void> {
         `A sync stops and asks you when it would remove more than ${s.gateMaxRemovedPercent}% of a game's save files, or shrink them by more than ${s.gateMaxSizeDropPercent}%. These limits can only be made stricter, in Gaming Mode's Settings.`,
       ),
     ),
+  );
+}
+
+// Export (ADR-0050): plain zips to a folder you choose, so you are never locked in.
+function exportCard(): HTMLElement {
+  const folder = h("input", { type: "text", placeholder: "Folder, for example E:\\Backups", "aria-label": "Export folder", size: "40" }) as HTMLInputElement;
+  const run = (scope: "latest" | "all", label: string) =>
+    button(label, async () => {
+      const result = await call<{ folder: string; games: number; snapshots: number }>("export_snapshots", folder.value, scope);
+      toast(`Exported ${result.snapshots} snapshots of ${result.games} games to ${result.folder}.`);
+    });
+  return h(
+    "div",
+    { class: "card" },
+    h("h2", {}, "Export snapshots"),
+    h("p", { class: "small" }, "Copy your saves out as plain zip files, with a list of what is in each. Nothing in the folder is overwritten."),
+    h("div", { class: "actions" }, folder, run("latest", "Export the latest of each game"), run("all", "Export every snapshot")),
   );
 }
 
