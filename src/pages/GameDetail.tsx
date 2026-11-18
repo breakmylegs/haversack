@@ -238,7 +238,7 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
           onMode={(m) => setConfig({ ...config, launchGate: m })}
         />
       )}
-      {match.gameKey && <SnapshotsPanel gameKey={gameKey} />}
+      {match.gameKey && <SnapshotsPanel gameKey={gameKey} gameName={game.name} />}
 
       {preview && (
         <>

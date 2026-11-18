@@ -6,6 +6,11 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ### Added
 
+- Checkpoints: **Save checkpoint** keeps a named copy of a game's save, for example "Before the final boss". It is in the Quick Access Menu while you play and in each game's History. Checkpoints are kept until you remove them (ADR-0048).
+- Restore some files: see what restoring an older save would change, file by file, and restore only the files you choose. It can be undone like any restore (ADR-0048).
+- A clearer conflict screen: it shows when this device's save last changed (not "now"), and lists the files that are new, gone or changed on each side. Keepsake still never chooses for you (ADR-0048).
+- Games: find a game by name, and turn sync on or off for every game shown in one go (ADR-0048).
+- Activity: a plain-words list of what Keepsake did, such as saves sent, saves brought in, checkpoints and restores, on the handheld and the PC (ADR-0048).
 - A user guide on GitHub: getting started on a handheld, a Linux PC or Windows, a guide to each feature, privacy, and questions and answers, with screenshots and diagrams. Start at docs/user/README.md (ADR-0046).
 - PC preview, the desktop interface: `python -m keepsake.host --open` now shows Keepsake in your browser, on this computer only. It has an overview with Sync now, conflicts with the same two-step choices as in Gaming Mode, history, health checks, and the modules page with on and off switches. It follows your light or dark setting. The rest of the screens follow (ADR-0040).
 - PC preview, Steam for Windows: on Windows, Keepsake finds Steam where Steam for Windows records it, and reads its libraries, games and non-Steam shortcuts. Games run natively there, so their saves are found in your Windows folders (ADR-0038).

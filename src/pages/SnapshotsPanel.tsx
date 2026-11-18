@@ -1,10 +1,12 @@
-import { ConfirmModal, DialogButton, Field, Focusable, showModal } from "@decky/ui";
+import { ConfirmModal, DialogButton, Field, Focusable, ToggleField, showModal } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import {
   listSnapshots,
   pinSnapshot,
   releaseQuarantine,
+  RestoreChange,
+  restorePreview,
   restoreSnapshot,
   runRetention,
   snapshotGame,
@@ -13,6 +15,9 @@ import {
   undoRestore,
 } from "../backend";
 import { kindText } from "../format";
+import { openCheckpointModal } from "./CheckpointModal";
+
+const ACTION_WORD = { create: "would come back", replace: "would be replaced", delete: "would be removed" } as const;
 
 function sizeText(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -25,9 +30,13 @@ function describe(s: SnapshotSummary): string {
 }
 
 // History for one game: restore, pin, release quarantine and undo, plus the last sync per device.
-export function SnapshotsPanel({ gameKey }: { gameKey: string }) {
+export function SnapshotsPanel({ gameKey, gameName }: { gameKey: string; gameName?: string }) {
   const [listing, setListing] = useState<SnapshotListing | null>(null);
   const [busy, setBusy] = useState(false);
+  // Partial restore (ADR-0048): the preview of one snapshot, and the files chosen from it.
+  const [preview, setPreview] = useState<{ snapId: string; changes: RestoreChange[] } | null>(null);
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const pathOf = (c: RestoreChange) => `${c.root}/${c.rel}`;
 
   const refresh = async () => {
     try {
@@ -52,6 +61,14 @@ export function SnapshotsPanel({ gameKey }: { gameKey: string }) {
       await refresh();
     }
   };
+
+  const openPreview = (snapId: string) =>
+    void act(async () => {
+      const result = await restorePreview(gameKey, snapId);
+      setPreview(result);
+      setChosen(new Set());
+      return result.changes.length ? "Choose the files to restore." : "This snapshot matches the files here.";
+    });
 
   const confirm = (title: string, description: string, ok: string, work: () => Promise<string>) =>
     showModal(
@@ -98,6 +115,13 @@ export function SnapshotsPanel({ gameKey }: { gameKey: string }) {
         <DialogButton
           style={{ width: "auto" }}
           disabled={busy}
+          onClick={() => openCheckpointModal(gameKey, gameName ?? "this game", () => void refresh())}
+        >
+          Save checkpoint
+        </DialogButton>
+        <DialogButton
+          style={{ width: "auto" }}
+          disabled={busy}
           onClick={() =>
             void act(async () => {
               const r = await runRetention(gameKey);
@@ -109,8 +133,54 @@ export function SnapshotsPanel({ gameKey }: { gameKey: string }) {
         </DialogButton>
       </Focusable>
 
+      {preview && preview.changes.length > 0 && (
+        <Field
+          label="Restore some files"
+          description="Only the files you choose change. Your current files are saved first, so this can be undone."
+          childrenLayout="below"
+        >
+          {preview.changes.map((c) => (
+            <ToggleField
+              key={pathOf(c)}
+              label={c.rel}
+              description={ACTION_WORD[c.action]}
+              checked={chosen.has(pathOf(c))}
+              onChange={(on) => {
+                const next = new Set(chosen);
+                if (on) next.add(pathOf(c));
+                else next.delete(pathOf(c));
+                setChosen(next);
+              }}
+            />
+          ))}
+          <Focusable style={{ display: "flex", gap: 8 }}>
+            <DialogButton
+              style={{ width: "auto" }}
+              disabled={busy || chosen.size === 0}
+              onClick={() =>
+                confirm(
+                  `Restore ${chosen.size} file${chosen.size === 1 ? "" : "s"}?`,
+                  "Quit the game first. Your current files are saved first and can be put back with Undo.",
+                  "Restore",
+                  async () => {
+                    await restoreSnapshot(gameKey, preview.snapId, [...chosen]);
+                    setPreview(null);
+                    return "Files restored.";
+                  },
+                )
+              }
+            >
+              Restore chosen files
+            </DialogButton>
+            <DialogButton style={{ width: "auto" }} onClick={() => setPreview(null)}>
+              Cancel
+            </DialogButton>
+          </Focusable>
+        </Field>
+      )}
+
       {(listing?.snapshots ?? []).map((s) => (
-        <Field key={s.snapId} label={s.snapId} description={describe(s)} childrenLayout="below">
+        <Field key={s.snapId} label={s.label ? `Checkpoint: ${s.label}` : s.snapId} description={describe(s)} childrenLayout="below">
           <Focusable style={{ display: "flex", gap: 8 }}>
             <DialogButton
               style={{ width: "auto" }}
@@ -128,6 +198,9 @@ export function SnapshotsPanel({ gameKey }: { gameKey: string }) {
               }
             >
               Restore
+            </DialogButton>
+            <DialogButton style={{ width: "auto" }} disabled={busy || s.pruned} onClick={() => openPreview(s.snapId)}>
+              Restore some files
             </DialogButton>
             <DialogButton
               style={{ width: "auto" }}

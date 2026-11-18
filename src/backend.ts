@@ -269,6 +269,8 @@ export interface ConflictSide {
   files: number;
   bytes: number;
   changedFiles: number;
+  /** ADR-0048: each file added, removed or changed since the last shared save (at most 200). */
+  changes?: { path: string; change: "added" | "removed" | "changed" }[];
 }
 
 export interface ConflictDetails {
@@ -514,9 +516,24 @@ export interface SnapshotSummary {
   files: number;
   bytes: number;
   pinned?: boolean;
+  /** A checkpoint's name (ADR-0048). */
+  label?: string | null;
   pruned?: boolean;
   base?: boolean;
   reasons?: string[];
+}
+
+export interface RestoreChange {
+  root: string;
+  rel: string;
+  action: "create" | "replace" | "delete";
+  size: number;
+}
+
+export interface ActivityEntry {
+  time: string | null;
+  text: string;
+  level: "info" | "warn";
 }
 
 export interface SnapshotListing {
@@ -608,9 +625,11 @@ export const resolveConflict = callable<[key: string, choice: string, head: stri
   "resolve_conflict",
 );
 export const syncStatus = callable<[key: string], SyncStatus>("sync_status");
-export const snapshotGame = callable<[key: string], SnapshotResult>("snapshot_game");
+export const snapshotGame = callable<[key: string, label?: string], SnapshotResult>("snapshot_game");
 export const listSnapshots = callable<[key: string], SnapshotListing>("list_snapshots");
-export const restoreSnapshot = callable<[key: string, snapId: string], SnapshotResult>("restore_snapshot");
+export const restoreSnapshot = callable<[key: string, snapId: string, paths?: string[]], SnapshotResult>("restore_snapshot");
+export const restorePreview = callable<[key: string, snapId: string], { snapId: string; changes: RestoreChange[] }>("restore_preview");
+export const activity = callable<[limit: number], ActivityEntry[]>("activity");
 export const undoRestore = callable<[key: string, prerestoreId: string], SnapshotResult>("undo_restore");
 export const pinSnapshot = callable<[key: string, snapId: string], { ok: boolean }>("pin_snapshot");
 export const releaseQuarantine = callable<[key: string, snapId: string, confirmed: boolean], SnapshotResult>(

@@ -481,10 +481,12 @@ class SyncEngine:
                 "side": "local",
                 "snapId": None,
                 "device": None,
-                "created": None,
+                # When this device's save last changed (display only: timestamps never pick a winner, P4).
+                "created": last_changed(local, ctx.roots),
                 "files": len(local),
                 "bytes": sum(e.size for e in local),
                 "changedFiles": changed_files(base_entries, local),
+                "changes": file_changes(base_entries, local),
             }
         ]
         for head in heads:
@@ -494,9 +496,41 @@ class SyncEngine:
                     "side": "cloud",
                     **self._summary(meta),
                     "changedFiles": changed_files(base_entries, entries_of(meta)),
+                    "changes": file_changes(base_entries, entries_of(meta)),
                 }
             )
         return {"conflict": conflict, "hasBase": base_meta is not None, "sides": sides}
+
+
+CHANGES_SHOWN = 200
+
+
+def file_changes(before: list[FileEntry], after: list[FileEntry], limit: int = CHANGES_SHOWN) -> list[dict[str, str]]:
+    """Each file added, removed or changed between two file lists, by logical path, sorted, capped."""
+    old = {(e.root, e.rel): e.sha256 for e in before}
+    new = {(e.root, e.rel): e.sha256 for e in after}
+    out = []
+    for root, rel in sorted(old.keys() | new.keys()):
+        was, now = old.get((root, rel)), new.get((root, rel))
+        if was == now:
+            continue
+        change = "added" if was is None else "removed" if now is None else "changed"
+        out.append({"path": f"{root}/{rel}", "change": change})
+    return out[:limit]
+
+
+def last_changed(entries: list[FileEntry], roots: Mapping[str, str | None]) -> str | None:
+    """The newest modification time among the files, as the snapshots write theirs; None if unreadable."""
+    newest = 0.0
+    for entry in entries:
+        root = roots.get(entry.root)
+        if not root:
+            continue
+        try:
+            newest = max(newest, os.stat(os.path.join(root, *entry.rel.split("/"))).st_mtime)
+        except OSError:
+            continue
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(newest)) if newest else None
 
 
 def changed_files(before: list[FileEntry], after: list[FileEntry]) -> int:

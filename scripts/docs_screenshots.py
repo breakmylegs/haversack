@@ -25,7 +25,19 @@ sys.path.insert(0, os.path.join(ROOT, "py_modules"))
 
 from keepsake import host as pc_host  # noqa: E402
 
-PAGES = ("overview", "conflicts", "games", "cloud", "import", "history", "health", "modules", "updates", "settings")
+PAGES = (
+    "overview",
+    "conflicts",
+    "games",
+    "cloud",
+    "import",
+    "history",
+    "activity",
+    "health",
+    "modules",
+    "updates",
+    "settings",
+)
 NOW = 1_794_000_000.0  # a fixed moment, so screenshots do not change from run to run
 SIZE = "1100,820"
 
@@ -261,6 +273,22 @@ class SampleApp:
             "error": None,
             "latest": {"tag": "v1.1.0", "version": "1.1.0", "prerelease": False, "desktop_url": "https://github.com/x"},
         }
+
+    async def activity(self, limit: int = 100) -> list[dict[str, Any]]:
+        return [
+            {"time": "2026-11-06T21:10:00Z", "level": "info", "text": "Saved Example Quest to the cloud."},
+            {
+                "time": "2026-11-06T20:31:00Z",
+                "level": "warn",
+                "text": "Sample Racer changed on two devices: your choice is needed.",
+            },
+            {"time": "2026-11-06T19:02:00Z", "level": "info", "text": "Saved a checkpoint of Example Quest."},
+            {
+                "time": "2026-11-06T18:45:00Z",
+                "level": "info",
+                "text": "Brought in the newer save from another device for Example Quest.",
+            },
+        ]
 
     async def get_status(self) -> dict[str, Any]:
         return {"ok": True}

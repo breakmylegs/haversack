@@ -21,7 +21,7 @@ import shutil
 import tempfile
 import threading
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from typing import Any
 
 from . import gates, restore, retention
@@ -290,11 +290,13 @@ class SnapshotEngine:
         game_running: bool,
         hook: RestoreHook | None = None,
         staged_blob: str | None = None,
+        only: Collection[tuple[str, str]] | None = None,
     ) -> dict[str, Any]:
         """Restore a cloud snapshot after taking and verifying a local pre-restore snapshot.
 
         ``staged_blob`` is a prefetched copy on local disk (section 10: restores
         during the launch gate are local only); it is verified like a download.
+        ``only`` restores just those ``(root, rel)`` paths (partial restore, ADR-0048).
         """
         meta = self.get_meta(game_key, snap_id)
         if snap_id in self.pruned(game_key):
@@ -308,9 +310,26 @@ class SnapshotEngine:
                     self.store.get_to_file(blob_key(game_key, snap_id), blob_path)
                 except NotFoundError as exc:
                     raise SnapshotError("that snapshot's files are missing from the cloud") from exc
-            return self._restore_from(game_key, blob_path, meta, current_files, roots, game_running, hook)
+            return self._restore_from(game_key, blob_path, meta, current_files, roots, game_running, hook, only)
         finally:
             os.unlink(blob_path)
+
+    def restore_preview(
+        self, game_key: str, snap_id: str, current_files: Mapping[str, list[str]], roots: Mapping[str, str | None]
+    ) -> list[dict[str, Any]]:
+        """What restoring ``snap_id`` would do to each file here. Reads metadata only; changes nothing."""
+        meta = self.get_meta(game_key, snap_id)
+        current = scan_entries(current_files, roots)
+        sizes = {(e.root, e.rel): e.size for e in entries_of(meta)}
+        return [
+            {
+                "root": op["root"],
+                "rel": op["rel"],
+                "action": op["action"],
+                "size": sizes.get((op["root"], op["rel"]), 0),
+            }
+            for op in restore.plan(current, entries_of(meta))
+        ]
 
     def restore_prerestore(
         self,
@@ -339,6 +358,7 @@ class SnapshotEngine:
         roots: Mapping[str, str | None],
         game_running: bool,
         hook: RestoreHook | None,
+        only: Collection[tuple[str, str]] | None = None,
     ) -> dict[str, Any]:
         if game_running:
             raise SnapshotError("the game is running; restores happen only before launch or after exit")
@@ -348,8 +368,9 @@ class SnapshotEngine:
         if content_hash(current) == meta["contentHash"]:
             return {"status": "already-current", "snapId": meta["snapId"]}
         pre = self._take_prerestore(game_key, current, roots)
-        result = restore.restore(blob_path, meta, current, roots, self.runtime_dir, hook)
-        return {"status": "restored", "snapId": meta["snapId"], "prerestore": pre, **result}
+        result = restore.restore(blob_path, meta, current, roots, self.runtime_dir, hook, only)
+        status = "restored" if only is None else "restored-partly"
+        return {"status": status, "snapId": meta["snapId"], "prerestore": pre, **result}
 
     def _take_prerestore(self, game_key: str, current: list[FileEntry], roots: Mapping[str, str | None]) -> str:
         blob_path = self._temp(".zip")
@@ -379,9 +400,12 @@ class SnapshotEngine:
 
     # Pins and retention
 
-    def pin(self, game_key: str, snap_id: str, until: float | None = None) -> None:
+    def pin(self, game_key: str, snap_id: str, until: float | None = None, label: str | None = None) -> None:
+        """Pin a snapshot. A checkpoint carries a ``label`` (ADR-0048); readers that predate it ignore the field."""
         self.get_meta(game_key, snap_id)
-        body = {"snapId": snap_id, "until": until, "deviceId": self.device_id, "created": self.clock()}
+        body: dict[str, Any] = {"snapId": snap_id, "until": until, "deviceId": self.device_id, "created": self.clock()}
+        if label:
+            body["label"] = label
         try:
             self.store.put_new(pin_key(game_key, snap_id), json.dumps(body, sort_keys=True).encode())
         except AlreadyExistsError:

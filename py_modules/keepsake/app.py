@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import functools
 import json
 import logging
 import os
@@ -21,6 +22,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from . import (
+    activity,
     clients,
     configrev,
     diagnostics,
@@ -63,6 +65,8 @@ from .loopback_auth import BrowserProbe, LoopbackFlow
 from .modules import Module, ModuleRegistry
 from .paths import PluginPaths
 from .procs import find_game_processes
+from .resolve import ALL_ROOTS
+from .safepath import PathEscapeError, validate_relative
 from .settings import SettingsStore
 from .snapshot import SnapshotError, content_hash, scan_entries
 from .statedb import StateDB, StateError, open_db
@@ -116,6 +120,34 @@ def import_verdict(results: list[dict[str, Any]], error: str | None) -> str:
 
 async def _no_emit(event: str, *args: Any) -> None:
     return None
+
+
+CHECKPOINT_LABEL_MAX = 60
+
+
+def checkpoint_label(label: Any) -> str:
+    """A checkpoint's name: one line of plain text, 1 to 60 characters (ADR-0048)."""
+    text = " ".join(str(label).split())
+    if not text or len(text) > CHECKPOINT_LABEL_MAX or any(ord(ch) < 32 for ch in text):
+        raise ValueError(f"give the checkpoint a name of 1 to {CHECKPOINT_LABEL_MAX} characters")
+    return text
+
+
+def restore_paths(paths: Any) -> set[tuple[str, str]]:
+    """``root/rel`` strings from a restore preview, checked: a known root and a safe relative path."""
+    if not isinstance(paths, list) or not paths or len(paths) > 10_000:
+        raise ValueError("choose at least one file to restore")
+    chosen: set[tuple[str, str]] = set()
+    for item in paths:
+        root, _, rel = str(item).partition("/")
+        if root not in ALL_ROOTS or not rel:
+            raise ValueError(f"not a file from this snapshot: {item}")
+        try:
+            validate_relative(rel)
+        except PathEscapeError as exc:
+            raise ValueError(f"not a file from this snapshot: {item}") from exc
+        chosen.add((root, rel))
+    return chosen
 
 
 def _read_bytes(path: str) -> bytes:
@@ -1204,16 +1236,24 @@ class KeepsakeApp:
             return {**result, "registry": "failed"}
         return {**result, "registry": merged["status"]}
 
-    async def snapshot_game(self, key: str) -> dict[str, Any]:
+    async def snapshot_game(self, key: str, label: str | None = None) -> dict[str, Any]:
+        """Take a manual snapshot. With a ``label`` it is a checkpoint (ADR-0048): always a new
+        snapshot, even when nothing changed, pinned with that label so retention keeps it."""
+        name = checkpoint_label(label) if label is not None else None
         ctx = await self._snapshot_context(key)
         eng = self._engine()
         with self.jobs.job("snapshot"):
             base_id = self._bases().get(ctx["gameKey"])
             base = await asyncio.to_thread(eng.get_meta, ctx["gameKey"], base_id) if base_id else None
-            result = await asyncio.to_thread(eng.take, ctx["gameKey"], ctx["files"], ctx["roots"], "manual", base)
+            result = await asyncio.to_thread(
+                eng.take, ctx["gameKey"], ctx["files"], ctx["roots"], "manual", base, force=name is not None
+            )
+            if name is not None and result["status"] == "published":
+                await asyncio.to_thread(eng.pin, ctx["gameKey"], result["snapId"], None, name)
         if result["status"] == "published":
             self._set_base(ctx["gameKey"], result["snapId"])
-        log_event(logging.INFO, "snapshot.take", "Snapshot taken", gameKey=ctx["gameKey"], status=result["status"])
+        event = "snapshot.checkpoint" if name is not None else "snapshot.take"
+        log_event(logging.INFO, event, "Snapshot taken", gameKey=ctx["gameKey"], status=result["status"])
         result.pop("meta", None)
         return result
 
@@ -1227,7 +1267,9 @@ class KeepsakeApp:
         eng = self._engine()
         metas = await asyncio.to_thread(eng.list_metas, game_key)
         pruned = await asyncio.to_thread(eng.pruned, game_key)
-        pins = {p["snapId"] for p in await asyncio.to_thread(eng.pins, game_key)}
+        pin_records = await asyncio.to_thread(eng.pins, game_key)
+        pins = {p["snapId"] for p in pin_records}
+        labels = {p["snapId"]: str(p["label"]) for p in pin_records if isinstance(p.get("label"), str)}
         base = self._bases().get(game_key)
         summary = snap_summary
         latest: dict[str, dict[str, Any]] = {}
@@ -1246,6 +1288,7 @@ class KeepsakeApp:
                 {
                     **summary(m),
                     "pinned": m["snapId"] in pins,
+                    "label": labels.get(m["snapId"]),
                     "pruned": m["snapId"] in pruned,
                     "base": m["snapId"] == base,
                 }
@@ -1257,16 +1300,29 @@ class KeepsakeApp:
             "prerestore": [summary(r["meta"]) for r in eng.prerestore.list(game_key)],
         }
 
-    async def restore_snapshot(self, key: str, snap_id: str) -> dict[str, Any]:
+    async def restore_preview(self, key: str, snap_id: str) -> dict[str, Any]:
+        """Each file restoring ``snap_id`` would add, replace or remove here. Changes nothing (ADR-0048)."""
+        ctx = await self._snapshot_context(key)
+        changes = await asyncio.to_thread(
+            self._engine().restore_preview, ctx["gameKey"], str(snap_id), ctx["files"], ctx["roots"]
+        )
+        return {"snapId": str(snap_id), "changes": changes}
+
+    async def restore_snapshot(self, key: str, snap_id: str, paths: list[str] | None = None) -> dict[str, Any]:
+        """Restore a snapshot, or with ``paths`` (``root/rel`` as the preview lists them) only those files."""
+        only = None if paths is None else restore_paths(paths)
         ctx = await self._snapshot_context(key)
         eng = self._engine()
         async with self.locks.hold(ctx["gameKey"], "saves"):
             with self.jobs.job("restore"):
                 result = await asyncio.to_thread(
-                    eng.restore, ctx["gameKey"], str(snap_id), ctx["files"], ctx["roots"], ctx["running"]
+                    functools.partial(
+                        eng.restore, ctx["gameKey"], str(snap_id), ctx["files"], ctx["roots"], ctx["running"], only=only
+                    )
                 )
                 result = await self._after_restore(ctx, result)
-        self._set_base(ctx["gameKey"], str(snap_id))
+        if only is None:
+            self._set_base(ctx["gameKey"], str(snap_id))  # a partial restore leaves a mix, so the base stays
         log_event(
             logging.INFO, "snapshot.restore", "Snapshot restored", gameKey=ctx["gameKey"], status=result["status"]
         )
@@ -1762,6 +1818,9 @@ class KeepsakeApp:
         game = await self._game(key)
         ctx = await self._sync_context(key)
         details = await asyncio.to_thread(self._sync().conflict_details, ctx)
+        for side in details.get("sides") or []:
+            if side["side"] == "local":
+                side["device"] = self.settings.get("deviceName") or "This device"
         return {"key": key, "name": game["name"], "gameKey": ctx.game_key, **details}
 
     async def recent_history(self, limit: int = 50) -> dict[str, Any]:
@@ -2548,6 +2607,19 @@ class KeepsakeApp:
         return result
 
     # Logs
+
+    async def activity(self, limit: int = 100) -> list[dict[str, Any]]:
+        """What Keepsake did, newest first, in plain words (ADR-0048)."""
+        records = await asyncio.to_thread(tail, self.paths.log_dir, 2000)
+        names: dict[str, str] = {}
+        try:
+            for game, _config, gk in await self._matched():
+                names[game["key"]] = game["name"]
+                if gk:
+                    names.setdefault(gk, game["name"])
+        except (OSError, ValueError, StoreError):
+            pass  # unnamed games are shown by their key
+        return activity.build(records, lambda key: names.get(key, key), max(1, min(int(limit), 500)))
 
     async def get_logs(self, limit: int = 200) -> list[dict[str, Any]]:
         return await asyncio.to_thread(tail, self.paths.log_dir, limit)

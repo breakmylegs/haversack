@@ -1,4 +1,4 @@
-import { DialogButton, Field, Focusable } from "@decky/ui";
+import { ConfirmModal, DialogButton, Field, Focusable, TextField, showModal } from "@decky/ui";
 import { addEventListener, removeEventListener, toaster } from "@decky/api";
 import { ReactElement, useEffect, useState } from "react";
 import { FaCheckCircle, FaClock, FaCodeBranch, FaExclamationTriangle, FaMinusCircle, FaRegCircle } from "react-icons/fa";
@@ -17,6 +17,7 @@ import {
   matchGames,
   refreshManifest,
   SyncWord,
+  updateGameConfig,
 } from "../backend";
 import { SYNC_LABELS } from "../format";
 import { GameDetail } from "./GameDetail";
@@ -117,6 +118,8 @@ export function GamesPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [order, setOrder] = useState<string[]>([]);
+  const [search, setSearch] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const scan = async (refresh: boolean) => {
     setScanning(true);
@@ -204,7 +207,48 @@ export function GamesPage() {
       if (filter === "steam") return g.kind === "steam";
       return true;
     })
+    .filter((g) => !search.trim() || g.name.toLowerCase().includes(search.trim().toLowerCase()))
     .sort((a, b) => (rank.get(a.key) ?? Infinity) - (rank.get(b.key) ?? Infinity));
+  // Bulk actions (ADR-0048) touch only the shown games that have save data to sync.
+  const syncable = games.filter((g) => {
+    const m = matches[g.key];
+    return m && !m.proposal && ["manual", "manual-key", "steam-id", "title"].includes(m.method);
+  });
+  const bulk = (on: boolean) => {
+    const targets = syncable.filter((g) => Boolean(matches[g.key]?.enabled) !== on);
+    if (!targets.length) {
+      toaster.toast({ title: "Keepsake", body: on ? "Every shown game already syncs." : "None of the shown games sync." });
+      return;
+    }
+    showModal(
+      <ConfirmModal
+        strTitle={on ? `Sync ${targets.length} games?` : `Stop syncing ${targets.length} games?`}
+        strDescription={
+          on
+            ? "Their saves start following you to your other devices. Games whose save data is not known are left out."
+            : "Their saves stay on this device and in the cloud, but stop syncing. Nothing is deleted."
+        }
+        strOKButtonText={on ? "Sync them" : "Stop syncing"}
+        strCancelButtonText="Cancel"
+        onOK={async () => {
+          setBulkBusy(true);
+          let done = 0;
+          try {
+            for (const g of targets) {
+              await updateGameConfig(g.key, { enabled: on });
+              done += 1;
+            }
+          } catch (err) {
+            toaster.toast({ title: "Keepsake", body: `Stopped after ${done} games: ${err}` });
+          } finally {
+            setBulkBusy(false);
+            toaster.toast({ title: "Keepsake", body: on ? `${done} games now sync.` : `${done} games no longer sync.` });
+            void scan(false);
+          }
+        }}
+      />,
+    );
+  };
   const waiting = order.filter((key) => matches[key]?.proposal);
 
   const crossCheck = async (game: GameEntry) => {
@@ -244,6 +288,17 @@ export function GamesPage() {
         </DialogButton>
         <DialogButton style={{ width: "auto" }} disabled={refreshing || !!progress} onClick={() => void updateManifest()}>
           {refreshing || progress ? "Updating manifest..." : "Update manifest"}
+        </DialogButton>
+      </Focusable>
+      <Field label="Find a game" childrenLayout="below">
+        <TextField value={search} onChange={(e) => setSearch(e.target.value)} />
+      </Field>
+      <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+        <DialogButton style={{ width: "auto" }} disabled={bulkBusy || !syncable.length} onClick={() => bulk(true)}>
+          Sync all shown
+        </DialogButton>
+        <DialogButton style={{ width: "auto" }} disabled={bulkBusy || !syncable.length} onClick={() => bulk(false)}>
+          Stop syncing all shown
         </DialogButton>
       </Focusable>
       {progress && <Field label="Updating the save-location manifest" description={manifestProgressText(progress)} />}

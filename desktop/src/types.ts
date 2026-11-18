@@ -38,6 +38,7 @@ export interface ConflictSide {
   files: number;
   bytes: number;
   changedFiles: number;
+  changes?: { path: string; change: "added" | "removed" | "changed" }[];
 }
 
 export interface ConflictDetails {
@@ -157,4 +158,10 @@ export interface ImportAllStatus {
   total: number;
   current?: string | null;
   summary: Record<string, number>;
+}
+
+export interface ActivityEntry {
+  time: string | null;
+  text: string;
+  level: "info" | "warn";
 }

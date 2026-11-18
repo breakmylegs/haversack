@@ -111,7 +111,7 @@ R1 to R3 need no device, so they are built now, while slices 16 to 25 wait for d
 
 | Slice | Items | Device? |
 |---|---|---|
-| R1 Save safety and control | Better conflict screen (times, devices, per-file changes), named checkpoints from the QAM, partial restore with preview, search and bulk actions on Games, Activity list | No |
+| R1 Save safety and control | Better conflict screen (times, devices, per-file changes), named checkpoints from the QAM, partial restore with preview, search and bulk actions on Games, Activity list. Built (ADR-0048, `docs/slices/r1-report.md`) | No |
 | R2 Everyday polish | Newer save from another device shown before launch, combined playtime (own layout ADR), no-battery devices, accessibility (icon plus text, larger text, controller hints), What's new and first-run tips | No |
 | R3 Trust and distribution | Cloud integrity scrub, zip export to a chosen folder, Decky store readiness, SBOM and key runbooks, performance budget in the gate | No |
 | R4 Coverage | Emulator saves (RetroArch, EmuDeck), Heroic, Lutris and Bottles games | Yes, at the end |

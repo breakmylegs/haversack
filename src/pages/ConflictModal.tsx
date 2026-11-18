@@ -14,8 +14,27 @@ export function openConflictModal(gameKey: string, onDone: () => void) {
 
 function sideText(side: ConflictSide, hasBase: boolean): string {
   const changed = hasBase ? `${side.changedFiles} changed since the last sync` : "never synced together";
-  const when = side.side === "local" ? "now" : isoText(side.created);
+  const when = side.created ? `last changed ${isoText(side.created)}` : "last change unknown";
   return `${when}, ${side.files} files, ${sizeText(side.bytes)}, ${changed}`;
+}
+
+const CHANGE_WORD = { added: "new", removed: "gone", changed: "changed" } as const;
+
+// The files each side added, removed or changed, so the choice is informed (ADR-0048). Never a pick.
+function Changes({ side }: { side: ConflictSide }) {
+  const changes = side.changes ?? [];
+  if (!changes.length) return null;
+  const shown = changes.slice(0, 8);
+  return (
+    <div style={{ fontSize: 12, marginLeft: 12, marginBottom: 6 }}>
+      {shown.map((c) => (
+        <div key={c.path}>
+          {CHANGE_WORD[c.change]}: {c.path.split("/").slice(1).join("/")}
+        </div>
+      ))}
+      {changes.length > shown.length && <div>and {changes.length - shown.length} more</div>}
+    </div>
+  );
 }
 
 function ConflictModal({ gameKey, onDone, closeModal }: { gameKey: string; onDone: () => void; closeModal?: () => void }) {
@@ -72,7 +91,8 @@ function ConflictModal({ gameKey, onDone, closeModal }: { gameKey: string; onDon
           </div>
           {local && (
             <div style={{ marginBottom: 4 }}>
-              <b>This device:</b> {sideText(local, hasBase)}
+              <b>This device{local.device ? ` (${local.device})` : ""}:</b> {sideText(local, hasBase)}
+              <Changes side={local} />
             </div>
           )}
           {sides
@@ -80,6 +100,7 @@ function ConflictModal({ gameKey, onDone, closeModal }: { gameKey: string; onDon
             .map((s) => (
               <div key={s.snapId} style={{ marginBottom: 4 }}>
                 <b>Cloud, from {s.device ?? "an unknown device"}:</b> {sideText(s, hasBase)}
+                <Changes side={s} />
               </div>
             ))}
         </>

@@ -247,14 +247,17 @@ class Plugin:
     async def idle_pass(self) -> list[dict[str, Any]]:
         return await self.app.idle_pass()
 
-    async def snapshot_game(self, key: str) -> dict[str, Any]:
-        return await self.app.snapshot_game(key)
+    async def snapshot_game(self, key: str, label: str | None = None) -> dict[str, Any]:
+        return await self.app.snapshot_game(key, label)
 
     async def list_snapshots(self, key: str) -> dict[str, Any]:
         return await self.app.list_snapshots(key)
 
-    async def restore_snapshot(self, key: str, snap_id: str) -> dict[str, Any]:
-        return await self.app.restore_snapshot(key, snap_id)
+    async def restore_snapshot(self, key: str, snap_id: str, paths: list[str] | None = None) -> dict[str, Any]:
+        return await self.app.restore_snapshot(key, snap_id, paths)
+
+    async def restore_preview(self, key: str, snap_id: str) -> dict[str, Any]:
+        return await self.app.restore_preview(key, snap_id)
 
     async def undo_restore(self, key: str, prerestore_id: str) -> dict[str, Any]:
         return await self.app.undo_restore(key, prerestore_id)
@@ -303,6 +306,9 @@ class Plugin:
 
     async def set_setting(self, key: str, value: Any) -> dict[str, Any]:
         return await self.app.set_setting(key, value)
+
+    async def activity(self, limit: int = 100) -> list[dict[str, Any]]:
+        return await self.app.activity(limit)
 
     async def get_logs(self, limit: int = 200) -> list[dict[str, Any]]:
         return await self.app.get_logs(limit)
