@@ -7,12 +7,14 @@ devices. The file is owner-only, and keys never leave this module except to the 
 
 from __future__ import annotations
 
+import builtins
 import re
 import threading
 import time
 from typing import Any
 
 from ..fsutil import atomic_write_json, read_json
+from .netinfo import clean_macs
 
 DEVICE_ID = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 MAX_NAME = 40
@@ -76,6 +78,7 @@ class PeerStore:
             "address": str(peer.get("address") or ""),
             "pairedAt": float(peer.get("pairedAt") or 0),
             "lastSeen": float(peer.get("lastSeen") or 0),
+            "canWake": bool(clean_macs(peer.get("wake"))),
         }
 
     def get(self, device_id: str) -> dict[str, Any] | None:
@@ -117,7 +120,12 @@ class PeerStore:
             self._save(peers)
             return True
 
-    def seen(self, device_id: str, address: str | None = None) -> None:
+    def wake_addresses(self, device_id: str) -> builtins.list[str]:
+        with self._lock:
+            peer = self._load().get(device_id)
+        return clean_macs(peer.get("wake")) if peer else []
+
+    def seen(self, device_id: str, address: str | None = None, wake: Any = None) -> None:
         with self._lock:
             peers = self._load()
             peer = peers.get(device_id)
@@ -126,4 +134,6 @@ class PeerStore:
             peer["lastSeen"] = time.time()
             if address:
                 peer["address"] = str(address)[:255]
+            if wake is not None:
+                peer["wake"] = clean_macs(wake)
             self._save(peers)

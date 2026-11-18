@@ -173,3 +173,44 @@ export interface ActivityEntry {
   text: string;
   level: "info" | "warn";
 }
+
+// Replication (ADR-0054, ADR-0056).
+export interface PairedDevice {
+  id: string;
+  name: string;
+  address: string;
+  lastSeen: number;
+  canWake: boolean;
+}
+export interface Pairing {
+  id: string;
+  address: string;
+  state: "connecting" | "compare" | "waiting" | "paired" | "failed" | "cancelled";
+  code: string | null;
+  peerName: string | null;
+  reason: string | null;
+}
+export interface FoundDevice {
+  id: string;
+  name: string;
+  address: string;
+  port: number;
+  paired: boolean;
+}
+export interface ReplicationStatus {
+  available: boolean;
+  listener: { on: boolean; addresses: string[]; port: number; pairingOpen: boolean; pairingSecondsLeft: number };
+  discovery: { on: boolean; problem: string | null };
+  peers: PairedDevice[];
+  pairings: Pairing[];
+  addressChoice: string;
+  addressesAvailable: { address: string; kind: string }[];
+}
+export interface LinkCheck {
+  ok: boolean;
+  reason?: string;
+  address?: string;
+  rttMs?: number;
+  slow?: boolean;
+  overlay?: boolean;
+}

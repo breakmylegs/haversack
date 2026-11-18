@@ -9,15 +9,20 @@ import type {
   ConflictDetails,
   ConflictEntry,
   ConflictSide,
+  FoundDevice,
   GameMatch,
   ImportAllStatus,
+  LinkCheck,
   LudusaviGame,
   HealthCheck,
   HistoryItem,
   ModuleStatus,
+  PairedDevice,
+  Pairing,
   PcResult,
   PcUpdateStatus,
   QamSummary,
+  ReplicationStatus,
   Settings,
   UpdateCheck,
 } from "./types.js";
@@ -823,6 +828,170 @@ async function updates(main: HTMLElement, check?: UpdateCheck, installed?: strin
   );
 }
 
+// Devices: Replication's links and pairing (ADR-0054, ADR-0056)
+
+function pairingActive(p: Pairing): boolean {
+  return p.state === "connecting" || p.state === "compare" || p.state === "waiting";
+}
+
+async function devices(main: HTMLElement, found: FoundDevice[] | null = null): Promise<void> {
+  const status = await call<ReplicationStatus>("replication_status");
+  const again = (list: FoundDevice[] | null = found) => devices(main, list);
+  if (!status.available) {
+    replace(main, h("h1", {}, "Devices"), h("p", { class: "warn" }, "This device's Python cannot make Replication's encrypted link, so Replication stays off."));
+    return;
+  }
+  const listener = status.listener;
+  const address = h("input", { type: "text", "aria-label": "Device address", placeholder: "192.168.1.20" }) as HTMLInputElement;
+  const pairingCards = status.pairings
+    .filter((p) => pairingActive(p) || p.state === "failed")
+    .map((p) => {
+      const who = p.peerName ?? p.address;
+      if (p.state === "failed") return h("li", { class: "check warn" }, h("strong", {}, `Pairing with ${who} did not finish`), h("p", {}, p.reason ?? ""));
+      if (p.state === "compare")
+        return h(
+          "li",
+          { class: "check info" },
+          h("strong", {}, `Pair with ${who}? Code ${p.code ?? ""}`),
+          h("p", {}, "Check that the other device shows exactly the same code. If it differs, say so: someone else may be on the network."),
+          h(
+            "div",
+            { class: "actions" },
+            button("The codes match", async () => (await call("replication_answer", p.id, true), await again())),
+            button("They differ", async () => (await call("replication_answer", p.id, false), await again())),
+          ),
+        );
+      return h(
+        "li",
+        { class: "check info" },
+        h("strong", {}, p.state === "waiting" ? `Code ${p.code ?? ""}` : `Connecting to ${who}`),
+        h("p", {}, p.state === "waiting" ? `Waiting for ${who} to confirm.` : ""),
+        p.state === "connecting" ? button("Cancel", async () => (await call("replication_cancel", p.id), await again())) : null,
+      );
+    });
+  const choice = h("select", { "aria-label": "Listen on" }) as HTMLSelectElement;
+  for (const option of [{ address: "", kind: "all" }, ...status.addressesAvailable]) {
+    const label = option.address ? `${option.address}${option.kind === "overlay" ? " (VPN)" : ""}` : "All home network and VPN addresses";
+    const item = h("option", { value: option.address }, label) as HTMLOptionElement;
+    item.selected = option.address === status.addressChoice;
+    choice.append(item);
+  }
+  choice.addEventListener("change", () => void call("replication_set_address", choice.value).then(() => again(), fail));
+  replace(
+    main,
+    h("h1", {}, "Devices"),
+    h("p", {}, "Keepsake links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once by checking that both screens show the same code."),
+    pairingCards.length ? h("ul", { class: "list" }, ...pairingCards) : null,
+    h(
+      "section",
+      { class: "card" },
+      h("h2", {}, "This device"),
+      h(
+        "p",
+        {},
+        listener.on
+          ? `Listening on ${listener.addresses.join(", ") || "no address"}, port ${listener.port}. Only paired devices get in.`
+          : "Other devices cannot reach this one. Switch it on to pair or to receive games.",
+      ),
+      status.discovery.problem ? h("p", { class: "warn" }, status.discovery.problem) : null,
+      h(
+        "div",
+        { class: "actions" },
+        button(listener.on ? "Stop listening" : "Let other devices reach this one", async () => {
+          await call("replication_set_listener", !listener.on);
+          await again();
+        }),
+        listener.on
+          ? button(listener.pairingOpen ? `Stop accepting (${listener.pairingSecondsLeft} s)` : "Let a device pair with this one", async () => {
+              await call(listener.pairingOpen ? "replication_close_pairing" : "replication_open_pairing");
+              await again();
+            })
+          : null,
+      ),
+      status.addressesAvailable.length > 1 ? h("label", {}, "Listen on ", choice) : null,
+    ),
+    h(
+      "section",
+      { class: "card" },
+      h("h2", {}, "Pair a device"),
+      h("div", { class: "actions" }, button("Find devices", async () => again(await call<FoundDevice[]>("replication_find")))),
+      found && !found.length ? h("p", {}, "No devices answered. On the other device, let other devices reach it, or type its address below.") : null,
+      found?.length
+        ? h(
+            "ul",
+            { class: "list" },
+            ...found.map((d) =>
+              h(
+                "li",
+                {},
+                h("strong", {}, d.name),
+                ` ${d.address}${d.paired ? ", already paired" : ""} `,
+                button("Pair", async () => {
+                  await call("replication_pair", `${d.address.includes(":") ? `[${d.address}]` : d.address}:${d.port}`);
+                  await again(null);
+                }),
+              ),
+            ),
+          )
+        : null,
+      h("label", {}, "Address ", address),
+      h(
+        "div",
+        { class: "actions" },
+        button("Pair by address", async () => {
+          await call("replication_pair", address.value.trim());
+          await again();
+        }),
+      ),
+    ),
+    h(
+      "section",
+      { class: "card" },
+      h("h2", {}, "Paired devices"),
+      status.peers.length ? h("ul", { class: "list" }, ...status.peers.map((peer) => peerItem(peer, main))) : h("p", {}, "None yet."),
+    ),
+  );
+  if (listener.pairingOpen || status.pairings.some(pairingActive)) {
+    setTimeout(() => {
+      if (document.getElementById("nav-devices")?.getAttribute("aria-current") === "true") void again().catch(() => undefined);
+    }, 1000);
+  }
+}
+
+function peerItem(peer: PairedDevice, main: HTMLElement): HTMLElement {
+  const note = h("p", {}, `Last seen ${when(peer.lastSeen)}${peer.address ? ` at ${peer.address}` : ""}`);
+  return h(
+    "li",
+    {},
+    h("strong", {}, peer.name),
+    note,
+    h(
+      "div",
+      { class: "actions" },
+      button("Check", async () => {
+        const r = await call<LinkCheck>("replication_check", peer.id);
+        const slow = r.slow ? (r.overlay ? " Slow: your VPN may be relaying this link." : " Slow.") : "";
+        note.textContent = r.ok ? `Reachable at ${r.address ?? ""}, ${r.rttMs ?? 0} ms.${slow}` : (r.reason ?? "Not reachable.");
+      }),
+      peer.canWake
+        ? button("Wake", async () => {
+            await call("replication_wake", peer.id);
+            toast("Wake signal sent. A device asleep on Wi-Fi may not wake.");
+          })
+        : null,
+      button(
+        "Remove",
+        async () => {
+          if (!window.confirm(`Remove ${peer.name}? Its link key is deleted here, and it can no longer connect. Pair again to link it back.`)) return;
+          await call("replication_remove", peer.id);
+          toast("Device removed.");
+          await devices(main);
+        },
+      ),
+    ),
+  );
+}
+
 // The shell
 
 const PAGES: Page[] = [
@@ -831,6 +1000,7 @@ const PAGES: Page[] = [
   { id: "games", title: "Games", render: (main) => games(main) },
   { id: "cloud", title: "Cloud", render: cloud },
   { id: "import", title: "Import", render: importPage },
+  { id: "devices", title: "Devices", render: (main) => devices(main) },
   { id: "history", title: "History", render: history },
   { id: "activity", title: "Activity", render: activityPage },
   { id: "health", title: "Health", render: health },
@@ -871,12 +1041,13 @@ function start(): void {
   );
   onEvents((event, args) => {
     if (event === "keepsake_toast" && typeof args[0] === "string") toast(args[0]);
+    if (event === "keepsake_replication" && document.getElementById("nav-devices")?.getAttribute("aria-current") === "true") void show("devices");
     if (event === "keepsake_signin") {
       const result = args[0] as { status?: string; reason?: string } | undefined;
       toast(result?.status === "signed-in" ? "Signed in." : `Sign-in did not complete: ${result?.reason ?? "unknown reason"}`);
       if (document.getElementById("nav-cloud")?.getAttribute("aria-current") === "true") void show("cloud");
     }
-  }, ["keepsake_toast", "keepsake_signin"]);
+  }, ["keepsake_toast", "keepsake_signin", "keepsake_replication"]);
   void show(initialPage() ?? "overview");
 }
 

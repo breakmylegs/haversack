@@ -223,10 +223,7 @@ def test_a_failing_module_leaves_saves_working(tmp_path):
     assert pushed["status"] == "published"
     assert by_name["flaky"]["failed"] and by_name["saves"]["running"]
     assert status["stateDatabase"] is True
-    assert {m["name"] for m in status["modules"] if not m["available"]} == {
-        "replication",
-        "desktop",
-    }
+    assert {m["name"] for m in status["modules"] if not m["available"]} == {"desktop"}  # Replication: ADR-0056
 
 
 def test_lifecycle_events_reach_subscribers_and_saves_can_be_switched_off(tmp_path):

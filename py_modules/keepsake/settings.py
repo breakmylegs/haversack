@@ -11,6 +11,7 @@ rollback), the store opens in read-only safe mode and never writes
 
 from __future__ import annotations
 
+import ipaddress
 import os
 import re
 import threading
@@ -54,6 +55,10 @@ DEFAULTS: dict[str, Any] = {
     "tipsDismissed": False,
     # Heroic, Lutris and Bottles games and emulator saves, on Linux devices (ADR-0051). Each still opts in.
     "otherLaunchers": True,
+    # Replication (ADR-0054, ADR-0056): the listener stays off until the user switches it on (P17), and binds
+    # to every home network and VPN address, or to the one address chosen here.
+    "replicationListener": False,
+    "replicationAddress": "",
 }
 SIGNIN_METHODS = ("browser", "phone")
 MODULE_NAMES = ("saves", "advisor", "replication", "installer", "desktop")
@@ -80,6 +85,8 @@ USER_KEYS = frozenset(
         "gamingModeSignin",
         "tipsDismissed",
         "otherLaunchers",
+        "replicationListener",
+        "replicationAddress",
     }
 )
 IDLE_MINUTES_RANGE = (10, 240)
@@ -200,9 +207,20 @@ def _validate(key: str, value: Any) -> Any:
         "suspendSnapshots",
         "tipsDismissed",
         "otherLaunchers",
+        "replicationListener",
     ):
         if not isinstance(value, bool):
             raise SettingsError("must be true or false")
+        return value
+    if key == "replicationAddress":
+        if not isinstance(value, str):
+            raise SettingsError("the listening address is an IP address, or empty for all")
+        value = value.strip()
+        if value:
+            try:
+                ipaddress.ip_address(value)
+            except ValueError:
+                raise SettingsError("the listening address is an IP address, or empty for all") from None
         return value
     if key == "snapshotStore":
         if value not in SNAPSHOT_STORES:

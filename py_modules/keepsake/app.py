@@ -70,6 +70,11 @@ from .loopback_auth import BrowserProbe, LoopbackFlow
 from .modules import Module, ModuleRegistry
 from .paths import PluginPaths
 from .procs import find_game_processes
+from .replication import link as replication_link
+from .replication import netinfo
+from .replication.peers import PeerStore
+from .replication.service import Links, ReplicationError
+from .replication.service import health_checks as replication_health_checks
 from .resolve import ALL_ROOTS
 from .safepath import PathEscapeError, validate_relative
 from .settings import SettingsStore
@@ -107,6 +112,7 @@ IDLE_EVENT = "keepsake_idle"
 MANIFEST_PROGRESS_EVENT = "keepsake_manifest_progress"
 ADVISOR_EVENT = "keepsake_advisor"
 IMPORT_PROGRESS_EVENT = "keepsake_import_progress"
+REPLICATION_EVENT = "keepsake_replication"
 MANIFEST_PROGRESS_SECONDS = 0.5
 RETARGET_KINDS = ("set-shortcut-name", "set-shortcut-exe", "set-shortcut-start-dir", "set-launch-options")
 
@@ -404,16 +410,62 @@ class KeepsakeApp:
                 default=None if self.host == "decky" else False,
             )
         )
-        for name, title, description, writes in (
-            ("replication", "Replication", "Copies games between your devices.", "Games you send between devices."),
-            (
+        self.links: Links | None = None
+        self.sys_root = "/sys"
+        self.replication_port = replication_link.DEFAULT_PORT
+
+        async def replication_start() -> None:
+            me = replication_link.Identity(
+                str(self.settings.get("deviceId")),
+                str(self.settings.get("deviceName") or "Unnamed device"),
+                await asyncio.to_thread(netinfo.own_macs, self.sys_root),
+            )
+            self.links = Links(
+                me,
+                PeerStore(os.path.join(self.paths.settings_dir, "replication-peers.json")),
+                lambda: netinfo.bind_hosts(
+                    str(self.settings.get("replicationAddress")), netinfo.local_addresses(self.proc_root)
+                ),
+                self.replication_port,
+                discovery=True,
+                on_change=self._replication_changed,
+            )
+            if self.settings.get("replicationListener") and replication_link.available():
+                try:
+                    await self.links.set_listener(True)
+                except (ReplicationError, replication_link.LinkError, OSError) as exc:
+                    log_event(logging.WARNING, "replication.listener_failed", "Listener not started", error=str(exc))
+
+        async def replication_stop() -> None:
+            links, self.links = self.links, None
+            if links is not None:
+                await links.close()
+
+        async def replication_health() -> list[dict[str, Any]]:
+            return replication_health_checks(self.links, self.host, self.proc_root)
+
+        self.registry.register(
+            Module(
+                "replication",
+                "Replication",
+                "Links your own devices directly, never through the cloud: pair them once, then send games between "
+                "them.",
+                "Its own list of paired devices and their link keys. Later: games you send, into the folders you "
+                "choose.",
+                start=replication_start,
+                stop=replication_stop,
+                health=replication_health,
+            )
+        )
+        self.registry.register(
+            Module(
                 "desktop",
                 "Desktop",
                 "Keepsake in Desktop Mode, with a tray icon.",
                 "Desktop Mode shortcuts for Keepsake.",
-            ),
-        ):
-            self.registry.register(Module(name, title, description, writes, available=False))
+                available=False,
+            )
+        )
         self.installer: Installer | None = None
 
         async def installer_start() -> None:
@@ -2792,6 +2844,102 @@ class KeepsakeApp:
         if advisor.game and set(values) & reload:
             await asyncio.to_thread(advisor.set_game, int(advisor.game["appid"]))
         return await self.advisor_view()
+
+    # Replication: device links and pairing (slice 17, ADR-0054, ADR-0056)
+
+    def _links(self) -> Links:
+        if self.links is None:
+            raise ValueError("Replication is off; switch it on in Settings, Modules")
+        return self.links
+
+    def _replication_changed(self) -> None:
+        """A pairing request arrived or changed: tell the open pages, and say so once in a toast."""
+        links = self.links
+        if links is None:
+            return
+        asyncio.get_running_loop().create_task(self.emit(REPLICATION_EVENT))
+        for pairing in links.listener.pairings.values() if links.listener else []:
+            if pairing.state == "compare" and not pairing.announced:
+                pairing.announced = True
+                name = pairing.peer_name or "another device"
+                text = f"{name} wants to pair. Check the code in Keepsake, Devices."
+                asyncio.get_running_loop().create_task(self.emit("keepsake_toast", text))
+
+    async def _replication(self, work: Callable[[Links], Any]) -> Any:
+        try:
+            result = work(self._links())
+            return await result if asyncio.iscoroutine(result) else result
+        except (ReplicationError, replication_link.LinkError) as exc:
+            raise ValueError(str(exc)) from exc
+
+    async def replication_status(self) -> dict[str, Any]:
+        status: dict[str, Any] = await self._replication(lambda links: links.status())
+        status["addressChoice"] = str(self.settings.get("replicationAddress"))
+        status["addressesAvailable"] = await asyncio.to_thread(netinfo.local_addresses, self.proc_root)
+        status["thisDevice"] = {"name": str(self.settings.get("deviceName") or "Unnamed device")}
+        return status
+
+    async def replication_set_listener(self, on: bool) -> dict[str, Any]:
+        """Switch the listener on or off. Only from a user action (P17); remembered across restarts."""
+        await self._replication(lambda links: links.set_listener(bool(on)))
+        self.settings.set("replicationListener", bool(on))
+        log_event(logging.INFO, "replication.listener", "Listener switched", on=bool(on))
+        return await self.replication_status()
+
+    async def replication_set_address(self, address: str) -> dict[str, Any]:
+        """Listen on one address, or on every home network and VPN address ("")."""
+        address = str(address or "")
+        available = [a["address"] for a in await asyncio.to_thread(netinfo.local_addresses, self.proc_root)]
+        if address and address not in available:
+            raise ValueError("that address is not one of this device's home network or VPN addresses")
+        self.settings.set("replicationAddress", address)
+        links = self._links()
+        if links.listener is not None:  # bind again where the user chose
+            await self._replication(lambda lk: lk.set_listener(False))
+            await self._replication(lambda lk: lk.set_listener(True))
+        return await self.replication_status()
+
+    async def replication_open_pairing(self) -> dict[str, Any]:
+        await self._replication(lambda links: links.open_pairing())
+        log_event(logging.INFO, "replication.pairing_open", "Pairing window opened")
+        return await self.replication_status()
+
+    async def replication_close_pairing(self) -> dict[str, Any]:
+        await self._replication(lambda links: links.close_pairing())
+        return await self.replication_status()
+
+    async def replication_pair(self, address: str) -> dict[str, Any]:
+        """Pair with a device whose pairing window is open, at a found or typed address."""
+        pairing: dict[str, Any] = await self._replication(lambda links: links.pair_with(str(address)))
+        log_event(logging.INFO, "replication.pair_start", "Pairing started")
+        return pairing
+
+    async def replication_answer(self, pairing_id: str, ok: bool) -> dict[str, Any]:
+        await self._replication(lambda links: links.answer(str(pairing_id), bool(ok)))
+        log_event(logging.INFO, "replication.pair_answer", "Pairing code answered", match=bool(ok))
+        return await self.replication_status()
+
+    async def replication_cancel(self, pairing_id: str) -> dict[str, Any]:
+        await self._replication(lambda links: links.cancel(str(pairing_id)))
+        return await self.replication_status()
+
+    async def replication_find(self) -> list[dict[str, Any]]:
+        """Look for Keepsake devices on the LAN for two seconds. Only from a user action."""
+        found: list[dict[str, Any]] = await self._replication(lambda links: links.find())
+        return found
+
+    async def replication_check(self, peer_id: str) -> dict[str, Any]:
+        result: dict[str, Any] = await self._replication(lambda links: links.check(str(peer_id)))
+        return result
+
+    async def replication_remove(self, peer_id: str) -> dict[str, Any]:
+        await self._replication(lambda links: links.remove(str(peer_id)))
+        log_event(logging.INFO, "replication.removed", "Paired device removed")
+        return await self.replication_status()
+
+    async def replication_wake(self, peer_id: str) -> dict[str, Any]:
+        sent: int = await self._replication(lambda links: asyncio.to_thread(links.wake, str(peer_id)))
+        return {"sent": sent}
 
     # Installer (slice 21, ADR-0026)
 

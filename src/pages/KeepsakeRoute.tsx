@@ -13,6 +13,7 @@ import {
   FaStethoscope,
   FaStream,
   FaHdd,
+  FaNetworkWired,
 } from "react-icons/fa";
 import { ROUTE_PATH } from "../routes";
 import { ConflictsPage } from "./ConflictsPage";
@@ -25,6 +26,7 @@ import { AdvisorPage } from "./AdvisorPage";
 import { modulesStatus } from "../backend";
 import { ActivityPage } from "./ActivityPage";
 import { StoragePage } from "./StoragePage";
+import { ReplicationPage } from "./ReplicationPage";
 import { LogsPage } from "./LogsPage";
 import { SettingsPage } from "./SettingsPage";
 import { UpdatesPage } from "./UpdatesPage";
@@ -33,7 +35,7 @@ export { ROUTE_PATH };
 
 // Tabs are grouped by module so later modules (Advisor, Replication, Installer, Desktop) add
 // their own entries here without touching the Saves tabs (build prompt v2 section 10, slice 9).
-type Module = "saves" | "core" | "installer" | "advisor";
+type Module = "saves" | "core" | "installer" | "advisor" | "replication";
 
 interface Tab {
   module: Module;
@@ -49,6 +51,7 @@ const TABS: Tab[] = [
   { module: "saves", title: "History", icon: <FaHistory />, content: <HistoryPage />, path: "history" },
   { module: "saves", title: "Import saves", icon: <FaFileImport />, content: <ImportPage />, path: "import" },
   { module: "advisor", title: "Advisor", icon: <FaLightbulb />, content: <AdvisorPage />, path: "advisor" },
+  { module: "replication", title: "Devices", icon: <FaNetworkWired />, content: <ReplicationPage />, path: "devices" },
   { module: "installer", title: "Install", icon: <FaCompactDisc />, content: <InstallerPage />, path: "install" },
   { module: "core", title: "Settings", icon: <FaCog />, content: <SettingsPage />, path: "settings" },
   { module: "core", title: "Updates", icon: <FaCloudDownloadAlt />, content: <UpdatesPage />, path: "updates" },

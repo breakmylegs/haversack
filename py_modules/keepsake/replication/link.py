@@ -167,6 +167,7 @@ class Pairing:
     reason: str | None = None
     confirmed: asyncio.Future[bool] | None = None
     ended_at: float | None = None
+    announced: bool = False  # the app has told the user about this request
 
     def public(self) -> dict[str, Any]:
         return {
@@ -199,6 +200,7 @@ def cancel(pairing: Pairing) -> None:
 class Identity:
     device_id: str
     name: str
+    wake: list[str] = field(default_factory=list)  # hardware addresses, for Wake-on-LAN (ADR-0056)
 
 
 async def _await_user(pairing: Pairing, timeout: float) -> bool:
@@ -215,11 +217,14 @@ async def _compare(
     writer: asyncio.StreamWriter,
     code: str,
     confirm_timeout: float,
+    changed: Callable[[], None] | None = None,
 ) -> None:
     """Show the code, send this user's answer, read the other's. Both must say the codes match."""
     pairing.code = code
     pairing.confirmed = asyncio.get_running_loop().create_future()
     pairing.state = "compare"
+    if changed:
+        changed()  # the code is ready to show
     ours = await _await_user(pairing, confirm_timeout)
     await send_frame(writer, {"type": "pair-confirm", "ok": ours})
     if not ours:
@@ -333,7 +338,7 @@ class Listener:
 
     me: Identity
     store: PeerStore
-    host: str
+    host: str | list[str]  # one address, or several (ADR-0056)
     port: int = DEFAULT_PORT
     clock: Clock = time.monotonic
     confirm_timeout: float = CONFIRM_TIMEOUT
@@ -461,8 +466,7 @@ class Listener:
             if not hmac.compare_digest(hashlib.sha256(nonce_i).digest(), committed):
                 raise LinkError("the other device's pairing answer did not match what it promised")
             code = comparison_code(binding, nonce_i, nonce_r, peer_id, self.me.device_id)
-            self._changed()
-            await _compare(pairing, reader, writer, code, self.confirm_timeout)
+            await _compare(pairing, reader, writer, code, self.confirm_timeout, self._changed)
             key = _hex(await expect(reader, "pair-key"), "key", KEY_BYTES)
             self.store.add(peer_id, pairing.peer_name, key, address)
             await send_frame(writer, {"type": "pair-done"})
@@ -493,9 +497,16 @@ class Listener:
             if hello.get("deviceId") != session.peer_id:
                 raise LinkError("the device's hello did not match its key")
             await send_frame(
-                session.writer, {"type": "hello", "v": PROTOCOL, "deviceId": self.me.device_id, "name": self.me.name}
+                session.writer,
+                {
+                    "type": "hello",
+                    "v": PROTOCOL,
+                    "deviceId": self.me.device_id,
+                    "name": self.me.name,
+                    "wake": self.me.wake,
+                },
             )
-            self.store.seen(session.peer_id)
+            self.store.seen(session.peer_id, wake=hello.get("wake"))
             while True:
                 message = await read_frame(session.reader, timeout=300)
                 if self.store.key(session.peer_id) is None:
@@ -555,12 +566,14 @@ async def connect(me: Identity, store: PeerStore, peer_id: str, host: str, port:
     connection = Connection(peer_id, reader, writer)
     try:
         checked_session(writer)
-        hello = await connection.request({"type": "hello", "v": PROTOCOL, "deviceId": me.device_id, "name": me.name})
+        hello = await connection.request(
+            {"type": "hello", "v": PROTOCOL, "deviceId": me.device_id, "name": me.name, "wake": me.wake}
+        )
         if hello.get("type") != "hello" or hello.get("deviceId") != peer_id:
             raise LinkError("a different device answered at that address")
         connection.peer_name = clean_name(hello.get("name"))
     except (LinkError, policy.PolicyError, OSError, ssl.SSLError) as exc:
         await connection.close()
         raise LinkError(str(exc)) from exc
-    store.seen(peer_id, f"{host}:{port}")
+    store.seen(peer_id, f"{host}:{port}", wake=hello.get("wake"))
     return connection
