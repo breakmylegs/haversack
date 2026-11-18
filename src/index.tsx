@@ -8,6 +8,7 @@ import { startLifecycle } from "./lifecycle";
 import { startProbes } from "./probes";
 import { startSteamOps } from "./steamops";
 import { AdvisorQam } from "./pages/AdvisorQam";
+import { openCheckpointModal } from "./pages/CheckpointModal";
 import { KeepsakeRoute } from "./pages/KeepsakeRoute";
 import { SetupWizard } from "./pages/SetupWizard";
 import { ROUTE_PATH, SETUP_PATH } from "./routes";
@@ -105,6 +106,17 @@ function Content() {
             onClick={() => openRoute(`${ROUTE_PATH}/games`)}
           >
             Playing: {summary.currentGame.name}
+          </ButtonItem>
+        </PanelSectionRow>
+      )}
+      {summary?.currentGame && (
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            description="Save in the game first, then keep a named copy of that save."
+            onClick={() => summary.currentGame && openCheckpointModal(summary.currentGame.key, summary.currentGame.name)}
+          >
+            Save checkpoint
           </ButtonItem>
         </PanelSectionRow>
       )}

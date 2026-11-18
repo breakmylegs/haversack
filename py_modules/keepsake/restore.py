@@ -24,7 +24,7 @@ from __future__ import annotations
 import os
 import shutil
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from typing import Any
 
 from .fsutil import atomic_write_json, read_json
@@ -81,15 +81,21 @@ def restore(
     roots: Mapping[str, str | None],
     runtime_dir: str,
     hook: Hook | None = None,
+    only: Collection[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Replace the files in ``current`` with the snapshot's files. Returns counts.
 
-    ``hook(stage, index)`` is called at each step for fault-injection tests.
+    ``only`` (partial restore, ADR-0048) limits the changes to those ``(root, rel)`` paths;
+    every other file is left exactly as it is. ``hook(stage, index)`` is called at each
+    step for fault-injection tests.
     """
     recover(runtime_dir)
     verify_blob(blob_path, meta)
     target = entries_of(meta)
     ops = plan(current, target)
+    if only is not None:
+        chosen = set(only)
+        ops = [op for op in ops if (op["root"], op["rel"]) in chosen]
     if not ops:
         return {"changed": 0, "created": 0, "replaced": 0, "deleted": 0}
     token = uuid.uuid4().hex[:12]

@@ -11,6 +11,7 @@ import {
   FaHistory,
   FaLightbulb,
   FaStethoscope,
+  FaStream,
 } from "react-icons/fa";
 import { ROUTE_PATH } from "../routes";
 import { ConflictsPage } from "./ConflictsPage";
@@ -21,6 +22,7 @@ import { ImportPage } from "./ImportPage";
 import { InstallerPage } from "./InstallerPage";
 import { AdvisorPage } from "./AdvisorPage";
 import { modulesStatus } from "../backend";
+import { ActivityPage } from "./ActivityPage";
 import { LogsPage } from "./LogsPage";
 import { SettingsPage } from "./SettingsPage";
 import { UpdatesPage } from "./UpdatesPage";
@@ -48,6 +50,7 @@ const TABS: Tab[] = [
   { module: "installer", title: "Install", icon: <FaCompactDisc />, content: <InstallerPage />, path: "install" },
   { module: "core", title: "Settings", icon: <FaCog />, content: <SettingsPage />, path: "settings" },
   { module: "core", title: "Updates", icon: <FaCloudDownloadAlt />, content: <UpdatesPage />, path: "updates" },
+  { module: "saves", title: "Activity", icon: <FaStream />, content: <ActivityPage />, path: "activity" },
   { module: "core", title: "Logs", icon: <FaClipboardList />, content: <LogsPage />, path: "logs" },
   { module: "core", title: "Diagnostics", icon: <FaStethoscope />, content: <DiagnosticsPage />, path: "diagnostics" },
 ];

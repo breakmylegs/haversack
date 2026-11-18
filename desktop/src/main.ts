@@ -4,9 +4,11 @@
 import { ApiError, call, hasToken, initialPage, onEvents } from "./api.js";
 import { h, replace, size, when } from "./dom.js";
 import type {
+  ActivityEntry,
   CloudStatus,
   ConflictDetails,
   ConflictEntry,
+  ConflictSide,
   GameMatch,
   ImportAllStatus,
   LudusaviGame,
@@ -117,7 +119,7 @@ function conflictCard(entry: ConflictEntry, main: HTMLElement): HTMLElement {
   return card;
 }
 
-function choices(info: ConflictDetails, main: HTMLElement): HTMLElement[] {
+function choices(info: ConflictDetails, main: HTMLElement): (HTMLElement | null)[] {
   const armed = new Set<string>();
   // Choosing replaces files, so each choice needs a second, explicit press (as in Gaming Mode).
   const choose = (label: string, id: string, run: () => Promise<unknown>) => {
@@ -138,19 +140,20 @@ function choices(info: ConflictDetails, main: HTMLElement): HTMLElement[] {
     h(
       "table",
       { class: "sides" },
-      h("tr", {}, h("th", {}, "Version"), h("th", {}, "Device"), h("th", {}, "Saved"), h("th", {}, "Files"), h("th", {}, "Size")),
+      h("tr", {}, h("th", {}, "Version"), h("th", {}, "Device"), h("th", {}, "Last changed"), h("th", {}, "Files"), h("th", {}, "Size")),
       ...sides.map((s) =>
         h(
           "tr",
           {},
           h("td", {}, s.side === "local" ? "This device" : "Cloud"),
           h("td", {}, s.device ?? ""),
-          h("td", {}, s.created ? new Date(s.created).toLocaleString() : "now"),
+          h("td", {}, s.created ? new Date(s.created).toLocaleString() : "unknown"),
           h("td", {}, `${s.files} (${s.changedFiles} changed)`),
           h("td", {}, size(s.bytes)),
         ),
       ),
     ),
+    ...sides.map((s) => changeList(s)),
     h(
       "div",
       { class: "actions" },
@@ -168,6 +171,21 @@ function choices(info: ConflictDetails, main: HTMLElement): HTMLElement[] {
       }),
     ),
   ];
+}
+
+const changeWords: Record<string, string> = { added: "new", removed: "gone", changed: "changed" };
+
+// The files each side added, removed or changed since the last shared save (ADR-0048). Shown, never picked.
+function changeList(side: ConflictSide): HTMLElement | null {
+  const changes = side.changes ?? [];
+  if (!changes.length) return null;
+  const title = side.side === "local" ? `On ${side.device ?? "this device"}` : `From ${side.device ?? "the cloud"}`;
+  return h(
+    "details",
+    {},
+    h("summary", {}, `${title}: ${changes.length}${changes.length === 200 ? " or more" : ""} files differ`),
+    h("ul", { class: "changes" }, ...changes.map((c) => h("li", {}, `${changeWords[c.change] ?? c.change}: ${c.path.split("/").slice(1).join("/")}`))),
+  );
 }
 
 // History
@@ -196,6 +214,30 @@ async function history(main: HTMLElement): Promise<void> {
           ),
         )
       : h("p", { class: "empty" }, "No snapshots yet."),
+  );
+}
+
+// Activity: what Keepsake did, in plain words (ADR-0048)
+
+async function activityPage(main: HTMLElement): Promise<void> {
+  const entries = await call<ActivityEntry[]>("activity", 100);
+  replace(
+    main,
+    h("h1", {}, "Activity"),
+    entries.length
+      ? h(
+          "ul",
+          { class: "list" },
+          ...entries.map((e) =>
+            h(
+              "li",
+              { class: e.level === "warn" ? "check warn" : "" },
+              h("strong", {}, e.level === "warn" ? `Needs attention: ${e.text}` : e.text),
+              h("p", { class: "small" }, e.time ? new Date(e.time).toLocaleString() : ""),
+            ),
+          ),
+        )
+      : h("p", { class: "empty" }, "Nothing yet. Syncs, restores and checkpoints appear here."),
   );
 }
 
@@ -293,11 +335,29 @@ async function games(main: HTMLElement, filter = ""): Promise<void> {
   const shown = all.filter((g) => g.name.toLowerCase().includes(filter.toLowerCase()));
   const search = h("input", { type: "search", placeholder: "Find a game", value: filter, "aria-label": "Find a game" }) as HTMLInputElement;
   search.addEventListener("change", () => void games(main, search.value));
+  // Bulk actions (ADR-0048): only shown games whose save data is known.
+  const syncable = shown.filter((g) => !g.proposal && ["manual", "manual-key", "steam-id", "title"].includes(g.method));
+  const bulk = (on: boolean) =>
+    button(on ? "Sync all shown" : "Stop syncing all shown", async (self) => {
+      const targets = syncable.filter((g) => g.enabled !== on);
+      if (!targets.length) {
+        toast(on ? "Every shown game already syncs." : "None of the shown games sync.");
+        return;
+      }
+      const label = on ? `Sync ${targets.length} games: press again` : `Stop ${targets.length} games: press again`;
+      if (self.textContent !== label) {
+        self.textContent = label; // a second, explicit press, as for other choices that change many games
+        return;
+      }
+      for (const g of targets) await call("update_game_config", g.key, { enabled: on });
+      toast(on ? `${targets.length} games now sync.` : `${targets.length} games no longer sync.`);
+      await games(main, filter);
+    });
   replace(
     main,
     h("h1", {}, "Games"),
     h("p", {}, "Turn sync on for the games whose saves should follow you. Keepsake finds each game's saves from the Ludusavi manifest."),
-    h("div", { class: "actions" }, search),
+    h("div", { class: "actions" }, search, syncable.length ? bulk(true) : null, syncable.length ? bulk(false) : null),
     shown.length
       ? h("ul", { class: "list" }, ...shown.map((g) => h("li", {}, gameCard(g, main, filter))))
       : h("p", { class: "empty" }, filter ? "No game matches that name." : "No games found yet."),
@@ -705,6 +765,7 @@ const PAGES: Page[] = [
   { id: "cloud", title: "Cloud", render: cloud },
   { id: "import", title: "Import", render: importPage },
   { id: "history", title: "History", render: history },
+  { id: "activity", title: "Activity", render: activityPage },
   { id: "health", title: "Health", render: health },
   { id: "modules", title: "Modules", render: modules },
   { id: "updates", title: "Updates", render: (main) => updates(main) },
