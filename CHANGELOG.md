@@ -6,6 +6,7 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ### Added
 
+- Storage: a new page shows how much space each game uses (the game, its Proton prefix, its shader cache and its saves). **Clear shader cache** frees a game's shader cache. **Reset prefix, keep saves** gives a game with a broken prefix a fresh one: Keepsake keeps a checked copy of the saves, moves the old prefix aside, and puts the saves back after you start the game once. The old prefix stays until you delete it (ADR-0052).
 - Heroic, Lutris and Bottles games: on a handheld or a Linux PC, Games lists your Heroic (GOG and Epic), Lutris and Bottles games, and syncs their saves like any other game. Newer saves from your other devices come in while the game is closed, and only if you have not played on since (ADR-0051).
 - Emulator saves: one entry each for RetroArch, Dolphin, PCSX2, DuckStation, PPSSPP, RPCS3 and Cemu, with battery and memory-card saves. Save states can be added per emulator, but are off by default (ADR-0051).
 - Cloud integrity: once a week Keepsake checks that the cloud copies of each game's important snapshots are intact, and **Check cloud integrity** checks them all. A damaged copy shows in Health and in the game's History, where **Repair** saves a fresh copy from this device (ADR-0050).

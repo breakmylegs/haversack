@@ -235,6 +235,21 @@ class Plugin:
     async def sync_pull(self, key: str) -> dict[str, Any]:
         return await self.app.sync_pull(key)
 
+    async def storage_usage(self, key: str | None = None) -> dict[str, Any]:
+        return await self.app.storage_usage(key)
+
+    async def clear_shader_cache(self, key: str) -> dict[str, Any]:
+        return await self.app.clear_shader_cache(key)
+
+    async def reset_prefix(self, key: str) -> dict[str, Any]:
+        return await self.app.reset_prefix(key)
+
+    async def cancel_prefix_reset(self, key: str) -> dict[str, Any]:
+        return await self.app.cancel_prefix_reset(key)
+
+    async def delete_old_prefix(self, key: str) -> dict[str, Any]:
+        return await self.app.delete_old_prefix(key)
+
     async def scrub_cloud(self, full: bool = False) -> dict[str, Any]:
         return await self.app.scrub_cloud(full)
 

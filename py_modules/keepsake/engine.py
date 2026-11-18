@@ -398,6 +398,55 @@ class SnapshotEngine:
             self.prerestore.remove(game_key, record["meta"]["snapId"])
         return str(meta["snapId"])
 
+    # Kept copies (ADR-0052): a verified local copy of a game's saves, held outside the
+    # rolling pre-restore list so later restores can never prune it.
+
+    def keep_copy(
+        self, game_key: str, files_by_root: Mapping[str, list[str]], roots: Mapping[str, str | None], dest: str
+    ) -> dict[str, Any]:
+        """Pack the current save files into ``dest`` (a new file) and verify it. Returns the metadata."""
+        self.list_metas(game_key)  # raises NewerSchemaError before anything is written
+        entries = scan_entries(files_by_root, roots)
+        if not entries:
+            raise SnapshotError("no save files were found to keep")
+        if os.path.exists(dest):
+            raise SnapshotError("a kept copy already exists there")
+        blob_sha = pack(entries, roots, dest)
+        meta = build_meta(
+            game_key=game_key,
+            entries=entries,
+            parents=[],
+            device_id=self.device_id,
+            device_name=self.device_name,
+            device_seq=self.seq.next(),
+            kind="manual",
+            flags=["before-prefix-reset"],
+            blob_sha256=blob_sha,
+            plugin_version=self.plugin_version,
+            created=self.clock(),
+        )
+        verify_blob(dest, meta)  # principle 3: verified before anything is moved
+        return meta
+
+    def restore_copy(
+        self,
+        game_key: str,
+        blob_path: str,
+        meta: Mapping[str, Any],
+        current_files: Mapping[str, list[str]],
+        roots: Mapping[str, str | None],
+        game_running: bool,
+    ) -> dict[str, Any]:
+        """Restore a kept copy, with the usual pre-restore snapshot of what is there now."""
+        copy = self._temp(".zip")
+        shutil.copyfile(blob_path, copy)
+        try:
+            return self._restore_from(
+                game_key, copy, validate_meta(dict(meta)), current_files, roots, game_running, None
+            )
+        finally:
+            os.unlink(copy)
+
     # Integrity (ADR-0050)
 
     def scrub(self, game_key: str, only: Collection[str] | None = None) -> dict[str, Any]:
