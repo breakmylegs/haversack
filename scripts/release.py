@@ -264,6 +264,11 @@ def publish(
             or runner(["git", "ls-remote", "--tags", "origin", tag]).strip()
         ):
             raise ReleaseError(f"tag {tag} already exists")
+    problem = package.client_secrets_problem()
+    if problem and not dry_run:
+        raise ReleaseError(problem)
+    if problem:
+        print(f"warning: {problem}", file=sys.stderr)
     if check is not None and check() != 0:
         raise ReleaseError("scripts/check.py failed")
     out_dir = os.path.join(ROOT, "out", "release", tag)

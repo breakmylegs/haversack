@@ -6,6 +6,7 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ### Added
 
+- One-button cloud sign-in: OneDrive and Google Drive now work out of the box. Pick one, press **Sign in** and approve with your account. No client ID or app registration is needed; your own client is still available under Advanced (ADR-0055).
 - Replication groundwork (not switchable yet): the encrypted link between your own devices, and pairing by checking that both screens show the same 6-digit code. Nothing is sent through the cloud, and nothing is compressed (ADR-0054).
 - Install, games on several discs: keep the ISOs together in one folder, and when the installer asks for the next disc, press **Swap to <disc>**. Keepsake puts it in the drive without stopping the installer (ADR-0053).
 - Install queue: start another install while one is under way, and it waits its turn. Queued installs start by themselves and carry on after a restart (ADR-0053).

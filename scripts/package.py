@@ -33,6 +33,29 @@ EXECUTABLE_TREES = ("bin",)
 SKIP_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache"}
 
 
+CLIENT_SECRETS = ("py_modules", "keepsake", "client_secrets.json")
+CLIENT_SECRET_KEYS = ("googleClientSecret", "googleDesktopClientSecret")
+
+
+def client_secrets_problem() -> str | None:
+    """Why the built-in Google clients would ship without their secrets, or None (ADR-0055).
+
+    The file is git-ignored; the walk over ``py_modules`` puts it in both packages.
+    """
+    path = os.path.join(ROOT, *CLIENT_SECRETS)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except FileNotFoundError:
+        return f"{'/'.join(CLIENT_SECRETS)} is missing: the built-in Google sign-in needs it (docs/releasing.md)"
+    except (OSError, ValueError):
+        return f"{'/'.join(CLIENT_SECRETS)} is not valid JSON"
+    missing = [k for k in CLIENT_SECRET_KEYS if not str((data or {}).get(k, "")).startswith("GOCSPX-")]
+    if missing:
+        return f"{'/'.join(CLIENT_SECRETS)} has no {', '.join(missing)}"
+    return None
+
+
 def plugin_name() -> str:
     with open(os.path.join(ROOT, "plugin.json"), encoding="utf-8") as handle:
         return str(json.load(handle)["name"])
