@@ -28,6 +28,7 @@ import type {
   TransfersStatus,
   IncomingOffer,
   OffersStatus,
+  GameLink,
   UpdateCheck,
 } from "./types.js";
 
@@ -864,6 +865,7 @@ async function devices(main: HTMLElement, found: FoundDevice[] | null = null): P
   const status = await call<ReplicationStatus>("replication_status");
   const transfers = await call<TransfersStatus>("replication_transfers");
   const offered = await call<OffersStatus>("replication_offers");
+  const linked = await call<GameLink[]>("replication_games");
   const again = (list: FoundDevice[] | null = found) => devices(main, list);
   if (!status.available) {
     replace(main, h("h1", {}, "Devices"), h("p", { class: "warn" }, "This device's Python cannot make Replication's encrypted link, so Replication stays off."));
@@ -910,6 +912,7 @@ async function devices(main: HTMLElement, found: FoundDevice[] | null = null): P
     h("h1", {}, "Devices"),
     h("p", {}, "Keepsake links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once by checking that both screens show the same code."),
     offersCard(offered, main),
+    linked.length ? linksCard(linked, main) : null,
     transfers.jobs.length ? transfersCard(transfers, main) : null,
     pairingCards.length ? h("ul", { class: "list" }, ...pairingCards) : null,
     h(
@@ -1013,6 +1016,66 @@ async function acceptOffer(offer: IncomingOffer, main: HTMLElement): Promise<voi
   await devices(main);
 }
 
+async function applyUpdate(offer: IncomingOffer, main: HTMLElement): Promise<void> {
+  try {
+    await call("replication_apply_update", offer.id, false);
+    toast(`Taking the update to ${offer.title}. Your saves and settings stay as they are.`);
+  } catch (error) {
+    const text = error instanceof ApiError ? error.message : "";
+    if (!text.includes("changed on this device too")) throw error;
+    const take = window.confirm(
+      `${offer.title} changed on both devices. OK takes ${offer.from}'s copy of the game; Cancel keeps this device's copy and writes nothing. Your saves and settings stay either way.`,
+    );
+    if (take) await call("replication_apply_update", offer.id, true);
+    else await call("replication_keep_mine", offer.id);
+  }
+  await devices(main);
+}
+
+const linkStateText: Record<string, string> = {
+  "in-sync": "in step",
+  "changed-here": "changed on this device",
+  "update-available": "an update is waiting above",
+  "both-changed": "changed on both devices: choose above",
+  updating: "taking an update",
+};
+
+function linksCard(linked: GameLink[], main: HTMLElement): HTMLElement {
+  return h(
+    "section",
+    { class: "card" },
+    h("h2", {}, "Games kept in step"),
+    h("p", {}, "Your saves and settings on each device are never replaced by an update."),
+    h(
+      "ul",
+      { class: "list" },
+      ...linked.map((link) => {
+        const policy = h("select", { "aria-label": `Updates for ${link.title}` }) as HTMLSelectElement;
+        for (const [value, label] of [["manual", "Ask me"], ["auto", "Take them by themselves"], ["off", "Off"]]) {
+          const option = h("option", { value }, label) as HTMLOptionElement;
+          option.selected = value === link.policy;
+          policy.append(option);
+        }
+        policy.addEventListener("change", () => void call("replication_set_policy", link.id, policy.value).then(() => devices(main), fail));
+        return h(
+          "li",
+          {},
+          h("strong", {}, `${link.title}: ${linkStateText[link.state] ?? link.state}`),
+          h(
+            "div",
+            { class: "actions" },
+            h("label", {}, "Updates ", policy),
+            button("Check now", async () => (await call("replication_check_game", link.id), toast("Checked."), await devices(main))),
+            link.state === "changed-here"
+              ? button("Send update", async () => (await call("replication_send_update", link.id), toast("The update is offered."), await devices(main)))
+              : null,
+          ),
+        );
+      }),
+    ),
+  );
+}
+
 function offersCard(offered: OffersStatus, main: HTMLElement): HTMLElement | null {
   const sending = Object.values(offered.sending).filter((s) => s.state !== "sent");
   if (!offered.incoming.length && !offered.outgoing.length && !sending.length) return null;
@@ -1042,9 +1105,16 @@ function offersCard(offered: OffersStatus, main: HTMLElement): HTMLElement | nul
           h(
             "div",
             { class: "actions" },
-            offer.state === "offered" ? button("Accept", () => acceptOffer(offer, main), "primary") : null,
-            offer.state === "offered" ? button("Decline", async () => (await call("replication_decline", offer.id), await again())) : null,
-            ["transferring", "registering", "failed"].includes(offer.state)
+            offer.state === "offered" && offer.update ? button("Apply update", () => applyUpdate(offer, main), "primary") : null,
+            offer.state === "offered" && offer.update
+              ? button("Keep mine", async () => (await call("replication_keep_mine", offer.id), await again()))
+              : null,
+            offer.state === "offered" && !offer.update ? button("Accept", () => acceptOffer(offer, main), "primary") : null,
+            offer.state === "offered" && !offer.update ? button("Decline", async () => (await call("replication_decline", offer.id), await again())) : null,
+            offer.update && ["transferring", "failed"].includes(offer.state)
+              ? button("Stop update", async () => (await call("replication_remove_game", offer.id), await again()))
+              : null,
+            !offer.update && ["transferring", "registering", "failed"].includes(offer.state)
               ? button("Stop and remove", async () => {
                   if (!window.confirm(`Stop and remove ${offer.title}? Everything this copy made here is deleted: its folder, prefix, a copied tool and its Steam shortcut.`)) return;
                   await call("replication_remove_game", offer.id);

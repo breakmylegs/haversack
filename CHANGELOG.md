@@ -7,7 +7,7 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 ### Added
 
 - One-button cloud sign-in: OneDrive and Google Drive now work out of the box. Pick one, press **Sign in** and approve with your account. No client ID or app registration is needed; your own client is still available under Advanced (ADR-0055).
-- Games you sent stay in step between devices (the controls come in the next update):
+- Games you sent stay in step between devices. On the game's page, **Updates** is Ask me, Take them by themselves, or Off, with **Check now** and **Send update**. On Devices, **Apply update**, **Keep mine** and **Stop update**:
   - when a game changes on one device, for example a patch, Keepsake offers the update to the other;
   - set to Auto, the update goes in by itself;
   - if both devices changed the game, Keepsake asks you which copy to keep;

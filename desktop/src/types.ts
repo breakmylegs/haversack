@@ -240,9 +240,17 @@ export interface IncomingOffer {
   compatTool: string | null;
   toolOffered: boolean;
   droppedOptions: string[];
+  update?: boolean;
 }
 export interface OffersStatus {
   incoming: IncomingOffer[];
   outgoing: { id: string; title: string; peer: string; created: number }[];
   sending: Record<string, { state: string; title: string; peer: string; reason?: string; warning?: string | null }>;
+}
+export interface GameLink {
+  id: string;
+  title: string;
+  appid: number | null;
+  policy: string;
+  state: string;
 }

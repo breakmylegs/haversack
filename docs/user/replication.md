@@ -45,6 +45,21 @@ Each device you pair is linked to every other one you pair, so a group such as t
 
 On the sending device, **Withdraw** an offer once the game has arrived, to free the space Keepsake keeps for it.
 
+## Keep a game in step
+
+Once a game has been sent, each device knows the other has it. When it changes on one device, for example after a patch or a mod, Keepsake notices when you quit the game.
+
+- On the game's page in Keepsake, **Updates** sets what happens:
+  - **Ask me** (the default) shows **Send update**;
+  - **Take them by themselves** sends and applies updates without asking;
+  - **Off** stops keeping it in step.
+- **Check now** looks for changes straight away. A big game takes a while.
+- On the other device, the update appears in **Devices**. **Apply update** takes it, and **Keep mine** leaves that device's copy as it is.
+- If the game changed on both devices, Keepsake changes nothing and asks you. **Take theirs** replaces this device's copy with the other's, and **Keep mine** keeps it.
+- **Stop update** stops an update part way. The game stays exactly as it was.
+
+Your saves and settings on each device are never replaced by an update, whichever you choose. Saves looks after them.
+
 ## Firewalls
 
 Keepsake never changes your firewall. Settings, **Health** says what to allow, if anything: TCP 47110 and UDP 5353.
