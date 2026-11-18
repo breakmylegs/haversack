@@ -6,9 +6,9 @@ Device-to-device replication of non-Steam games, then ongoing install sync. Byte
 |---|---|
 | Flag default | Off. The listener is a separate switch, also off |
 | Spec | `docs/build-prompt-v2.md` sections 4 (P10, P14, P15, P17, P19), 6, 7.4 and 8.2; research sections 2, 4.2, 4.4, 4.6, 4.7 and 4.10 with the supersessions in spec section 11 |
-| ADRs | 0012, 0014, 0015, 0016, 0018, 0045 (hard requirements); transport ADR in slice 16 |
-| Code | `py_modules/keepsake/replication/` (`policy.py` so far), `src/modules/replication/`, `docs/protocol.md` (planned) |
-| Slices | 16 (spike), 17 (listener and pairing), 18 (transfer engine, protocol frozen), 19 (send a game), 20 (ongoing sync, minor release) |
+| ADRs | 0012, 0014, 0015, 0016, 0018, 0045 (hard requirements), 0054 (link and pairing) |
+| Code | `py_modules/keepsake/replication/`: `policy.py`, `link.py`, `peers.py`, `service.py`; `docs/protocol.md` (planned) |
+| Slices | 17a (link and pairing, built), 17b (discovery, Wake-on-LAN, pages), 18 (transfer engine, protocol frozen), 19 (send a game), 20 (ongoing sync, minor release), then R7 (direct save sync). Slice 16's measurements are tuning input, not a gate |
 
 ## Hard requirements (Peter, 17 November 2026; ADR-0045)
 
@@ -47,8 +47,8 @@ Device-to-device replication of non-Steam games, then ongoing install sync. Byte
 
 ## What it does
 
-- **Pairing.** A user-started window, a 6-digit code, time-boxed and rate-limited. Peers are listed with revoke. mDNS discovery if viable, and a manual address always.
-- **Transport.** Authenticated encryption over stdlib `ssl` (mutual TLS with pinned self-signed certificates, or TLS-PSK), chosen by the slice 16 spike, with compression always off. Versioned framing over asyncio streams.
+- **Pairing (ADR-0054).** A user-started window of 120 seconds and 3 attempts. Both screens show the same 6-digit code, bound to the TLS session and to committed nonces, and the user confirms on both; then a random 256-bit link key is shared. Peers are listed with remove. mDNS discovery (17b), and a manual address always.
+- **Transport (ADR-0054).** TLS 1.2 `ECDHE-PSK-CHACHA20-POLY1305` from stdlib `ssl`: forward secret, authenticated by the link key, compression off and checked. Length-prefixed JSON control frames over asyncio streams. Built for fast and slow links alike: streams added only while speed rises, 4 MiB verified pieces, resume, an optional cap.
 - **Manifests** per scope (`install`, `prefix`, `meta`):
   - paths relative to logical roots;
   - size, mode, mtime and symlink target;
