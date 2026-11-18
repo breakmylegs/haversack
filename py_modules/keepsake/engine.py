@@ -398,6 +398,51 @@ class SnapshotEngine:
             self.prerestore.remove(game_key, record["meta"]["snapId"])
         return str(meta["snapId"])
 
+    # Integrity (ADR-0050)
+
+    def scrub(self, game_key: str, only: Collection[str] | None = None) -> dict[str, Any]:
+        """Download and verify snapshot blobs against their metadata. Changes nothing.
+
+        ``only`` limits it to those snapshots (the weekly check covers heads, pins and
+        bases, which every restore relies on). Pruned snapshots are skipped.
+        """
+        pruned = self.pruned(game_key)
+        checked, bad, missing = 0, [], []
+        for meta in self.list_metas(game_key):
+            snap_id = meta["snapId"]
+            if snap_id in pruned or (only is not None and snap_id not in only):
+                continue
+            checked += 1
+            blob_path = self._temp(".zip")
+            try:
+                try:
+                    self.store.get_to_file(blob_key(game_key, snap_id), blob_path)
+                except NotFoundError:
+                    missing.append(snap_id)
+                    continue
+                try:
+                    verify_blob(blob_path, meta)
+                except SnapshotError:
+                    bad.append(snap_id)
+            finally:
+                if os.path.exists(blob_path):
+                    os.unlink(blob_path)
+        return {"checked": checked, "bad": bad, "missing": missing}
+
+    def download_verified(self, game_key: str, snap_id: str, dest: str) -> dict[str, Any]:
+        """Fetch one snapshot's zip to ``dest`` (a new file), verified against its metadata, for export."""
+        meta = self.get_meta(game_key, snap_id)
+        blob_path = self._temp(".zip")
+        try:
+            self.store.get_to_file(blob_key(game_key, snap_id), blob_path)
+            verify_blob(blob_path, meta)
+            with open(blob_path, "rb") as source, open(dest, "xb") as out:  # never overwrites
+                shutil.copyfileobj(source, out)
+        finally:
+            if os.path.exists(blob_path):
+                os.unlink(blob_path)
+        return meta
+
     # Pins and retention
 
     def pin(self, game_key: str, snap_id: str, until: float | None = None, label: str | None = None) -> None:

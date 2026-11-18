@@ -235,6 +235,15 @@ class Plugin:
     async def sync_pull(self, key: str) -> dict[str, Any]:
         return await self.app.sync_pull(key)
 
+    async def scrub_cloud(self, full: bool = False) -> dict[str, Any]:
+        return await self.app.scrub_cloud(full)
+
+    async def repair_snapshot(self, key: str) -> dict[str, Any]:
+        return await self.app.repair_snapshot(key)
+
+    async def export_snapshots(self, folder: str, scope: str = "latest", key: str | None = None) -> dict[str, Any]:
+        return await self.app.export_snapshots(folder, scope, key)
+
     async def game_playtime(self, key: str) -> dict[str, Any]:
         return await self.app.game_playtime(key)
 

@@ -33,6 +33,7 @@ def test_all_clear_is_ok():
         "conflicts",
         "prefix",
         "played-without",
+        "integrity",
         "manifest",
         "ludusavi",
         "python-modules",

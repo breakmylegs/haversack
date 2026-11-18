@@ -37,6 +37,24 @@ def make_repo(root, version="1.2.3", changelog=None, plugin_extra=None):
     (root / "desktop" / "dist" / "main.js").write_text("export {};")
     (root / "docs").mkdir()
     (root / "docs" / "pc-host.md").write_text("pc")
+    # The vendored libraries' manifest, which the SBOM reads (ADR-0050).
+    (root / "py_modules" / "keepsake" / "_vendor").mkdir()
+    (root / "py_modules" / "keepsake" / "_vendor" / "MANIFEST.json").write_text(
+        json.dumps(
+            {
+                "libraries": [
+                    {
+                        "name": "examplelib",
+                        "version": "1.0",
+                        "licence": "MIT",
+                        "sha256": "ab" * 32,
+                        "url": "https://files.example/examplelib-1.0-py3-none-any.whl",
+                    }
+                ],
+                "files": {},
+            }
+        )
+    )
 
 
 def test_package_layout_modes_and_determinism(tmp_path, monkeypatch):

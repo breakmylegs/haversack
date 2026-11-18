@@ -35,6 +35,7 @@ from collections.abc import Callable, Sequence
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import package
+import sbom
 import signing
 from keepsake import minisign
 
@@ -132,14 +133,19 @@ def build_assets(out_dir: str, version: str, notes: str) -> list[str]:
     desktop_path = package.build_desktop(out_dir)
     with open(desktop_path, "rb") as handle:
         desktop_digest = hashlib.sha256(handle.read()).hexdigest()
+    # The software bill of materials (ADR-0050), under the same signature.
+    sbom_path = sbom.write(os.path.join(out_dir, sbom.asset_name(package.plugin_name(), version)), ROOT)
+    with open(sbom_path, "rb") as handle:
+        sbom_digest = hashlib.sha256(handle.read()).hexdigest()
     sums_path = os.path.join(out_dir, SUMS_NAME)
     with open(sums_path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(
             f"{digest}  {expected}\n{digest}  {stable_zip_name()}\n{desktop_digest}  {os.path.basename(desktop_path)}\n"
+            f"{sbom_digest}  {os.path.basename(sbom_path)}\n"
         )
     with open(os.path.join(out_dir, "notes.md"), "w", encoding="utf-8", newline="\n") as handle:
         handle.write(notes)
-    return [zip_path, stable_path, desktop_path, sums_path]
+    return [zip_path, stable_path, desktop_path, sbom_path, sums_path]
 
 
 def pinned_key() -> str:

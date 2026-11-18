@@ -5,6 +5,7 @@ import {
   listSnapshots,
   pinSnapshot,
   releaseQuarantine,
+  repairSnapshot,
   RestoreChange,
   restorePreview,
   restoreSnapshot,
@@ -87,6 +88,26 @@ export function SnapshotsPanel({ gameKey, gameName }: { gameKey: string; gameNam
         label="History"
         description="Snapshots of this game's saves, newest first. Every restore first saves the current files so it can be undone."
       />
+      {(listing?.damaged ?? []).length > 0 && (
+        <Field
+          label={`${listing?.damaged?.length} snapshots are damaged in the cloud`}
+          description="The weekly check found their files damaged or missing, so they cannot be restored. Your current save is fine. Repair saves a fresh copy of it from this device."
+          childrenLayout="below"
+        >
+          <DialogButton
+            style={{ width: "auto" }}
+            disabled={busy}
+            onClick={() =>
+              void act(async () => {
+                const r = await repairSnapshot(gameKey);
+                return r.status === "published" ? "A fresh copy is saved." : `Not repaired: ${r.status}`;
+              })
+            }
+          >
+            Repair
+          </DialogButton>
+        </Field>
+      )}
       {(listing?.lastByDevice ?? []).length > 0 && (
         <Field
           focusable

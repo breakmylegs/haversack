@@ -135,10 +135,16 @@ def test_publish_dry_run_builds_assets_without_git_changes(repo):
         digest = hashlib.sha256(handle.read()).hexdigest()
     with open(os.path.join(out_dir, "Keepsake-desktop-v0.2.1.zip"), "rb") as handle:
         desktop = hashlib.sha256(handle.read()).hexdigest()
+    with open(os.path.join(out_dir, "Keepsake-v0.2.1.sbom.cdx.json"), "rb") as handle:
+        sbom_bytes = handle.read()
     with open(os.path.join(out_dir, "SHA256SUMS"), encoding="utf-8") as handle:
         assert handle.read() == (
             f"{digest}  Keepsake-v0.2.1.zip\n{digest}  Keepsake.zip\n{desktop}  Keepsake-desktop-v0.2.1.zip\n"
+            f"{hashlib.sha256(sbom_bytes).hexdigest()}  Keepsake-v0.2.1.sbom.cdx.json\n"
         )
+    sbom = json.loads(sbom_bytes)
+    assert sbom["metadata"]["component"]["version"] == "0.2.1"
+    assert [c["name"] for c in sbom["components"]] == ["examplelib"]
     with open(os.path.join(out_dir, "notes.md"), encoding="utf-8") as handle:
         assert "Something." in handle.read()
     assert runner.calls == []

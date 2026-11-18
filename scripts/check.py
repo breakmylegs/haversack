@@ -1,7 +1,8 @@
 """Local quality gate, run before every pull request (ADR-0004).
 
 Runs the static checks and the build: ESLint, tsc, Rollup, version
-consistency, packaging, ruff, mypy, the secret scan and the user guide check. It does not run the
+consistency, packaging, ruff, mypy, the secret scan, the user guide check and the
+performance budget. It does not run the
 test suite: run the tests for what you changed, named one by one, and the
 posix-marked tests on a device with scripts/test_on_device.py.
 
@@ -42,6 +43,7 @@ STEPS: list[tuple[str, list[str]]] = [
     ("mypy", venv_tool("mypy")),
     ("secret scan", [sys.executable, "scripts/secret_scan.py"]),
     ("docs", [sys.executable, "scripts/check_docs.py"]),  # the user guide's links, images and sample data (ADR-0046)
+    ("perf", [sys.executable, "scripts/perf_budget.py"]),  # hot paths at 500 games and 10,000 snapshots (ADR-0050)
 ]
 
 

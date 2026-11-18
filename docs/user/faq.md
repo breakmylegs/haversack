@@ -30,5 +30,8 @@ No. On a handheld everything happens in Gaming Mode with the controller. Nothing
 
 Each check says what is wrong and what to do. Most warnings are a game waiting for your choice in Conflicts, or a sign-in that needs renewing. See [Troubleshooting](../troubleshooting.md).
 
+**Can I leave Keepsake and keep my saves?**
+Yes. Settings, **Export snapshots** copies them out as plain zip files with a list of their contents. See [Conflicts, history and restoring](conflicts-and-history.md#exporting-your-saves).
+
 **Where do I report a problem?**
-Open an issue on [GitHub](https://github.com/breakmylegs/keepsake/issues). Diagnostics, then **Export diagnostics**, makes a file you can attach. Tokens and passwords are removed from it, but read it first.
+Open an issue on [GitHub](https://github.com/breakmylegs/keepsake/issues). For a security problem, use **Report a vulnerability** on the repository's Security tab instead, so it stays private. Diagnostics, then **Export diagnostics**, makes a file you can attach. Tokens and passwords are removed from it, but read it first.

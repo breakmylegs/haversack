@@ -69,7 +69,8 @@ A pinned key that is lost locks every installed device out of in-place updates. 
 | `Keepsake-v<version>.zip` | The in-plugin updater and the rebuild check below |
 | `Keepsake.zip` | First install: `https://github.com/breakmylegs/keepsake/releases/latest/download/Keepsake.zip` |
 | `Keepsake-desktop-v<version>.zip` | The PC package for Windows and Linux PCs (ADR-0042) |
-| `SHA256SUMS` | Every zip, one line each, so one signature covers them all |
+| `Keepsake-v<version>.sbom.cdx.json` | The software bill of materials: every shipped third-party component (ADR-0050) |
+| `SHA256SUMS` | Every asset above, one line each, so one signature covers them all |
 
 First install on a new device: Decky, Settings, Developer, Install Plugin from URL, then paste the URL above. After that, updates come through Keepsake's Updates page.
 
@@ -102,3 +103,29 @@ Tags `v*` cannot be moved or deleted (ADR-0005). If a release is wrong, publish 
 ## Rebuilding a release to check it
 
 The zip has sorted entries, fixed timestamps and fixed modes, and `.gitattributes` forces LF line endings, so the same tag built with the same Node, pnpm lockfile and Python (zlib) versions gives the same bytes. Check out the tag, run `pnpm install --frozen-lockfile`, `pnpm run build` and `python scripts/package.py`, and compare the printed SHA-256 with `SHA256SUMS`. If they differ, compare the zip contents (`python -m zipfile -l`) before drawing conclusions: a different zlib version changes compressed bytes without changing any file.
+
+The software bill of materials can be rebuilt from the same tag with `python scripts/sbom.py`. It has no timestamp, so it matches the release asset byte for byte.
+
+## Signing key: rotation and compromise
+
+Devices trust exactly one release key, the one built into `py_modules/keepsake/release_key.py` (ADR-0036). Any change of key reaches devices only through a release signed with the key they already trust.
+
+**Planned rotation** (for example, a new laptop):
+
+1. Create the new key with `python scripts/signing.py setup` on the laptop that will sign from now on, and back it up as above.
+2. In one pull request, put the new public key in `release_key.py` and note the change in the changelog.
+3. Release that version signed with the **old** key. Devices accept it, and from then on they trust only the new key.
+4. Sign every later release with the new key. Keep the old key's offline backup until every device has updated, then destroy it.
+
+**Lost key** (no backup works):
+
+1. Devices refuse anything not signed with the lost key, so they cannot be moved to a new key by an update.
+2. Create a new key, put its public key in `release_key.py`, and release.
+3. Tell users plainly, in the release notes and the README, to install that release by hand from the first-install URL. Decky's own installer does not check Keepsake's signature. From then on, updates work again.
+
+**Exposed key** (someone else may have it):
+
+1. Stop releasing with it at once.
+2. Create a new key and follow "Lost key", step 2 onwards. A release signed with the exposed key could be forged, so do not rely on step 3 of the planned rotation.
+3. Say in a GitHub security advisory which versions were signed with the exposed key, and that releases are only genuine if they come from this repository's Releases page.
+4. Check the published releases' `SHA256SUMS` against a fresh rebuild of each tag.
