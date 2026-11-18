@@ -7,6 +7,7 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 ### Added
 
 - One-button cloud sign-in: OneDrive and Google Drive now work out of the box. Pick one, press **Sign in** and approve with your account. No client ID or app registration is needed; your own client is still available under Advanced (ADR-0055).
+- Replication's transfer engine (no button yet; sending games comes with slice 19): folders copy between paired devices exactly. Every piece is checked, and a copy carries on after a dropped network, a restart or a power cut. Nothing replaces the existing copy until the new one is complete and verified, and **Stop and remove** leaves nothing behind (ADR-0057).
 - Devices: switch on Replication in Modules to link your own handhelds and PCs directly, with no SSH, keys or accounts. **Find devices** lists Keepsake devices on your network. You pair each one once by checking that both screens show the same 6-digit code. Paired devices can be checked, woken with Wake-on-LAN, or removed. Every connection is encrypted with a key only your two devices know, and nothing goes through the cloud. Sending games between devices comes next (ADR-0054, ADR-0056).
 - Install, games on several discs: keep the ISOs together in one folder, and when the installer asks for the next disc, press **Swap to <disc>**. Keepsake puts it in the drive without stopping the installer (ADR-0053).
 - Install queue: start another install while one is under way, and it waits its turn. Queued installs start by themselves and carry on after a restart (ADR-0053).
