@@ -13,8 +13,8 @@ Released up to v0.24.0. Merged since, not yet released: network install (#38 to 
 | P1 to P5, S1, S2, D1, R0, R1 to R6 | merged; device checks in each slice report |
 | R6b Dropbox | waits for Peter's Dropbox app registration |
 | 16 Replication spike | no longer a gate (ADR-0054): its figures become tuning input from the device runs |
-| 17 Replication I | 17a (link, pairing, peers) built; 17b (discovery, Wake-on-LAN, pages) next |
-| 18 to 20 Replication, R7 direct save sync | after 17b, in order |
+| 17 Replication I | built: 17a (link, pairing, peers, ADR-0054) and 17b (discovery, Wake-on-LAN, addresses, pages, ADR-0056); waits for the device checks |
+| 18 to 20 Replication, R7 direct save sync | 18 next, then in order |
 | 23 Desktop I | step 0 (A79 probe) waits for device runs |
 | 24 Desktop II | after 23 |
 | 25 v2 hardening | parser fuzzing done; the rest after the other slices |

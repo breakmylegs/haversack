@@ -149,6 +149,62 @@ export const installerNetDownload = callable<[access: NetAccess, url: string, ti
 );
 export const installerNetCancel = callable<[], NetDownload>("installer_net_cancel");
 
+// Replication: device links and pairing (ADR-0054, ADR-0056).
+export interface PairedDevice {
+  id: string;
+  name: string;
+  address: string;
+  pairedAt: number;
+  lastSeen: number;
+  canWake: boolean;
+}
+export interface Pairing {
+  id: string;
+  role: "initiator" | "responder";
+  address: string;
+  state: "connecting" | "compare" | "waiting" | "paired" | "failed" | "cancelled";
+  code: string | null;
+  peerName: string | null;
+  reason: string | null;
+}
+export interface FoundDevice {
+  id: string;
+  name: string;
+  address: string;
+  port: number;
+  paired: boolean;
+}
+export interface ReplicationStatus {
+  available: boolean;
+  listener: { on: boolean; addresses: string[]; port: number; pairingOpen: boolean; pairingSecondsLeft: number };
+  discovery: { on: boolean; problem: string | null };
+  peers: PairedDevice[];
+  pairings: Pairing[];
+  addressChoice: string;
+  addressesAvailable: { address: string; kind: "lan" | "overlay" }[];
+  thisDevice: { name: string };
+}
+export interface LinkCheck {
+  ok: boolean;
+  reason?: string;
+  address?: string;
+  rttMs?: number;
+  slow?: boolean;
+  overlay?: boolean;
+}
+export const replicationStatus = callable<[], ReplicationStatus>("replication_status");
+export const replicationSetListener = callable<[on: boolean], ReplicationStatus>("replication_set_listener");
+export const replicationSetAddress = callable<[address: string], ReplicationStatus>("replication_set_address");
+export const replicationOpenPairing = callable<[], ReplicationStatus>("replication_open_pairing");
+export const replicationClosePairing = callable<[], ReplicationStatus>("replication_close_pairing");
+export const replicationPair = callable<[address: string], Pairing>("replication_pair");
+export const replicationAnswer = callable<[pairingId: string, ok: boolean], ReplicationStatus>("replication_answer");
+export const replicationCancel = callable<[pairingId: string], ReplicationStatus>("replication_cancel");
+export const replicationFind = callable<[], FoundDevice[]>("replication_find");
+export const replicationCheck = callable<[peerId: string], LinkCheck>("replication_check");
+export const replicationRemove = callable<[peerId: string], ReplicationStatus>("replication_remove");
+export const replicationWake = callable<[peerId: string], { sent: number }>("replication_wake");
+
 export const installerStatus = callable<[], InstallerStatus>("installer_status");
 export const installerAddCdDrive = callable<[jobId: number], InstallJob>("installer_add_cd_drive");
 export const installerRemoveShortcut = callable<[jobId: number], InstallJob>("installer_remove_shortcut");

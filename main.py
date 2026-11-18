@@ -131,6 +131,42 @@ class Plugin:
     async def advisor_ai_generate(self) -> dict[str, Any]:
         return await self.app.advisor_ai_generate()
 
+    async def replication_status(self) -> dict[str, Any]:
+        return await self.app.replication_status()
+
+    async def replication_set_listener(self, on: bool) -> dict[str, Any]:
+        return await self.app.replication_set_listener(on)
+
+    async def replication_set_address(self, address: str) -> dict[str, Any]:
+        return await self.app.replication_set_address(address)
+
+    async def replication_open_pairing(self) -> dict[str, Any]:
+        return await self.app.replication_open_pairing()
+
+    async def replication_close_pairing(self) -> dict[str, Any]:
+        return await self.app.replication_close_pairing()
+
+    async def replication_pair(self, address: str) -> dict[str, Any]:
+        return await self.app.replication_pair(address)
+
+    async def replication_answer(self, pairing_id: str, ok: bool) -> dict[str, Any]:
+        return await self.app.replication_answer(pairing_id, ok)
+
+    async def replication_cancel(self, pairing_id: str) -> dict[str, Any]:
+        return await self.app.replication_cancel(pairing_id)
+
+    async def replication_find(self) -> list[dict[str, Any]]:
+        return await self.app.replication_find()
+
+    async def replication_check(self, peer_id: str) -> dict[str, Any]:
+        return await self.app.replication_check(peer_id)
+
+    async def replication_remove(self, peer_id: str) -> dict[str, Any]:
+        return await self.app.replication_remove(peer_id)
+
+    async def replication_wake(self, peer_id: str) -> dict[str, Any]:
+        return await self.app.replication_wake(peer_id)
+
     async def installer_status(self) -> dict[str, Any]:
         return await self.app.installer_status()
 
