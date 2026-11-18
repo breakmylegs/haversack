@@ -4,7 +4,7 @@ The full queue after the v2 consolidation (slice C0). v1 slices come from `docs/
 
 ## Status on 18 November 2026
 
-Released up to v0.24.0. Merged since, not yet released (the next release waits for the built-in sign-in client IDs, ADR-0032 and ADR-0044): network install (#38 to #41), the ProtonDB index source, P1 to P5, S1, S2, D1, R0 and R1 to R6 (up to #63). Every item that needs no device is built; what remains waits for device runs or Peter's inputs.
+Released up to v0.24.0. Merged since, not yet released: network install (#38 to #41), the ProtonDB index source, P1 to P5, S1, S2, D1, R0, R1 to R6, slice 17a and the built-in sign-in clients (ADR-0055). The next release now needs only the device checks.
 
 | Slice | State |
 |---|---|
@@ -98,7 +98,7 @@ These two come before R0. S1 is next after the PC self-update change. Each is re
 
 | Item | Scope | Rule |
 |---|---|---|
-| S1 One-button cloud sign-in | Authorization code with PKCE (S256) and an RFC 8252 loopback redirect: a one-shot listener on 127.0.0.1 on a random port, with a checked `state` and a timeout. The browser opens itself: the default browser on a PC and in Desktop Mode, Steam's browser in Gaming Mode where the provider allows it. Otherwise "Sign in on your phone" with a QR code, and device code is kept as the fallback. Tokens refresh silently. Client IDs only appear under Advanced. Also: an ADR on "one sign-in for all devices", ADR-0032's registration steps updated, and a Steam browser probe for the Legion Go 2. | Built (ADR-0044, `docs/slices/s1-report.md`). It waits for the client IDs and the Legion Go 2 probe run, which sets the Gaming Mode defaults. |
+| S1 One-button cloud sign-in | Authorization code with PKCE (S256) and an RFC 8252 loopback redirect: a one-shot listener on 127.0.0.1 on a random port, with a checked `state` and a timeout. The browser opens itself: the default browser on a PC and in Desktop Mode, Steam's browser in Gaming Mode where the provider allows it. Otherwise "Sign in on your phone" with a QR code, and device code is kept as the fallback. Tokens refresh silently. Client IDs only appear under Advanced. Also: an ADR on "one sign-in for all devices", ADR-0032's registration steps updated, and a Steam browser probe for the Legion Go 2. | Built (ADR-0044, `docs/slices/s1-report.md`). The client IDs are in (ADR-0055); it waits for the Legion Go 2 probe run, which sets the Gaming Mode defaults. |
 | S2 Replication direct-only requirements | Hard requirements for slices 16 to 20:<br>- never through cloud storage or a relay (with a test);<br>- no compression at any layer (`OP_NO_COMPRESSION` asserted and tested);<br>- pause and resume with a durable journal and automatic recovery;<br>- "Stop and remove" cleans up everything;<br>- free-space checks, preallocation and sleep inhibition;<br>- speed and progress UI, and a bandwidth cap;<br>- cross-OS targets;<br>- fault injection tests.<br>Updates `docs/modules/replication.md`, the threat model and the slice plans, plus an ADR and the slice 16 device steps. | Recorded (ADR-0045, `docs/slices/s2-report.md`): the requirements are in the module document, the threat model and slices 16 to 20 above; the no-cloud and no-compression rules are enforced by tests now. The rest is built in slices 16 to 20. |
 
 ### After slice 25 (Peter, 17 November 2026)

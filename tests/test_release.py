@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import sys
+import zipfile
 
 import pytest
 
@@ -55,6 +56,9 @@ def repo(tmp_path, monkeypatch):
     root.mkdir()
     make_repo(root, version="0.2.1", changelog=CHANGELOG)
     (root / "package.json").write_text('{\n  "name": "keepsake",\n  "version": "0.2.1",\n  "x": 1\n}\n')
+    # Synthetic stand-ins for the built-in Google secrets (ADR-0055), too short to look like real ones.
+    secrets = {"googleClientSecret": "GOCSPX-test-tv", "googleDesktopClientSecret": "GOCSPX-test-desk"}
+    (root / "py_modules" / "keepsake" / "client_secrets.json").write_text(json.dumps(secrets))
     monkeypatch.setattr(package, "ROOT", str(root))
     monkeypatch.setattr(release, "ROOT", str(root))
     monkeypatch.delenv("KEEPSAKE_MINISIGN_KEY", raising=False)
@@ -186,6 +190,39 @@ def test_device_tested_notes_have_no_untested_line(repo):
 def test_both_test_flags_rejected(repo):
     with pytest.raises(release.ReleaseError, match="not both"):
         release.publish(device_tested=True, dry_run=False, runner=FakeRunner(), check=lambda: 0, accept_untested=True)
+
+
+@pytest.mark.parametrize(
+    ("content", "message"),
+    [
+        (None, "is missing"),
+        ("not json", "not valid JSON"),
+        ('{"googleClientSecret": "GOCSPX-test-tv"}', "googleDesktopClientSecret"),
+        ('{"googleClientSecret": "x", "googleDesktopClientSecret": "GOCSPX-test-desk"}', "googleClientSecret"),
+    ],
+)
+def test_publish_refuses_without_the_google_client_secrets(repo, content, message, capsys):
+    path = repo / "py_modules" / "keepsake" / "client_secrets.json"
+    if content is None:
+        path.unlink()
+    else:
+        path.write_text(content)
+    runner = FakeRunner()
+    with pytest.raises(release.ReleaseError, match=message):
+        release.publish(device_tested=True, dry_run=False, runner=runner, check=lambda: 0)
+    assert not runner.commands(("git", "tag", "-a"))
+    release.publish(device_tested=False, dry_run=True, runner=FakeRunner(), check=lambda: 0)  # a dry run warns
+    assert message in capsys.readouterr().err
+
+
+def test_the_secrets_file_ships_in_both_packages(repo):
+    out_dir = release.publish(device_tested=False, dry_run=True, runner=FakeRunner(), check=lambda: 0)
+    for name, inner in (
+        ("Keepsake-v0.2.1.zip", "Keepsake/py_modules/keepsake/client_secrets.json"),
+        ("Keepsake-desktop-v0.2.1.zip", "Keepsake-desktop/py_modules/keepsake/client_secrets.json"),
+    ):
+        with zipfile.ZipFile(os.path.join(out_dir, name)) as archive:
+            assert json.loads(archive.read(inner))["googleDesktopClientSecret"] == "GOCSPX-test-desk"
 
 
 def test_publish_requires_device_tests(repo):

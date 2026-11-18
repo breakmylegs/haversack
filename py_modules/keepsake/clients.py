@@ -7,23 +7,46 @@ user's own registration is needed, as before.
 
 A user's own client always wins when one is saved. Every saved sign-in records
 the client ID it was made with, and refreshes use that one.
+
+The two Google secrets are not in the repository: secret scanners rightly flag
+their shape, so the release build adds ``client_secrets.json`` beside this file
+from the owner's git-ignored copy (ADR-0055). A source checkout without it has
+no built-in Google client, as before.
 """
 
+import json
+import os
 from typing import Any
+
+SECRETS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "client_secrets.json")
+
+
+def _secrets(path: str = SECRETS_FILE) -> dict[str, str]:
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {k: v for k, v in data.items() if isinstance(v, str) and v.startswith("GOCSPX-")}
+
+
+_SECRETS = _secrets()
 
 # Microsoft Entra registration "Keepsake": personal accounts, public client
 # flows on, Files.ReadWrite.AppFolder and offline_access, no secret.
-ONEDRIVE_CLIENT_ID = ""
+ONEDRIVE_CLIENT_ID = "85765c01-7092-40b4-a7eb-f61c9d00b6d9"
 
 # Google Cloud client "TVs and Limited Input devices", scope drive.appdata only,
 # published to Production. Used by the phone (device code) sign-in.
-GOOGLE_CLIENT_ID = ""
-GOOGLE_CLIENT_SECRET = ""
+GOOGLE_CLIENT_ID = "572895278811-l1nic6t0fo5b9om3pmsj24tptt9po3ud.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET = _SECRETS.get("googleClientSecret", "")
 
 # Google Cloud client "Desktop app" in the same project (ADR-0044). Used by the browser
 # sign-in with a loopback redirect; Google treats its secret as not secret, too.
-GOOGLE_DESKTOP_CLIENT_ID = ""
-GOOGLE_DESKTOP_CLIENT_SECRET = ""
+GOOGLE_DESKTOP_CLIENT_ID = "572895278811-7s60khejasi35c5dmte3tebh8chvaj8f.apps.googleusercontent.com"
+GOOGLE_DESKTOP_CLIENT_SECRET = _SECRETS.get("googleDesktopClientSecret", "")
 
 
 def onedrive_builtin() -> bool:
@@ -47,6 +70,8 @@ def google_browser_client(own: dict[str, Any]) -> tuple[str, str]:
     client_id, secret = str(own.get("clientId") or "").strip(), str(own.get("clientSecret") or "")
     if client_id and secret:
         return client_id, secret
+    if not google_browser_builtin():  # an ID without its secret is no client (a source checkout)
+        return "", ""
     return GOOGLE_DESKTOP_CLIENT_ID, GOOGLE_DESKTOP_CLIENT_SECRET
 
 
@@ -61,6 +86,8 @@ def google_client(own: dict[str, Any]) -> tuple[str, str]:
     client_id, secret = str(own.get("clientId") or "").strip(), str(own.get("clientSecret") or "")
     if client_id and secret:
         return client_id, secret
+    if not google_phone_builtin():
+        return "", ""
     return GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 
 

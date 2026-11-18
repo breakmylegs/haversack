@@ -29,6 +29,21 @@ A pinned key that is lost locks every installed device out of in-place updates. 
 2. Run `python scripts/signing.py restore E:\keepsake-signing` and type the passphrase when asked. It re-seals the passphrase for this laptop's account, locks the folder and runs a signing check.
 3. Run `python scripts/signing.py status`. The public key must match `release_key.py`.
 
+## Once: the Google sign-in secrets (ADR-0055)
+
+The built-in Google clients' secrets ship in the release packages but are never committed. They live in the git-ignored file `py_modules/keepsake/client_secrets.json`, and `publish` refuses to run without it. To recreate it on another laptop:
+
+1. Sign in to https://console.cloud.google.com with the Keepsake Google account, and open the `Keepsake` project.
+2. Open **Google Auth Platform**, then **Clients**. For each client, open it and copy its secret. If the secret is no longer shown, use **Add secret**.
+3. Create the file with exactly these two names:
+   ```json
+   {
+     "googleClientSecret": "<secret of the TVs and Limited Input client>",
+     "googleDesktopClientSecret": "<secret of the Desktop app client>"
+   }
+   ```
+4. Run `git status`. The file must not be listed.
+
 ## Each release
 
 1. Add a section to `CHANGELOG.md` for the new version, for example `## [0.2.1]`, with the notes. It becomes the release notes.

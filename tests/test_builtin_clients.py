@@ -16,10 +16,13 @@ OTHER = "99998888-ffff-7777-eeee-6666dddd5555"
 
 @pytest.fixture
 def builtin(monkeypatch):
-    def set_ids(onedrive="", google=("", "")):
+    def set_ids(onedrive="", google=("", ""), desktop=("", "")):
+        # Every built-in value is set, so a packaged secrets file on this machine changes nothing.
         monkeypatch.setattr(clients, "ONEDRIVE_CLIENT_ID", onedrive)
         monkeypatch.setattr(clients, "GOOGLE_CLIENT_ID", google[0])
         monkeypatch.setattr(clients, "GOOGLE_CLIENT_SECRET", google[1])
+        monkeypatch.setattr(clients, "GOOGLE_DESKTOP_CLIENT_ID", desktop[0])
+        monkeypatch.setattr(clients, "GOOGLE_DESKTOP_CLIENT_SECRET", desktop[1])
 
     return set_ids
 
@@ -33,9 +36,22 @@ async def signed_in(app, events):
     return shown
 
 
-def test_shipped_constants_are_empty_until_the_owner_supplies_them():
-    # Remove this test in the change that fills them in (ADR-0032: nothing is released before that).
-    assert clients.ONEDRIVE_CLIENT_ID == "" and clients.GOOGLE_CLIENT_ID == "" and clients.GOOGLE_CLIENT_SECRET == ""
+def test_the_built_in_client_ids_are_set():
+    assert clients.onedrive_builtin()
+    assert clients.GOOGLE_CLIENT_ID.endswith(".apps.googleusercontent.com")
+    assert clients.GOOGLE_DESKTOP_CLIENT_ID.endswith(".apps.googleusercontent.com")
+    assert clients.GOOGLE_CLIENT_ID != clients.GOOGLE_DESKTOP_CLIENT_ID  # two clients: phone and browser
+
+
+def test_google_secrets_come_only_from_the_packaged_file(tmp_path):
+    path = tmp_path / "client_secrets.json"
+    assert clients._secrets(str(path)) == {}  # a source checkout: no built-in Google client
+    path.write_text('{"googleClientSecret": "GOCSPX-test-tv", "googleDesktopClientSecret": 5, "x": "plain"}')
+    assert clients._secrets(str(path)) == {"googleClientSecret": "GOCSPX-test-tv"}
+    path.write_text("[1]")
+    assert clients._secrets(str(path)) == {}
+    path.write_text("not json")
+    assert clients._secrets(str(path)) == {}
 
 
 def test_onedrive_signs_in_with_the_built_in_client_and_no_client_id_saved(setup, builtin):
@@ -93,8 +109,9 @@ def test_google_client_choice(builtin):
     assert clients.google_secret_for("built-in-id", own) == "built-in-secret"
     assert clients.google_secret_for("own-id", own) == "own-secret"
     assert clients.google_builtin() is True
-    builtin(google=("built-in-id", ""))
+    builtin(google=("built-in-id", ""), desktop=("desktop-id", ""))
     assert clients.google_builtin() is False  # half a client is no client
+    assert clients.google_client({}) == ("", "") and clients.google_browser_client({}) == ("", "")
 
 
 def test_google_refresh_sends_the_secret_of_the_client_the_sign_in_was_made_with(tmp_path, builtin):

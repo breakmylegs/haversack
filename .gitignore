@@ -46,6 +46,8 @@ cli/decky
 
 # Local settings, tokens and diagnostics exports. Never commit these.
 deploy.local.json
+# The built-in Google clients' secrets (ADR-0055): added to the packages at build time, never committed.
+py_modules/keepsake/client_secrets.json
 .secret-scan-denylist
 settings.json
 *.token
