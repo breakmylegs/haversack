@@ -23,6 +23,7 @@ import { LaunchGatePanel } from "./LaunchGatePanel";
 import { SnapshotsPanel } from "./SnapshotsPanel";
 import { SyncPanel } from "./SyncPanel";
 import { SendPanel } from "./SendPanel";
+import { InStepPanel } from "./InStepPanel";
 
 // FileSelectionType.FOLDER in @decky/api is a type-only const enum (value 1).
 const FOLDER = 1 as unknown as Parameters<typeof openFilePicker>[0];
@@ -272,6 +273,7 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
       )}
       {match.gameKey && <SnapshotsPanel gameKey={gameKey} gameName={game.name} />}
       {game.kind === "shortcut" && <SendPanel gameKey={gameKey} gameName={game.name} />}
+      {game.kind === "shortcut" && <InStepPanel appid={game.appid} />}
 
       {preview && (
         <>

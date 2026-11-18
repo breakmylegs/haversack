@@ -33,6 +33,8 @@ import {
   replicationOffers,
   replicationRemoveGame,
   replicationWithdraw,
+  replicationApplyUpdate,
+  replicationKeepMine,
 } from "../backend";
 
 const REPLICATION_EVENT = "keepsake_replication";
@@ -434,6 +436,29 @@ function OffersSection() {
     toaster.toast({ title: "Keepsake", body: check.problem });
   };
 
+  const applyUpdate = async (offer: IncomingOffer) => {
+    try {
+      await replicationApplyUpdate(offer.id, false);
+      toaster.toast({ title: "Keepsake", body: `Taking the update to ${offer.title}. Your saves and settings stay as they are.` });
+      await refresh();
+    } catch (err) {
+      if (!String(err).includes("changed on this device too")) {
+        toaster.toast({ title: "Keepsake", body: String(err) });
+        return;
+      }
+      showModal(
+        <ConfirmModal
+          strTitle={`${offer.title} changed on both devices`}
+          strDescription={`Take theirs replaces this device's copy of the game with the one from ${offer.from}. Keep mine leaves this device's copy and writes nothing. Your saves and settings stay either way.`}
+          strOKButtonText="Take theirs"
+          strCancelButtonText="Keep mine"
+          onOK={() => void act(() => replicationApplyUpdate(offer.id, true), `Taking ${offer.from}'s copy of ${offer.title}.`)}
+          onCancel={() => void act(() => replicationKeepMine(offer.id), `${offer.title} stays as it is on this device.`)}
+        />,
+      );
+    }
+  };
+
   const removeGame = (offer: IncomingOffer) =>
     showModal(
       <ConfirmModal
@@ -470,7 +495,17 @@ function OffersSection() {
           childrenLayout="below"
         >
           <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {offer.state === "offered" && (
+            {offer.state === "offered" && offer.update && (
+              <>
+                <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void applyUpdate(offer)}>
+                  Apply update
+                </DialogButton>
+                <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void act(() => replicationKeepMine(offer.id))}>
+                  Keep mine
+                </DialogButton>
+              </>
+            )}
+            {offer.state === "offered" && !offer.update && (
               <>
                 <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void accept(offer)}>
                   Accept
@@ -480,9 +515,18 @@ function OffersSection() {
                 </DialogButton>
               </>
             )}
-            {(offer.state === "transferring" || offer.state === "registering" || offer.state === "failed") && (
+            {(offer.state === "transferring" || offer.state === "registering" || offer.state === "failed") && !offer.update && (
               <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => removeGame(offer)}>
                 Stop and remove
+              </DialogButton>
+            )}
+            {(offer.state === "transferring" || offer.state === "failed") && offer.update && (
+              <DialogButton
+                style={{ width: "auto" }}
+                disabled={busy}
+                onClick={() => void act(() => replicationRemoveGame(offer.id), `The update to ${offer.title} stopped. The game is as it was.`)}
+              >
+                Stop update
               </DialogButton>
             )}
             {offer.state === "done" && (
