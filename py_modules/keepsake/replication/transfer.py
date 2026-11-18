@@ -42,6 +42,7 @@ STATES = ("running", "waiting", "paused", "verifying", "promoting", "done", "fai
 JOURNAL_EVERY_SECONDS = 2.0
 JOURNAL_EVERY_CHUNKS = 16
 CORRUPT_LIMIT = 3
+MAX_KEEP = 50_000  # files an update keeps from the target (ADR-0060)
 RETRY_MIN, RETRY_MAX = 1.0, 60.0
 MAX_STREAMS = 4
 ADAPT_SECONDS = 3.0  # how often the rate is measured and a stream may be added
@@ -80,6 +81,7 @@ class Job:
     held: bool = False  # paused by the battery or a running game, not by the user: resumes by itself
     by_user: bool = False  # paused by the user: waits for Resume
     peers: list[str] = field(default_factory=list)  # every device offering this root (ADR-0058)
+    keep: list[str] = field(default_factory=list)  # files of the target that stay as they are (ADR-0060, P14)
     rate: float = 0.0  # bytes a second, smoothed
     streams: int = 0
 
@@ -102,6 +104,7 @@ class Job:
             "held": self.held,
             "byUser": self.by_user,
             "peers": self.peers,
+            "keep": self.keep,
         }
 
     @classmethod
@@ -121,6 +124,7 @@ class Job:
             held=bool(data.get("held")),
             by_user=bool(data.get("byUser")),
             peers=[str(p) for p in data.get("peers") or [] if isinstance(p, str)][:8],
+            keep=[str(p) for p in data.get("keep") or [] if isinstance(p, str)][:MAX_KEEP],
         )
 
     def public(self) -> dict[str, Any]:
@@ -556,6 +560,8 @@ class Receiver:
             raise TransferError("the copy does not match what was offered")
         job.state = "promoting"
         await asyncio.to_thread(save_journal, job)
+        if job.keep:
+            await asyncio.to_thread(carry_over, job)  # after every check: these files are this device's own
         await asyncio.to_thread(promote, job)
         job.state = "done"
         self._notify()
@@ -597,6 +603,35 @@ class Receiver:
         for entry in entries:
             if entry["type"] == "dir" and os.name == "posix":
                 os.chmod(self._staged(entry["path"]), (entry["mode"] & 0o7777) | stat.S_IRWXU)
+
+
+def carry_over(job: Job) -> int:
+    """Copy the files ``job.keep`` names from the current target into the new copy, over anything there.
+
+    An update replaces a game's folder, but this device's own saves and settings must stay exactly as
+    they are (P14): they are copied, never moved, so the target is untouched until promote swaps it.
+    """
+    tree = os.path.join(job.staging, "tree")
+    real_tree = os.path.realpath(tree)
+    copied = 0
+    for rel in job.keep:
+        try:
+            mf.check_path(rel)
+        except mf.ManifestError:
+            continue
+        source = os.path.join(job.target, *rel.split("/"))
+        if os.path.islink(source) or not os.path.isfile(source):
+            continue
+        dest = os.path.join(tree, *rel.split("/"))
+        parent = os.path.dirname(dest)
+        if os.path.commonpath([os.path.realpath(parent), real_tree]) != real_tree:
+            continue  # a link in the new copy must not lead the copy outside it
+        os.makedirs(parent, exist_ok=True)
+        if os.path.islink(dest):
+            os.unlink(dest)
+        shutil.copy2(source, dest)
+        copied += 1
+    return copied
 
 
 RENAME_ATTEMPTS = 20

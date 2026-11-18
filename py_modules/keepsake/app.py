@@ -75,6 +75,9 @@ from .replication import link as replication_link
 from .replication import netinfo, transfer
 from .replication.jobs import Transfers, hold_reason
 from .replication.offers import Incoming, OfferError, Outgoing, send_offer
+from .replication.ongoing import GameLinks, keep_relative
+from .replication.ongoing import LinkError as LinkStoreError
+from .replication.ongoing import scan as scan_game
 from .replication.peers import PeerStore
 from .replication.sendgame import SendError
 from .replication.sendgame import plan as send_plan
@@ -420,6 +423,7 @@ class KeepsakeApp:
         self.transfers: Transfers | None = None
         self.incoming: Incoming | None = None
         self.outgoing: Outgoing | None = None
+        self.game_links: GameLinks | None = None
         self._sending: dict[str, dict[str, Any]] = {}  # games being prepared to send, by game key
         self.sys_root = "/sys"
         self.power_root = "/"  # where /sys/class/power_supply is read (tests point it elsewhere)
@@ -465,8 +469,11 @@ class KeepsakeApp:
                 self.transfers,
                 lambda kind, payload: self._ops().enqueue("replication", kind, payload),
                 self._replication_places,
+                on_done=self._replication_update_done,
                 on_change=self._replication_changed,
+                on_offer=self._replication_offer_arrived,
             )
+            self.game_links = GameLinks(os.path.join(self.paths.runtime_dir, "replication-games.json"))
             restored = await asyncio.to_thread(self.outgoing.restore)
             self.links.handlers.update({**shares.handlers(), "offer": self.incoming.handle_offer})
             if restored:
@@ -477,6 +484,7 @@ class KeepsakeApp:
 
         async def replication_stop() -> None:
             self.incoming = self.outgoing = None
+            self.game_links = None
             transfers, self.transfers = self.transfers, None
             if transfers is not None:
                 await transfers.shut_down()
@@ -491,6 +499,13 @@ class KeepsakeApp:
             self._games_running.discard(int(payload.get("appid") or 0))
             if self.transfers is not None:
                 self.transfers.check_holds()  # a transfer that waited for the game carries on now
+            found = self.game_links.for_appid(int(payload.get("appid") or 0)) if self.game_links else None
+            if found and found[1].get("policy") != "off":
+                try:
+                    game = await self._linked_game(found[1])
+                except ValueError:
+                    return
+                self._background.append(asyncio.create_task(self._scan_link(found[0], game)))
 
         async def replication_health() -> list[dict[str, Any]]:
             return replication_health_checks(self.links, self.host, self.proc_root)
@@ -3127,6 +3142,9 @@ class KeepsakeApp:
             finally:
                 await connection.close()
             state.update(state="sent", offer=wire["id"])
+            game = await self._game(key)
+            scopes = {s: r for s, r in plan.roots.items() if s in ("install", "prefix")}
+            self._link_game(wire["id"], plan.title, peer_id, int(game["appid"]), scopes, dict(game))
             await self.emit("keepsake_toast", f"{plan.title} is offered. Accept it on the other device, in Devices.")
         except (OfferError, replication_link.LinkError, OSError, ValueError) as exc:
             state.update(state="failed", reason=str(exc))
@@ -3195,8 +3213,192 @@ class KeepsakeApp:
             await self.set_game_key(game["key"], sent["gameKey"])
             if sent.get("savesEnabled"):
                 await self.update_game_config(game["key"], {"enabled": True})
+        if game is not None:
+            scopes = {
+                s: p
+                for s, p in (
+                    ("install", record.get("targets", {}).get("install")),
+                    ("prefix", record.get("prefixFinal")),
+                )
+                if p
+            }
+            self._link_game(offer["id"], offer["title"], record["peer"], int(game["appid"]), scopes, dict(game))
         text = f"{offer['title']} is ready on this device."
         await self.emit("keepsake_toast", text + (f" {offer['reason']}" if offer.get("reason") else ""))
+
+    # Keeping games in step (slice 20, ADR-0060)
+
+    def _game_links(self) -> GameLinks:
+        if self.game_links is None:
+            raise ValueError("Replication is off; switch it on in Settings, Modules")
+        return self.game_links
+
+    def _replication_keep(self, game: dict[str, Any], scopes: dict[str, str]) -> dict[str, list[str]]:
+        """Every file Saves manages and every config file of the game, per share: never part of an update."""
+        config = self.game_configs.get(game["key"])
+        index = self.manifest.load()
+        match = manifest.match_game(index, game, config)
+        title = match.get("title")
+        record = index["games"].get(title) if index and title else None
+        found = resolve.preview(game, title, record, {**config, "includeConfig": True}, self.home, include_files=True)
+        files = [
+            os.path.join(found["roots"][root], *rel.split("/"))
+            for root, rels in found.get("files", {}).items()
+            for rel in rels
+            if found["roots"].get(root)
+        ]
+        return {scope: keep_relative(root, files) for scope, root in scopes.items()}
+
+    def _link_game(
+        self, link_id: str, title: str, peer: str, appid: int, scopes: dict[str, str], game: dict[str, Any]
+    ) -> None:
+        """Link a game sent or received, and take its base in the background (it hashes the whole game)."""
+        try:
+            self._game_links().add(link_id, title, peer, appid, scopes, {})
+        except (LinkStoreError, ValueError) as exc:
+            log_event(logging.WARNING, "replication.link_failed", "Game not linked", error=str(exc))
+            return
+        self._background.append(asyncio.create_task(self._scan_link(link_id, game)))
+
+    async def _scan_link(self, link_id: str, game: dict[str, Any]) -> dict[str, Any] | None:
+        links = self._game_links()
+        link = links.get(link_id)
+        if link is None:
+            return None
+        keep = await asyncio.to_thread(self._replication_keep, game, link["scopes"])
+        manifests = await asyncio.to_thread(scan_game, link["scopes"], keep)
+        roots = {s: m["root"] for s, m in manifests.items()}
+        changed = links.changed(link_id, roots)
+        link = links.get(link_id) or link
+        if changed and link["state"] in ("in-sync", "changed-here"):
+            link = links.update(link_id, state="changed-here", checked=time.time())
+            if link["policy"] == "auto":
+                await self._send_update(link_id, game, keep)
+        else:
+            link = links.update(link_id, checked=time.time())
+        self._replication_changed()
+        return link
+
+    async def _send_update(self, link_id: str, game: dict[str, Any], keep: dict[str, list[str]]) -> None:
+        links = self._game_links()
+        link = links.get(link_id)
+        if link is None:
+            raise ValueError("that game is no longer linked")
+        extra = {"from": {"name": str(self.settings.get("deviceName") or "Unnamed device")}}
+        try:
+            wire, roots = await asyncio.to_thread(
+                self._outgoing().prepare_update,
+                link_id,
+                link["title"],
+                link["scopes"],
+                keep,
+                link["base"],
+                link["peer"],
+                extra,
+            )
+            connection = await self._replication_connect_for(link["peer"])()
+            try:
+                await send_offer(connection, wire)
+            finally:
+                await connection.close()
+        except (OfferError, replication_link.LinkError, OSError) as exc:
+            raise ValueError(f"the update was not sent: {exc}") from exc
+        links.update(link_id, base=roots, state="in-sync", checked=time.time())
+        await self.emit("keepsake_toast", f"An update to {link['title']} is offered to the other device.")
+
+    async def _linked_game(self, link: dict[str, Any]) -> dict[str, Any]:
+        games = (await self.discover_games())["games"]
+        game = next((g for g in games if g.get("kind") == "shortcut" and g.get("appid") == link.get("appid")), None)
+        if game is None:
+            raise ValueError(f"{link['title']} was not found in Steam on this device")
+        return dict(game)
+
+    async def replication_games(self) -> list[dict[str, Any]]:
+        return await asyncio.to_thread(self._game_links().list)
+
+    async def replication_set_policy(self, link_id: str, policy: str) -> list[dict[str, Any]]:
+        try:
+            self._game_links().update(str(link_id), policy=str(policy))
+        except LinkStoreError as exc:
+            raise ValueError(str(exc)) from exc
+        return await self.replication_games()
+
+    async def replication_check_game(self, link_id: str) -> dict[str, Any]:
+        """Look for changes now. Hashes the whole game, so it can take a while for a big one."""
+        link = self._game_links().get(str(link_id))
+        if link is None:
+            raise ValueError("that game is no longer linked")
+        result = await self._scan_link(str(link_id), await self._linked_game(link))
+        return result or {}
+
+    async def replication_send_update(self, link_id: str) -> list[dict[str, Any]]:
+        link = self._game_links().get(str(link_id))
+        if link is None:
+            raise ValueError("that game is no longer linked")
+        game = await self._linked_game(link)
+        keep = await asyncio.to_thread(self._replication_keep, game, link["scopes"])
+        await self._send_update(str(link_id), game, keep)
+        return await self.replication_games()
+
+    async def replication_apply_update(self, offer_id: str, take_theirs: bool = False) -> dict[str, Any]:
+        """Apply an update from the other device. If this device changed too, only with ``take_theirs``."""
+        offered = {o["id"]: o for o in await asyncio.to_thread(self._incoming().list)}.get(str(offer_id))
+        if offered is None or not offered.get("update"):
+            raise ValueError("that update has gone")
+        links = self._game_links()
+        link = links.get(str(offered["link"]))
+        if link is None:
+            raise ValueError("that game is not linked on this device")
+        game = await self._linked_game(link)
+        keep = await asyncio.to_thread(self._replication_keep, game, link["scopes"])
+        roots = {s: m["root"] for s, m in (await asyncio.to_thread(scan_game, link["scopes"], keep)).items()}
+        if links.changed(str(offered["link"]), roots) and not take_theirs:
+            links.update(str(offered["link"]), state="both-changed")
+            self._replication_changed()
+            raise ValueError(f"{link['title']} changed on this device too: choose which copy to keep")
+        try:
+            result = await asyncio.to_thread(self._incoming().accept_update, str(offer_id), link["scopes"], keep)
+        except (OfferError, transfer.TransferError, OSError) as exc:
+            raise ValueError(str(exc)) from exc
+        links.update(str(offered["link"]), state="updating", pending=str(offer_id))
+        return result
+
+    async def replication_keep_mine(self, offer_id: str) -> dict[str, Any]:
+        """Both sides changed and the user keeps this device's copy: the update is declined, nothing written."""
+        offered = {o["id"]: o for o in await asyncio.to_thread(self._incoming().list)}.get(str(offer_id))
+        if offered is None or not offered.get("update"):
+            raise ValueError("that update has gone")
+        await asyncio.to_thread(self._incoming().decline, str(offer_id))
+        if self._game_links().get(str(offered["link"])):
+            self._game_links().update(str(offered["link"]), state="changed-here")
+        return await self.replication_offers()
+
+    def _replication_offer_arrived(self, offer: dict[str, Any]) -> None:
+        """An update for a game set to auto is applied by itself, unless this device changed it too."""
+        update = offer.get("update")
+        links = self.game_links
+        if not update or links is None:
+            return
+        link = links.get(str(update["link"]))
+        if link is None:
+            return
+        links.update(str(update["link"]), state="update-available")
+        if link["policy"] == "auto":
+            self._background.append(asyncio.create_task(self._auto_apply(offer["id"])))
+
+    async def _auto_apply(self, offer_id: str) -> None:
+        try:
+            await self.replication_apply_update(offer_id)
+        except ValueError as exc:
+            await self.emit("keepsake_toast", str(exc))
+
+    def _replication_update_done(self, record: dict[str, Any]) -> None:
+        update = record["offer"].get("update")
+        if update and self.game_links and self.game_links.get(update["link"]):
+            roots = {s: share["root"] for s, share in record["offer"]["shares"].items()}
+            base = {**(self.game_links.get(update["link"]) or {}).get("base", {}), **roots}
+            self.game_links.update(update["link"], base=base, state="in-sync", pending=None, checked=time.time())
+            self._replication_changed()
 
     async def replication_wake(self, peer_id: str) -> dict[str, Any]:
         sent: int = await self._replication(lambda links: asyncio.to_thread(links.wake, str(peer_id)))

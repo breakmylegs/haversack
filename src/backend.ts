@@ -240,6 +240,8 @@ export interface IncomingOffer {
   toolOffered: boolean;
   droppedOptions: string[];
   appid: number | null;
+  update: boolean;
+  link: string | null;
 }
 export interface OffersStatus {
   incoming: IncomingOffer[];
@@ -256,6 +258,21 @@ export const replicationAccept = callable<[offerId: string, copyTool: boolean], 
 export const replicationDecline = callable<[offerId: string], OffersStatus>("replication_decline");
 export const replicationWithdraw = callable<[offerId: string], OffersStatus>("replication_withdraw");
 export const replicationDismiss = callable<[offerId: string], OffersStatus>("replication_dismiss");
+export interface GameLink {
+  id: string;
+  title: string;
+  peer: string;
+  appid: number | null;
+  policy: "off" | "manual" | "auto";
+  state: "in-sync" | "changed-here" | "update-available" | "both-changed" | "updating";
+  checked: number;
+}
+export const replicationGames = callable<[], GameLink[]>("replication_games");
+export const replicationSetPolicy = callable<[linkId: string, policy: string], GameLink[]>("replication_set_policy");
+export const replicationCheckGame = callable<[linkId: string], GameLink>("replication_check_game");
+export const replicationSendUpdate = callable<[linkId: string], GameLink[]>("replication_send_update");
+export const replicationApplyUpdate = callable<[offerId: string, takeTheirs: boolean], IncomingOffer>("replication_apply_update");
+export const replicationKeepMine = callable<[offerId: string], OffersStatus>("replication_keep_mine");
 export const replicationRemoveGame = callable<[offerId: string], OffersStatus>("replication_remove_game");
 
 export const installerStatus = callable<[], InstallerStatus>("installer_status");

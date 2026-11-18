@@ -194,6 +194,24 @@ class Plugin:
     async def replication_decline(self, offer_id: str) -> dict[str, Any]:
         return await self.app.replication_decline(offer_id)
 
+    async def replication_games(self) -> list[dict[str, Any]]:
+        return await self.app.replication_games()
+
+    async def replication_set_policy(self, link_id: str, policy: str) -> list[dict[str, Any]]:
+        return await self.app.replication_set_policy(link_id, policy)
+
+    async def replication_check_game(self, link_id: str) -> dict[str, Any]:
+        return await self.app.replication_check_game(link_id)
+
+    async def replication_send_update(self, link_id: str) -> list[dict[str, Any]]:
+        return await self.app.replication_send_update(link_id)
+
+    async def replication_apply_update(self, offer_id: str, take_theirs: bool = False) -> dict[str, Any]:
+        return await self.app.replication_apply_update(offer_id, take_theirs)
+
+    async def replication_keep_mine(self, offer_id: str) -> dict[str, Any]:
+        return await self.app.replication_keep_mine(offer_id)
+
     async def replication_dismiss(self, offer_id: str) -> dict[str, Any]:
         return await self.app.replication_dismiss(offer_id)
 
