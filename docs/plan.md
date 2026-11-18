@@ -2,15 +2,17 @@
 
 The full queue after the v2 consolidation (slice C0). v1 slices come from `docs/build-prompt.md` section 16, amended by `docs/build-prompt-v2.md` section 10. v2 slices come from `docs/build-prompt-v2.md` section 12. Every slice follows the working conventions in `CLAUDE.md`: its own branch, a pull request, a slice report, threat model and assumptions updated, and a stop for Peter's on-device checks.
 
-## Status on 17 November 2026
+## Status on 18 November 2026
 
-Released up to v0.24.0. Merged since, not yet released (the next release waits for the built-in sign-in client IDs, ADR-0032): built-in sign-in placeholders (#38), network install over HTTP and HTTPS (#39), SMB (#40), WebDAV (#41), and the ProtonDB index source (this change).
+Released up to v0.24.0. Merged since, not yet released (the next release waits for the built-in sign-in client IDs, ADR-0032 and ADR-0044): network install (#38 to #41), the ProtonDB index source, P1 to P5, S1, S2, D1, R0 and R1 to R6 (up to #63). Every item that needs no device is built; what remains waits for device runs or Peter's inputs.
 
 | Slice | State |
 |---|---|
 | 12 Hardening and v1.0.0 | merged; v1.0.0 waits for the release signing key, the security review sign-off and clean installs |
 | 13 Module framework, 14 and 15 Advisor, 21 and 22 Installer | merged and released |
-| 16 Replication spike | waits for device measurements and R1 to R3 |
+| P1 to P5, S1, S2, D1, R0, R1 to R6 | merged; device checks in each slice report |
+| R6b Dropbox | waits for Peter's Dropbox app registration |
+| 16 Replication spike | waits for the device measurements (`docs/slices/s2-report.md`) |
 | 17 to 20 Replication | blocked on slice 16's results and ADR-0025 |
 | 23 Desktop I | step 0 (A79 probe) waits for device runs |
 | 24 Desktop II | after 23 |
