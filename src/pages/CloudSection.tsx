@@ -2,6 +2,7 @@ import { DialogButton, Field, Focusable, Navigation, TextField, ToggleField } fr
 import { addEventListener, removeEventListener, toaster } from "@decky/api";
 import { useEffect, useRef, useState } from "react";
 import {
+  directSyncNow,
   Backend,
   backendConfig,
   BackendConfig,
@@ -22,7 +23,7 @@ import { QrCode } from "./QrCode";
 
 const SIGNIN_EVENT = "keepsake_signin";
 // OneDrive first: with the built-in client it is pick, sign in on the phone, done (ADR-0032).
-const BACKENDS: Backend[] = ["onedrive", "gdrive", "webdav", "s3", "local"];
+const BACKENDS: Backend[] = ["onedrive", "gdrive", "direct", "webdav", "s3", "local"];
 
 type FieldSpec = { name: string; label: string; secret?: boolean; bool?: boolean; hint?: string };
 
@@ -67,6 +68,8 @@ const HELP: Record<Backend, string> = {
   gdrive: "Sign in with your Google account. Keepsake can use only its own hidden app folder in your Google Drive, never your files.",
   webdav: "Your own WebDAV server, such as Nextcloud. It must refuse to overwrite files (Keepsake checks).",
   s3: "Amazon S3 or an S3-compatible service. It must support conditional writes (Keepsake checks).",
+  direct:
+    "No account and no cloud: each device keeps its own copy of your saves' history, and paired devices fetch what they lack from each other when they can reach each other. Needs Replication and a paired device. There is no copy away from your devices.",
 };
 
 export function CloudSection({ settings, onSettings }: { settings: Settings; onSettings: (s: Settings) => void }) {
@@ -134,11 +137,18 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
     }
   };
 
-  const signedIn = view === "onedrive" ? status?.onedriveSignedIn : view === "gdrive" ? status?.googleSignedIn : config?.configured;
+  const signedIn =
+    view === "onedrive"
+      ? status?.onedriveSignedIn
+      : view === "gdrive"
+        ? status?.googleSignedIn
+        : view === "direct"
+          ? status?.directReady
+          : config?.configured;
 
   const use = () =>
     run(async () => {
-      if (view !== "local") {
+      if (view !== "local" && view !== "direct") {
         const checked = await testCloud(view);
         if (!checked.ok) return `${BACKEND_LABELS[view]} did not pass the check: ${checked.error}`;
       }
@@ -338,7 +348,22 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
             Sign in with {view === "gdrive" ? "Google" : "OneDrive"}
           </DialogButton>
         )}
-        {view !== "local" && signedIn && (
+        {view === "direct" && settings.snapshotStore === "direct" && (
+          <DialogButton
+            style={{ width: "auto" }}
+            disabled={locked}
+            onClick={() =>
+              void run(async () => {
+                const r = await directSyncNow();
+                const away = r.unreachable.length ? ` Not reachable: ${r.unreachable.join(", ")}.` : "";
+                return `Fetched ${r.copied} new save objects from ${r.peers} device(s).${away}`;
+              })
+            }
+          >
+            Sync now
+          </DialogButton>
+        )}
+        {view !== "local" && view !== "direct" && signedIn && (
           <DialogButton
             style={{ width: "auto" }}
             disabled={locked}

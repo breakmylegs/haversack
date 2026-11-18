@@ -17,7 +17,7 @@ Released up to v0.24.0. Merged since, not yet released: network install (#38 to 
 | 18 Replication II | built: 18a (engine, ADR-0057) and 18b (adaptive streams, several sources, sleep inhibitor, battery and game holds, transfers manager and progress, protocol frozen; ADR-0058); waits for the device checks |
 | 19 Replication III | built: 19a (send a game, ADR-0059) and 19b (Send buttons, offers on Devices, the user guide); waits for the device checks |
 | 20 Replication IV | built: 20a (ADR-0060) and 20b (controls); the minor release waits for the device checks |
-| R7 direct save sync | next |
+| R7 direct save sync | built (ADR-0061, `docs/slices/r7-report.md`); waits for the device checks |
 | 23 Desktop I | step 0 (A79 probe) waits for device runs |
 | 24 Desktop II | after 23 |
 | 25 v2 hardening | parser fuzzing done; the rest after the other slices |
@@ -124,7 +124,7 @@ R1 to R3 need no device, so they are built now, while slices 16 to 25 wait for d
 | R5 Storage | Per-game disk use, clear shader cache, reset prefix and keep saves. Built (ADR-0052, `docs/slices/r5-report.md`); waits for the device checks | Yes, at the end |
 | R6 Installer III | Multi-disc swap, install queue, runtime check. Built (ADR-0053, `docs/slices/r6-report.md`); waits for the device checks | Yes, at the end |
 | R6b Dropbox | Dropbox with PKCE and an app folder | Needs Peter's app registration |
-| R7 Direct save sync (ADR-0054, Peter's option C) | Saves go device to device over Replication's link with no cloud account, under Saves' own snapshot and conflict rules; its own ADR. After slice 18 | Yes, at the end |
+| R7 Direct save sync (ADR-0054, Peter's option C) | Saves go device to device over Replication's link with no cloud account, under Saves' own snapshot and conflict rules. Built (ADR-0061, `docs/slices/r7-report.md`) | Yes, at the end |
 
 Also: Wake-on-LAN joins slice 17, and the Steam LAN transfer explanation joins slice 19.
 

@@ -90,7 +90,7 @@ USER_KEYS = frozenset(
     }
 )
 IDLE_MINUTES_RANGE = (10, 240)
-SNAPSHOT_STORES = ("local", "onedrive", "webdav", "s3", "gdrive")
+SNAPSHOT_STORES = ("local", "onedrive", "webdav", "s3", "gdrive", "direct")
 _GUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 # Safety gates may only be tightened (build prompt section 9): [floor, default].
 GATE_LIMITS = {"gateMaxRemovedPercent": (5, 50), "gateMaxSizeDropPercent": (5, 70)}
@@ -224,7 +224,7 @@ def _validate(key: str, value: Any) -> Any:
         return value
     if key == "snapshotStore":
         if value not in SNAPSHOT_STORES:
-            raise SettingsError("store must be local, onedrive, webdav, s3 or gdrive")
+            raise SettingsError("store must be local, onedrive, webdav, s3, gdrive or direct")
         return value
     if key in GATE_LIMITS:
         low, high = GATE_LIMITS[key]
