@@ -1,6 +1,6 @@
 # Replication: your devices
 
-Replication links your own devices directly: handhelds, Linux PCs and Windows PCs. Today it pairs them. Sending whole games between them comes next: a non-Steam game you set up on one handheld will appear on the other, playable, with the same Proton version, artwork and launch options.
+Replication links your own devices directly: handhelds, Linux PCs and Windows PCs. It pairs them, then sends non-Steam games between them: a game you set up on one handheld appears on the other, playable, with the same Proton version, artwork and launch options.
 
 ```mermaid
 flowchart LR
@@ -32,6 +32,19 @@ Each device you pair is linked to every other one you pair, so a group such as t
 - **Wake** sends a Wake-on-LAN signal. It usually wakes a PC on a cable. A handheld asleep on Wi-Fi usually cannot be woken this way.
 - **Remove** forgets a device. It can no longer connect until you pair it again.
 
+## Send a game
+
+1. On the device that has the game, open it in Keepsake's **Games** and press **Send to <device>**. Keepsake checks every file first, which takes a few minutes for a large game. If Saves syncs the game, the newest saves go first.
+2. On the other device, open **Devices**. Under **Games between devices**, press **Accept**.
+   - If that device lacks the game's compatibility tool (a GE-Proton version, for example), Keepsake offers to copy it too. Steam finds a copied tool after a restart.
+   - Launch options that only make sense on the first device, such as a mounted disc, stay behind, and Keepsake lists them.
+3. Keepsake copies the game, adds it to Steam with the same name, program, launch options, Proton version and artwork, and says when it is ready. If Saves synced the game, it carries on with the same saves, with no conflict.
+4. **Clear from this list** tidies a finished game away. The game stays.
+
+**Stop and remove** on a game being received deletes everything that copy made on this device: its folder, its prefix, a copied tool and its Steam shortcut. Nothing else is touched.
+
+On the sending device, **Withdraw** an offer once the game has arrived, to free the space Keepsake keeps for it.
+
 ## Firewalls
 
 Keepsake never changes your firewall. Settings, **Health** says what to allow, if anything: TCP 47110 and UDP 5353.
@@ -43,8 +56,8 @@ Keepsake never changes your firewall. Settings, **Health** says what to allow, i
 - **Device to device only.** Game files go straight between your own devices, on your home network or over your own VPN (WireGuard, Tailscale or ZeroTier). They never go through cloud storage, or through any server or relay run by Keepsake.
 - **Paired devices only.** Every connection is encrypted with a key only your two devices know. Devices you have not paired are refused.
 - **Exact copies.** Files arrive exactly as they were, with their sizes, permissions, times and links. Nothing is compressed, at any layer.
-- **Pause and resume** (coming with transfers). You can pause a transfer and resume it later. It also carries on by itself after errors, a lost network, the other device going away and coming back, a restart, sleep, or a power cut. Nothing already checked is sent twice.
-- **Stop means clean** (coming with transfers). **Stop and remove**, which asks you first, deletes everything the transfer made: partial files, the shortcut, the prefix and any tool copy. Your existing install is never touched.
+- **Pause and resume.** You can pause a transfer and resume it later. It also carries on by itself after errors, a lost network, the other device going away and coming back, a restart, sleep, or a power cut. Nothing already checked is sent twice.
+- **Stop means clean.** **Stop and remove**, which asks you first, deletes everything the transfer made: partial files, the shortcut, the prefix and any tool copy. Your existing install is never touched.
 - **Room to spare.** Keepsake checks there is enough free space before it starts, and keeps the device awake while it copies.
 - **Honest speed.** It shows the speed, time left and progress for each file, and says plainly when a link looks slow.
 - **Saves stay with Saves.** Replication never touches save files. Keepsake's save sync looks after them.

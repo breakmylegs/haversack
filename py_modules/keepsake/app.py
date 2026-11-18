@@ -3162,6 +3162,13 @@ class KeepsakeApp:
             raise ValueError(str(exc)) from exc
         return await self.replication_offers()
 
+    async def replication_dismiss(self, offer_id: str) -> dict[str, Any]:
+        try:
+            await asyncio.to_thread(self._incoming().dismiss, str(offer_id))
+        except OfferError as exc:
+            raise ValueError(str(exc)) from exc
+        return await self.replication_offers()
+
     async def replication_withdraw(self, offer_id: str) -> dict[str, Any]:
         try:
             await asyncio.to_thread(self._outgoing().withdraw, str(offer_id))

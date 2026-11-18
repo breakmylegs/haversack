@@ -317,6 +317,16 @@ class Incoming:
             )
         return out
 
+    def dismiss(self, offer_id: str) -> None:
+        """Forget a finished offer. The game it installed stays: this only clears the list."""
+        offers = self._load()
+        record = offers.get(offer_id)
+        if record is None or record["state"] != "done":
+            raise OfferError("only a finished game can be cleared from the list")
+        offers.pop(offer_id)
+        self._save(offers)
+        self._changed()
+
     def decline(self, offer_id: str) -> None:
         offers = self._load()
         record = offers.get(offer_id)
