@@ -119,3 +119,42 @@ export interface CloudStatus {
   googleSignedIn: boolean;
   methods?: Record<"onedrive" | "gdrive", { browser: boolean; phone: boolean }>;
 }
+
+export interface GameMatch {
+  key: string;
+  name: string;
+  kind: "steam" | "shortcut";
+  method: string;
+  title: string | null;
+  gameKey: string | null;
+  candidates: string[];
+  proposal?: { candidate: { gameKey: string; title: string | null } } | null;
+  enabled: boolean;
+  sync: string;
+}
+
+export interface Settings {
+  deviceName: string;
+  updateChannel: "stable" | "prerelease";
+  idleSyncMinutes: number;
+  toastOnSync: boolean;
+  gateMaxRemovedPercent: number;
+  gateMaxSizeDropPercent: number;
+  readOnly: boolean;
+}
+
+export interface LudusaviGame {
+  name: string;
+  backups: unknown[];
+  error: string | null;
+  inManifest: boolean;
+}
+
+export interface ImportAllStatus {
+  running: boolean;
+  cancelled?: boolean;
+  done: number;
+  total: number;
+  current?: string | null;
+  summary: Record<string, number>;
+}
