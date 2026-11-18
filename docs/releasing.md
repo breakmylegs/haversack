@@ -32,6 +32,13 @@ A pinned key that is lost locks every installed device out of in-place updates. 
 ## Each release
 
 1. Add a section to `CHANGELOG.md` for the new version, for example `## [0.2.1]`, with the notes. It becomes the release notes.
+   - **User guide (ADR-0046).** Regenerate the screenshots and check the guide. Commit any changed images and pages in the same pull request as the changelog:
+     ```
+     npx -y pnpm@9.15.9 run build:desktop
+     python scripts/docs_screenshots.py
+     python scripts/check_docs.py
+     ```
+   - **Page updates.** Update the pages in `docs/user/` for anything the release changes for users.
 2. On an up-to-date `main` with a clean tree:
 
    ```

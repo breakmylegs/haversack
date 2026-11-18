@@ -1,0 +1,34 @@
+# Questions and answers
+
+**Does Keepsake replace Steam Cloud?**
+No. Steam games that use Steam Cloud are left to Steam, and hidden in Keepsake's list by default. Keepsake is for everything Steam Cloud does not cover: non-Steam games, and Steam games without cloud saves.
+
+**My non-Steam game has a different shortcut ID on each device. Will it still sync?**
+Yes. That is what Keepsake is built for. Saves are stored under neutral locations rather than prefix numbers. The same game is recognised on each device by its save data and title, and by your confirmation when Keepsake is not sure.
+
+**What happens if I play on two devices without syncing in between?**
+Keepsake notices that both changed and asks you which save to keep. The other one stays in History, pinned. See [Conflicts, history and restoring](conflicts-and-history.md).
+
+**Can a sync ever wipe my save?**
+Keepsake takes and checks a snapshot of your current save before replacing any file, so every restore can be undone. A save that suddenly loses most of its files is held back on the device instead of being uploaded.
+
+**What if I am offline?**
+Games always start. Keepsake syncs the next time it can reach your cloud.
+
+**Why does my game pause for a moment when it starts?**
+On a handheld, Keepsake pauses the game briefly while it checks for a newer save, so it can put that save in place before the game reads it. A watchdog always resumes the game, whatever happens. You can switch this off per game.
+
+**Why does a PC not pause the game?**
+On a PC, Keepsake does not start your games, so it cannot pause one safely at launch. It never touches saves while a game runs. Press **Sync now** before playing to be sure you have the newest save.
+
+**Does Keepsake need root, Desktop Mode or a terminal?**
+No. On a handheld everything happens in Gaming Mode with the controller. Nothing runs as root, and Keepsake installs no extra programs.
+
+**Is my health page showing a warning?**
+
+![The Health page on a PC](images/desktop-health.png)
+
+Each check says what is wrong and what to do. Most warnings are a game waiting for your choice in Conflicts, or a sign-in that needs renewing. See [Troubleshooting](../troubleshooting.md).
+
+**Where do I report a problem?**
+Open an issue on [GitHub](https://github.com/breakmylegs/keepsake/issues). Diagnostics, then **Export diagnostics**, makes a file you can attach. Tokens and passwords are removed from it, but read it first.
