@@ -24,6 +24,8 @@ import type {
   QamSummary,
   ReplicationStatus,
   Settings,
+  TransferJob,
+  TransfersStatus,
   UpdateCheck,
 } from "./types.js";
 
@@ -836,6 +838,7 @@ function pairingActive(p: Pairing): boolean {
 
 async function devices(main: HTMLElement, found: FoundDevice[] | null = null): Promise<void> {
   const status = await call<ReplicationStatus>("replication_status");
+  const transfers = await call<TransfersStatus>("replication_transfers");
   const again = (list: FoundDevice[] | null = found) => devices(main, list);
   if (!status.available) {
     replace(main, h("h1", {}, "Devices"), h("p", { class: "warn" }, "This device's Python cannot make Replication's encrypted link, so Replication stays off."));
@@ -881,6 +884,7 @@ async function devices(main: HTMLElement, found: FoundDevice[] | null = null): P
     main,
     h("h1", {}, "Devices"),
     h("p", {}, "Keepsake links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once by checking that both screens show the same code."),
+    transfers.jobs.length ? transfersCard(transfers, main) : null,
     pairingCards.length ? h("ul", { class: "list" }, ...pairingCards) : null,
     h(
       "section",
@@ -951,11 +955,62 @@ async function devices(main: HTMLElement, found: FoundDevice[] | null = null): P
       status.peers.length ? h("ul", { class: "list" }, ...status.peers.map((peer) => peerItem(peer, main))) : h("p", {}, "None yet."),
     ),
   );
-  if (listener.pairingOpen || status.pairings.some(pairingActive)) {
+  const moving = transfers.jobs.some((j) => ["running", "verifying", "waiting"].includes(j.state));
+  if (listener.pairingOpen || status.pairings.some(pairingActive) || moving) {
     setTimeout(() => {
       if (document.getElementById("nav-devices")?.getAttribute("aria-current") === "true") void again().catch(() => undefined);
     }, 1000);
   }
+}
+
+function transferText(job: TransferJob): string {
+  const percent = job.total ? Math.floor((job.received / job.total) * 100) : 0;
+  const parts = [`${size(job.received)} of ${size(job.total)} (${percent}%)`];
+  if (job.state === "running" && job.megabytesPerSecond) {
+    parts.push(`${job.megabytesPerSecond} MB/s`);
+    if (job.secondsLeft !== null) parts.push(`about ${Math.max(1, Math.round(job.secondsLeft / 60))} min left`);
+  }
+  if (job.reason) parts.push(job.reason);
+  return parts.join(", ");
+}
+
+function transfersCard(transfers: TransfersStatus, main: HTMLElement): HTMLElement {
+  const note = [transfers.waitingFor, transfers.sleepProblem].filter(Boolean).join(" ");
+  return h(
+    "section",
+    { class: "card" },
+    h("h2", {}, "Transfers"),
+    note ? h("p", {}, note) : null,
+    h(
+      "ul",
+      { class: "list" },
+      ...transfers.jobs.map((job) =>
+        h(
+          "li",
+          {},
+          h("strong", {}, `${job.target}: ${job.state}`),
+          h("p", {}, transferText(job)),
+          h(
+            "div",
+            { class: "actions" },
+            job.state === "running" || job.state === "waiting"
+              ? button("Pause", async () => (await call("replication_pause", job.id), await devices(main)))
+              : job.state === "paused" || job.state === "failed"
+                ? button("Resume", async () => (await call("replication_resume", job.id), await devices(main)))
+                : null,
+            button("Stop and remove", async () => {
+              const ok = window.confirm(
+                "Stop and remove this transfer? Everything it copied so far is deleted. The game already on this device, if any, is not touched.",
+              );
+              if (!ok) return;
+              await call("replication_stop", job.id);
+              await devices(main);
+            }),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 function peerItem(peer: PairedDevice, main: HTMLElement): HTMLElement {

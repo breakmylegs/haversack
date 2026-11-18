@@ -214,3 +214,19 @@ export interface LinkCheck {
   slow?: boolean;
   overlay?: boolean;
 }
+export interface TransferJob {
+  id: string;
+  target: string;
+  state: string;
+  reason: string | null;
+  total: number;
+  received: number;
+  megabytesPerSecond: number;
+  secondsLeft: number | null;
+}
+export interface TransfersStatus {
+  jobs: TransferJob[];
+  awake: boolean;
+  sleepProblem: string | null;
+  waitingFor: string | null;
+}

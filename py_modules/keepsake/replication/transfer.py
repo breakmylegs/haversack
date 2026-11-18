@@ -18,6 +18,7 @@ file matches its whole-file hash from the manifest.
 from __future__ import annotations
 
 import asyncio
+import collections
 import contextlib
 import errno
 import hashlib
@@ -27,7 +28,7 @@ import shutil
 import stat
 import sys
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -42,6 +43,9 @@ JOURNAL_EVERY_SECONDS = 2.0
 JOURNAL_EVERY_CHUNKS = 16
 CORRUPT_LIMIT = 3
 RETRY_MIN, RETRY_MAX = 1.0, 60.0
+MAX_STREAMS = 4
+ADAPT_SECONDS = 3.0  # how often the rate is measured and a stream may be added
+ADD_STREAM_GAIN = 1.10  # another stream is added only while the rate rose by 10 percent
 
 Connect = Callable[[], Awaitable[Connection]]
 _rename = os.replace  # promote's two renames (tests interrupt them here)
@@ -73,6 +77,11 @@ class Job:
     total: int = 0
     received: int = 0
     rate_limit: int = 0  # bytes a second; 0 is no cap
+    held: bool = False  # paused by the battery or a running game, not by the user: resumes by itself
+    by_user: bool = False  # paused by the user: waits for Resume
+    peers: list[str] = field(default_factory=list)  # every device offering this root (ADR-0058)
+    rate: float = 0.0  # bytes a second, smoothed
+    streams: int = 0
 
     @property
     def staging(self) -> str:
@@ -90,6 +99,9 @@ class Job:
             "reason": self.reason,
             "done": self.done,
             "rateLimit": self.rate_limit,
+            "held": self.held,
+            "byUser": self.by_user,
+            "peers": self.peers,
         }
 
     @classmethod
@@ -106,21 +118,36 @@ class Job:
             reason=data.get("reason"),
             done={str(k): sorted({int(i) for i in v}) for k, v in done.items() if isinstance(v, list)},
             rate_limit=int(data.get("rateLimit") or 0),
+            held=bool(data.get("held")),
+            by_user=bool(data.get("byUser")),
+            peers=[str(p) for p in data.get("peers") or [] if isinstance(p, str)][:8],
         )
 
     def public(self) -> dict[str, Any]:
+        left = max(0, self.total - self.received)
         return {
             "id": self.id,
             "peer": self.peer_id,
+            "peers": self.peers or [self.peer_id],
+            "target": os.path.basename(self.target),
             "state": self.state,
             "reason": self.reason,
+            "held": self.held,
             "total": self.total,
             "received": self.received,
+            "megabytesPerSecond": round(self.rate / 1_000_000, 1),
+            "secondsLeft": int(left / self.rate) if self.rate > 0 and self.state == "running" else None,
+            "streams": self.streams,
+            "rateLimit": self.rate_limit,
         }
 
 
-def save_journal(job: Job) -> None:
-    atomic_write_json(os.path.join(job.staging, "journal.json"), job.journal())
+def save_journal(job: Job, done: dict[str, list[int]] | None = None) -> None:
+    """Write the journal durably. ``done`` is the chunk list as it was when its data was flushed."""
+    data = job.journal()
+    if done is not None:
+        data["done"] = done
+    atomic_write_json(os.path.join(job.staging, "journal.json"), data)
 
 
 def load_journal(staging: str) -> Job | None:
@@ -203,26 +230,53 @@ def _prepare_file(path: str, size: int, zero: list[bool]) -> None:
         os.close(fd)
 
 
+class Held(TransferError):
+    """The battery or a running game asks the transfer to wait (ADR-0058). It resumes by itself."""
+
+
+class _Pull:
+    """What the streams of one pull share."""
+
+    def __init__(self, items: list[tuple[str, int, str, int]], rate_limit: int) -> None:
+        self.queue = collections.deque(items)
+        self.pending: set[str] = set()
+        self.pace = RateLimit(rate_limit)
+        self.window_bytes = 0
+        self.lock = asyncio.Lock()  # one journal commit at a time
+
+
 class Receiver:
-    """Runs one job to the end, or until it is paused, stopped or fails."""
+    """Runs one job to the end, or until it is paused, stopped or fails.
+
+    Chunks are pulled by up to ``max_streams`` streams spread over one or more sources (paired
+    devices offering the same root). It starts with one stream and adds another only while the
+    measured rate keeps rising, so a slow link is not crowded and a fast one is filled (ADR-0058).
+    A source whose connection fails is dropped; the job waits and retries only when none is left.
+    """
 
     def __init__(
         self,
         job: Job,
-        connect: Connect,
+        connect: Connect | Sequence[Connect],
         windows_target: bool = False,
         retries: int | None = None,
         on_progress: Callable[[Job], None] | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        hold: Callable[[], str | None] | None = None,
+        max_streams: int = MAX_STREAMS,
+        adapt_seconds: float = ADAPT_SECONDS,
     ) -> None:
         self.job = job
-        self.connect = connect
+        self.sources: list[Connect] = list(connect) if isinstance(connect, (list, tuple)) else [connect]  # type: ignore[list-item]
         self.windows_target = windows_target
         self.retries = retries  # None: keep trying (with backoff) until paused or stopped
         self.on_progress = on_progress
         self.sleep = sleep
+        self.hold = hold
+        self.max_streams = max(1, max_streams)
+        self.adapt_seconds = adapt_seconds
         self.manifest: dict[str, Any] | None = None
-        self._connection: Connection | None = None
+        self._control: Connection | None = None
 
     # The whole job
 
@@ -231,7 +285,7 @@ class Receiver:
         attempt = 0
         os.makedirs(os.path.join(job.staging, "tree"), exist_ok=True)
         while True:
-            job.state, job.reason = "running", None
+            job.state, job.reason, job.held = "running", None, False
             await asyncio.to_thread(save_journal, job)
             try:
                 await self._pull()
@@ -247,12 +301,16 @@ class Receiver:
                 await asyncio.to_thread(save_journal, job)
                 self._notify()
                 await self.sleep(min(RETRY_MAX, RETRY_MIN * 2 ** (attempt - 1)))
+            except Held as exc:
+                job.held = True
+                return await self._end("paused", str(exc))
             except DiskFull as exc:
                 return await self._end("paused", f"{exc}: free some space, then resume")
             except (TransferError, mf.ManifestError, policy.PolicyError) as exc:
                 return await self._end("failed", str(exc))
             finally:
                 await self._disconnect()
+                job.rate, job.streams = 0.0, 0
 
     async def _end(self, state: str, reason: str | None) -> Job:
         self.job.state, self.job.reason = state, reason
@@ -265,16 +323,24 @@ class Receiver:
         if self.on_progress:
             self.on_progress(self.job)
 
-    async def _conn(self) -> Connection:
-        if self._connection is None:
-            self._connection = await self.connect()
-        return self._connection
+    async def _first_connection(self) -> Connection:
+        """A connection for the manifest: the first source that answers."""
+        if self._control is not None:
+            return self._control
+        error: Exception | None = None
+        for source in self.sources:
+            try:
+                self._control = await source()
+                return self._control
+            except (LinkError, ConnectionError, TimeoutError) as exc:
+                error = exc
+        raise error if error else LinkError("no device offers this folder")
 
     async def _disconnect(self) -> None:
-        if self._connection is not None:
+        if self._control is not None:
             with contextlib.suppress(Exception):
-                await self._connection.close()
-            self._connection = None
+                await self._control.close()
+            self._control = None
 
     # Manifest and space
 
@@ -287,7 +353,7 @@ class Receiver:
             with open(path, "rb") as handle:
                 data = json.loads(handle.read())
         except (OSError, ValueError):
-            header, raw = await (await self._conn()).request_blob({"type": "manifest", "share": job.share})
+            header, raw = await (await self._first_connection()).request_blob({"type": "manifest", "share": job.share})
             try:
                 data = json.loads(raw)
             except ValueError as exc:
@@ -316,50 +382,128 @@ class Receiver:
     def _staged(self, rel: str) -> str:
         return os.path.join(self.job.staging, "tree", *rel.split("/"))
 
+    def _wanted(self, manifest: dict[str, Any]) -> list[tuple[str, int, str, int]]:
+        items = []
+        for entry in manifest["entries"]:
+            if entry["type"] != "file":
+                continue
+            done = set(self.job.done.get(entry["path"], []))
+            for index, (expected, size) in enumerate(zip(entry["chunks"], mf.chunk_sizes(entry["size"]), strict=True)):
+                if index not in done and not mf.is_zero_chunk(expected, size):
+                    items.append((entry["path"], index, expected, size))
+        return items
+
     async def _pull(self) -> None:
         manifest = await self._manifest()
         job = self.job
         await asyncio.to_thread(self._check_space, manifest)
         await asyncio.to_thread(self._make_tree, manifest)
         await asyncio.to_thread(self._recheck, manifest)
-        pace = RateLimit(job.rate_limit)
-        pending: set[str] = set()
-        last_journal = time.monotonic()
-        for entry in manifest["entries"]:
-            if entry["type"] != "file":
-                continue
-            sizes = mf.chunk_sizes(entry["size"])
-            done = set(job.done.get(entry["path"], []))
-            for index, (expected, size) in enumerate(zip(entry["chunks"], sizes, strict=True)):
-                if index in done or mf.is_zero_chunk(expected, size):
-                    continue
-                data = await self._fetch(entry["path"], index, expected, size)
-                await pace.take(size)
-                path = self._staged(entry["path"])
-                await asyncio.to_thread(_write_at, path, index * mf.CHUNK, data)
-                pending.add(entry["path"])
-                job.done.setdefault(entry["path"], []).append(index)
-                job.received += size
-                if len(pending) >= JOURNAL_EVERY_CHUNKS or time.monotonic() - last_journal > JOURNAL_EVERY_SECONDS:
-                    await asyncio.to_thread(self._commit, pending)
-                    pending, last_journal = set(), time.monotonic()
-                    self._notify()
-        await asyncio.to_thread(self._commit, pending)
+        shared = _Pull(self._wanted(manifest), job.rate_limit)
+        alive = list(range(len(self.sources)))
+        workers: dict[asyncio.Task[None], int] = {}
 
-    async def _fetch(self, rel: str, index: int, expected: str, size: int) -> bytes:
+        def spawn() -> None:
+            source = alive[len(workers) % len(alive)]
+            reuse, self._control = (self._control, None) if not workers else (None, self._control)
+            task = asyncio.create_task(self._worker(source, shared, reuse))
+            workers[task] = source
+
+        if shared.queue:
+            spawn()
+        last_journal = window_start = time.monotonic()
+        last_rate: float | None = None
+        growing = True
+        try:
+            while workers:
+                finished, _ = await asyncio.wait(
+                    workers, timeout=self.adapt_seconds, return_when=asyncio.FIRST_COMPLETED
+                )
+                for task in finished:
+                    source = workers.pop(task)
+                    error = task.exception()
+                    if error is None:
+                        continue
+                    if isinstance(error, (LinkError, ConnectionError, TimeoutError)) and not isinstance(error, Refused):
+                        if source in alive:
+                            alive.remove(source)  # this source is gone for now; others carry on
+                        if not alive:
+                            raise error
+                        if not workers and shared.queue:
+                            spawn()
+                        continue
+                    raise error
+                reason = self.hold() if self.hold else None
+                if reason:
+                    raise Held(reason)
+                now = time.monotonic()
+                if now - window_start >= self.adapt_seconds:
+                    rate = shared.window_bytes / (now - window_start)
+                    job.rate = rate if not job.rate else 0.7 * job.rate + 0.3 * rate
+                    shared.window_bytes, window_start = 0, now
+                    if growing and len(workers) < self.max_streams and shared.queue:
+                        if last_rate is None or rate > last_rate * ADD_STREAM_GAIN:
+                            spawn()
+                        else:
+                            growing = False  # one more stream did not help: this is the link's speed
+                    last_rate = rate
+                job.streams = len(workers)
+                if shared.pending and now - last_journal > JOURNAL_EVERY_SECONDS:
+                    await self._commit_now(shared)
+                    last_journal = now
+                    self._notify()
+        finally:
+            for task in workers:
+                task.cancel()
+            for task in workers:
+                with contextlib.suppress(BaseException):
+                    await task
+        await self._commit_now(shared)
+
+    async def _commit_now(self, shared: _Pull) -> None:
+        async with shared.lock:
+            # What to record is fixed before the flush: chunks written meanwhile wait for the next commit.
+            pending, shared.pending = shared.pending, set()
+            listed = {rel: list(chunks) for rel, chunks in self.job.done.items()}
+            await asyncio.to_thread(self._commit, pending, listed)
+
+    async def _worker(self, source: int, shared: _Pull, connection: Connection | None) -> None:
+        connection = connection or await self.sources[source]()
+        try:
+            while shared.queue:
+                item = shared.queue.popleft()
+                rel, index, expected, size = item
+                try:
+                    data = await self._fetch(connection, rel, index, expected, size)
+                    await shared.pace.take(size)
+                    await asyncio.to_thread(_write_at, self._staged(rel), index * mf.CHUNK, data)
+                except BaseException:
+                    shared.queue.appendleft(item)  # not done: another stream, or the next try, takes it
+                    raise
+                self.job.done.setdefault(rel, []).append(index)
+                self.job.received += size
+                shared.window_bytes += size
+                shared.pending.add(rel)
+                if len(shared.pending) >= JOURNAL_EVERY_CHUNKS:
+                    await self._commit_now(shared)  # the stream that fills a batch records it
+        finally:
+            with contextlib.suppress(Exception):
+                await connection.close()
+
+    async def _fetch(self, connection: Connection, rel: str, index: int, expected: str, size: int) -> bytes:
         for _ in range(CORRUPT_LIMIT):
-            _header, data = await (await self._conn()).request_blob(
+            _header, data = await connection.request_blob(
                 {"type": "chunk", "share": self.job.share, "path": rel, "index": index}, max_size=mf.CHUNK
             )
             if len(data) == size and hashlib.sha256(data).hexdigest() == expected:
                 return data
         raise TransferError(f"a piece of {rel[:80]} arrived damaged {CORRUPT_LIMIT} times; the transfer stopped")
 
-    def _commit(self, paths: set[str]) -> None:
+    def _commit(self, paths: set[str], listed: dict[str, list[int]] | None = None) -> None:
         """Make the written chunks durable, then record them: data first, journal second."""
         for rel in paths:
             _fsync(self._staged(rel))
-        save_journal(self.job)
+        save_journal(self.job, listed)
 
     def _make_tree(self, manifest: dict[str, Any]) -> None:
         for entry in manifest["entries"]:

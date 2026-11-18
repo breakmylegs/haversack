@@ -18,6 +18,12 @@ import {
   replicationSetListener,
   replicationStatus,
   replicationWake,
+  replicationPause,
+  replicationResume,
+  replicationStop,
+  replicationTransfers,
+  TransferJob,
+  TransfersStatus,
 } from "../backend";
 
 const REPLICATION_EVENT = "keepsake_replication";
@@ -88,6 +94,8 @@ export function ReplicationPage() {
         label="Your devices"
         description="Keepsake links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once by checking that both screens show the same code."
       />
+
+      <TransfersSection />
 
       {pairings.map((p) => (
         <PairingCard key={p.id} pairing={p} busy={busy} run={run} />
@@ -264,5 +272,99 @@ function PeerRow(props: { peer: PairedDevice; busy: boolean; run: (work: () => P
         </DialogButton>
       </Focusable>
     </Field>
+  );
+}
+
+function size(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  return `${Math.max(0, Math.round(bytes / 1024 ** 2))} MB`;
+}
+
+function progress(job: TransferJob): string {
+  const done = job.total ? Math.floor((job.received / job.total) * 100) : 0;
+  const parts = [`${size(job.received)} of ${size(job.total)} (${done}%)`];
+  if (job.state === "running" && job.megabytesPerSecond) {
+    parts.push(`${job.megabytesPerSecond} MB/s`);
+    if (job.secondsLeft !== null) parts.push(`about ${Math.max(1, Math.round(job.secondsLeft / 60))} min left`);
+  }
+  if (job.reason) parts.push(job.reason);
+  return parts.join(", ");
+}
+
+const STATE_TEXT: Record<string, string> = {
+  running: "Copying",
+  waiting: "Waiting for the other device",
+  paused: "Paused",
+  verifying: "Checking the copy",
+  promoting: "Putting it in place",
+  failed: "Stopped with a problem",
+};
+
+// Transfers in progress: progress, speed and time left, Pause, Resume and Stop and remove (ADR-0058).
+function TransfersSection() {
+  const [status, setStatus] = useState<TransfersStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const refresh = () => replicationTransfers().then(setStatus).catch(() => undefined);
+  useEffect(() => {
+    void refresh();
+    const listener = addEventListener(REPLICATION_EVENT, () => void refresh());
+    return () => removeEventListener(REPLICATION_EVENT, listener);
+  }, []);
+  const moving = !!status && status.jobs.some((j) => j.state === "running" || j.state === "verifying" || j.state === "waiting");
+  useEffect(() => {
+    if (!moving) return;
+    const timer = setInterval(() => void refresh(), 2000);
+    return () => clearInterval(timer);
+  }, [moving]);
+  if (!status || status.jobs.length === 0) return null;
+  const act = async (work: () => Promise<TransfersStatus>) => {
+    setBusy(true);
+    try {
+      setStatus(await work());
+    } catch (err) {
+      toaster.toast({ title: "Keepsake", body: String(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <Field
+        label="Transfers"
+        description={[status.waitingFor, status.sleepProblem].filter(Boolean).join(" ") || undefined}
+      />
+      {status.jobs.map((job) => (
+        <Field key={job.id} label={`${job.target}: ${STATE_TEXT[job.state] ?? job.state}`} description={progress(job)} childrenLayout="below">
+          <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {job.state === "running" || job.state === "waiting" ? (
+              <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void act(() => replicationPause(job.id))}>
+                Pause
+              </DialogButton>
+            ) : job.state === "paused" || job.state === "failed" ? (
+              <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void act(() => replicationResume(job.id))}>
+                Resume
+              </DialogButton>
+            ) : null}
+            <DialogButton
+              style={{ width: "auto" }}
+              disabled={busy}
+              onClick={() =>
+                showModal(
+                  <ConfirmModal
+                    strTitle="Stop and remove this transfer?"
+                    strDescription="Everything this transfer copied so far is deleted. The game already on this device, if any, is not touched. Pause keeps the progress instead."
+                    strOKButtonText="Stop and remove"
+                    strCancelButtonText="Cancel"
+                    onOK={() => void act(() => replicationStop(job.id))}
+                  />,
+                )
+              }
+            >
+              Stop and remove
+            </DialogButton>
+          </Focusable>
+        </Field>
+      ))}
+    </>
   );
 }
