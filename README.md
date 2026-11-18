@@ -4,6 +4,8 @@ Keepsake is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 
 
 It is built for non-Steam shortcuts installed into their own Proton prefixes, whose compatdata IDs differ on every device. Saves are stored under canonical logical roots, so the same game finds its saves on each device whatever its local prefix is called, and Keepsake recognises the same game on both devices even when the shortcuts are named differently.
 
+**[User guide](docs/user/README.md):** getting started on a handheld, a Linux PC or Windows, a guide to each feature, privacy and questions and answers.
+
 ## What it does
 
 - Checks the cloud before a game starts (pausing it for a moment) and saves after it quits.
@@ -40,7 +42,7 @@ The URL always gives the newest stable release; pre-releases are only offered th
 Open Keepsake from the Quick Access Menu and choose **Set up Keepsake**. The wizard walks through:
 
 1. **Device name**, shown next to this device's saves on your other devices.
-2. **Cloud.** Choose OneDrive (needs a free app registration once: [docs/setup-entra.md](docs/setup-entra.md)), Google Drive ([docs/setup-google.md](docs/setup-google.md)), or WebDAV or S3 ([docs/setup-backends.md](docs/setup-backends.md)), and sign in with your phone where asked.
+2. **Cloud.** Choose OneDrive, Google Drive, WebDAV or S3, and sign in ([Cloud storage and sign-in](docs/user/cloud.md)).
 3. **Scan games** and **review matches**: approve any match Keepsake is not sure about.
 4. **Choose games** to sync. Steam games are hidden by default because Steam Cloud covers them.
 5. **Dry run**: see what the first sync will do for each game. Nothing changes until you confirm.

@@ -22,6 +22,8 @@ import type {
 
 type Page = { id: string; title: string; render: (main: HTMLElement) => Promise<void> };
 
+const storeNames: Record<string, string> = { local: "Test store on this device", onedrive: "OneDrive", gdrive: "Google Drive", webdav: "WebDAV", s3: "S3" };
+
 const statusText: Record<string, string> = { ok: "All good", info: "Note", warn: "Needs attention", fail: "Problem" };
 
 function toast(text: string): void {
@@ -55,7 +57,7 @@ async function overview(main: HTMLElement): Promise<void> {
   const summary = await call<QamSummary>("qam_summary");
   const rows: [string, string][] = [
     ["This device", summary.deviceName || "Not named yet"],
-    ["Cloud", `${summary.store}${summary.signedIn ? ", signed in" : summary.store === "local" ? "" : ", not signed in"}`],
+    ["Cloud", `${storeNames[summary.store] ?? summary.store}${summary.signedIn ? ", signed in" : summary.store === "local" ? "" : ", not signed in"}`],
     ["Games synced", String(summary.enabledGames)],
     ["Last sync", when(summary.lastSync)],
     ["Conflicts", summary.conflicts ? `${summary.conflicts} to resolve` : "None"],
@@ -100,11 +102,12 @@ async function conflicts(main: HTMLElement): Promise<void> {
 
 function conflictCard(entry: ConflictEntry, main: HTMLElement): HTMLElement {
   const details = h("div", { class: "details" });
+  const versions = entry.conflict.heads.length;
   const card = h(
     "div",
-    { class: "card" },
+    {},
     h("h2", {}, entry.name),
-    h("p", {}, `${entry.conflict.heads.length} cloud version(s), ${entry.conflict.localFiles} files here.`),
+    h("p", {}, `${versions === 1 ? "1 version" : `${versions} versions`} from your other devices, ${entry.conflict.localFiles} files here.`),
     button("Compare and choose", async () => {
       const info = await call<ConflictDetails>("conflict_details", entry.key);
       replace(details, ...choices(info, main));

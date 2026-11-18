@@ -6,6 +6,7 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ### Added
 
+- A user guide on GitHub: getting started on a handheld, a Linux PC or Windows, a guide to each feature, privacy, and questions and answers, with screenshots and diagrams. Start at docs/user/README.md (ADR-0046).
 - PC preview, the desktop interface: `python -m keepsake.host --open` now shows Keepsake in your browser, on this computer only. It has an overview with Sync now, conflicts with the same two-step choices as in Gaming Mode, history, health checks, and the modules page with on and off switches. It follows your light or dark setting. The rest of the screens follow (ADR-0040).
 - PC preview, Steam for Windows: on Windows, Keepsake finds Steam where Steam for Windows records it, and reads its libraries, games and non-Steam shortcuts. Games run natively there, so their saves are found in your Windows folders (ADR-0038).
 - PC preview, saves after you play: the PC host notices when a game starts and stops. When you quit, it saves to the cloud within seconds. It never restores a save while a game is running. On a PC, saves from your other devices arrive when Keepsake syncs while the game is closed (ADR-0041).
