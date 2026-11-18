@@ -15,7 +15,8 @@ Released up to v0.24.0. Merged since, not yet released: network install (#38 to 
 | 16 Replication spike | no longer a gate (ADR-0054): its figures become tuning input from the device runs |
 | 17 Replication I | built: 17a (link, pairing, peers, ADR-0054) and 17b (discovery, Wake-on-LAN, addresses, pages, ADR-0056); waits for the device checks |
 | 18 Replication II | built: 18a (engine, ADR-0057) and 18b (adaptive streams, several sources, sleep inhibitor, battery and game holds, transfers manager and progress, protocol frozen; ADR-0058); waits for the device checks |
-| 19, 20 Replication, R7 direct save sync | 19 next, then in order |
+| 19 Replication III | 19a (send a game: plan, offer, accept, copy, Steam registration, prefix promote, tool copy, re-keying; ADR-0059) built; 19b (pages and user guide) next |
+| 20 Replication IV, R7 direct save sync | after 19b, in order |
 | 23 Desktop I | step 0 (A79 probe) waits for device runs |
 | 24 Desktop II | after 23 |
 | 25 v2 hardening | parser fuzzing done; the rest after the other slices |

@@ -228,6 +228,34 @@ export const replicationTransfers = callable<[], TransfersStatus>("replication_t
 export const replicationPause = callable<[jobId: string], TransfersStatus>("replication_pause");
 export const replicationResume = callable<[jobId: string], TransfersStatus>("replication_resume");
 export const replicationStop = callable<[jobId: string], TransfersStatus>("replication_stop");
+export interface IncomingOffer {
+  id: string;
+  title: string;
+  from: string;
+  peer: string;
+  state: "offered" | "transferring" | "registering" | "done" | "failed";
+  reason: string | null;
+  bytes: number;
+  compatTool: string | null;
+  toolOffered: boolean;
+  droppedOptions: string[];
+  appid: number | null;
+}
+export interface OffersStatus {
+  incoming: IncomingOffer[];
+  outgoing: { id: string; title: string; peer: string; created: number }[];
+  sending: Record<string, { state: "preparing" | "sent" | "failed"; title: string; peer: string; reason?: string; warning?: string | null }>;
+}
+export const replicationSend = callable<[key: string, peerId: string], { state: string; title: string; droppedOptions: string[] }>("replication_send");
+export const replicationOffers = callable<[], OffersStatus>("replication_offers");
+export const replicationOfferCheck = callable<
+  [offerId: string, copyTool: boolean],
+  { targets?: Record<string, string>; toolMissing?: boolean; problem?: string }
+>("replication_offer_check");
+export const replicationAccept = callable<[offerId: string, copyTool: boolean], IncomingOffer>("replication_accept");
+export const replicationDecline = callable<[offerId: string], OffersStatus>("replication_decline");
+export const replicationWithdraw = callable<[offerId: string], OffersStatus>("replication_withdraw");
+export const replicationRemoveGame = callable<[offerId: string], OffersStatus>("replication_remove_game");
 
 export const installerStatus = callable<[], InstallerStatus>("installer_status");
 export const installerAddCdDrive = callable<[jobId: number], InstallJob>("installer_add_cd_drive");

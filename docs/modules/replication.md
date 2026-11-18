@@ -6,9 +6,9 @@ Device-to-device replication of non-Steam games, then ongoing install sync. Byte
 |---|---|
 | Flag default | Off. The listener is a separate switch, also off |
 | Spec | `docs/build-prompt-v2.md` sections 4 (P10, P14, P15, P17, P19), 6, 7.4 and 8.2; research sections 2, 4.2, 4.4, 4.6, 4.7 and 4.10 with the supersessions in spec section 11 |
-| ADRs | 0012, 0014, 0015, 0016, 0018, 0045 (hard requirements), 0054 (link and pairing), 0056 (discovery, addresses, Wake-on-LAN, pages), 0057 (transfer engine), 0058 (streams, sources, sleep, battery, protocol freeze) |
-| Code | `py_modules/keepsake/replication/`: `policy.py`, `link.py`, `peers.py`, `service.py`, `discovery.py`, `netinfo.py`, `manifest.py`, `source.py`, `transfer.py`, `jobs.py`, `sleepguard.py`; `src/pages/ReplicationPage.tsx`; the desktop Devices page; `docs/protocol.md` |
-| Slices | 17a (link and pairing, built), 17b (discovery, Wake-on-LAN, pages, built), 18 (transfer engine, built; protocol frozen), 19 (send a game), 20 (ongoing sync, minor release), then R7 (direct save sync). Slice 16's measurements are tuning input, not a gate |
+| ADRs | 0012, 0014, 0015, 0016, 0018, 0045 (hard requirements), 0054 (link and pairing), 0056 (discovery, addresses, Wake-on-LAN, pages), 0057 (transfer engine), 0058 (streams, sources, sleep, battery, protocol freeze), 0059 (send a game) |
+| Code | `py_modules/keepsake/replication/`: `policy.py`, `link.py`, `peers.py`, `service.py`, `discovery.py`, `netinfo.py`, `manifest.py`, `source.py`, `transfer.py`, `jobs.py`, `sleepguard.py`, `sendgame.py`, `offers.py`; `src/pages/ReplicationPage.tsx`; the desktop Devices page; `docs/protocol.md` |
+| Slices | 17a (link and pairing, built), 17b (discovery, Wake-on-LAN, pages, built), 18 (transfer engine, built; protocol frozen), 19 (send a game: 19a built, 19b pages next), 20 (ongoing sync, minor release), then R7 (direct save sync). Slice 16's measurements are tuning input, not a gate |
 
 ## Hard requirements (Peter, 17 November 2026; ADR-0045)
 

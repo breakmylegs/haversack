@@ -72,3 +72,22 @@ Both are refused unless the share is offered to the asking device. A chunk is re
 
 - **Streams:** a receiver opens up to 4 connections, each with one request in flight. Streams may go to several devices offering the same root hash (ADR-0058).
 - **Order:** chunks may be requested in any order. A sender answers each one on its own, so a receiver may ask again after any failure.
+
+## Additions to version 1 (ADR-0059)
+
+Only new request types are added under version 1. A device that does not know one answers `error` with `unknown request`.
+
+| Request | Answer |
+|---|---|
+| `{"type": "offer", "offer": {...}}` | `{"type": "offer-received", "id": offer id}` |
+
+The offer holds:
+- `id` (16 hex), `title`, `from.name`;
+- `shares`: per scope (`install`, `prefix`, `tool`, `art`) a `share`, its manifest `root` and `bytes`;
+- `exe` and `startDir`: a scope and a relative path;
+- `launchOptions`, with only the placeholders `{install}`, `{prefix}` and `{home}`;
+- `compatTool`;
+- `art`: an asset type from 0 to 3, and a file name;
+- `gameKey` and `savesEnabled`.
+
+It never holds an absolute path.

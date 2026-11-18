@@ -36,8 +36,9 @@ class Shares:
     def __init__(self) -> None:
         self._shares: dict[str, Share] = {}
 
-    def add(self, root: str, manifest: dict[str, Any], peers: set[str]) -> Share:
-        share = Share(secrets.token_hex(16), os.path.abspath(root), manifest, set(peers))
+    def add(self, root: str, manifest: dict[str, Any], peers: set[str], share_id: str | None = None) -> Share:
+        """Offer a folder. ``share_id`` keeps an offer's ID across a restart."""
+        share = Share(share_id or secrets.token_hex(16), os.path.abspath(root), manifest, set(peers))
         self._shares[share.id] = share
         return share
 

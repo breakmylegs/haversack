@@ -179,6 +179,27 @@ class Plugin:
     async def replication_stop(self, job_id: str) -> dict[str, Any]:
         return await self.app.replication_stop(job_id)
 
+    async def replication_send(self, key: str, peer_id: str) -> dict[str, Any]:
+        return await self.app.replication_send(key, peer_id)
+
+    async def replication_offers(self) -> dict[str, Any]:
+        return await self.app.replication_offers()
+
+    async def replication_offer_check(self, offer_id: str, copy_tool: bool = False) -> dict[str, Any]:
+        return await self.app.replication_offer_check(offer_id, copy_tool)
+
+    async def replication_accept(self, offer_id: str, copy_tool: bool = False) -> dict[str, Any]:
+        return await self.app.replication_accept(offer_id, copy_tool)
+
+    async def replication_decline(self, offer_id: str) -> dict[str, Any]:
+        return await self.app.replication_decline(offer_id)
+
+    async def replication_withdraw(self, offer_id: str) -> dict[str, Any]:
+        return await self.app.replication_withdraw(offer_id)
+
+    async def replication_remove_game(self, offer_id: str) -> dict[str, Any]:
+        return await self.app.replication_remove_game(offer_id)
+
     async def installer_status(self) -> dict[str, Any]:
         return await self.app.installer_status()
 
