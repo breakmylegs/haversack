@@ -251,7 +251,7 @@ class Links:
         return self.status()
 
 
-def _firewalld_running(proc_root: str) -> bool:
+def firewalld_running(proc_root: str) -> bool:
     try:
         names = os.listdir(proc_root)
     except OSError:
@@ -276,7 +276,7 @@ def firewall_advice(platform: str, proc_root: str = "/proc") -> str:
             "The first time the listener starts, Windows asks whether Python may use the network. "
             f"Allow it on private networks only. If you said no, allow {port} in Windows Defender Firewall."
         )
-    if _firewalld_running(proc_root):
+    if firewalld_running(proc_root):
         return (
             "This device runs firewalld. Fedora-based systems such as Bazzite allow ports above 1024 on home "
             f"networks by default; if you changed that, allow {port}."

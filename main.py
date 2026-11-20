@@ -194,6 +194,18 @@ class Plugin:
     async def replication_decline(self, offer_id: str) -> dict[str, Any]:
         return await self.app.replication_decline(offer_id)
 
+    async def device_checks(self) -> dict[str, Any]:
+        return await self.app.device_checks()
+
+    async def device_check_run(self, check_id: str) -> dict[str, Any]:
+        return await self.app.device_check_run(check_id)
+
+    async def device_checks_run_all(self) -> dict[str, Any]:
+        return await self.app.device_checks_run_all()
+
+    async def device_checks_export(self) -> dict[str, Any]:
+        return await self.app.device_checks_export()
+
     async def direct_sync_now(self) -> dict[str, Any]:
         return await self.app.direct_sync_now()
 
