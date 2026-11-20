@@ -14,6 +14,7 @@ import logging
 import os
 import re
 import shutil
+import sys
 import time
 import uuid
 import zipfile
@@ -25,6 +26,7 @@ from . import (
     activity,
     clients,
     configrev,
+    devicechecks,
     diagnostics,
     directsync,
     discovery,
@@ -431,6 +433,7 @@ class KeepsakeApp:
         self.power_root = "/"  # where /sys/class/power_supply is read (tests point it elsewhere)
         self._games_running: set[int] = set()
         self._direct_last: dict[str, Any] | None = None
+        self._device_results: dict[str, dict[str, Any]] = {}
         self.replication_port = replication_link.DEFAULT_PORT
 
         async def replication_start() -> None:
@@ -483,6 +486,7 @@ class KeepsakeApp:
                     **shares.handlers(),
                     "offer": self.incoming.handle_offer,
                     **directsync.handlers(self._direct_store, on_changed=self._direct_peer_changed),
+                    "speed": devicechecks.serve_speed,  # the other side of the link speed check (ADR-0062)
                 }
             )
             if restored:
@@ -3877,6 +3881,64 @@ class KeepsakeApp:
 
     async def record_probe_event(self, kind: str, payload: Any) -> int:
         return await asyncio.to_thread(diagnostics.record_probe_event, self.paths.runtime_dir, kind, payload)
+
+    # Device checks: the device run inside the plugin (ADR-0062)
+
+    def _device_context(self) -> devicechecks.Context:
+        return devicechecks.Context(
+            home=discovery.real_home(self.home),
+            proc_root=self.proc_root,
+            sys_root=self.sys_root,
+            library=self._library_root(),
+            places=self._replication_places(),
+            work_dir=os.path.join(self.paths.runtime_dir, "device-checks"),
+            links=self.links,
+            connect_for=self._replication_connect_for if self.links else None,
+        )
+
+    async def device_checks(self) -> dict[str, Any]:
+        return {
+            "checks": [{"id": c.id, "title": c.title, "needs": c.needs} for c in devicechecks.CHECKS],
+            "results": [self._device_results[c.id] for c in devicechecks.CHECKS if c.id in self._device_results],
+        }
+
+    async def device_check_run(self, check_id: str) -> dict[str, Any]:
+        """Run one check now. Only from a user action: some take a minute and write test files."""
+        context = self._device_context()
+        os.makedirs(context.work_dir, exist_ok=True)
+        outcome = await devicechecks.run(str(check_id), context)
+        self._device_results[outcome["id"]] = outcome
+        log_event(logging.INFO, "devicecheck.run", "Device check run", check=outcome["id"], status=outcome["status"])
+        return outcome
+
+    async def device_checks_run_all(self) -> dict[str, Any]:
+        for check in devicechecks.CHECKS:
+            await self.device_check_run(check.id)
+        return await self.device_checks()
+
+    async def device_checks_export(self) -> dict[str, Any]:
+        """Save the results as one redacted file, and give a short summary for the screen and a QR code."""
+        import ssl
+
+        results = [self._device_results[c.id] for c in devicechecks.CHECKS if c.id in self._device_results]
+        if not results:
+            raise ValueError("run the checks first")
+        model = devicechecks.model_name(self.sys_root)
+        text = devicechecks.summary(self.version, results, model)
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        name = f"device-checks-{stamp}.json"
+        payload = {
+            "version": self.version,
+            "host": self.host,
+            "model": model,
+            "python": sys.version.split()[0],
+            "openssl": ssl.OPENSSL_VERSION,
+            "results": results,
+        }
+        await asyncio.to_thread(atomic_write_json, os.path.join(self.paths.settings_dir, name), payload)
+        where = devicechecks.tilde(os.path.join(self.paths.settings_dir, name), discovery.real_home(self.home))
+        log_event(logging.INFO, "devicecheck.export", "Device check results exported", file=name)
+        return {"file": name, "where": where, "summary": text}
 
     async def export_diagnostics(self, frontend: dict[str, Any] | None = None) -> str:
         path = await asyncio.to_thread(

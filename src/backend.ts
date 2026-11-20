@@ -268,6 +268,20 @@ export interface GameLink {
   checked: number;
 }
 export const replicationGames = callable<[], GameLink[]>("replication_games");
+export interface DeviceCheck {
+  id: string;
+  title: string;
+  needs: "one" | "both";
+}
+export interface DeviceCheckResult extends DeviceCheck {
+  status: "pass" | "warn" | "fail" | "skip";
+  found: string;
+  at: number;
+}
+export const deviceChecks = callable<[], { checks: DeviceCheck[]; results: DeviceCheckResult[] }>("device_checks");
+export const deviceCheckRun = callable<[id: string], DeviceCheckResult>("device_check_run");
+export const deviceChecksRunAll = callable<[], { checks: DeviceCheck[]; results: DeviceCheckResult[] }>("device_checks_run_all");
+export const deviceChecksExport = callable<[], { file: string; where: string; summary: string }>("device_checks_export");
 export const directSyncNow = callable<[], { peers: number; copied: number; removed: number; unreachable: string[] }>("direct_sync_now");
 export const replicationSetPolicy = callable<[linkId: string, policy: string], GameLink[]>("replication_set_policy");
 export const replicationCheckGame = callable<[linkId: string], GameLink>("replication_check_game");

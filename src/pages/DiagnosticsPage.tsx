@@ -17,6 +17,7 @@ import { deckyMechanisms, runningAppDetails } from "../probes";
 import { HealthSection } from "./HealthSection";
 import { JsonBlock } from "./JsonBlock";
 import { SigninProbe } from "./SigninProbe";
+import { DeviceChecks } from "./DeviceChecks";
 
 type Section = "environment" | "steam" | "processes" | "frontend" | "https" | "steamops" | "export" | "integrity";
 
@@ -77,6 +78,7 @@ export function DiagnosticsPage() {
   return (
     <div>
       <HealthSection />
+      <DeviceChecks />
       <Field
         label="Diagnostics"
         description="Facts about this device for troubleshooting. The export is saved in Keepsake's settings folder on this device and includes the health checks."
