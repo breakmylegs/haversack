@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.26.0-beta.1]
+
+> **Pre-release for device testing: nothing in this version has been tested on a device yet.** It is offered only to devices on the Pre-release update channel. The stable channel and the first-install link stay on v0.25.0.
+
 ### Added
 
 - Save sync with no cloud account: on the Cloud page, **Directly between my devices** keeps your saves in step between your paired devices. Each device keeps the history, and they fetch what they are missing from each other whenever they can reach each other. Conflicts and history work as with a cloud store. There is no copy away from your devices (ADR-0061).
