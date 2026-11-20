@@ -4,6 +4,70 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.26.0]
+
+> **Not yet tested on a device.** This release has everything in 0.26.0-beta.1, published as stable at the owner's request before the device run. Report anything that misbehaves on the Releases page.
+
+### Added
+
+- Device checks: on the Diagnostics page, **Device checks** runs the device run's measurements on the device itself. Each check shows pass or fail and what it found, **Run all** runs them all, and **Export results** saves one file with no names, addresses or paths and shows a QR code and a short summary to photograph. The steps are in docs/device-run.md (ADR-0062).
+- Save sync with no cloud account: on the Cloud page, **Directly between my devices** keeps your saves in step between your paired devices. Each device keeps the history, and they fetch what they are missing from each other whenever they can reach each other. Conflicts and history work as with a cloud store. There is no copy away from your devices (ADR-0061).
+- One-button cloud sign-in: OneDrive and Google Drive now work out of the box. Pick one, press **Sign in** and approve with your account. No client ID or app registration is needed; your own client is still available under Advanced (ADR-0055).
+- Games you sent stay in step between devices. On the game's page, **Updates** is Ask me, Take them by themselves, or Off, with **Check now** and **Send update**. On Devices, **Apply update**, **Keep mine** and **Stop update**:
+  - when a game changes on one device, for example a patch, Keepsake offers the update to the other;
+  - set to Auto, the update goes in by itself;
+  - if both devices changed the game, Keepsake asks you which copy to keep;
+  - your saves and settings on each device are never replaced by an update (ADR-0060).
+- Send a game to another device: **Send to <device>** on a non-Steam game, then **Accept** on the other device, under Devices:
+  - Keepsake copies a non-Steam game, its Proton prefix, its compatibility tool if needed, and its artwork to the other device;
+  - it adds the game to Steam there with the same name, program, launch options and tool;
+  - your saves come along and Saves carries on with them;
+  - the other device asks before anything is copied, and **Stop and remove** undoes everything (ADR-0059).
+- Transfers between your devices adapt to the link:
+  - they use more parallel streams only while that makes them faster, and can pull from several of your devices at once;
+  - they keep the device awake while copying, wait while a game runs and below 30 percent battery off the charger, then carry on by themselves;
+  - **Devices** shows each transfer's progress, speed and time left, with **Pause**, **Resume** and **Stop and remove** (ADR-0058).
+- Replication's transfer engine (no button yet; sending games comes with slice 19): folders copy between paired devices exactly. Every piece is checked, and a copy carries on after a dropped network, a restart or a power cut. Nothing replaces the existing copy until the new one is complete and verified, and **Stop and remove** leaves nothing behind (ADR-0057).
+- Devices: switch on Replication in Modules to link your own handhelds and PCs directly, with no SSH, keys or accounts. **Find devices** lists Keepsake devices on your network. You pair each one once by checking that both screens show the same 6-digit code. Paired devices can be checked, woken with Wake-on-LAN, or removed. Every connection is encrypted with a key only your two devices know, and nothing goes through the cloud. Sending games between devices comes next (ADR-0054, ADR-0056).
+- Install, games on several discs: keep the ISOs together in one folder, and when the installer asks for the next disc, press **Swap to <disc>**. Keepsake puts it in the drive without stopping the installer (ADR-0053).
+- Install queue: start another install while one is under way, and it waits its turn. Queued installs start by themselves and carry on after a restart (ADR-0053).
+- Install, runtimes: the runtime installers a game ships (Visual C++, DirectX, .NET and others) are listed, with advice on when they are needed. Nothing is run for you (ADR-0053).
+- Storage: a new page shows how much space each game uses (the game, its Proton prefix, its shader cache and its saves). **Clear shader cache** frees a game's shader cache. **Reset prefix, keep saves** gives a game with a broken prefix a fresh one: Keepsake keeps a checked copy of the saves, moves the old prefix aside, and puts the saves back after you start the game once. The old prefix stays until you delete it (ADR-0052).
+- Heroic, Lutris and Bottles games: on a handheld or a Linux PC, Games lists your Heroic (GOG and Epic), Lutris and Bottles games, and syncs their saves like any other game. Newer saves from your other devices come in while the game is closed, and only if you have not played on since (ADR-0051).
+- Emulator saves: one entry each for RetroArch, Dolphin, PCSX2, DuckStation, PPSSPP, RPCS3 and Cemu, with battery and memory-card saves. Save states can be added per emulator, but are off by default (ADR-0051).
+- Cloud integrity: once a week Keepsake checks that the cloud copies of each game's important snapshots are intact, and **Check cloud integrity** checks them all. A damaged copy shows in Health and in the game's History, where **Repair** saves a fresh copy from this device (ADR-0050).
+- Export snapshots: copy your saves out as plain zip files, with a list of their contents, to a folder you choose, such as an SD card. There is no lock-in, and nothing in that folder is overwritten (ADR-0050).
+- Releases now include a software bill of materials, covered by the release signature. The release instructions include signing-key rotation and compromise runbooks, and private vulnerability reporting is on (ADR-0050).
+- Newer save from another device: the game's row, the Quick Access Menu and the PC Overview say when another device has a newer save, for example "Newer save from Handheld B, 10 minutes ago". **Get it now** brings it in straight away, but only if you have not played on since; otherwise nothing is replaced (ADR-0049).
+- Playtime across your devices: each game's page shows how long you have played it in all, and on each device (ADR-0049).
+- What's new: after an update, Keepsake shows that version's release notes once. A short tip in the Quick Access Menu introduces checkpoints and restoring single files (ADR-0049).
+- Machines without a battery, such as a Steam Machine or a desktop: Advisor leaves out battery estimates, and suggests no TDP when it has no profile for the machine (ADR-0049).
+
+- Checkpoints: **Save checkpoint** keeps a named copy of a game's save, for example "Before the final boss". It is in the Quick Access Menu while you play and in each game's History. Checkpoints are kept until you remove them (ADR-0048).
+- Restore some files: see what restoring an older save would change, file by file, and restore only the files you choose. It can be undone like any restore (ADR-0048).
+- A clearer conflict screen: it shows when this device's save last changed (not "now"), and lists the files that are new, gone or changed on each side. Keepsake still never chooses for you (ADR-0048).
+- Games: find a game by name, and turn sync on or off for every game shown in one go (ADR-0048).
+- Activity: a plain-words list of what Keepsake did, such as saves sent, saves brought in, checkpoints and restores, on the handheld and the PC (ADR-0048).
+- A user guide on GitHub: getting started on a handheld, a Linux PC or Windows, a guide to each feature, privacy, and questions and answers, with screenshots and diagrams. Start at docs/user/README.md (ADR-0046).
+- PC preview, the desktop interface: `python -m keepsake.host --open` now shows Keepsake in your browser, on this computer only. It has an overview with Sync now, conflicts with the same two-step choices as in Gaming Mode, history, health checks, and the modules page with on and off switches. It follows your light or dark setting. The rest of the screens follow (ADR-0040).
+- PC preview, Steam for Windows: on Windows, Keepsake finds Steam where Steam for Windows records it, and reads its libraries, games and non-Steam shortcuts. Games run natively there, so their saves are found in your Windows folders (ADR-0038).
+- PC preview, saves after you play: the PC host notices when a game starts and stops. When you quit, it saves to the cloud within seconds. It never restores a save while a game is running. On a PC, saves from your other devices arrive when Keepsake syncs while the game is closed (ADR-0041).
+- PC preview, install from the release: each release now carries `Keepsake-desktop-v<version>.zip`, covered by the release signature. Unzip it and run `install.pyw`. Keepsake installs into your own folders with no administrator rights, starts when you sign in, and opens in your browser. `install.pyw --uninstall` removes it and keeps your settings and saves (ADR-0042).
+- Sign in with one button: "Sign in with OneDrive" or "Sign in with Google" opens the provider's page in a browser. Sign in with your normal account, allow access, and Keepsake carries on, refreshing its access by itself. On a PC it is your usual browser. In Gaming Mode it is Steam's browser where the provider allows it. Google does not allow sign-in there, so Google starts with a code on your phone instead, and a switch lets you choose either way for each service. If a browser sign-in does not finish, "Use your phone instead" is one press away. Each device signs in for itself, so you can sign out one device without the others. The desktop interface gains a Cloud page (ADR-0044).
+- Replication (in development): game installs will go only directly between your own devices, on your network or over your own VPN, and never through any cloud storage. They are sent uncompressed and exactly as they are. They can be paused and resumed, and recover by themselves after errors, network loss or a restart. "Stop and remove" cleans up everything a transfer made. Tests now enforce the no-cloud and no-compression rules (ADR-0045).
+- Diagnostics, "Sign-in browser test": three steps that check which sign-ins work in Steam's browser on your device (ADR-0044).
+- PC preview, more of the desktop interface: Games (turn sync on per game, choose a game's save data, confirm a link another device proposes), Import from Ludusavi with progress, and Settings (device name, sync interval, notifications, update channel).
+- PC preview, updates: the desktop interface has an Updates page. Check, Install, then Restart. Keepsake installs a new version only when the release signature and checksum prove it is Keepsake's own. It keeps the version you had, so "Go back" returns to it. Your settings, saves and start-up choice are left as they are (ADR-0043).
+
+### Changed
+
+- The PC interface's text now follows your browser's text size setting (ADR-0049).
+- Snapshot clean-up plans are about four times faster for games with long histories (ADR-0050).
+
+### Fixed
+
+- A device that had never synced a game and had no save files for it no longer reports a conflict; the cloud save is simply brought in (ADR-0051).
+
 ## [0.26.0-beta.1]
 
 > **Pre-release for device testing: nothing in this version has been tested on a device yet.** It is offered only to devices on the Pre-release update channel. The stable channel and the first-install link stay on v0.25.0.
