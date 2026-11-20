@@ -24,7 +24,7 @@ Each device signs in for itself. You can sign one device out, at the provider or
 
 ### Using your own app registration
 
-Releases up to and including 0.25.0 do not yet include Keepsake's own sign-in, so they need your own app registration. Once a release includes it, most people never need this. Under **Advanced: use my own client ID** you can use your own Microsoft or Google app registration instead of Keepsake's: see [setting up Microsoft Entra](../setup-entra.md) and [setting up Google](../setup-google.md).
+From version 0.26.0, Keepsake includes its own sign-in, so most people never need this. Version 0.25.0 and earlier need your own app registration. Under **Advanced: use my own client ID** you can use your own Microsoft or Google app registration instead of Keepsake's: see [setting up Microsoft Entra](../setup-entra.md) and [setting up Google](../setup-google.md).
 
 ## WebDAV and S3
 
