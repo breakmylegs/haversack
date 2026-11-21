@@ -39,7 +39,9 @@ DEFAULT: dict[str, Any] = {
     "gameKey": None,
     "gameKeySource": None,
     "syncRegistry": False,  # slice 11: off by default per game
+    "locations": None,  # ADR-0071: the save locations this game uses; None means all of them
 }
+LOCATIONS = ("local", "onedrive", "webdav", "s3", "gdrive", "direct")  # settings.SNAPSHOT_STORES
 
 
 class GameConfigError(ValueError):
@@ -119,6 +121,12 @@ def validate(config: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(config.get("syncRegistry", False), bool):
         raise GameConfigError("syncRegistry must be true or false")
     out["syncRegistry"] = config.get("syncRegistry", False)
+    locations = config.get("locations")
+    if locations is not None and (
+        not isinstance(locations, list) or not locations or any(v not in LOCATIONS for v in locations)
+    ):
+        raise GameConfigError("a game's save locations are a list of known locations, or all of them")
+    out["locations"] = list(dict.fromkeys(locations)) if locations is not None else None
     return out
 
 
@@ -164,6 +172,16 @@ class GameConfigStore:
             return validate(stored)
         except GameConfigError:
             return dict(DEFAULT)
+
+    def locations_by_game_key(self) -> dict[str, list[str]]:
+        """Games that use only some save locations, by game key (ADR-0071)."""
+        with self._lock:
+            data = self._all()
+        out: dict[str, list[str]] = {}
+        for value in data.values():
+            if isinstance(value, dict) and value.get("gameKey") and isinstance(value.get("locations"), list):
+                out[str(value["gameKey"])] = [str(v) for v in value["locations"]]
+        return out
 
     def any_enabled(self) -> bool:
         with self._lock:

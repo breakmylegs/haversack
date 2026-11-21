@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- Several save locations at once: on the Cloud page, **Add ... as a save location** for each one you want, for example OneDrive, directly between your devices, and a NAS. Every snapshot goes to each, a location that is down is caught up later and never stops you playing, and each is listed with its status and **Remove**, which never deletes what is stored there. A game can use only some of them. Existing setups with one location work exactly as before (ADR-0071).
+
 ## [0.29.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

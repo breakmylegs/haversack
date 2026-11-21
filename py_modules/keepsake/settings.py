@@ -35,6 +35,9 @@ DEFAULTS: dict[str, Any] = {
     "gateMaxSizeDropPercent": 70,
     "onedriveClientId": "",
     "snapshotStore": "local",
+    # Several save locations (ADR-0071): every one gets each snapshot; the first is also snapshotStore.
+    # Empty means just snapshotStore, so nothing changes until a second location is added.
+    "snapshotStores": [],
     "launchPullTimeout": 20,
     "toastOnSync": True,
     "idleSyncMinutes": 30,
@@ -79,6 +82,7 @@ USER_KEYS = frozenset(
         "gateMaxSizeDropPercent",
         "onedriveClientId",
         "snapshotStore",
+        "snapshotStores",
         "launchPullTimeout",
         "toastOnSync",
         "idleSyncMinutes",
@@ -233,6 +237,15 @@ def _validate(key: str, value: Any) -> Any:
             except ValueError:
                 raise SettingsError("the listening address is an IP address, or empty for all") from None
         return value
+    if key == "snapshotStores":
+        if (
+            not isinstance(value, list)
+            or len(value) > len(SNAPSHOT_STORES)
+            or any(v not in SNAPSHOT_STORES for v in value)
+            or len(set(value)) != len(value)
+        ):
+            raise SettingsError("save locations are a list of local, onedrive, webdav, s3, gdrive or direct, once each")
+        return list(value)
     if key == "snapshotStore":
         if value not in SNAPSHOT_STORES:
             raise SettingsError("store must be local, onedrive, webdav, s3, gdrive or direct")

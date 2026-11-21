@@ -49,4 +49,10 @@ There is no copy away from your devices. If you lose all of them, the history go
 
 ## Choosing where snapshots go
 
-After signing in, choose **Use ... for snapshots**. Keepsake tests the connection first. Until then, snapshots stay in a test store on the device.
+After signing in, choose **Add ... as a save location**. Keepsake tests the connection first. Until you add one, snapshots stay in a test store on the device.
+
+You can use several save locations at once, for example OneDrive, directly between your devices, and a NAS over WebDAV. Every snapshot goes to each of them, so you have extra copies:
+- If one location cannot be reached, the others still get the snapshot, and that location is caught up later by itself. A location that is down never stops you playing.
+- When a game starts, Keepsake looks at what all of them hold together.
+- The Cloud page lists each location with when it was last reached, how much is still to copy to it, and the space it uses. **Remove** stops using a location; nothing stored there is deleted.
+- On a game's page, **Save locations for this game** lets that game use only some of them.

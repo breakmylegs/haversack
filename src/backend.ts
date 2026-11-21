@@ -13,6 +13,7 @@ export interface Settings {
   gateMaxSizeDropPercent: number;
   onedriveClientId: string;
   snapshotStore: Backend;
+  snapshotStores: Backend[];
   launchPullTimeout: number;
   toastOnSync: boolean;
   idleSyncMinutes: number;
@@ -648,6 +649,10 @@ export interface GameConfig {
   gameKey: string | null;
   gameKeySource: "user" | "auto" | null;
   syncRegistry: boolean;
+  /** ADR-0063: who last switched sync. */
+  enabledSource?: "user" | "auto" | null;
+  /** ADR-0071: the save locations this game uses; null means all of them. */
+  locations?: Backend[] | null;
 }
 
 export interface IdentitySuggestion {
@@ -1148,3 +1153,20 @@ export interface AdvisorSessions {
 }
 export const advisorPerfSample = callable<[diagnosticB64: string], { ok: boolean; fps?: number | null }>("advisor_perf_sample");
 export const onResume = callable<[], { ok: boolean }>("on_resume");
+
+// Several save locations (ADR-0071).
+export interface SaveLocation {
+  id: Backend;
+  lastOk?: number;
+  problem?: string | null;
+  missing?: number;
+  bytes?: number;
+}
+export interface LocationsStatus {
+  locations: SaveLocation[];
+  available: Backend[];
+}
+export const locationsStatus = callable<[], LocationsStatus>("locations_status");
+export const addLocation = callable<[backend: Backend], LocationsStatus>("add_location");
+export const removeLocation = callable<[backend: Backend], LocationsStatus>("remove_location");
+export const setGameLocations = callable<[key: string, names: Backend[] | null], GameConfig>("set_game_locations");
