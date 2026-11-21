@@ -27,6 +27,12 @@ That is all. Before a game starts, Keepsake checks the cloud for newer saves, pa
 
 The Quick Access Menu shows the current game's sync state, any conflicts, available updates and **Sync now**. **Open Keepsake** opens the full view, with Games, Conflicts, History, Import saves, Install, Advisor, Settings, Updates, Logs and Diagnostics.
 
+## In Desktop Mode
+
+Keepsake comes with a desktop app, with nothing more to install. When you switch to Desktop Mode, its icon appears in the system tray, with no window. Click it, or choose **Open Keepsake** from its menu, to open Keepsake in your browser; it covers the same pages as in Gaming Mode. Closing the window leaves the icon in the tray. **Quit** in the icon's menu stops it until you next log in. Keepsake is also in the app menu, which brings up the one already running.
+
+If the icon's status line says Keepsake's plugin cannot be reached, Decky Loader is not running in Desktop Mode: switch back to Gaming Mode once, then try again. To stop the desktop app starting, switch **Desktop** off in Settings, Modules.
+
 ## Next device
 
 Set up your next device the same way, with the same cloud account. Non-Steam games installed into their own Proton prefixes are recognised as the same game, even though their shortcut IDs and prefix folders differ on each device.

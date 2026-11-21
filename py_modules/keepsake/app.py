@@ -59,6 +59,7 @@ from .advisor.service import Advisor, AdvisorError
 from .auth import GOOGLE, AuthError, DeviceCodeFlow, TokenManager, TokenStore
 from .backends import BackendConfigError, CredentialStore
 from .bus import EventBus
+from .desktop import entries as desktop_entries
 from .engine import SnapshotEngine
 from .freeze import Freezer
 from .fsutil import atomic_write_json, read_json
@@ -553,13 +554,28 @@ class KeepsakeApp:
                 listeners={"game_started": replication_game_started, "game_exited": replication_game_exited},
             )
         )
+        self._desktop_server: Any = None
+        self._desktop_emit: Any = None
+
+        async def desktop_start() -> None:
+            await asyncio.to_thread(self._desktop_up)
+
+        async def desktop_stop() -> None:
+            await asyncio.to_thread(self._desktop_down)
+
+        async def desktop_health() -> list[dict[str, Any]]:
+            return await asyncio.to_thread(self._desktop_health)
+
         self.registry.register(
             Module(
                 "desktop",
                 "Desktop",
-                "Keepsake in Desktop Mode, with a tray icon.",
-                "Desktop Mode shortcuts for Keepsake.",
-                available=False,
+                "Keepsake in Desktop Mode: starts with your desktop, in the system tray. Click the icon to open it.",
+                "A Desktop Mode start-up entry and app-menu entry, and a page on 127.0.0.1 only this device can open.",
+                start=desktop_start,
+                stop=desktop_stop,
+                health=desktop_health,
+                available=self.host == "decky" and os.name == "posix",
             )
         )
         self.installer: Installer | None = None
@@ -2351,7 +2367,104 @@ class KeepsakeApp:
             "store": self.settings.get("snapshotStore"),
             "integrity": await asyncio.to_thread(read_json, os.path.join(self.paths.runtime_dir, SCRUB_FILE), {}),
         }
-        return health.run(facts)
+        return health.run(facts) + await asyncio.to_thread(self._desktop_leftovers)
+
+    # Desktop (ADR-0068): the plugin serves the desktop interface on loopback and writes the tray's entries
+
+    def _desktop_up(self) -> None:
+        """Worker thread: serve the desktop interface on 127.0.0.1 and write the tray's entries for this version."""
+        from . import host as loopback
+
+        if self._desktop_server is None:
+            loop = self._loop
+            if loop is None:
+                raise RuntimeError("the backend has not started")
+            events = loopback.Events()
+            original = self.emit
+
+            async def both(event: str, *args: Any) -> None:
+                await original(event, *args)
+                await events.emit(event, *args)
+
+            ui_dir = os.path.join(self.paths.plugin_dir, "desktop")
+            api = loopback.Api(self, loop, secrets.token_urlsafe(32), events, loopback.PLACEHOLDER, ui_dir)
+            self._desktop_server = loopback.serve(api, loopback.DEFAULT_PORT)
+            self._desktop_emit = original
+            self.emit = both
+            state = os.path.join(self.paths.runtime_dir, loopback.STATE_FILE)
+            atomic_write_json(state, {"port": api.port, "token": api.token})
+            os.chmod(state, 0o600)
+        written = desktop_entries.install(
+            discovery.real_home(self.home), self.paths.plugin_dir, self.paths.runtime_dir, str(self.version)
+        )
+        log_event(logging.INFO, "desktop.up", "Desktop Mode entries ready", written=len(written))
+
+    def _desktop_down(self) -> None:
+        """Worker thread: stop the loopback page and remove the entries (switched off, or the plugin stopping)."""
+        from . import host as loopback
+
+        if self._desktop_server is not None:
+            self._desktop_server.shutdown()
+            self._desktop_server = None
+            self.emit = self._desktop_emit or self.emit
+            try:
+                os.unlink(os.path.join(self.paths.runtime_dir, loopback.STATE_FILE))  # no token left behind
+            except OSError:
+                pass
+
+    async def _desktop_probe(self) -> dict[str, Any]:
+        def probe() -> dict[str, Any]:
+            home = discovery.real_home(self.home)
+            uid = os.getuid() if hasattr(os, "getuid") else 0
+            return {
+                "entries": desktop_entries.check(home, self.paths.plugin_dir, str(self.version)),
+                "python3": bool(shutil.which("python3")),
+                "sessionBus": os.path.exists(f"/run/user/{uid}/bus"),
+                "page": self._desktop_server is not None,
+            }
+
+        return await asyncio.to_thread(probe)
+
+    def desktop_remove_entries(self) -> list[str]:
+        """The tray's entries go when Desktop is switched off and in Decky's uninstall (ADR-0068, T52)."""
+        return desktop_entries.remove(discovery.real_home(self.home))
+
+    def _desktop_health(self) -> list[dict[str, Any]]:
+        found = desktop_entries.check(discovery.real_home(self.home), self.paths.plugin_dir, str(self.version))
+        problems = [f"{k}: {', '.join(v)}" for k, v in found.items() if v]
+        return [
+            {
+                "id": "desktop-page",
+                "label": "Desktop Mode page",
+                "status": "ok" if self._desktop_server is not None else "warn",
+                "detail": "Served on 127.0.0.1 for the tray." if self._desktop_server else "Not running.",
+                "items": [],
+            },
+            {
+                "id": "desktop-entries",
+                "label": "Tray and app-menu entries",
+                "status": "warn" if problems else "ok",
+                "detail": "Both present, for this version." if not problems else "Rewritten at the next start.",
+                "items": problems,
+            },
+        ]
+
+    def _desktop_leftovers(self) -> list[dict[str, Any]]:
+        """T52: entries left behind while Desktop is off (they should have gone with it)."""
+        if self.registry.enabled("desktop") or self.host != "decky":
+            return []
+        left = [p for p in desktop_entries.paths(discovery.real_home(self.home)).values() if desktop_entries.ours(p)]
+        if not left:
+            return []
+        return [
+            {
+                "id": "desktop-leftovers",
+                "label": "Desktop Mode entries left behind",
+                "status": "warn",
+                "detail": "Desktop is off, but its tray entries are still there. Switch Desktop on and off again.",
+                "items": [devicechecks.tilde(p, discovery.real_home(self.home)) for p in left],
+            }
+        ]
 
     # Storage (R5, ADR-0052): disk use, shader cache, reset prefix and keep saves
 
@@ -2894,6 +3007,9 @@ class KeepsakeApp:
         flags[name] = bool(enabled)
         self.settings.set("moduleFlags", flags)
         await self.registry.apply_flags()
+        if name == "desktop" and not enabled:
+            removed = await asyncio.to_thread(self.desktop_remove_entries)  # switched off: the tray goes (ADR-0068)
+            log_event(logging.INFO, "desktop.removed", "Desktop Mode entries removed", removed=len(removed))
         log_event(logging.INFO, "module.flag", "Module switched", module=name, enabled=bool(enabled))
         return await self.modules_status()
 
@@ -4383,6 +4499,7 @@ class KeepsakeApp:
                 "remote-shortcuts": self._remote_shortcuts_probe,
                 "smb-find": lambda: asyncio.to_thread(lanfind.find_servers, 2.5, self._lan_sockets),
                 "network-iso": self._network_iso_probe,
+                **({"desktop-app": self._desktop_probe} if self.registry.enabled("desktop") else {}),
             },
         )
 

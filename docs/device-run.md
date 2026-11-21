@@ -67,6 +67,13 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
 
 5. **Network ISO in place.** In Desktop Mode, open your NAS share in the file manager so it is mounted, with an ISO on it. Switch back to Gaming Mode, run the Device check **Network ISO in place**, and photograph it. It should say whether an ISO on that share opens in place, and whether fusermount3 and /dev/fuse are there.
 
+6. **Desktop app.** On the Go, run the Device check **Desktop app ready** once in Gaming Mode (it says to run it in Desktop Mode for the session bus). Then switch to Desktop Mode:
+   - The Keepsake icon should appear in the system tray, with no window.
+   - Click it: Keepsake should open in the browser. Close the window: the icon should still be there.
+   - Open Keepsake from the app menu: the same Keepsake should come up, not a second icon.
+   - Right-click the icon and press **Quit**: the icon goes. Log out and back in: it comes back.
+   - In Diagnostics (in the browser page), run **Desktop app ready** again: it should pass.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

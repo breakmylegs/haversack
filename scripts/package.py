@@ -66,11 +66,19 @@ def version() -> str:
         return str(json.load(handle)["version"])
 
 
+# The desktop interface the plugin serves in Desktop Mode, and the tray's icon (ADR-0068).
+PLUGIN_DESKTOP = ("desktop/index.html", "desktop/app.css", "assets/icons/hicolor/256x256/apps/keepsake-tray.png")
+
+
 def collect() -> list[tuple[str, str, int]]:
     """Return (source path, archive path, mode) for every file to ship."""
     entries: list[tuple[str, str, int]] = []
-    for name in FILES:
+    for name in FILES + PLUGIN_DESKTOP:
         entries.append((os.path.join(ROOT, name), name, 0o644))
+    dist = os.path.join(ROOT, "desktop", "dist")
+    for name in sorted(os.listdir(dist)) if os.path.isdir(dist) else []:
+        if name.endswith(".js"):
+            entries.append((os.path.join(dist, name), f"desktop/dist/{name}", 0o644))
     for tree in TREES:
         base = os.path.join(ROOT, tree)
         if not os.path.isdir(base):
@@ -90,6 +98,8 @@ def collect() -> list[tuple[str, str, int]]:
 def build(out_dir: str) -> str:
     if not os.path.isfile(os.path.join(ROOT, "dist", "index.js")):
         sys.exit("dist/index.js is missing. Run pnpm build first.")
+    if not os.path.isfile(os.path.join(ROOT, "desktop", "dist", "main.js")):
+        sys.exit("desktop/dist/main.js is missing. Run pnpm run build:desktop first (ADR-0068).")
     name = plugin_name()
     os.makedirs(out_dir, exist_ok=True)
     target = os.path.join(out_dir, f"{name}-v{version()}.zip")

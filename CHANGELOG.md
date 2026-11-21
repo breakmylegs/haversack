@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- The desktop app comes with the plugin: on SteamOS and Bazzite, Keepsake now starts with Desktop Mode, minimised to the system tray. Click the icon, or **Open Keepsake** in its menu, to open it; closing the window leaves it in the tray, and **Quit** stops it until you next log in. Keepsake is also in the app menu, which brings up the running one. Nothing to install and nothing to switch on; Settings, Modules can turn it off. A new Device check, "Desktop app ready" (ADR-0068).
+
 ## [0.27.0-beta.1]
 
 > **Not yet tested on a device.** A pre-release with the changes merged since 0.26.0. It is offered only on the Pre-release update channel. Report anything that misbehaves on the Releases page.
