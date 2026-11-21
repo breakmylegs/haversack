@@ -650,6 +650,36 @@ async def check_see_other(ctx: Context) -> dict[str, Any]:
     )
 
 
+TRAY_LIMIT_MS = 200.0
+
+
+async def check_tray_responsive(ctx: Context) -> dict[str, Any]:
+    """Desktop tray responsive (v0.30.1): the tray's D-Bus replies and the page's get_status, each under 200 ms."""
+    probe = ctx.probes.get("tray-responsive")
+    if probe is None:
+        return result("skip", "Run this in Desktop Mode, with the Desktop module on.")
+    found = await probe()
+    details = {k: found.get(k) for k in ("trayMs", "statusMs", "tray", "page")}
+    if not found.get("tray") and found.get("statusMs") is None:
+        return result("skip", "No Keepsake tray is running here: run this in Desktop Mode.", **details)
+    slow = []
+    if found.get("trayMs") is not None and found["trayMs"] > TRAY_LIMIT_MS:
+        slow.append(f"the tray took {found['trayMs']:.0f} ms to answer")
+    if found.get("statusMs") is not None and found["statusMs"] > TRAY_LIMIT_MS:
+        slow.append(f"the plugin took {found['statusMs']:.0f} ms to give its status")
+    for key, what in (("trayError", "the tray did not answer"), ("statusError", "the plugin's page did not answer")):
+        if found.get(key):
+            slow.append(f"{what} ({found[key]})")
+    parts = []
+    if found.get("trayMs") is not None:
+        parts.append(f"tray {found['trayMs']:.0f} ms")
+    if found.get("statusMs") is not None:
+        parts.append(f"status {found['statusMs']:.0f} ms")
+    if slow:
+        return result("fail", "; ".join(slow) + ".", **details)
+    return result("pass", f"Answering quickly: {', '.join(parts)}.", **details)
+
+
 _SPEED_BLOCK = b""
 
 
@@ -694,6 +724,7 @@ CHECKS = [
     Check("network-iso", "Network ISO in place", "one", "A158, network_mount_probe.py --loop-test", check_network_iso),
     Check("desktop-app", "Desktop app ready", "one", "A208, A209", check_desktop_app),
     Check("session-sources", "Session stats sources", "one", "A211, A212", check_session_sources),
+    Check("tray-responsive", "Desktop tray responsive", "one", "v0.30.1", check_tray_responsive),
 ]
 BY_ID = {c.id: c for c in CHECKS}
 

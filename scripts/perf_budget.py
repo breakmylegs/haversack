@@ -38,6 +38,8 @@ BUDGETS = {
     # Advisor sessions (ADR-0069): sampling runs once a second while a game plays, so it must stay tiny.
     "100 session readings": 0.1,  # Keepsake's parsing per reading, file reads served from memory: once a second
     "an hour of session samples summarised": 0.25,
+    # v0.30.1: the desktop page's status, while a game scan is held by a slow disk on a disk thread.
+    "1,000 get_status calls during a scan": 0.05,
 }
 
 
@@ -112,6 +114,37 @@ def metas(count: int) -> list[dict[str, Any]]:
     return out
 
 
+def status_during_scan() -> float:
+    """The desktop page answers get_status from memory while a scan is stuck on a slow disk."""
+    import asyncio
+    import threading
+
+    from keepsake import host
+    from keepsake.app import KeepsakeApp
+    from keepsake.paths import PluginPaths
+
+    with tempfile.TemporaryDirectory() as root:
+        paths = PluginPaths(*(os.path.join(root, n) for n in ("settings", "runtime", "logs", "plugin")))
+        app = KeepsakeApp(paths, proc_root=os.path.join(root, "proc"), version="perf", home=root)
+        release = threading.Event()
+        app._disk.submit(release.wait, 30)  # a scan held in the kernel by a disk that went offline
+        loop = asyncio.new_event_loop()  # never runs: even a stuck event loop must not slow the answer
+        try:
+            api = host.Api(app, loop, "token", host.Events(), b"")
+            return measure(lambda: [api.call("get_status", []) for _ in range(1000)])
+        finally:
+            release.set()
+            loop.close()
+            app._disk.shutdown(wait=True)
+            import logging
+
+            from keepsake.log import LOGGER_NAME
+
+            for handler in list(logging.getLogger(LOGGER_NAME).handlers):  # release the log file before cleanup
+                handler.close()
+                logging.getLogger(LOGGER_NAME).removeHandler(handler)
+
+
 def measure(work: Callable[[], Any]) -> float:
     start = time.perf_counter()
     work()
@@ -165,6 +198,7 @@ def run() -> dict[str, float]:
         acc.summary()
 
     results["an hour of session samples summarised"] = measure(an_hour)
+    results["1,000 get_status calls during a scan"] = status_during_scan()
     if len(matched) != GAMES or not all(m.get("title") for m in matched):
         raise SystemExit("perf budget: the synthetic games did not all match; the benchmark is broken")
     return results
