@@ -130,6 +130,7 @@ MANIFEST_PROGRESS_EVENT = "keepsake_manifest_progress"
 ADVISOR_EVENT = "keepsake_advisor"
 IMPORT_PROGRESS_EVENT = "keepsake_import_progress"
 REPLICATION_EVENT = "keepsake_replication"
+PAIR_REQUEST_EVENT = "keepsake_pair_request"  # a device asks to pair (ADR-0070)
 MANIFEST_PROGRESS_SECONDS = 0.5
 RETARGET_KINDS = ("set-shortcut-name", "set-shortcut-exe", "set-shortcut-start-dir", "set-launch-options")
 
@@ -3528,11 +3529,11 @@ class KeepsakeApp:
             return
         asyncio.get_running_loop().create_task(self.emit(REPLICATION_EVENT))
         for pairing in links.listener.pairings.values() if links.listener else []:
-            if pairing.state == "compare" and not pairing.announced:
+            if pairing.state == "request" and not pairing.announced:
+                # The page shows Accept and Decline, or, while a game runs, only a notification (ADR-0070).
                 pairing.announced = True
-                name = pairing.peer_name or "another device"
-                text = f"{name} wants to pair. Check the code in Keepsake, Devices."
-                asyncio.get_running_loop().create_task(self.emit("keepsake_toast", text))
+                request = {"id": pairing.id, "name": pairing.peer_name or "Another device", "address": pairing.address}
+                asyncio.get_running_loop().create_task(self.emit(PAIR_REQUEST_EVENT, request))
 
     async def _replication(self, work: Callable[[Links], Any]) -> Any:
         try:
@@ -3568,24 +3569,22 @@ class KeepsakeApp:
             await self._replication(lambda lk: lk.set_listener(True))
         return await self.replication_status()
 
-    async def replication_open_pairing(self) -> dict[str, Any]:
-        await self._replication(lambda links: links.open_pairing())
-        log_event(logging.INFO, "replication.pairing_open", "Pairing window opened")
-        return await self.replication_status()
-
-    async def replication_close_pairing(self) -> dict[str, Any]:
-        await self._replication(lambda links: links.close_pairing())
-        return await self.replication_status()
-
     async def replication_pair(self, address: str) -> dict[str, Any]:
-        """Pair with a device whose pairing window is open, at a found or typed address."""
+        """Send a pairing request to a found or typed address (ADR-0070)."""
         pairing: dict[str, Any] = await self._replication(lambda links: links.pair_with(str(address)))
         log_event(logging.INFO, "replication.pair_start", "Pairing started")
         return pairing
 
     async def replication_answer(self, pairing_id: str, ok: bool) -> dict[str, Any]:
+        """Accept or Decline a pairing request on this device."""
         await self._replication(lambda links: links.answer(str(pairing_id), bool(ok)))
-        log_event(logging.INFO, "replication.pair_answer", "Pairing code answered", match=bool(ok))
+        log_event(logging.INFO, "replication.pair_answer", "Pairing request answered", accepted=bool(ok))
+        return await self.replication_status()
+
+    async def replication_enter_code(self, pairing_id: str, code: str) -> dict[str, Any]:
+        """The code the other device shows, typed here (never logged)."""
+        await self._replication(lambda links: links.enter_code(str(pairing_id), str(code)))
+        log_event(logging.INFO, "replication.pair_code", "Pairing code entered")
         return await self.replication_status()
 
     async def replication_cancel(self, pairing_id: str) -> dict[str, Any]:

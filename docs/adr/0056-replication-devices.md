@@ -1,6 +1,6 @@
 # ADR-0056: Finding, choosing and waking devices (slice 17b)
 
-- Status: accepted (decided under ADR-0037)
+- Status: accepted (decided under ADR-0037) The code comparison step is superseded by ADR-0070 (request, accept, type the code).
 - Date: 18 November 2026
 - Deciders: Peter (owner)
 

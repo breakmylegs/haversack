@@ -1,6 +1,6 @@
 # ADR-0054: Replication link and pairing, built for any connection speed
 
-- Status: accepted (decided under ADR-0037, after Peter's direction of 18 November 2026). Supersedes ADR-0025's proposal.
+- Status: accepted (decided under ADR-0037, after Peter's direction of 18 November 2026). Supersedes ADR-0025's proposal. Points 4.5 to 4.7 (confirming on both devices, the pairing window, comparing instead of typing) are superseded by ADR-0070, pairing by code.
 - Date: 18 November 2026
 - Deciders: Peter (owner)
 

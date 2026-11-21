@@ -631,6 +631,25 @@ async def check_session_sources(ctx: Context) -> dict[str, Any]:
     return result("pass" if found.get("frameRate") else "warn", text, **details)
 
 
+async def check_see_other(ctx: Context) -> dict[str, Any]:
+    """The other handheld can be seen (ADR-0070): any Keepsake device answers Find devices, paired or not."""
+    if ctx.links is None:
+        return result("skip", "Switch on Replication in Settings, Modules, then run it again.")
+    found = await discovery.browse(ctx.links.me.device_id, 2.0)
+    if found:
+        return result(
+            "pass",
+            f"{len(found)} other Keepsake {'device answers' if len(found) == 1 else 'devices answer'}.",
+            devices=len(found),
+        )
+    return result(
+        "fail",
+        "No other Keepsake device answered: on the other one, switch on Let other devices reach this one, on the same "
+        "network. Typing its address still works.",
+        devices=0,
+    )
+
+
 _SPEED_BLOCK = b""
 
 
@@ -667,6 +686,7 @@ CHECKS = [
         "speed", "Link speed to the other handheld", "both", "replication_measure.py send and serve", check_link_speed
     ),
     Check("find", "Finding the other handheld", "both", "A190", check_find),
+    Check("see-other", "The other handheld can be seen", "both", "A190, ADR-0070", check_see_other),
     Check(
         "remote-shortcuts", "Games you can stream from another device", "one", "A199 to A201", check_remote_shortcuts
     ),

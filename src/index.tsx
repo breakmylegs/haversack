@@ -1,4 +1,4 @@
-import { ButtonItem, Navigation, PanelSection, PanelSectionRow, staticClasses } from "@decky/ui";
+import { ButtonItem, ConfirmModal, Navigation, PanelSection, PanelSectionRow, showModal, staticClasses } from "@decky/ui";
 import { addEventListener, definePlugin, removeEventListener, routerHook, toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { FaSave } from "react-icons/fa";
@@ -11,6 +11,7 @@ import {
   syncNow,
   takeStartupNotice,
   UpdateStatus,
+  replicationAnswer,
 } from "./backend";
 import { agoText, BACKEND_LABELS, HEALTH_COLOURS, HEALTH_LABELS, newerText, SYNC_LABELS } from "./format";
 import { startLifecycle } from "./lifecycle";
@@ -220,6 +221,23 @@ export default definePlugin(() => {
   const toastListener = addEventListener<[string]>("keepsake_toast", (body) =>
     toaster.toast({ title: "Keepsake", body }),
   );
+  // A device asks to pair (ADR-0070): Accept or Decline here, or, while a game runs, only a notification.
+  const pairListener = addEventListener<[{ id: string; name: string; address: string }]>("keepsake_pair_request", (request) => {
+    if (SteamUIStore?.MainRunningAppID) {
+      toaster.toast({ title: "Keepsake", body: `${request.name} wants to pair. Answer it in Keepsake, Devices, after your game.` });
+      return;
+    }
+    showModal(
+      <ConfirmModal
+        strTitle={`${request.name} wants to pair`}
+        strDescription={`From ${request.address}. Accept only if you are pairing your own device right now. This device then shows a code to type on the other one.`}
+        strOKButtonText="Accept"
+        strCancelButtonText="Decline"
+        onOK={() => void replicationAnswer(request.id, true).catch(() => undefined)}
+        onCancel={() => void replicationAnswer(request.id, false).catch(() => undefined)}
+      />,
+    );
+  });
   void announce();
 
   return {
@@ -233,6 +251,7 @@ export default definePlugin(() => {
       stopSteamOps();
       stopRemoteCopies();
       removeEventListener("keepsake_toast", toastListener);
+      removeEventListener("keepsake_pair_request", pairListener);
       routerHook.removeRoute(ROUTE_PATH);
       routerHook.removeRoute(SETUP_PATH);
     },

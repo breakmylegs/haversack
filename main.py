@@ -177,17 +177,14 @@ class Plugin:
     async def replication_set_address(self, address: str) -> dict[str, Any]:
         return await self.app.replication_set_address(address)
 
-    async def replication_open_pairing(self) -> dict[str, Any]:
-        return await self.app.replication_open_pairing()
-
-    async def replication_close_pairing(self) -> dict[str, Any]:
-        return await self.app.replication_close_pairing()
-
     async def replication_pair(self, address: str) -> dict[str, Any]:
         return await self.app.replication_pair(address)
 
     async def replication_answer(self, pairing_id: str, ok: bool) -> dict[str, Any]:
         return await self.app.replication_answer(pairing_id, ok)
+
+    async def replication_enter_code(self, pairing_id: str, code: str) -> dict[str, Any]:
+        return await self.app.replication_enter_code(pairing_id, code)
 
     async def replication_cancel(self, pairing_id: str) -> dict[str, Any]:
         return await self.app.replication_cancel(pairing_id)

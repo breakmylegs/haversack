@@ -7,11 +7,10 @@ import {
   PairedDevice,
   ReplicationStatus,
   replicationAnswer,
+  replicationEnterCode,
   replicationCancel,
   replicationCheck,
-  replicationClosePairing,
   replicationFind,
-  replicationOpenPairing,
   replicationPair,
   replicationRemove,
   replicationSetAddress,
@@ -43,8 +42,10 @@ function seen(seconds: number): string {
   return seconds ? new Date(seconds * 1000).toLocaleString() : "never";
 }
 
+const ACTIVE = ["connecting", "waiting-accept", "enter-code", "request", "show-code", "checking"];
+
 function active(p: Pairing): boolean {
-  return p.state === "connecting" || p.state === "compare" || p.state === "waiting";
+  return ACTIVE.includes(p.state);
 }
 
 // Paired devices, pairing by a confirmed code, and the listener (ADR-0054, ADR-0056).
@@ -65,8 +66,8 @@ export function ReplicationPage() {
     return () => removeEventListener(REPLICATION_EVENT, listener);
   }, []);
 
-  // While a pairing runs or the window is open, follow it every second.
-  const following = !!status && (status.listener.pairingOpen || status.pairings.some(active));
+  // While a pairing runs, follow it every second.
+  const following = !!status && status.pairings.some(active);
   useEffect(() => {
     if (!following) return;
     const timer = setInterval(() => void refresh(), 1000);
@@ -97,13 +98,13 @@ export function ReplicationPage() {
     );
   }
   const listener = status.listener;
-  const pairings = status.pairings.filter((p) => active(p) || p.state === "failed");
+  const pairings = status.pairings.filter((p) => active(p) || p.state === "failed" || p.state === "declined");
 
   return (
     <div>
       <Field
         label="Your devices"
-        description="Keepsake links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once by checking that both screens show the same code."
+        description="Keepsake links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once: send a request from one, accept it on the other, and type the code it shows."
       />
 
       <OffersSection />
@@ -117,7 +118,7 @@ export function ReplicationPage() {
         label="Let other devices reach this one"
         description={
           listener.on
-            ? `Listening on ${listener.addresses.join(", ") || "no address"}, port ${listener.port}. Only paired devices get in.`
+            ? `Listening on ${listener.addresses.join(", ") || "no address"}, port ${listener.port}. Only paired devices get in; other devices can ask to pair.`
             : "Off: no other device can connect to this one. Switch it on to pair or to receive games."
         }
         checked={listener.on}
@@ -144,19 +145,6 @@ export function ReplicationPage() {
 
       <Field label="Pair a device" childrenLayout="below">
         <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {listener.pairingOpen ? (
-            <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void run(replicationClosePairing)}>
-              Stop accepting ({listener.pairingSecondsLeft} s)
-            </DialogButton>
-          ) : (
-            <DialogButton
-              style={{ width: "auto" }}
-              disabled={busy || !listener.on}
-              onClick={() => void run(replicationOpenPairing, "Open Keepsake on the other device and pair with this one.")}
-            >
-              Let a device pair with this one
-            </DialogButton>
-          )}
           <DialogButton
             style={{ width: "auto" }}
             disabled={busy}
@@ -203,36 +191,88 @@ export function ReplicationPage() {
   );
 }
 
+// Pairing by code (ADR-0070): the receiver accepts and shows a code; the requester types it on a number pad.
+function NumberPad({ onDone, busy }: { onDone: (code: string) => void; busy: boolean }) {
+  const [digits, setDigits] = useState("");
+  const press = (d: string) => setDigits((v) => (v.length < 6 ? v + d : v));
+  const key = (label: string, action: () => void, disabled = false) => (
+    <DialogButton key={label} style={{ width: 64, minWidth: 64 }} disabled={busy || disabled} onClick={action}>
+      {label}
+    </DialogButton>
+  );
+  return (
+    <>
+      <Field label={`Code: ${digits.padEnd(6, "_").split("").join(" ")}`} />
+      {[["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"]].map((row) => (
+        <Focusable key={row[0]} style={{ display: "flex", gap: 8, marginBottom: 8 }} flow-children="horizontal">
+          {row.map((d) => key(d, () => press(d)))}
+        </Focusable>
+      ))}
+      <Focusable style={{ display: "flex", gap: 8, marginBottom: 8 }} flow-children="horizontal">
+        {key("Delete", () => setDigits((v) => v.slice(0, -1)), !digits)}
+        {key("0", () => press("0"))}
+        {key("OK", () => onDone(digits), digits.length !== 6)}
+      </Focusable>
+    </>
+  );
+}
+
 function PairingCard(props: { pairing: Pairing; busy: boolean; run: (work: () => Promise<unknown>, done?: string) => Promise<void> }) {
   const { pairing: p, busy, run } = props;
   const who = p.peerName ?? p.address;
-  if (p.state === "failed") return <Field label={`Pairing with ${who} did not finish`} description={p.reason ?? ""} />;
-  if (p.state === "connecting") {
-    return (
-      <Field label={`Connecting to ${who}`} childrenLayout="below">
-        <DialogButton style={{ width: "auto" }} onClick={() => void run(() => replicationCancel(p.id))}>
-          Cancel
-        </DialogButton>
-      </Field>
-    );
-  }
-  if (p.state === "waiting") return <Field label={`Code ${p.code}`} description={`Waiting for ${who} to confirm.`} />;
-  return (
-    <Field
-      label={`Pair with ${who}? Code ${p.code}`}
-      description="Check that the other device shows exactly the same code. If it differs, say so: someone else may be on the network."
-      childrenLayout="below"
-    >
-      <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void run(() => replicationAnswer(p.id, true))}>
-          The codes match
-        </DialogButton>
-        <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void run(() => replicationAnswer(p.id, false))}>
-          They differ
-        </DialogButton>
-      </Focusable>
-    </Field>
+  const cancelButton = (
+    <DialogButton style={{ width: "auto" }} onClick={() => void run(() => replicationCancel(p.id))}>
+      Cancel
+    </DialogButton>
   );
+  switch (p.state) {
+    case "failed":
+      return <Field label={`Pairing with ${who} did not finish`} description={p.reason ?? ""} />;
+    case "declined":
+      return <Field label={`Not paired with ${who}`} description={p.reason ?? "Declined."} />;
+    case "connecting":
+      return <Field label={`Connecting to ${who}`} childrenLayout="below">{cancelButton}</Field>;
+    case "waiting-accept":
+      return (
+        <Field label={`Waiting for ${who} to accept`} description="Press Accept on the other device." childrenLayout="below">
+          {cancelButton}
+        </Field>
+      );
+    case "enter-code":
+      return (
+        <Field label={`${who} accepted. Enter the code shown on it.`} childrenLayout="below">
+          <NumberPad busy={busy} onDone={(code) => void run(() => replicationEnterCode(p.id, code))} />
+          {cancelButton}
+        </Field>
+      );
+    case "request":
+      return (
+        <Field
+          label={`${who} wants to pair`}
+          description={`From ${p.address}. Accept only if you are pairing your own device right now.`}
+          childrenLayout="below"
+        >
+          <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void run(() => replicationAnswer(p.id, true))}>
+              Accept
+            </DialogButton>
+            <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void run(() => replicationAnswer(p.id, false))}>
+              Decline
+            </DialogButton>
+          </Focusable>
+        </Field>
+      );
+    case "show-code":
+      return (
+        <Field label={`Code: ${p.code}`} description={`Type this code on ${who}.`} childrenLayout="below">
+          {cancelButton}
+        </Field>
+      );
+    case "checking":
+      return <Field label={`Checking the code with ${who}`} />;
+    default:
+      return null;
+  }
 }
 
 function PeerRow(props: { peer: PairedDevice; busy: boolean; run: (work: () => Promise<unknown>, done?: string) => Promise<void> }) {

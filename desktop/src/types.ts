@@ -187,7 +187,7 @@ export interface PairedDevice {
 export interface Pairing {
   id: string;
   address: string;
-  state: "connecting" | "compare" | "waiting" | "paired" | "failed" | "cancelled";
+  state: "connecting" | "waiting-accept" | "enter-code" | "request" | "show-code" | "checking" | "paired" | "declined" | "failed" | "cancelled";
   code: string | null;
   peerName: string | null;
   reason: string | null;
@@ -201,7 +201,7 @@ export interface FoundDevice {
 }
 export interface ReplicationStatus {
   available: boolean;
-  listener: { on: boolean; addresses: string[]; port: number; pairingOpen: boolean; pairingSecondsLeft: number };
+  listener: { on: boolean; addresses: string[]; port: number; acceptsRequests: boolean };
   discovery: { on: boolean; problem: string | null };
   peers: PairedDevice[];
   pairings: Pairing[];

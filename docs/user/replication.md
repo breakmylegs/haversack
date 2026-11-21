@@ -19,10 +19,13 @@ Do this on each device you want to link. You need no SSH, keys or accounts.
 
 ## Pair two devices
 
-1. On the first device, press **Let a device pair with this one**. It accepts pairing for two minutes.
-2. On the second device, press **Find devices** and choose the first one. If it is not listed, for example over a VPN, type its address under **Pair by address**.
-3. Both screens show a 6-digit code. Check that they are the same, and press **The codes match** on both.
-   - If the codes differ, press **They differ**. Another device on the network may be trying to listen in, and nothing is paired.
+1. On both devices, switch on **Let other devices reach this one** under Devices.
+2. On the device you are holding, press **Find devices**, choose the other one and press **Pair**. If it is not listed, for example over a VPN, type its address under **Pair by address**.
+3. The other device shows "*name* wants to pair", with the address it came from. Press **Accept** if it is your own device; **Decline** if you do not recognise it. If a game is running there, you get a notification instead, and the request waits under Devices.
+4. It then shows a 6-digit code. Type that code on the first device with the number pad and press **OK**.
+5. Both show **Paired**. If the code was wrong, both say so and nothing is paired; start again.
+
+The code is new each time and only works for that attempt. A device that keeps getting it wrong, or keeps asking, is locked out for ten minutes.
 
 Each device you pair is linked to every other one you pair, so a group such as two handhelds and a PC works.
 
