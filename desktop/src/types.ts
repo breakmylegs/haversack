@@ -246,7 +246,7 @@ export interface IncomingOffer {
 }
 export interface OffersStatus {
   incoming: IncomingOffer[];
-  outgoing: { id: string; title: string; peer: string; created: number }[];
+  outgoing: { id: string; title: string; peer: string; created: number; remoteState?: string; remoteReason?: string | null }[];
   sending: Record<string, { state: string; title: string; peer: string; reason?: string; warning?: string | null }>;
 }
 export interface GameLink {

@@ -85,7 +85,7 @@ from .procs import find_game_processes
 from .replication import link as replication_link
 from .replication import netinfo, transfer
 from .replication.jobs import Transfers, hold_reason
-from .replication.offers import Incoming, OfferError, Outgoing, send_offer
+from .replication.offers import Incoming, OfferError, Outgoing, send_offer, wire_reason
 from .replication.ongoing import GameLinks, keep_relative
 from .replication.ongoing import LinkError as LinkStoreError
 from .replication.ongoing import scan as scan_game
@@ -160,6 +160,7 @@ async def _no_emit(event: str, *args: Any) -> None:
 
 # Games whose launch Keepsake cannot see: newer saves come in from the idle pass (ADR-0051).
 SCAN_WAIT = 20.0  # seconds a game scan may take before the last list is used
+TELL_SENDER_WAITS = (0.0, 5.0, 30.0)  # seconds before each try at telling the sending device about an offer
 
 
 def low_priority() -> None:
@@ -367,6 +368,8 @@ class KeepsakeApp:
         self._transport = transport
         self._signin: DeviceCodeFlow | LoopbackFlow | None = None
         self._signin_probe: BrowserProbe | None = None
+        # Browser sign-ins the user moved away from (to the phone): their tabs are told when it worked.
+        self._signin_lingering: list[LoopbackFlow] = []
         self._launching: set[str] = set()
         self._identity_cache: tuple[float, list[dict[str, Any]]] | None = None
         self._auth_lock = asyncio.Lock()
@@ -527,6 +530,7 @@ class KeepsakeApp:
                 on_done=self._replication_update_done,
                 on_change=self._replication_changed,
                 on_offer=self._replication_offer_arrived,
+                on_state=self._replication_offer_state,
             )
             self.game_links = GameLinks(os.path.join(self.paths.runtime_dir, "replication-games.json"))
             restored = await asyncio.to_thread(self.outgoing.restore)
@@ -534,6 +538,7 @@ class KeepsakeApp:
                 {
                     **shares.handlers(),
                     "offer": self.incoming.handle_offer,
+                    "offer-state": self._replication_offer_news,
                     **directsync.handlers(self._direct_store, on_changed=self._direct_peer_changed),
                     "speed": devicechecks.serve_speed,  # the other side of the link speed check (ADR-0062)
                 }
@@ -1406,6 +1411,8 @@ class KeepsakeApp:
         async with self._auth_lock:
             if self._signin is not None:
                 self._signin.cancelled.set()
+                if isinstance(self._signin, LoopbackFlow):
+                    self._signin_lingering = [*self._signin_lingering[-3:], self._signin]
             flow: DeviceCodeFlow | LoopbackFlow
             if method == "browser":
                 if backend == "gdrive":
@@ -1455,10 +1462,14 @@ class KeepsakeApp:
             return
         if self._signin is flow:
             self._signin = None
+        for moved in self._signin_lingering:
+            if moved is not flow:
+                moved.signed_in_elsewhere()  # its tab now says the phone sign-in worked (v0.30.2)
         self._token_manager(backend).last_error = None
         log_event(logging.INFO, "auth.signed_in", "Signed in", backend=backend)
         registered = await self.register_device(self._gdrive() if backend == "gdrive" else self._graph())
-        await self.emit("keepsake_signin", {"status": "signed-in", "registered": registered})
+        method = "browser" if isinstance(flow, LoopbackFlow) else "phone"
+        await self.emit("keepsake_signin", {"status": "signed-in", "registered": registered, "method": method})
 
     async def cancel_signin(self) -> dict[str, Any]:
         if self._signin is not None:
@@ -3929,9 +3940,11 @@ class KeepsakeApp:
             scopes = {s: r for s, r in plan.roots.items() if s in ("install", "prefix")}
             self._link_game(wire["id"], plan.title, peer_id, int(game["appid"]), scopes, dict(game))
             await self.emit("keepsake_toast", f"{plan.title} is offered. Accept it on the other device, in Devices.")
-        except (OfferError, replication_link.LinkError, OSError, ValueError) as exc:
-            state.update(state="failed", reason=str(exc))
-            await self.emit("keepsake_toast", f"{plan.title} was not offered: {exc}")
+        except Exception as exc:  # noqa: BLE001 - whatever goes wrong, the page must not say "preparing" for ever
+            reason = str(exc) or type(exc).__name__
+            state.update(state="failed", reason=reason)
+            log_event(logging.WARNING, "replication.offer_failed", "Offer not sent", error=type(exc).__name__)
+            await self.emit("keepsake_toast", f"{plan.title} was not offered: {reason}")
         self._replication_changed()
 
     async def replication_offers(self) -> dict[str, Any]:
@@ -3949,12 +3962,77 @@ class KeepsakeApp:
             return {"problem": str(exc)}
 
     async def replication_accept(self, offer_id: str, copy_tool: bool = False) -> dict[str, Any]:
+        incoming = self._incoming()
         try:
-            offer = await asyncio.to_thread(self._incoming().accept, str(offer_id), bool(copy_tool))
+            jobs = await asyncio.to_thread(incoming.begin, str(offer_id), bool(copy_tool))
         except (OfferError, transfer.TransferError, OSError) as exc:
             raise ValueError(str(exc)) from exc
+        # The copies are asyncio tasks, so they start here on the event loop, never in the worker
+        # thread that checked and planned them (the v0.30.1 stall: they never started).
+        incoming.start_jobs(str(offer_id), jobs)
         log_event(logging.INFO, "replication.accepted", "Offered game accepted", copyTool=bool(copy_tool))
-        return offer
+        return await asyncio.to_thread(incoming._public, str(offer_id))
+
+    def _replication_offer_state(self, offer_id: str, record: dict[str, Any]) -> None:
+        """An offer this device received changed state: tell the device that sent it (v0.30.2).
+
+        Called from worker threads too. Best effort, with two retries: the other device's list
+        catches up whenever it is told. Only the state and a path-free reason go over the link.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            if self._loop is not None:
+                self._loop.call_soon_threadsafe(self._replication_offer_state, offer_id, record)
+            return
+        message = {
+            "type": "offer-state",
+            "id": offer_id,
+            "state": record.get("state"),
+            "reason": wire_reason(record.get("reason")),
+        }
+        if record.get("state") == "failed":
+            title = record.get("offer", {}).get("title") or "The game"
+            self._background.append(
+                loop.create_task(self.emit("keepsake_toast", f"{title} did not arrive: {record.get('reason')}"))
+            )
+        self._background.append(loop.create_task(self._tell_sender(str(record.get("peer")), message)))
+
+    async def _tell_sender(self, peer_id: str, message: dict[str, Any]) -> None:
+        for wait in TELL_SENDER_WAITS:
+            await asyncio.sleep(wait)
+            if self.links is None:
+                return
+            try:
+                connection = await self._replication_connect_for(peer_id)()
+                try:
+                    reply = await connection.request(message)
+                finally:
+                    await connection.close()
+            except (replication_link.LinkError, OSError, ValueError) as exc:
+                log_event(logging.INFO, "replication.tell_failed", "Could not tell the sending device", error=str(exc))
+                continue
+            if reply.get("type") == "error":
+                # An older Keepsake does not know offer-state; it shows "offered" until withdrawn.
+                log_event(logging.INFO, "replication.tell_refused", "The sending device did not take the news")
+            return
+
+    async def _replication_offer_news(self, session: Any, message: dict[str, Any]) -> dict[str, Any]:
+        """The ``offer-state`` request: news from the device an offer went to (v0.30.2)."""
+        outgoing = self.outgoing
+        if outgoing is None:
+            raise replication_link.ServeError("Replication is off on this device")
+        changed = await asyncio.to_thread(
+            outgoing.record_state, session.peer_id, message.get("id"), message.get("state"), message.get("reason")
+        )
+        if changed:
+            self._replication_changed()
+            title = changed["title"] or "The game"
+            if changed["state"] == "failed":
+                await self.emit("keepsake_toast", f"{title} did not arrive on the other device: {changed['reason']}")
+            elif changed["state"] == "done":
+                await self.emit("keepsake_toast", f"{title} arrived on the other device. You can withdraw the offer.")
+        return {"type": "offer-state-received", "id": message.get("id")}
 
     async def replication_decline(self, offer_id: str) -> dict[str, Any]:
         try:
@@ -4211,12 +4289,14 @@ class KeepsakeApp:
             links.update(str(offered["link"]), state="both-changed")
             self._replication_changed()
             raise ValueError(f"{link['title']} changed on this device too: choose which copy to keep")
+        incoming = self._incoming()
         try:
-            result = await asyncio.to_thread(self._incoming().accept_update, str(offer_id), link["scopes"], keep)
+            jobs = await asyncio.to_thread(incoming.begin_update, str(offer_id), link["scopes"], keep)
         except (OfferError, transfer.TransferError, OSError) as exc:
             raise ValueError(str(exc)) from exc
+        incoming.start_jobs(str(offer_id), jobs)  # on the event loop, as in replication_accept
         links.update(str(offered["link"]), state="updating", pending=str(offer_id))
-        return result
+        return await asyncio.to_thread(incoming._public, str(offer_id))
 
     async def replication_keep_mine(self, offer_id: str) -> dict[str, Any]:
         """Both sides changed and the user keeps this device's copy: the update is declined, nothing written."""
@@ -4376,7 +4456,7 @@ class KeepsakeApp:
             url, username = loc["url"], loc["username"]
         else:
             url, username, password = (str(access.get(k) or "") for k in ("url", "username", "password"))
-        if url.strip().lower().startswith("smb://"):
+        if smbshare.is_smb(url):  # also \\server\share, as File Explorer writes it (Share parses it)
             return smbshare.Share(url, username, password, connect=self._smb_connect, resolve=self._net_resolve)
         if webdav.is_dav(url):
             return webdav.DavSession(
@@ -4395,7 +4475,7 @@ class KeepsakeApp:
     def _net_target(session: remote.Session | smbshare.Share, url: str, what: str) -> str:
         """``url`` checked to be on the session's own server."""
         if isinstance(session, smbshare.Share):
-            address = smbshare.parse(url)
+            address = smbshare.parse(url)  # also takes \\\\server\\share, as File Explorer writes it
             same = (address.host, address.port) == (session.home, session.address.port)
             target = address.url(folder=what == "browse")
         else:
@@ -4404,6 +4484,20 @@ class KeepsakeApp:
         if not same:
             raise remote.RemoteError(f"{what} within the location you chose")
         return target
+
+    @staticmethod
+    def _net_unexpected(what: str, exc: BaseException) -> str:
+        log_event(
+            logging.WARNING,
+            "installer.net_unexpected",
+            "Network install step failed",
+            step=what,
+            error=type(exc).__name__,
+        )
+        return (
+            f"Keepsake could not {what} ({type(exc).__name__}). Check the address, user name and "
+            "password; if it keeps happening, export diagnostics from Settings."
+        )
 
     async def installer_net_locations(self) -> list[dict[str, Any]]:
         return await asyncio.to_thread(self.net_locations.public)
@@ -4420,6 +4514,8 @@ class KeepsakeApp:
             )
         except remote.RemoteError as exc:
             raise ValueError(str(exc)) from exc
+        except Exception as exc:  # a plain message, never a raw exception (v0.30.2)
+            raise ValueError(self._net_unexpected("remember that location", exc)) from exc
 
     async def installer_net_forget(self, location_id: str) -> list[dict[str, Any]]:
         return await asyncio.to_thread(self.net_locations.forget, str(location_id))
@@ -4441,6 +4537,8 @@ class KeepsakeApp:
             return {"url": url, "entries": [], "redirectHost": exc.host, "error": str(exc)}
         except remote.RemoteError as exc:
             raise ValueError(str(exc)) from exc
+        except Exception as exc:  # a plain message on the page, never a raw exception (v0.30.2)
+            raise ValueError(self._net_unexpected("browse that location", exc)) from exc
         folder = target if target.endswith("/") else target + "/"
         return {"url": webdav.to_dav(folder) if isinstance(session, webdav.DavSession) else folder, "entries": entries}
 
@@ -4467,7 +4565,10 @@ class KeepsakeApp:
     async def installer_net_find_smb(self) -> dict[str, Any]:
         """User action: SMB servers answering on the local network (ADR-0066). Read only; nothing is mounted."""
         self._installer()
-        found = await asyncio.to_thread(lanfind.find_servers, 2.5, self._lan_sockets)
+        try:
+            found = await asyncio.to_thread(lanfind.find_servers, 2.5, self._lan_sockets)
+        except Exception as exc:  # a plain message, never a raw exception (v0.30.2)
+            raise ValueError(self._net_unexpected("search your network", exc)) from exc
         log_event(logging.INFO, "installer.smb_find", "Looked for Windows shares", servers=len(found["servers"]))
         return found
 
@@ -4688,6 +4789,8 @@ class KeepsakeApp:
         for task in self._background:
             task.cancel()
         self._disk.shutdown(wait=False, cancel_futures=True)  # a scan held by a slow disk is left behind
+        for moved in self._signin_lingering:
+            moved.close()  # a lingering sign-in listener goes with the plugin
         await asyncio.to_thread(self.freezer.resume_all, "unload")
         await self.registry.stop_all()
         if self.db is not None:
@@ -4816,11 +4919,25 @@ class KeepsakeApp:
             "python": sys.version.split()[0],
             "openssl": ssl.OPENSSL_VERSION,
             "results": results,
+            "replication": await self._replication_redacted(),
         }
         await asyncio.to_thread(atomic_write_json, os.path.join(self.paths.settings_dir, name), payload)
         where = devicechecks.tilde(os.path.join(self.paths.settings_dir, name), discovery.real_home(self.home))
         log_event(logging.INFO, "devicecheck.export", "Device check results exported", file=name)
         return {"file": name, "where": where, "summary": text}
+
+    async def _replication_redacted(self) -> dict[str, Any] | None:
+        """Offer and transfer states for the Device checks' export (v0.30.2): no titles, names or paths."""
+        incoming, outgoing = self.incoming, self.outgoing
+        if incoming is None or outgoing is None:
+            return None
+        return {
+            "incoming": await asyncio.to_thread(incoming.redacted),
+            "outgoing": await asyncio.to_thread(outgoing.redacted),
+            "sending": [
+                {"state": s.get("state"), "reason": wire_reason(s.get("reason"))} for s in self._sending.values()
+            ],
+        }
 
     async def export_diagnostics(self, frontend: dict[str, Any] | None = None) -> str:
         path = await asyncio.to_thread(

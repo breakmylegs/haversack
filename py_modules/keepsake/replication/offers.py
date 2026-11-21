@@ -40,6 +40,19 @@ GAME_KEY = re.compile(r"^[A-Za-z0-9._:\- ]{1,200}$")
 MAX_OFFERS = 16
 PREFIX_PLACEHOLDER = ".keepsake-prefix-"
 BUILT_IN_TOOLS = re.compile(r"^(proton_\w+|steamlinuxruntime\w*)$")
+# The states the receiving device tells the sending one about (v0.30.2): every change after an
+# answer, so a failure shows on both devices.
+TOLD_STATES = ("transferring", "registering", "done", "failed", "declined", "removed")
+MAX_REASON = 300
+_PATH = re.compile(r"(?<![\w.])(?:[A-Za-z]:[\\/]|/|~/)\S*")
+
+
+def wire_reason(reason: str | None) -> str | None:
+    """A reason fit to send to the other device: one line, short, and no device paths (principle 10)."""
+    if not reason:
+        return None
+    text = _PATH.sub("a folder", " ".join(str(reason).split()))
+    return text[:MAX_REASON]
 
 
 class OfferError(Exception):
@@ -270,8 +283,46 @@ class Outgoing:
 
     def list(self) -> list[dict[str, Any]]:
         return [
-            {"id": k, "title": v.get("title"), "peer": v.get("peer"), "created": v.get("created")}
+            {
+                "id": k,
+                "title": v.get("title"),
+                "peer": v.get("peer"),
+                "created": v.get("created"),
+                "remoteState": v.get("remoteState", "offered"),
+                "remoteReason": v.get("remoteReason"),
+            }
             for k, v in sorted(self._load().items(), key=lambda kv: -float(kv[1].get("created") or 0))
+        ]
+
+    def record_state(self, peer_id: str, offer_id: Any, state: Any, reason: Any) -> dict[str, Any] | None:
+        """The other device's news about an offer this device made to it, and only to it.
+
+        Returns the offer when its state changed, else None.
+        """
+        if not isinstance(offer_id, str) or not OFFER_ID.match(offer_id) or state not in TOLD_STATES:
+            raise ServeError("that is not an offer state")
+        offers = self._load()
+        record = offers.get(offer_id)
+        if record is None or record.get("peer") != peer_id:
+            raise ServeError("no such offer was made to this device")
+        reason = wire_reason(reason) if isinstance(reason, str) else None
+        if record.get("remoteState") == state and record.get("remoteReason") == reason:
+            return None
+        record.update(remoteState=state, remoteReason=reason, remoteAt=time.time())
+        self._save(offers)
+        return {"id": offer_id, "title": record.get("title"), "state": state, "reason": reason}
+
+    def redacted(self) -> builtins.list[dict[str, Any]]:
+        """For the Device checks' export: states only, no titles, names or paths."""
+        return [
+            {
+                "id": k[:6],
+                "remoteState": v.get("remoteState", "offered"),
+                "remoteReason": v.get("remoteReason"),
+                "scopes": sorted(v.get("shares", {})),
+                "ageSeconds": int(time.time() - float(v.get("created") or 0)),
+            }
+            for k, v in self._load().items()
         ]
 
     def withdraw(self, offer_id: str) -> None:
@@ -300,6 +351,7 @@ class Incoming:
         on_done: Callable[[dict[str, Any]], None] | None = None,
         on_change: Callable[[], None] | None = None,
         on_offer: Callable[[dict[str, Any]], None] | None = None,
+        on_state: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
         self.path = path
         self.transfers = transfers
@@ -308,6 +360,7 @@ class Incoming:
         self.on_done = on_done
         self.on_change = on_change
         self.on_offer = on_offer  # told about each new offer, so a game set to auto can take its update
+        self.on_state = on_state  # told when an offer's state changes, to tell the sending device (v0.30.2)
         self._lock = threading.Lock()
 
     def _load(self) -> dict[str, Any]:
@@ -325,10 +378,24 @@ class Incoming:
         record: dict[str, Any] | None = offers.get(offer_id)
         if record is None:
             raise OfferError("that offer has gone")
+        before = record.get("state")
         record.update(changes)
         self._save(offers)
         self._changed()
+        if record.get("state") != before:
+            self._tell(offer_id, record)
         return record
+
+    def _tell(self, offer_id: str, record: dict[str, Any]) -> None:
+        if self.on_state and record.get("state") in TOLD_STATES:
+            self.on_state(offer_id, record)
+
+    def fail(self, offer_id: str, reason: str) -> None:
+        """An offer that cannot go on: shown as failed, with the reason, on both devices."""
+        try:
+            self._update(offer_id, state="failed", reason=reason)
+        except OfferError:
+            pass  # removed meanwhile
 
     def _changed(self) -> None:
         if self.on_change:
@@ -399,6 +466,7 @@ class Incoming:
         offers.pop(offer_id)
         self._save(offers)
         self._changed()
+        self._tell(offer_id, {**record, "state": "declined", "reason": None})
 
     def preflight(self, offer_id: str, copy_tool: bool) -> dict[str, Any]:
         """Where everything would go, and whether it fits. Raises OfferError when it cannot start."""
@@ -449,7 +517,29 @@ class Incoming:
         return {"targets": targets, "toolMissing": tool_missing}
 
     def accept(self, offer_id: str, copy_tool: bool = False) -> dict[str, Any]:
-        """Start the copy. Only from a user action."""
+        """Start the copy, on the event loop. Only from a user action."""
+        self.start_jobs(offer_id, self.begin(offer_id, copy_tool))
+        return self._public(offer_id)
+
+    def start_jobs(self, offer_id: str, jobs: builtins.list[transfer.Job]) -> None:
+        """Start the copies ``begin`` planned. Must run on the event loop: a transfer is an asyncio task.
+
+        A copy that cannot start fails the offer with the reason, so it never sits "transferring"
+        with nothing running (the v0.30.1 stall).
+        """
+        for job in jobs:
+            try:
+                self.transfers.start(job)
+            except (transfer.TransferError, OSError, RuntimeError) as exc:
+                for started in jobs:
+                    task = self.transfers.tasks.get(started.id)
+                    if task is not None:
+                        task.cancel()
+                self.fail(offer_id, f"the copy could not start: {exc}")
+                return
+
+    def begin(self, offer_id: str, copy_tool: bool = False) -> builtins.list[transfer.Job]:
+        """Check, record and plan the copy without starting it (safe in a worker thread)."""
         record = self._load().get(offer_id)
         if record is None or record["state"] != "offered":
             raise OfferError("that offer is not waiting for an answer")
@@ -457,7 +547,7 @@ class Incoming:
         offer = record["offer"]
         # Everything this offer will make is recorded first (ADR-0045 rule 4).
         record = self._update(offer_id, state="transferring", targets=checked["targets"], created=[], jobs={})
-        jobs = {}
+        jobs, planned = {}, []
         for scope, target in checked["targets"].items():
             share = offer["shares"][scope]
             job = transfer.Job(
@@ -468,10 +558,10 @@ class Incoming:
                 target=target,
                 peers=[record["peer"]],
             )
-            self.transfers.start(job)
+            planned.append(job)
             jobs[scope] = job.id
         self._update(offer_id, jobs=jobs)
-        return self._public(offer_id)
+        return planned
 
     def _public(self, offer_id: str) -> dict[str, Any]:
         return next(o for o in self.list() if o["id"] == offer_id)
@@ -479,6 +569,13 @@ class Incoming:
     def accept_update(
         self, offer_id: str, scopes: dict[str, str], keep: dict[str, builtins.list[str]]
     ) -> dict[str, Any]:
+        """``begin_update`` then start, on the event loop."""
+        self.start_jobs(offer_id, self.begin_update(offer_id, scopes, keep))
+        return self._public(offer_id)
+
+    def begin_update(
+        self, offer_id: str, scopes: dict[str, str], keep: dict[str, builtins.list[str]]
+    ) -> builtins.list[transfer.Job]:
         """Apply an update into the game's existing folders, keeping this device's saves and settings.
 
         The folders are the game's own, not this offer's: "Stop and remove" never deletes them, it
@@ -499,7 +596,7 @@ class Incoming:
             if shutil.disk_usage(os.path.dirname(target)).free < needed:
                 raise OfferError(f"not enough space beside {target} for the update")
         self._update(offer_id, state="transferring", updateTargets=targets, jobs={})
-        jobs = {}
+        jobs, planned = {}, []
         for scope, target in targets.items():
             share = offer["shares"][scope]
             job = transfer.Job(
@@ -511,10 +608,10 @@ class Incoming:
                 peers=[record["peer"]],
                 keep=list(keep.get(scope, [])),
             )
-            self.transfers.start(job)
+            planned.append(job)
             jobs[scope] = job.id
         self._update(offer_id, jobs=jobs)
-        return self._public(offer_id)
+        return planned
 
     # As the copy and the Steam operations finish
 
@@ -524,7 +621,7 @@ class Incoming:
                 continue
             if job.state != "done":
                 if job.state == "failed":
-                    self._update(offer_id, reason=job.reason)
+                    self._update(offer_id, state="failed", reason=job.reason or "the copy failed")
                 return
             done = set(record.get("doneScopes", [])) | {next(s for s, j in record["jobs"].items() if j == job.id)}
             record = self._update(offer_id, doneScopes=sorted(done))
@@ -654,6 +751,40 @@ class Incoming:
         if record.get("appid") and "shortcut" in record.get("created", []):
             self.enqueue_op("remove-shortcut", {"appid": int(record["appid"])})
         offers = self._load()
-        offers.pop(offer_id, None)
+        gone = offers.pop(offer_id, None)
         self._save(offers)
         self._changed()
+        if gone is not None:
+            self._tell(offer_id, {**gone, "state": "removed", "reason": None})
+
+    def redacted(self) -> builtins.list[dict[str, Any]]:
+        """For the Device checks' export: states and sizes only, no titles, names or paths."""
+        out = []
+        for offer_id, record in self._load().items():
+            jobs = []
+            for scope, job_id in record.get("jobs", {}).items():
+                job = self.transfers.jobs.get(job_id)
+                task = self.transfers.tasks.get(job_id)
+                jobs.append(
+                    {
+                        "scope": scope,
+                        "state": job.state if job else "done" if scope in record.get("doneScopes", []) else "missing",
+                        "running": task is not None and not task.done(),
+                        "received": job.received if job else None,
+                        "total": job.total if job else None,
+                        "held": job.held if job else None,
+                        "reason": wire_reason(job.reason) if job else None,
+                    }
+                )
+            out.append(
+                {
+                    "id": offer_id[:6],
+                    "state": record.get("state"),
+                    "reason": wire_reason(record.get("reason")),
+                    "update": bool(record["offer"].get("update")),
+                    "bytes": sum(s["bytes"] for s in record["offer"]["shares"].values()),
+                    "ageSeconds": int(time.time() - float(record.get("received") or 0)),
+                    "jobs": jobs,
+                }
+            )
+        return out

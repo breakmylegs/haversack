@@ -105,14 +105,14 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
 
   useEffect(() => {
     void refresh();
-    const listener = addEventListener<[{ status: string; reason?: string }]>(SIGNIN_EVENT, (result) => {
+    const listener = addEventListener<[{ status: string; reason?: string; method?: string }]>(SIGNIN_EVENT, (result) => {
       setCode((shown) => {
         if (shown?.method === "browser" && result.status !== "signed-in" && result.reason !== "cancelled") setBrowserFailed(true);
         return null;
       });
       toaster.toast({
         title: "Keepsake",
-        body: result.status === "signed-in" ? "Signed in." : `Sign-in did not complete: ${result.reason}`,
+        body: result.status !== "signed-in" ? `Sign-in did not complete: ${result.reason}` : result.method === "phone" ? "Signed in with your phone. Keepsake is signed in; you can close any sign-in tab left open." : "Signed in.",
       });
       void refresh();
     });

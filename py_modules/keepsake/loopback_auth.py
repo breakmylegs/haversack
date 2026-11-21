@@ -9,13 +9,20 @@
    device code flow does.
 
 The listener answers only ``GET /`` with the right ``state``; anything else gets a 404
-and leaves the attempt running. It closes after the first valid answer, a cancel or the
-timeout, whichever comes first. Nothing is ever logged from the callback (T2, T11).
+and leaves the attempt running. Nothing is ever logged from the callback (T2, T11).
+
+**After the attempt ends** (v0.30.2) the listener stays up for ``GRACE_SECONDS`` and answers
+every request with a page that says how it ended, never a code: a browser that loads the
+address again, or arrives after the user finished on a phone instead, sees "You're signed in"
+rather than the browser's own "cannot connect to localhost" error. Then it closes. With a
+``localhost`` redirect it holds the same port on ``127.0.0.1`` and ``::1``, trying another
+port if ``::1`` has that one taken, so a browser that resolves ``localhost`` to IPv6 arrives.
 """
 
 from __future__ import annotations
 
 import base64
+import errno
 import hashlib
 import hmac
 import secrets
@@ -31,6 +38,8 @@ from . import net
 from .auth import MICROSOFT, AuthError, Provider, TokenStore, _form, _store_tokens
 
 TIMEOUT_SECONDS = 300.0
+GRACE_SECONDS = 120.0  # how long the listener answers after the attempt ends
+PORT_TRIES = 8  # ports tried to find one free on both 127.0.0.1 and ::1
 AUTHORIZE_HOSTS = {"login.microsoftonline.com", "accounts.google.com"}
 
 DONE_PAGE = (
@@ -43,6 +52,31 @@ FAILED_PAGE = (
     "<body style='font-family:sans-serif;text-align:center;margin-top:20vh'>"
     "<h1>Sign-in did not complete</h1><p>Close this tab and try again in Keepsake.</p>"
 )
+ELSEWHERE_PAGE = (
+    "<!doctype html><meta charset=utf-8><title>Keepsake</title>"
+    "<body style='font-family:sans-serif;text-align:center;margin-top:20vh'>"
+    "<h1>You're signed in</h1><p>You finished signing in on your phone, so Keepsake is signed in. "
+    "You can close this tab.</p>"
+)
+MOVED_PAGE = (
+    "<!doctype html><meta charset=utf-8><title>Keepsake</title>"
+    "<body style='font-family:sans-serif;text-align:center;margin-top:20vh'>"
+    "<h1>Sign-in moved to your phone</h1><p>Keepsake stopped waiting for this tab. Finish on your phone, "
+    "or start again in Keepsake. You can close this tab.</p>"
+)
+EXPIRED_PAGE = (
+    "<!doctype html><meta charset=utf-8><title>Keepsake</title>"
+    "<body style='font-family:sans-serif;text-align:center;margin-top:20vh'>"
+    "<h1>This sign-in timed out</h1><p>Close this tab and start again in Keepsake.</p>"
+)
+# What the listener shows once the attempt has ended, by how it ended.
+ENDED_PAGES = {
+    "signed-in": DONE_PAGE,
+    "elsewhere": ELSEWHERE_PAGE,
+    "moved": MOVED_PAGE,
+    "expired": EXPIRED_PAGE,
+    "failed": FAILED_PAGE,
+}
 
 
 def pkce_pair() -> tuple[str, str]:
@@ -60,25 +94,54 @@ class _Listener:
         self.result: dict[str, str] | None = None
         self.client: dict[str, str] = {}  # which address answered, and the browser (the probe reports it)
         self.done = threading.Event()
-        self.servers: list[HTTPServer] = []
-        port = 0
-        for index, host in enumerate(hosts):
-            try:
-                server = _server(host, port, self)
-            except OSError:
-                if index == 0:
-                    raise  # the first address (127.0.0.1) must work; the others are a courtesy
-                continue
-            port = server.server_address[1]
-            self.servers.append(server)
-        self.port = port
+        self.ended: str | None = None  # how the attempt ended, once it has: a key of ENDED_PAGES
+        self._close_lock = threading.Lock()
+        self._timer: threading.Timer | None = None
+        self.servers = _bind_all(hosts, self)
+        self.port = self.servers[0].server_address[1]
         for server in self.servers:
             threading.Thread(target=server.serve_forever, name="keepsake-signin", daemon=True).start()
 
+    def linger(self, ended: str, seconds: float) -> None:
+        """The attempt is over: answer every request with how it ended for ``seconds``, then close."""
+        self.ended = ended
+        with self._close_lock:
+            if not self.servers or self._timer is not None:
+                return
+            self._timer = threading.Timer(seconds, self.close)
+            self._timer.daemon = True
+            self._timer.start()
+
     def close(self) -> None:
-        for server in self.servers:
+        with self._close_lock:
+            servers, self.servers = self.servers, []
+            if self._timer is not None:
+                self._timer.cancel()
+        for server in servers:
             server.shutdown()
             server.server_close()
+
+
+def _bind_all(hosts: tuple[str, ...], listener: _Listener) -> list[HTTPServer]:
+    """The same port on every address. The first (127.0.0.1) must work; another address that has
+    that port taken means trying a new port, and one the system lacks (no IPv6) is left out."""
+    for _attempt in range(PORT_TRIES):
+        servers = [_server(hosts[0], 0, listener)]
+        port = servers[0].server_address[1]
+        clash = False
+        for host in hosts[1:]:
+            try:
+                servers.append(_server(host, port, listener))
+            except OSError as exc:
+                if exc.errno in (errno.EADDRINUSE, getattr(errno, "WSAEADDRINUSE", errno.EADDRINUSE)):
+                    clash = True
+                    break
+                # No IPv6 here: 127.0.0.1 alone, as before.
+        if not clash:
+            return servers
+        for server in servers:
+            server.server_close()
+    raise OSError(errno.EADDRINUSE, "no loopback port is free on every address")
 
 
 def _server(host: str, port: int, listener: _Listener) -> HTTPServer:
@@ -112,6 +175,15 @@ def _handler(listener: _Listener) -> type[BaseHTTPRequestHandler]:
 
         def do_GET(self) -> None:
             parts = urllib.parse.urlsplit(self.path)
+            if listener.ended is not None:
+                # The attempt is over: say how, whatever is asked, and never take a code now.
+                if parts.path == "/favicon.ico":
+                    self.send_response(204)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                self._page(200, ENDED_PAGES.get(listener.ended, FAILED_PAGE))
+                return
             query = urllib.parse.parse_qs(parts.query)
             state = (query.get("state") or [""])[0]
             if parts.path != "/" or not hmac.compare_digest(state.encode(), listener.state.encode()):
@@ -125,6 +197,7 @@ def _handler(listener: _Listener) -> type[BaseHTTPRequestHandler]:
             agent = self.headers.get("User-Agent", "")[:200]
             listener.client = {"address": str(self.client_address[0]), "userAgent": agent}
             self._page(200, DONE_PAGE if "code" in listener.result else FAILED_PAGE)
+            listener.ended = "signed-in" if "code" in listener.result else "failed"
             listener.done.set()
 
     return Handler
@@ -179,15 +252,19 @@ class LoopbackFlow:
         if listener is None:
             raise AuthError("not-started")
         deadline = self.clock() + self.timeout
+        ended = "moved"
         try:
             while not listener.done.wait(0.25):
                 if self.cancelled.is_set():
                     raise AuthError("cancelled")
                 if self.clock() >= deadline:
+                    ended = "expired"
                     raise AuthError("expired_token", "the sign-in took too long; start again")
+            ended = listener.ended or "failed"
         finally:
-            listener.close()
+            listener.linger(listener.ended or ended, GRACE_SECONDS)
         if self.cancelled.is_set():
+            listener.ended = "moved"  # the code came, but the user had moved on: nothing is exchanged
             raise AuthError("cancelled")
         result = listener.result or {}
         if "code" not in result:
@@ -205,8 +282,18 @@ class LoopbackFlow:
             fields["client_secret"] = self.client_secret
         status, data = _form(self.transport, self.provider.token_url, fields)
         if status != 200:
+            listener.ended = "failed"  # a tab loaded again now says so, not "signed in"
             raise AuthError(str(data.get("error", f"http-{status}")), str(data.get("error_description", ""))[:200])
         return _store_tokens(self.store, self.client_id, data, self.clock())
+
+    def signed_in_elsewhere(self) -> None:
+        """The user finished on the phone instead: a tab still open here is told it worked."""
+        if self._listener is not None and self._listener.servers:
+            self._listener.ended = "elsewhere"
+
+    def close(self) -> None:
+        if self._listener is not None:
+            self._listener.close()
 
 
 class BrowserProbe:
