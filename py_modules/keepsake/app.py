@@ -93,7 +93,7 @@ from .replication.service import health_checks as replication_health_checks
 from .replication.source import Shares
 from .resolve import ALL_ROOTS
 from .safepath import PathEscapeError, validate_relative
-from .settings import SettingsStore
+from .settings import SNAPSHOT_STORES, SettingsStore
 from .snapshot import SnapshotError, content_hash, scan_entries
 from .statedb import StateDB, StateError, open_db
 from .statedb import sqlite_available as statedb_sqlite_available
@@ -101,6 +101,9 @@ from .steamops import SteamOps
 from .store import AlreadyExistsError, LocalFolderStore, Store, StoreError, httpcall
 from .store.gdrive import GoogleDriveStore
 from .store.graph import GraphStore
+from .store.multi import LocationState as MultiStoreState
+from .store.multi import MultiStore
+from .store.multi import game_of as multi_game_of
 from .store.s3 import S3Store
 from .store.webdav import WebDavStore
 from .sync import GameContext, SyncEngine
@@ -1510,8 +1513,32 @@ class KeepsakeApp:
 
     # Snapshots against the local test store or the chosen cloud backend
 
+    # Save locations (ADR-0071): one, or several written together and read as one
+
+    def _locations(self) -> list[str]:
+        """The save locations in use. A list whose first entry is not snapshotStore was replaced by a later
+        single choice (an older page or the desktop app), so snapshotStore alone counts then."""
+        primary = str(self.settings.get("snapshotStore"))
+        listed = [str(v) for v in self.settings.get("snapshotStores") or []]
+        return listed if listed and listed[0] == primary else [primary]
+
+    def _location_state(self) -> MultiStoreState:
+        return MultiStoreState(os.path.join(self.paths.runtime_dir, "locations.json"))
+
     def _store(self) -> Store:
-        backend = self.settings.get("snapshotStore")
+        names = self._locations()
+        if len(names) == 1:
+            return self._single_store(names[0])  # one location: exactly as before
+        chosen = self.game_configs.locations_by_game_key()
+
+        def route(key: str) -> list[str]:
+            game = multi_game_of(key)
+            return [n for n in chosen.get(game, names) if n in names] if game else names
+
+        cache = os.path.join(self.paths.runtime_dir, "locations-history")
+        return MultiStore({n: self._single_store(n) for n in names}, route, self._location_state(), cache)
+
+    def _single_store(self, backend: str) -> Store:
         if backend == "onedrive":
             return self._graph()
         if backend == "gdrive":
@@ -2170,9 +2197,67 @@ class KeepsakeApp:
             return {"available": False, "reason": str(exc)}
         return {"available": True, "gameKey": ctx.game_key, **self._sync().status(ctx.game_key)}
 
+    async def locations_status(self) -> dict[str, Any]:
+        """Each save location with its last success, problem, objects still to copy and space used."""
+        state = await asyncio.to_thread(self._location_state().load)
+        return {
+            "locations": [{"id": n, **(state.get(n) or {})} for n in self._locations()],
+            "available": list(SNAPSHOT_STORES),
+        }
+
+    async def add_location(self, backend: str) -> dict[str, Any]:
+        """Add a save location; every snapshot goes there too from now on, and the history is copied over."""
+        backend = str(backend)
+        if backend not in SNAPSHOT_STORES:
+            raise ValueError("unknown save location")
+        names = self._locations()
+        if backend in names:
+            return await self.locations_status()
+        if backend not in ("local", "direct"):
+            checked = await self.test_cloud(backend)
+            if not checked.get("ok"):
+                raise ValueError(
+                    f"{BACKEND_NAMES.get(backend, backend)} did not pass the check: {checked.get('error')}"
+                )
+        self.settings.set("snapshotStores", [*names, backend])
+        log_event(logging.INFO, "locations.added", "Save location added", location=backend)
+        self._background.append(asyncio.create_task(self._catch_up()))
+        return await self.locations_status()
+
+    async def remove_location(self, backend: str) -> dict[str, Any]:
+        """Stop using a save location. Nothing stored there is deleted."""
+        names = [n for n in self._locations() if n != str(backend)]
+        if not names:
+            raise ValueError("keep at least one save location")
+        self.settings.set("snapshotStore", names[0])
+        self.settings.set("snapshotStores", names)
+        log_event(logging.INFO, "locations.removed", "Save location removed", location=str(backend))
+        return await self.locations_status()
+
+    async def set_game_locations(self, key: str, names: list[str] | None) -> dict[str, Any]:
+        """The save locations one game uses; None means all of them."""
+        if names is not None and not set(names) <= set(self._locations()):
+            raise ValueError("choose from the save locations in use")
+        return await self.update_game_config(key, {"locations": names})
+
+    async def _catch_up(self) -> dict[str, int]:
+        """Copy to each location what another one has and it lacks (bounded per pass)."""
+        store = self._store()
+        if not isinstance(store, MultiStore):
+            return {}
+        try:
+            copied = await asyncio.to_thread(store.catch_up)
+        except StoreError as exc:
+            log_event(logging.INFO, "locations.catch_up_skipped", "Save locations not caught up", error=str(exc))
+            return {}
+        if any(copied.values()):
+            log_event(logging.INFO, "locations.caught_up", "Save locations caught up", copied=sum(copied.values()))
+        return copied
+
     async def idle_pass(self) -> list[dict[str, Any]]:
         """Prefetch and push for every enabled game with no open session (section 9)."""
         await self._direct_exchange()
+        await self._catch_up()
         outcomes = []
         for game in (await self.discover_games())["games"]:
             if not self.game_configs.get(game["key"]).get("enabled"):
@@ -3818,7 +3903,7 @@ class KeepsakeApp:
 
     def _direct_store(self) -> LocalFolderStore | None:
         """This device's store, only while it syncs saves directly. Otherwise peers are refused."""
-        if self.settings.get("snapshotStore") != "direct":
+        if "direct" not in self._locations():
             return None
         return LocalFolderStore(self._direct_root())
 

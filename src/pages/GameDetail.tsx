@@ -25,6 +25,7 @@ import { SyncPanel } from "./SyncPanel";
 import { SendPanel } from "./SendPanel";
 import { InStepPanel } from "./InStepPanel";
 import { UninstallPanel } from "./UninstallPanel";
+import { GameLocations } from "./GameLocations";
 
 // FileSelectionType.FOLDER in @decky/api is a type-only const enum (value 1).
 const FOLDER = 1 as unknown as Parameters<typeof openFilePicker>[0];
@@ -264,6 +265,7 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
           onEnabled={() => void load().then(runPreview)}
         />
       )}
+      {match.gameKey && config.enabled && <GameLocations gameKey={gameKey} config={config} onConfig={setConfig} />}
       {match.gameKey && (game.kind === "steam" || game.kind === "shortcut") && (
         <LaunchGatePanel
           gameKey={gameKey}

@@ -117,6 +117,18 @@ class Plugin:
     async def sign_out(self, backend: str = "onedrive") -> dict[str, Any]:
         return await self.app.sign_out(backend)
 
+    async def locations_status(self) -> dict[str, Any]:
+        return await self.app.locations_status()
+
+    async def add_location(self, backend: str) -> dict[str, Any]:
+        return await self.app.add_location(backend)
+
+    async def remove_location(self, backend: str) -> dict[str, Any]:
+        return await self.app.remove_location(backend)
+
+    async def set_game_locations(self, key: str, names: list[str] | None) -> dict[str, Any]:
+        return await self.app.set_game_locations(key, names)
+
     async def test_cloud(self, backend: str | None = None) -> dict[str, Any]:
         return await self.app.test_cloud(backend)
 

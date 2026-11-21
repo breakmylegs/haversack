@@ -17,6 +17,11 @@ import {
   SigninMethod,
   startSignin,
   testCloud,
+  addLocation,
+  getSettings,
+  LocationsStatus,
+  locationsStatus,
+  removeLocation,
 } from "../backend";
 import { BACKEND_LABELS } from "../format";
 import { QrCode } from "./QrCode";
@@ -85,7 +90,11 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
   const [busy, setBusy] = useState(false);
   const buttons = useRef<HTMLDivElement>(null);
 
-  const refresh = async () => setStatus(await cloudStatus());
+  const [locations, setLocations] = useState<LocationsStatus | null>(null);
+  const refresh = async () => {
+    setStatus(await cloudStatus());
+    setLocations(await locationsStatus().catch(() => null));
+  };
 
   useEffect(() => {
     if (refocusAfterBrowser) {
@@ -146,14 +155,19 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
           ? status?.directReady
           : config?.configured;
 
+  const inUse = locations?.locations.map((l) => l.id) ?? [settings.snapshotStore];
   const use = () =>
     run(async () => {
-      if (view !== "local" && view !== "direct") {
-        const checked = await testCloud(view);
-        if (!checked.ok) return `${BACKEND_LABELS[view]} did not pass the check: ${checked.error}`;
-      }
-      onSettings(await setSetting("snapshotStore", view));
-      return `Snapshots now go to ${BACKEND_LABELS[view]}.`;
+      // Several save locations (ADR-0071): this one is added, and the others keep theirs.
+      setLocations(await addLocation(view));
+      onSettings(await getSettings());
+      return `Snapshots now also go to ${BACKEND_LABELS[view]}. Its history is copied over in the background.`;
+    });
+  const drop = (id: Backend) =>
+    run(async () => {
+      setLocations(await removeLocation(id));
+      onSettings(await getSettings());
+      return `${BACKEND_LABELS[id]} is no longer used. Nothing stored there was deleted.`;
     });
 
   const locked = settings.readOnly || busy;
@@ -208,14 +222,38 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
   return (
     <div>
       <Field
-        label={`Cloud: ${BACKEND_LABELS[settings.snapshotStore]}`}
-        description={status?.problem ? `Needs attention: ${status.problem}` : "Choose where snapshots are kept."}
+        label={`Save locations: ${inUse.map((b) => BACKEND_LABELS[b]).join(", ")}`}
+        description={
+          status?.problem
+            ? `Needs attention: ${status.problem}`
+            : "Every snapshot goes to each location. Add more for extra copies; when saves differ, Keepsake looks at all of them."
+        }
       />
+      {(locations?.locations ?? []).length > 1 &&
+        locations!.locations.map((l) => (
+          <Field
+            key={l.id}
+            label={BACKEND_LABELS[l.id]}
+            description={[
+              l.lastOk ? `last reached ${new Date(l.lastOk * 1000).toLocaleString()}` : "not reached yet",
+              l.missing ? `${l.missing} objects still to copy` : "",
+              l.bytes ? `${(l.bytes / 1024 / 1024).toFixed(1)} MB used` : "",
+              l.problem ? `problem: ${l.problem}` : "",
+            ]
+              .filter(Boolean)
+              .join(", ")}
+            childrenLayout="inline"
+          >
+            <DialogButton style={{ width: "auto" }} disabled={settings.readOnly || busy} onClick={() => void drop(l.id)}>
+              Remove
+            </DialogButton>
+          </Field>
+        ))}
       <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         {BACKENDS.map((b) => (
           <DialogButton key={b} style={{ width: "auto", opacity: b === view ? 1 : 0.6 }} onClick={() => setView(b)}>
             {BACKEND_LABELS[b]}
-            {b === settings.snapshotStore ? " (in use)" : ""}
+            {inUse.includes(b) ? " (in use)" : ""}
           </DialogButton>
         ))}
       </Focusable>
@@ -348,7 +386,7 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
             Sign in with {view === "gdrive" ? "Google" : "OneDrive"}
           </DialogButton>
         )}
-        {view === "direct" && settings.snapshotStore === "direct" && (
+        {view === "direct" && inUse.includes("direct") && (
           <DialogButton
             style={{ width: "auto" }}
             disabled={locked}
@@ -382,9 +420,9 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
             Sign out
           </DialogButton>
         )}
-        {view !== settings.snapshotStore && (
+        {!inUse.includes(view) && (
           <DialogButton style={{ width: "auto" }} disabled={locked || (view !== "local" && !signedIn)} onClick={() => void use()}>
-            Use {BACKEND_LABELS[view]} for snapshots
+            Add {BACKEND_LABELS[view]} as a save location
           </DialogButton>
         )}
       </Focusable>
