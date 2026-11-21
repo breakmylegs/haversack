@@ -527,6 +527,52 @@ async def check_smb_find(ctx: Context) -> dict[str, Any]:
     )
 
 
+async def check_network_iso(ctx: Context) -> dict[str, Any]:
+    """Installing straight from a network ISO (ADR-0067): in-place mounting here, and a loop test on a share.
+
+    Replaces the SSH ``--loop-test`` step of ``network_mount_probe.py``. Paths and share names are never reported.
+    """
+    probe = ctx.probes.get("network-iso")
+    if probe is None:
+        return result("skip", "Switch on the Installer module, then run it again.")
+    found = await probe()
+    parts = [
+        "fusermount3 " + ("present" if found["fusermount3"] else "missing"),
+        "/dev/fuse " + ("usable" if found["devFuse"] else "not usable"),
+        "in place "
+        + (
+            "ready"
+            if found["inPlace"] is None
+            else "off until fusermount3 is approved"
+            if not found["approved"]
+            else "not available"
+        ),
+    ]
+    details = {k: found[k] for k in ("udisks", "fusermount3", "devFuse", "approved")}
+    iso = found["iso"]
+    if not found["udisks"]:
+        return result("fail", "udisksctl is missing, so no ISO can be opened. " + ", ".join(parts) + ".", **details)
+    if iso is None:
+        return result(
+            "skip",
+            "No ISO was found on a mounted network share, so the loop test did not run ("
+            + ", ".join(parts)
+            + "). Mount a share with an ISO on it (for example, open it in Desktop Mode's file manager), then run "
+            "this again.",
+            **details,
+        )
+    details["fstype"] = iso["fstype"]
+    if iso["error"] is None:
+        return result("pass", f"An ISO on a {iso['fstype']} share opens in place. " + ", ".join(parts) + ".", **details)
+    return result(
+        "warn",
+        f"An ISO on a {iso['fstype']} share could not be opened in place, so Keepsake copies it first. "
+        + ", ".join(parts)
+        + ".",
+        **details,
+    )
+
+
 _SPEED_BLOCK = b""
 
 
@@ -567,6 +613,7 @@ CHECKS = [
         "remote-shortcuts", "Games you can stream from another device", "one", "A199 to A201", check_remote_shortcuts
     ),
     Check("smb-find", "Find shares on my network", "one", "A206", check_smb_find),
+    Check("network-iso", "Network ISO in place", "one", "A158, network_mount_probe.py --loop-test", check_network_iso),
 ]
 BY_ID = {c.id: c for c in CHECKS}
 

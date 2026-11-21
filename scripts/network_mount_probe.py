@@ -9,11 +9,8 @@ installing anything. From the laptop (PowerShell):
 Run it once in Gaming Mode and once in Desktop Mode, with a share opened in
 Dolphin for the Desktop run, and paste both outputs into the slice report.
 
-``--loop-test FILE`` also checks whether udisks can open an ISO that sits on a
-FUSE mount (ADR-0033, A158). It runs ``udisksctl loop-setup --read-only`` on
-that file, then ``loop-delete``, and changes nothing else:
-
-    Get-Content scripts\\network_mount_probe.py | ssh deck@<device> "python3 - --loop-test '/path/to/small.iso'"
+The loop test that used to run here with ``--loop-test`` is now the Device check
+"Network ISO in place", run from Keepsake's Diagnostics page with no SSH (ADR-0067).
 
 It prints no user names, host names, share names or paths: mounts are reported
 by filesystem type and folder depth only.
@@ -23,10 +20,7 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shutil
-import subprocess
-import sys
 
 BINARIES = (
     "gio",
@@ -117,49 +111,6 @@ def running(names: tuple[str, ...]) -> dict[str, bool]:
     return found
 
 
-def loop_test(path: str) -> dict[str, object]:
-    """udisksctl loop-setup --read-only on ``path``, then loop-delete. Reports the outcome only."""
-    result: dict[str, object] = {"fileReadable": os.access(path, os.R_OK), "onFuse": False}
-    try:
-        with open("/proc/self/mounts", encoding="utf-8", errors="replace") as handle:
-            points = [(p[1], p[2]) for p in (line.split() for line in handle) if len(p) >= 3]
-        real = os.path.realpath(path)
-        best = max(
-            (m for m in points if real == m[0] or real.startswith(m[0].rstrip("/") + "/")), key=lambda m: len(m[0])
-        )
-        result["fstype"], result["onFuse"] = best[1], best[1].startswith("fuse")
-    except (OSError, ValueError):
-        pass
-    if not shutil.which("udisksctl"):
-        result["loopSetup"] = "udisksctl missing"
-        return result
-    try:
-        out = subprocess.run(
-            ["udisksctl", "loop-setup", "--read-only", "--no-user-interaction", "--file", path],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        result["loopSetup"] = f"error: {type(exc).__name__}"
-        return result
-    device = re.search(r"(/dev/loop\d+)", out.stdout)
-    result["loopSetup"] = "ok" if out.returncode == 0 and device else f"failed (exit {out.returncode})"
-    if out.returncode != 0:
-        result["loopSetupError"] = re.sub(r"/\S+", "<path>", out.stderr.strip())[:300]
-    if device:
-        deleted = subprocess.run(
-            ["udisksctl", "loop-delete", "--no-user-interaction", "-b", device.group(1)],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-        result["loopDelete"] = "ok" if deleted.returncode == 0 else f"failed (exit {deleted.returncode})"
-    return result
-
-
 def main() -> None:
     report = {
         "binaries": {name: bool(shutil.which(name)) for name in BINARIES},
@@ -172,8 +123,6 @@ def main() -> None:
         "fstabUserEntries": 0,
         "networkMounts": mounts(),
     }
-    if len(sys.argv) >= 3 and sys.argv[1] == "--loop-test":
-        report["loopTest"] = loop_test(sys.argv[2])
     try:
         with open("/etc/fstab", encoding="utf-8", errors="replace") as handle:
             report["fstabUserEntries"] = sum(

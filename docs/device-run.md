@@ -65,6 +65,8 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
    - Run the Device check **Find shares on my network**. It should find at least one server and say which ways answered.
    - In Install, then From a network location, then Windows share (SMB), press **Find shares**. Pick your server: its shares should be listed. Open one and browse to an ISO, as before.
 
+5. **Network ISO in place.** In Desktop Mode, open your NAS share in the file manager so it is mounted, with an ISO on it. Switch back to Gaming Mode, run the Device check **Network ISO in place**, and photograph it. It should say whether an ISO on that share opens in place, and whether fusermount3 and /dev/fuse are there.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

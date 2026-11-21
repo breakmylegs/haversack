@@ -96,7 +96,7 @@ WebDAV addresses use the `davs://` and `dav://` forms that file managers use. Th
 - `/dev/fuse` access;
 - free space in the Installer's staging folder.
 
-With `--loop-test FILE` it also runs `udisksctl loop-setup --read-only` on a file you choose, which may be on a FUSE mount, reports whether it worked, then deletes the loop device. It prints no host, share or user names.
+The loop test it used to run with `--loop-test FILE` is now the Device check "Network ISO in place", run from Diagnostics with no SSH (ADR-0067). It prints no host, share or user names.
 
 From the laptop (PowerShell), once in Gaming Mode and once in Desktop Mode:
 
@@ -104,11 +104,7 @@ From the laptop (PowerShell), once in Gaming Mode and once in Desktop Mode:
 Get-Content scripts\network_mount_probe.py | ssh deck@<device> "python3 -"
 ```
 
-For the loop test, open the share in Dolphin (Desktop Mode) and copy the path of a small ISO on it, then:
-
-```
-Get-Content scripts\network_mount_probe.py | ssh deck@<device> "python3 - --loop-test '/run/user/1000/kio-fuse-XXXX/smb/.../small.iso'"
-```
+For the loop test, see the Device check "Network ISO in place" in `docs/device-run.md` (ADR-0067).
 
 ## Consequences
 

@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import shutil
 import sys
 import time
@@ -64,10 +65,10 @@ from .fsutil import atomic_write_json, read_json
 from .gameconfig import DEFAULT as GAME_DEFAULTS
 from .gameconfig import GameConfigStore, custom_path_from_absolute
 from .importers import ludusavi
-from .installer import artwork, lanfind, remote, smbshare, udisks, webdav
+from .installer import artwork, inplace, lanfind, netfuse, remote, smbshare, udisks, webdav
 from .installer import files as installer_files
 from .installer.artwork import SteamGridDB
-from .installer.service import Installer, InstallerError
+from .installer.service import InPlaceFailed, Installer, InstallerError
 from .installer.service import health_checks as installer_health_checks
 from .jobs import JobTracker
 from .locks import GameLocks
@@ -324,6 +325,11 @@ class KeepsakeApp:
         self._net_connect: remote.Connector = remote._connect  # tests use a scripted server
         self._smb_connect: smbshare.Connector = smbshare._connect  # and a fake share
         self._lan_sockets: lanfind.SocketFactory = lanfind._udp  # and fake answers (ADR-0066)
+        # Network ISOs used in place (ADR-0067): open mounts by id, and seams for tests.
+        self._net_mounts: dict[str, netfuse.Mount] = {}
+        self._netfuse_available: Callable[[], str | None] = netfuse.available
+        self._netfuse_mount: Callable[[str, netfuse.Handler], netfuse.Mount] = netfuse.Mount
+        self._udisks_runner: udisks.Runner = udisks.run
         self._net_resolve: remote.Resolver = remote._resolve
         self._pc_processes: Callable[[], list[str]] = pcwatch.list_processes  # PC hosts only; tests use a fake
         self._manifest_progress: dict[str, Any] = {"stage": "idle", "running": False}
@@ -571,6 +577,7 @@ class KeepsakeApp:
                 work_dir=os.path.join(self.paths.runtime_dir, "installer"),
                 art=SteamGridDB(lambda: str(self.credentials.load("steamgriddb")["apiKey"])),
             )
+            self.installer.on_released = self._net_mount_released
             removed = await asyncio.to_thread(self.installer.clean_downloads)
             if removed:
                 log_event(logging.INFO, "installer.net_cleaned", "Left-over downloads removed", count=len(removed))
@@ -3956,6 +3963,9 @@ class KeepsakeApp:
     async def installer_start(self, source: str, title: str, queue: bool = False) -> dict[str, Any]:
         try:
             job = await asyncio.to_thread(self._installer().start, str(source), str(title), False, bool(queue))
+        except InPlaceFailed as exc:
+            # Option A (ADR-0067): the share would not let udisks open the ISO there, so copy it first.
+            return await self._copy_then_install(exc.source, str(title), str(exc))
         except (InstallerError, udisks.UdisksError) as exc:
             raise ValueError(str(exc)) from exc
         log_event(logging.INFO, "installer.start", "Install prepared", job=job["id"], kind=job.get("kind", "queued"))
@@ -4046,6 +4056,26 @@ class KeepsakeApp:
         folder = target if target.endswith("/") else target + "/"
         return {"url": webdav.to_dav(folder) if isinstance(session, webdav.DavSession) else folder, "entries": entries}
 
+    async def _network_iso_probe(self) -> dict[str, Any]:
+        """The Device check's findings (ADR-0067): in-place mounting here, and a loop test on a mounted share."""
+
+        def probe() -> dict[str, Any]:
+            found = inplace.find_network_iso(os.path.join(self.proc_root, "self", "mounts"))
+            out: dict[str, Any] = {
+                "udisks": udisks.available(),
+                "fusermount3": bool(shutil.which(netfuse.FUSERMOUNT)),
+                "devFuse": os.access("/dev/fuse", os.R_OK | os.W_OK),
+                "approved": netfuse.FUSERMOUNT_APPROVED,
+                "inPlace": self._netfuse_available(),
+                "iso": None,
+            }
+            if found and out["udisks"]:
+                path, fstype = found
+                out["iso"] = {"fstype": fstype, "error": inplace.loop_test(path, self._udisks_runner)}
+            return out
+
+        return await asyncio.to_thread(probe)
+
     async def installer_net_find_smb(self) -> dict[str, Any]:
         """User action: SMB servers answering on the local network (ADR-0066). Read only; nothing is mounted."""
         self._installer()
@@ -4091,6 +4121,89 @@ class KeepsakeApp:
         )
         return dict(self._net)
 
+    def _net_progress(self) -> Callable[[int, int | None], None]:
+        loop = asyncio.get_running_loop()
+        last = [0.0]
+
+        def progress(done: int, total: int | None) -> None:
+            now = time.time()
+            if now - last[0] < 0.5 and done != total:
+                return
+            last[0] = now
+            elapsed = max(now - float(self._net.get("started") or now), 0.001)
+            self._net.update(done=done, total=total, rate=int(done / elapsed))
+            asyncio.run_coroutine_threadsafe(self.emit(self.NET_PROGRESS_EVENT, dict(self._net)), loop)
+
+        return progress
+
+    async def _copy_then_install(self, source: str, title: str, reason: str) -> dict[str, Any]:
+        """Copy an ISO from a mounted share to staging in the background, then install from the copy."""
+        if self._net.get("running"):
+            raise ValueError("a download or copy is already running; cancel it first")
+        installer = self._installer()
+        folder = await asyncio.to_thread(installer.downloads_dir)
+        name = os.path.basename(source)
+        self._net_cancel = False
+        self._net = {"running": True, "name": name, "title": title, "done": 0, "total": None, "rate": 0}
+        self._net.update(started=time.time(), copying=True)
+        log_event(logging.INFO, "installer.copy_fallback", "Copying an ISO the share would not open in place")
+        await self.emit("keepsake_toast", f"{name} is copied to this device first: {reason}. The install starts after.")
+
+        async def run() -> None:
+            outcome: dict[str, Any] = {}
+            try:
+                path = await asyncio.to_thread(
+                    inplace.copy_iso, source, folder, self._net_progress(), lambda: self._net_cancel
+                )
+                job = await asyncio.to_thread(installer.start, path, title, True)
+                outcome = {"job": job["id"]}
+            except inplace.CopyCancelled:
+                outcome = {"cancelled": True}
+            except (InstallerError, udisks.UdisksError, ValueError, OSError) as exc:
+                outcome = {"error": str(exc)}
+            self._net = {**self._net, **outcome, "running": False}
+            await self.emit(self.NET_PROGRESS_EVENT, dict(self._net))
+
+        self._background.append(asyncio.create_task(run()))
+        return {"copying": True, **self._net}
+
+    def _net_mount_released(self, data: dict[str, Any]) -> None:
+        mount = self._net_mounts.pop(str(data.get("netMount") or ""), None)
+        if mount is not None:
+            mount.close()
+
+    def _try_in_place(
+        self, installer: Installer, session: remote.Session | smbshare.Share, url: str, title: str
+    ) -> dict[str, Any] | None:
+        """Worker thread: install from Keepsake's own read-only mount of the network ISO (ADR-0067).
+
+        Returns the new install, or None when it cannot be done here, so the caller copies instead.
+        """
+        if self._netfuse_available() is not None:
+            return None
+        mount: netfuse.Mount | None = None
+        try:
+            if isinstance(session, smbshare.Share):
+                source: netfuse.RangeSource = netfuse.SmbRange(session, url)
+                name = smbshare.parse(url).path.rsplit("/", 1)[-1]
+            else:
+                source = netfuse.HttpRange(session, webdav.to_http(url) if webdav.is_dav(url) else url)
+                name = remote.file_name(url)
+            mount_id = secrets.token_hex(6)
+            point = os.path.join(self.paths.runtime_dir, "installer", "netmount", mount_id)
+            mount = self._netfuse_mount(point, netfuse.Handler(name, netfuse.BlockCache(source)))
+            path = mount.start()
+            self._net_mounts[mount_id] = mount
+            job = installer.start(path, title, False, False, mount_id)
+            log_event(logging.INFO, "installer.in_place", "Installing from the network ISO in place", job=job["id"])
+            return job
+        except (netfuse.FuseError, remote.RemoteError, InstallerError, udisks.UdisksError, OSError) as exc:
+            if mount is not None:
+                mount.close()
+                self._net_mounts = {k: v for k, v in self._net_mounts.items() if v is not mount}
+            log_event(logging.INFO, "installer.in_place_failed", "Copying the ISO instead", reason=type(exc).__name__)
+            return None
+
     async def _run_net_download(
         self,
         installer: Installer,
@@ -4114,6 +4227,11 @@ class KeepsakeApp:
 
         outcome: dict[str, Any] = {}
         try:
+            in_place = await asyncio.to_thread(self._try_in_place, installer, session, url, title)
+            if in_place is not None:
+                self._net = {**self._net, "job": in_place["id"], "inPlace": True, "running": False}
+                await self.emit(self.NET_PROGRESS_EVENT, dict(self._net))
+                return
             fetch = smbshare.download if isinstance(session, smbshare.Share) else remote.download
             path = await asyncio.to_thread(
                 fetch,  # type: ignore[arg-type]
@@ -4264,6 +4382,7 @@ class KeepsakeApp:
             probes={
                 "remote-shortcuts": self._remote_shortcuts_probe,
                 "smb-find": lambda: asyncio.to_thread(lanfind.find_servers, 2.5, self._lan_sockets),
+                "network-iso": self._network_iso_probe,
             },
         )
 

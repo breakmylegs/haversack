@@ -39,6 +39,8 @@ Browse to an ISO and pick it. Keepsake downloads it with progress and a cancel b
 
 NFS shares still need mounting first, for example by opening them in Dolphin in Desktop Mode. They then appear on the Install page.
 
+An ISO on a share that is already mounted is opened where it is, with nothing copied. If the share does not allow that, Keepsake copies the ISO to the device first, by itself, shows the progress, and installs from the copy. Installing straight from a share that is not mounted, without downloading first, is coming once a system tool it needs is approved; until then the ISO is downloaded as above.
+
 ## Artwork
 
 With your own [SteamGridDB](https://www.steamgriddb.com) API key in Settings, Keepsake can find artwork for the new shortcut. Your key is never sent anywhere except SteamGridDB.
