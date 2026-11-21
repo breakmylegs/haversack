@@ -188,3 +188,37 @@ def build_manifests(plan_: Plan, art_folder: str | None) -> dict[str, dict[str, 
     if art_folder:
         manifests["art"] = mf.build(art_folder)
     return manifests
+
+
+def sizes(plan_: Plan) -> dict[str, int]:
+    """Bytes each share would carry, without hashing: for the space check before sending (v0.31.0).
+
+    It walks the same files the manifest would take (the same exclusions, no symbolic links), so
+    it is a fair estimate of what the other device must hold.
+    """
+    out: dict[str, int] = {}
+    for scope, root in plan_.roots.items():
+        exclude = exclude_for(scope)
+        total = 0
+        for folder, dirs, files in os.walk(root):
+            inner = os.path.relpath(folder, root).replace(os.sep, "/")
+            inner = "" if inner == "." else inner + "/"
+            dirs[:] = [d for d in dirs if not exclude(inner + d) and not os.path.islink(os.path.join(folder, d))]
+            for name in files:
+                path = os.path.join(folder, name)
+                if exclude(inner + name) or os.path.islink(path):
+                    continue
+                try:
+                    total += os.path.getsize(path)
+                except OSError:
+                    continue  # gone since the listing: the manifest will not have it either
+        out[scope] = total
+    art = 0
+    for item in plan_.art:
+        try:
+            art += os.path.getsize(str(item.get("source")))
+        except OSError:
+            continue
+    if art:
+        out["art"] = art
+    return out

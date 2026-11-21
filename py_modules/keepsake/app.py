@@ -82,9 +82,11 @@ from .loopback_auth import BrowserProbe, LoopbackFlow
 from .modules import Module, ModuleRegistry
 from .paths import PluginPaths
 from .procs import find_game_processes
+from .replication import activity as replication_activity
 from .replication import link as replication_link
 from .replication import netinfo, transfer
 from .replication.jobs import Transfers, hold_reason
+from .replication.news import PeerNews
 from .replication.offers import Incoming, OfferError, Outgoing, send_offer, wire_reason
 from .replication.ongoing import GameLinks, keep_relative
 from .replication.ongoing import LinkError as LinkStoreError
@@ -92,6 +94,7 @@ from .replication.ongoing import scan as scan_game
 from .replication.peers import PeerStore
 from .replication.sendgame import SendError
 from .replication.sendgame import plan as send_plan
+from .replication.sendgame import sizes as send_sizes
 from .replication.service import Links, ReplicationError, parse_address
 from .replication.service import health_checks as replication_health_checks
 from .replication.source import Shares
@@ -160,7 +163,21 @@ async def _no_emit(event: str, *args: Any) -> None:
 
 # Games whose launch Keepsake cannot see: newer saves come in from the idle pass (ADR-0051).
 SCAN_WAIT = 20.0  # seconds a game scan may take before the last list is used
-TELL_SENDER_WAITS = (0.0, 5.0, 30.0)  # seconds before each try at telling the sending device about an offer
+PROGRESS_SECONDS = 1.0  # how often a receiving device reports progress to the sender
+PULL_TOKEN_SECONDS = 900.0  # a listed game can be asked for for 15 minutes
+PULL_LIST_MAX = 200
+
+
+def capital(text: str) -> str:
+    """A device name at the start of a sentence: "the other device" becomes "The other device"."""
+    return text[:1].upper() + text[1:]
+
+
+def space_text(device: str, needed: int, free: int) -> str:
+    """\"Legion Go 2 doesn't have enough space: needs 41.2 GiB, has 12.0 GiB free\" (ADR-0072)."""
+    return (
+        f"{capital(device)} doesn't have enough space: needs {needed / 2**30:.1f} GiB, has {free / 2**30:.1f} GiB free"
+    )
 
 
 def low_priority() -> None:
@@ -481,6 +498,13 @@ class KeepsakeApp:
         self.outgoing: Outgoing | None = None
         self.game_links: GameLinks | None = None
         self._sending: dict[str, dict[str, Any]] = {}  # games being prepared to send, by game key
+        self._send_tasks: dict[str, asyncio.Task[None]] = {}
+        self._pulling: dict[str, dict[str, Any]] = {}  # games asked for from another device, by pull token
+        self._pull_tokens: dict[str, dict[str, Any]] = {}  # this device's games listed to a peer, by token
+        self._pulls_stopped: set[str] = set()
+        self._news: PeerNews | None = None
+        self._progress_task: asyncio.Task[None] | None = None
+        self._progress_told: dict[str, tuple[Any, ...]] = {}
         self.sys_root = "/sys"
         self.power_root = "/"  # where /sys/class/power_supply is read (tests point it elsewhere)
         self._games_running: set[int] = set()
@@ -539,17 +563,32 @@ class KeepsakeApp:
                     **shares.handlers(),
                     "offer": self.incoming.handle_offer,
                     "offer-state": self._replication_offer_news,
+                    # v0.31.0 (ADR-0072): space before sending, Stop from either side, and pulling a game
+                    "space-check": self.incoming.handle_space,
+                    "offer-stop": self.incoming.handle_stop,
+                    "games-list": self._serve_games_list,
+                    "pull-check": self._serve_pull_check,
+                    "pull": self._serve_pull,
+                    "pull-state": self._replication_pull_news,
                     **directsync.handlers(self._direct_store, on_changed=self._direct_peer_changed),
                     "speed": devicechecks.serve_speed,  # the other side of the link speed check (ADR-0062)
                 }
             )
             if restored:
                 log_event(logging.INFO, "replication.offers_restored", "Offered games available again", count=restored)
+            self._news = PeerNews(self._replication_connect_for)
             resumed = await self.transfers.start_up()
             if resumed:
                 log_event(logging.INFO, "replication.resumed", "Transfers resumed after a restart", count=len(resumed))
+                self._progress_pump()
 
         async def replication_stop() -> None:
+            news, self._news = self._news, None
+            if news is not None:
+                await news.close()
+            if self._progress_task is not None:
+                self._progress_task.cancel()
+                self._progress_task = None
             self.incoming = self.outgoing = None
             self.game_links = None
             transfers, self.transfers = self.transfers, None
@@ -3743,6 +3782,32 @@ class KeepsakeApp:
                 pairing.announced = True
                 request = {"id": pairing.id, "name": pairing.peer_name or "Another device", "address": pairing.address}
                 asyncio.get_running_loop().create_task(self.emit(PAIR_REQUEST_EVENT, request))
+        self._replication_two_way(links)
+
+    def _replication_two_way(self, links: Links) -> None:
+        """Pairing is trust both ways (ADR-0072): a device that started a pairing becomes reachable too.
+
+        Sending needs both directions (the offer goes one way, the files come back the other), so
+        a finished pairing switches this device's listener on for paired devices, and says so.
+        """
+        for pairing in list(links.initiated.values()):
+            if pairing.state != "paired" or pairing.two_way:
+                continue
+            pairing.two_way = True
+            if links.listener is None and replication_link.available():
+                name = pairing.peer_name or "The other device"
+                asyncio.get_running_loop().create_task(self._open_for_peer(name))
+
+    async def _open_for_peer(self, name: str) -> None:
+        try:
+            await self._replication(lambda links: links.set_listener(True))
+        except ValueError as exc:
+            await self.emit("keepsake_toast", f"Paired with {name}, but it cannot reach this device yet: {exc}")
+            return
+        self.settings.set("replicationListener", True)
+        log_event(logging.INFO, "replication.listener", "Listener switched on by a pairing", on=True)
+        await self.emit("keepsake_toast", f"Paired with {name}. Games can now go both ways between you.")
+        self._replication_changed()
 
     async def _replication(self, work: Callable[[Links], Any]) -> Any:
         try:
@@ -3897,15 +3962,43 @@ class KeepsakeApp:
         other device adopts them silently (spec 8.2, Send a game, step 1).
         """
         links = self._links()
-        if links.store.get(str(peer_id)) is None:
+        peer = links.store.get(str(peer_id))
+        if peer is None:
             raise ValueError("that device is not paired")
-        game = await self._game(str(key))
+        key, peer_id = str(key), str(peer_id)
+        state: dict[str, Any] = {"state": "preparing", "stage": "checking-space", "title": "", "peer": peer_id}
+        try:
+            plan, _warning, extra = await self._prepare_send(key, peer_id, state, check_space=True)
+        except ValueError as exc:
+            if state["title"]:
+                state.update(state="failed", stage="failed", reason=str(exc))
+                self._replication_changed()
+            raise
+        self._background.append(asyncio.create_task(self._send_game(key, plan, peer_id, extra)))
+        return state | {"droppedOptions": plan.dropped_options}
+
+    async def _prepare_send(
+        self, key: str, peer_id: str, state: dict[str, Any], check_space: bool, pull: str | None = None
+    ) -> tuple[Any, str | None, dict[str, Any]]:
+        """The quick steps before a send, shared by Send and by another device's Get this game.
+
+        The plan, the space check on the other device (skipped when that device asked: it checked
+        its own space), then the source checkpoint. Raises ValueError with a plain reason.
+        """
+        game = await self._game(key)
         places = self._replication_places()
         try:
             plan = await asyncio.to_thread(send_plan, dict(game), places["home"], places["library"], places["tools"])
         except SendError as exc:
             raise ValueError(str(exc)) from exc
-        config = self.game_configs.get(str(key))
+        state["title"] = plan.title
+        self._sending[key] = state
+        self._replication_changed()
+        if check_space:
+            await self._peer_space_check(peer_id, plan)
+        state["stage"] = "preparing"
+        self._replication_changed()
+        config = self.game_configs.get(key)
         warning = None
         if config.get("enabled"):
             try:
@@ -3921,13 +4014,43 @@ class KeepsakeApp:
             "from": {"name": str(self.settings.get("deviceName") or "Unnamed device")},
             "gameKey": config.get("gameKey"),
             "savesEnabled": bool(config.get("enabled")),
+            **({"pull": pull} if pull else {}),
         }
-        self._sending[str(key)] = {"state": "preparing", "title": plan.title, "peer": str(peer_id), "warning": warning}
-        self._background.append(asyncio.create_task(self._send_game(str(key), plan, str(peer_id), extra)))
-        return self._sending[str(key)] | {"droppedOptions": plan.dropped_options}
+        state["warning"] = warning
+        return plan, warning, extra
+
+    async def _peer_space_check(self, peer_id: str, plan: Any) -> None:
+        """Ask the other device whether the game fits, before reading every file (ADR-0072)."""
+        sizes = await asyncio.to_thread(send_sizes, plan)
+        name = self._peer_name(peer_id)
+        try:
+            connection = await self._replication_connect_for(peer_id)()
+            try:
+                reply = await connection.request(
+                    {"type": "space-check", "bytes": sizes, "compatTool": plan.compat_tool}
+                )
+            finally:
+                await connection.close()
+        except (replication_link.LinkError, OSError) as exc:
+            raise ValueError(f"{capital(name)} could not be reached: {exc}") from exc
+        if reply.get("type") == "error":
+            log_event(logging.INFO, "replication.space_unknown", "The other device has no space check")
+            return  # an older Keepsake: its own check runs when the copy starts
+        if not reply.get("ok"):
+            if reply.get("reason"):
+                raise ValueError(f"{capital(name)} cannot take it: {reply['reason']}")
+            raise ValueError(space_text(name, int(reply.get("needed") or 0), int(reply.get("free") or 0)))
+
+    def _peer_name(self, peer_id: str) -> str:
+        links = self.links
+        peer = links.store.get(peer_id) if links is not None else None
+        return str((peer or {}).get("name") or "the other device")
 
     async def _send_game(self, key: str, plan: Any, peer_id: str, extra: dict[str, Any]) -> None:
         state = self._sending[key]
+        task = asyncio.current_task()
+        if task is not None:
+            self._send_tasks[key] = task
         try:
             wire = await asyncio.to_thread(self._outgoing().prepare, plan, peer_id, extra)
             connection = await self._replication_connect_for(peer_id)()
@@ -3935,16 +4058,30 @@ class KeepsakeApp:
                 await send_offer(connection, wire)
             finally:
                 await connection.close()
-            state.update(state="sent", offer=wire["id"])
+            state.update(state="sent", stage="copying", offer=wire["id"])
+            self._sending.pop(key, None)  # the offer's own entry takes over
             game = await self._game(key)
             scopes = {s: r for s, r in plan.roots.items() if s in ("install", "prefix")}
             self._link_game(wire["id"], plan.title, peer_id, int(game["appid"]), scopes, dict(game))
-            await self.emit("keepsake_toast", f"{plan.title} is offered. Accept it on the other device, in Devices.")
+            await self.emit("keepsake_toast", f"{plan.title} is on its way to {self._peer_name(peer_id)}.")
+        except asyncio.CancelledError:
+            self._sending.pop(key, None)  # Stop and remove before the offer went
+            raise
         except Exception as exc:  # noqa: BLE001 - whatever goes wrong, the page must not say "preparing" for ever
             reason = str(exc) or type(exc).__name__
-            state.update(state="failed", reason=reason)
+            state.update(state="failed", stage="failed", reason=reason)
             log_event(logging.WARNING, "replication.offer_failed", "Offer not sent", error=type(exc).__name__)
             await self.emit("keepsake_toast", f"{plan.title} was not offered: {reason}")
+            if extra.get("pull") and self._news is not None:
+                message = {
+                    "type": "pull-state",
+                    "game": extra["pull"],
+                    "state": "failed",
+                    "reason": wire_reason(reason),
+                }
+                self._news.tell(peer_id, f"pull:{extra['pull']}", message, final=True)
+        finally:
+            self._send_tasks.pop(key, None)
         self._replication_changed()
 
     async def replication_offers(self) -> dict[str, Any]:
@@ -3952,7 +4089,99 @@ class KeepsakeApp:
             "incoming": await asyncio.to_thread(self._incoming().list),
             "outgoing": await asyncio.to_thread(self._outgoing().list),
             "sending": self._sending,
+            "activity": await self.replication_activity(),
         }
+
+    async def replication_activity(self) -> list[dict[str, Any]]:
+        """Every game moving between devices, as bars for the pages and the quick access menu (ADR-0072).
+
+        Empty when Replication is off. Read from memory and two small files, so a page can ask
+        every second while something moves.
+        """
+        incoming, outgoing, links = self.incoming, self.outgoing, self.links
+        if incoming is None or outgoing is None or links is None:
+            return []
+        names = {str(p["id"]): str(p.get("name") or "the other device") for p in links.store.list()}
+        out = [
+            replication_activity.preparing(
+                f"pull:{token}", "receiving", p["title"], names.get(p["peer"], "the other device"), p
+            )
+            for token, p in self._pulling.items()
+        ]
+        out += await asyncio.to_thread(incoming.activity, names)
+        out += [
+            replication_activity.preparing(
+                f"send:{key}", "sending", s["title"], names.get(s["peer"], "the other device"), s
+            )
+            for key, s in self._sending.items()
+            if s.get("state") != "sent" and s.get("title")
+        ]
+        out += await asyncio.to_thread(outgoing.activity, names)
+        return out
+
+    async def replication_stop_game(self, entry_id: str) -> list[dict[str, Any]]:
+        """Stop and remove, from either device (ADR-0072). Confirmed on the page.
+
+        On the receiving device it removes everything the copy made. On the sending device it asks
+        the receiving one to do that, then withdraws the offer; if that device cannot be reached,
+        its copy fails once the files are no longer offered, and it can be removed there.
+        """
+        entry_id = str(entry_id)
+        if entry_id.startswith("send:"):
+            key = entry_id[5:]
+            task = self._send_tasks.get(key)
+            if task is not None:
+                task.cancel()
+            self._sending.pop(key, None)
+        elif entry_id.startswith("pull:"):
+            token = entry_id[5:]
+            self._pulling.pop(token, None)
+            self._pulls_stopped.add(token)  # an offer that still comes for it is declined
+        elif await asyncio.to_thread(lambda: entry_id in self._incoming()._load()):
+            await self.replication_remove_game(entry_id)
+        else:
+            outgoing = self._outgoing()
+            peer_id = await asyncio.to_thread(outgoing.peer_of, entry_id)
+            if peer_id is None:
+                raise ValueError("that game is no longer moving")
+            try:
+                connection = await self._replication_connect_for(peer_id)()
+                try:
+                    await asyncio.wait_for(connection.request({"type": "offer-stop", "id": entry_id}), 30)
+                finally:
+                    await connection.close()
+            except (replication_link.LinkError, OSError, TimeoutError) as exc:
+                log_event(
+                    logging.INFO, "replication.stop_unreached", "Could not ask the other device to stop", error=str(exc)
+                )
+            try:
+                await asyncio.to_thread(outgoing.withdraw, entry_id)
+            except OfferError:
+                pass  # the other device's "removed" withdrew it first
+        log_event(logging.INFO, "replication.stopped_game", "Game transfer stopped and removed")
+        self._replication_changed()
+        return await self.replication_activity()
+
+    async def replication_clear_game(self, entry_id: str) -> list[dict[str, Any]]:
+        """Clear a finished or failed bar. A failed copy on this device is removed, as Stop and remove does."""
+        entry_id = str(entry_id)
+        if entry_id.startswith("send:"):
+            self._sending.pop(entry_id[5:], None)
+        elif entry_id.startswith("pull:"):
+            self._pulling.pop(entry_id[5:], None)
+        else:
+            record = (await asyncio.to_thread(self._incoming()._load)).get(entry_id)
+            if record is not None and record.get("state") == "done":
+                await asyncio.to_thread(self._incoming().dismiss, entry_id)
+            elif record is not None:
+                await self._incoming().stop(entry_id)
+            else:
+                try:
+                    await asyncio.to_thread(self._outgoing().withdraw, entry_id)
+                except OfferError:
+                    pass
+        self._replication_changed()
+        return await self.replication_activity()
 
     async def replication_offer_check(self, offer_id: str, copy_tool: bool = False) -> dict[str, Any]:
         """Where an offered game would go, and what is missing, before the user accepts."""
@@ -3970,8 +4199,57 @@ class KeepsakeApp:
         # The copies are asyncio tasks, so they start here on the event loop, never in the worker
         # thread that checked and planned them (the v0.30.1 stall: they never started).
         incoming.start_jobs(str(offer_id), jobs)
+        self._progress_pump()
         log_event(logging.INFO, "replication.accepted", "Offered game accepted", copyTool=bool(copy_tool))
         return await asyncio.to_thread(incoming._public, str(offer_id))
+
+    async def _auto_accept(self, offer: dict[str, Any]) -> None:
+        """A new game from a paired device starts copying by itself (ADR-0072, replacing ADR-0059's Accept).
+
+        The same checks run as when Accept was pressed: nothing replaced, space with margin, the
+        compatibility tool copied when this device lacks it. A refusal fails the offer with the
+        reason, shown on both devices.
+        """
+        incoming = self._incoming()
+        try:
+            jobs = await asyncio.to_thread(incoming.begin, offer["id"], True)
+        except (OfferError, transfer.TransferError, OSError) as exc:
+            await asyncio.to_thread(incoming.fail, offer["id"], str(exc))
+            return
+        incoming.start_jobs(offer["id"], jobs)
+        self._progress_pump()
+        log_event(logging.INFO, "replication.auto_accepted", "Game from a paired device started copying")
+
+    def _progress_pump(self) -> None:
+        """While games come in, tell their senders the progress about once a second."""
+        if self._progress_task is None or self._progress_task.done():
+            self._progress_task = asyncio.get_running_loop().create_task(self._pump_progress())
+
+    async def _pump_progress(self) -> None:
+        while self.incoming is not None and self._news is not None:
+            entries = await asyncio.to_thread(self.incoming.activity, {})
+            moving = [e for e in entries if e["stage"] not in ("done", "failed")]
+            records = await asyncio.to_thread(self.incoming._load)
+            for entry in moving:
+                record = records.get(entry["id"])
+                if record is None:
+                    continue
+                told = (entry["stage"], entry["done"] // (1 << 20), entry["secondsLeft"])
+                if self._progress_told.get(entry["id"]) == told:
+                    continue
+                self._progress_told[entry["id"]] = told
+                message = {
+                    "type": "offer-state",
+                    "id": entry["id"],
+                    "state": record.get("state"),
+                    "reason": wire_reason(entry.get("reason")),
+                    **replication_activity.wire(entry),
+                }
+                self._news.tell(str(record["peer"]), entry["id"], message)
+            if not moving:
+                return
+            self._replication_changed()
+            await asyncio.sleep(PROGRESS_SECONDS)
 
     def _replication_offer_state(self, offer_id: str, record: dict[str, Any]) -> None:
         """An offer this device received changed state: tell the device that sent it (v0.30.2).
@@ -3985,37 +4263,29 @@ class KeepsakeApp:
             if self._loop is not None:
                 self._loop.call_soon_threadsafe(self._replication_offer_state, offer_id, record)
             return
-        message = {
+        state = record.get("state")
+        message: dict[str, Any] = {
             "type": "offer-state",
             "id": offer_id,
-            "state": record.get("state"),
+            "state": state,
             "reason": wire_reason(record.get("reason")),
         }
-        if record.get("state") == "failed":
-            title = record.get("offer", {}).get("title") or "The game"
+        if record.get("offer", {}).get("shares") and state not in ("declined", "removed"):
+            jobs = {}
+            if self.transfers is not None:
+                jobs = {j: self.transfers.jobs[j] for j in record.get("jobs", {}).values() if j in self.transfers.jobs}
+            message.update(replication_activity.wire(replication_activity.receiving(offer_id, record, jobs, "")))
+        title = record.get("offer", {}).get("title") or "The game"
+        if state == "failed":
             self._background.append(
                 loop.create_task(self.emit("keepsake_toast", f"{title} did not arrive: {record.get('reason')}"))
             )
-        self._background.append(loop.create_task(self._tell_sender(str(record.get("peer")), message)))
-
-    async def _tell_sender(self, peer_id: str, message: dict[str, Any]) -> None:
-        for wait in TELL_SENDER_WAITS:
-            await asyncio.sleep(wait)
-            if self.links is None:
-                return
-            try:
-                connection = await self._replication_connect_for(peer_id)()
-                try:
-                    reply = await connection.request(message)
-                finally:
-                    await connection.close()
-            except (replication_link.LinkError, OSError, ValueError) as exc:
-                log_event(logging.INFO, "replication.tell_failed", "Could not tell the sending device", error=str(exc))
-                continue
-            if reply.get("type") == "error":
-                # An older Keepsake does not know offer-state; it shows "offered" until withdrawn.
-                log_event(logging.INFO, "replication.tell_refused", "The sending device did not take the news")
-            return
+        elif state == "transferring" and not record.get("offer", {}).get("update"):
+            sender = record.get("offer", {}).get("from") or "the other device"
+            self._background.append(loop.create_task(self.emit("keepsake_toast", f"{title} is coming from {sender}.")))
+        if self._news is not None:
+            final = state in ("done", "failed", "declined", "removed")
+            self._news.tell(str(record.get("peer")), offer_id, message, final=final)
 
     async def _replication_offer_news(self, session: Any, message: dict[str, Any]) -> dict[str, Any]:
         """The ``offer-state`` request: news from the device an offer went to (v0.30.2)."""
@@ -4023,16 +4293,191 @@ class KeepsakeApp:
         if outgoing is None:
             raise replication_link.ServeError("Replication is off on this device")
         changed = await asyncio.to_thread(
-            outgoing.record_state, session.peer_id, message.get("id"), message.get("state"), message.get("reason")
+            outgoing.record_state,
+            session.peer_id,
+            message.get("id"),
+            message.get("state"),
+            message.get("reason"),
+            message,
         )
         if changed:
             self._replication_changed()
-            title = changed["title"] or "The game"
-            if changed["state"] == "failed":
-                await self.emit("keepsake_toast", f"{title} did not arrive on the other device: {changed['reason']}")
-            elif changed["state"] == "done":
-                await self.emit("keepsake_toast", f"{title} arrived on the other device. You can withdraw the offer.")
+        if changed and changed["stateChanged"]:
+            title, name = changed["title"] or "The game", self._peer_name(session.peer_id)
+            state = changed["state"]
+            if state == "failed":
+                await self.emit("keepsake_toast", f"{title} did not arrive on {name}: {changed['reason']}")
+            elif state == "done":
+                await self.emit("keepsake_toast", f"{title} arrived on {name}.")
+            elif state == "transferring":
+                await self.emit("keepsake_toast", f"{title} is copying to {name}.")
+            elif state in ("removed", "declined"):
+                with contextlib.suppress(OfferError):
+                    await asyncio.to_thread(outgoing.withdraw, str(changed["id"]))  # its files are no longer needed
+                word = "stopped and removed" if state == "removed" else "declined"
+                await self.emit("keepsake_toast", f"{capital(name)} {word} {title}.")
+                self._replication_changed()
         return {"type": "offer-state-received", "id": message.get("id")}
+
+    # Getting a game from another device (ADR-0072)
+
+    def _pull_key(self, session: Any, message: dict[str, Any]) -> str:
+        token = message.get("game")
+        held = self._pull_tokens.get(token) if isinstance(token, str) else None
+        if held is None or held["peer"] != session.peer_id or held["expires"] < time.time():
+            raise replication_link.ServeError("that game list is out of date; open it again")
+        return str(held["key"])
+
+    async def _serve_games_list(self, session: Any, message: dict[str, Any]) -> dict[str, Any]:
+        """The ``games-list`` request: the non-Steam games a paired device may take from here.
+
+        Each gets a fresh random token, valid for that device for 15 minutes: no app ID, key or
+        path goes over the link (principle 10).
+        """
+        games = (await self.discover_games())["games"]
+
+        def sendable() -> list[dict[str, Any]]:
+            return [
+                g for g in games if g.get("kind") == "shortcut" and os.path.isfile(str(g.get("exe") or "").strip('"'))
+            ]
+
+        now = time.time()
+        self._pull_tokens = {k: v for k, v in self._pull_tokens.items() if v["expires"] > now}
+        listed = []
+        for game in (await asyncio.to_thread(sendable))[:PULL_LIST_MAX]:
+            token = secrets.token_hex(8)
+            self._pull_tokens[token] = {
+                "key": game["key"],
+                "peer": session.peer_id,
+                "expires": now + PULL_TOKEN_SECONDS,
+            }
+            listed.append({"id": token, "title": str(game.get("name") or "A game")[:200]})
+        return {"type": "games", "games": sorted(listed, key=lambda g: g["title"].casefold())}
+
+    async def _serve_pull_check(self, session: Any, message: dict[str, Any]) -> dict[str, Any]:
+        """The ``pull-check`` request: what a game would need, so the asking device checks its own space."""
+        key = self._pull_key(session, message)
+        game = await self._game(key)
+        places = self._replication_places()
+        try:
+            plan = await asyncio.to_thread(send_plan, dict(game), places["home"], places["library"], places["tools"])
+        except SendError as exc:
+            raise replication_link.ServeError(str(exc)) from exc
+        sizes = await asyncio.to_thread(send_sizes, plan)
+        return {"type": "pull-size", "title": plan.title, "bytes": sizes, "compatTool": plan.compat_tool}
+
+    async def _serve_pull(self, session: Any, message: dict[str, Any]) -> dict[str, Any]:
+        """The ``pull`` request: a paired device pressed Get this game. Allowed by the pairing itself."""
+        key = self._pull_key(session, message)
+        token = str(message["game"])
+        self._pull_tokens.pop(token, None)  # one pull per listing
+        self._background.append(asyncio.create_task(self._serve_pull_task(key, session.peer_id, token)))
+        return {"type": "pull-started", "game": token}
+
+    async def _serve_pull_task(self, key: str, peer_id: str, token: str) -> None:
+        state: dict[str, Any] = {"state": "preparing", "stage": "preparing", "title": "", "peer": peer_id}
+        try:
+            plan, _warning, extra = await self._prepare_send(key, peer_id, state, check_space=False, pull=token)
+        except ValueError as exc:
+            state.update(state="failed", stage="failed", reason=str(exc))
+            if self._news is not None:
+                failed = {"type": "pull-state", "game": token, "state": "failed", "reason": wire_reason(str(exc))}
+                self._news.tell(peer_id, f"pull:{token}", failed, final=True)
+            self._replication_changed()
+            return
+        await self.emit("keepsake_toast", f"{plan.title} is being copied to {self._peer_name(peer_id)}.")
+        await self._send_game(key, plan, peer_id, extra)
+
+    async def _replication_pull_news(self, session: Any, message: dict[str, Any]) -> dict[str, Any]:
+        """The ``pull-state`` request: the device a game was asked from could not send it."""
+        token = message.get("game")
+        pending = self._pulling.get(token) if isinstance(token, str) else None
+        if pending is None or pending["peer"] != session.peer_id:
+            raise replication_link.ServeError("no such game was asked for")
+        if message.get("state") == "failed":
+            reason = wire_reason(str(message.get("reason") or "")) or "it could not be sent"
+            pending.update(state="failed", stage="failed", reason=reason)
+            await self.emit("keepsake_toast", f"{pending['title']} could not be copied: {reason}")
+            self._replication_changed()
+        return {"type": "pull-state-received", "game": token}
+
+    async def replication_peer_games(self, peer_id: str) -> list[dict[str, Any]]:
+        """Games on a paired device that this device can get (a user action: Games on <device>)."""
+        peer_id = str(peer_id)
+        if self._links().store.get(peer_id) is None:
+            raise ValueError("that device is not paired")
+        try:
+            connection = await self._replication_connect_for(peer_id)()
+            try:
+                reply = await connection.request({"type": "games-list"})
+            finally:
+                await connection.close()
+        except (replication_link.LinkError, OSError) as exc:
+            raise ValueError(f"{self._peer_name(peer_id)} could not be reached: {exc}") from exc
+        if reply.get("type") == "error":
+            raise ValueError(f"update Keepsake on {self._peer_name(peer_id)} to get games from it")
+        listed = reply.get("games")
+        games: list[Any] = listed if isinstance(listed, list) else []
+        return [
+            {"id": str(g["id"]), "title": " ".join(str(g.get("title") or "").split())[:200]}
+            for g in games[:PULL_LIST_MAX]
+            if isinstance(g, dict) and isinstance(g.get("id"), str) and re.fullmatch(r"[0-9a-f]{16}", g["id"])
+        ]
+
+    async def replication_get_game(self, peer_id: str, game_id: str, title: str = "") -> list[dict[str, Any]]:
+        """Get this game: the same as a send, started from this side (ADR-0072).
+
+        This device checks its own space first, then asks the other device to send it. The offer
+        that comes back starts copying by itself.
+        """
+        peer_id, token = str(peer_id), str(game_id)
+        if not re.fullmatch(r"[0-9a-f]{16}", token):
+            raise ValueError("that game is not valid")
+        name = self._peer_name(peer_id)
+        pending = {
+            "state": "preparing",
+            "stage": "checking-space",
+            "title": " ".join(title.split())[:200] or "A game",
+            "peer": peer_id,
+        }
+        self._pulling[token] = pending
+        self._replication_changed()
+        try:
+            connection = await self._replication_connect_for(peer_id)()
+            try:
+                sized = await connection.request({"type": "pull-check", "game": token})
+                if sized.get("type") != "pull-size":
+                    raise ValueError(str(sized.get("reason") or f"{capital(name)} would not send it"))
+                pending["title"] = " ".join(str(sized.get("title") or pending["title"]).split())[:200]
+                given = sized.get("bytes")
+                raw: dict[Any, Any] = given if isinstance(given, dict) else {}
+                sizes = {
+                    str(k): int(v)
+                    for k, v in raw.items()
+                    if k in ("install", "prefix", "tool", "art") and isinstance(v, int) and v >= 0
+                }
+                tool = sized.get("compatTool") if isinstance(sized.get("compatTool"), str) else None
+                fits = await asyncio.to_thread(self._incoming().space_check, sizes, tool)
+                if not fits["ok"]:
+                    me = str(self.settings.get("deviceName") or "This device")
+                    raise ValueError(fits["reason"] or space_text(me, int(fits["needed"]), int(fits["free"])))
+                started = await connection.request({"type": "pull", "game": token})
+                if started.get("type") != "pull-started":
+                    raise ValueError(str(started.get("reason") or f"{capital(name)} would not send it"))
+            finally:
+                await connection.close()
+        except (replication_link.LinkError, OSError) as exc:
+            pending.update(state="failed", stage="failed", reason=f"{capital(name)} could not be reached: {exc}")
+            self._replication_changed()
+            raise ValueError(pending["reason"]) from exc
+        except ValueError as exc:
+            pending.update(state="failed", stage="failed", reason=str(exc))
+            self._replication_changed()
+            raise
+        pending.update(stage="preparing", reason=f"{capital(name)} is reading the game's files")
+        log_event(logging.INFO, "replication.pull", "Asked a paired device for a game")
+        self._replication_changed()
+        return await self.replication_activity()
 
     async def replication_decline(self, offer_id: str) -> dict[str, Any]:
         try:
@@ -4309,10 +4754,22 @@ class KeepsakeApp:
         return await self.replication_offers()
 
     def _replication_offer_arrived(self, offer: dict[str, Any]) -> None:
-        """An update for a game set to auto is applied by itself, unless this device changed it too."""
+        """A new game starts copying by itself (ADR-0072). An update for a game set to auto is applied
+        by itself, unless this device changed it too; other updates wait for the user."""
         update = offer.get("update")
+        if not update:
+            pull = offer.get("pull")
+            if pull and pull in self._pulls_stopped:
+                self._pulls_stopped.discard(pull)
+                with contextlib.suppress(OfferError):
+                    self._incoming().decline(offer["id"])  # stopped here while the other device prepared it
+                return
+            if pull:
+                self._pulling.pop(pull, None)  # the offer's own bar takes over
+            self._background.append(asyncio.create_task(self._auto_accept(offer)))
+            return
         links = self.game_links
-        if not update or links is None:
+        if links is None:
             return
         link = links.get(str(update["link"]))
         if link is None:
@@ -4937,6 +5394,11 @@ class KeepsakeApp:
             "sending": [
                 {"state": s.get("state"), "reason": wire_reason(s.get("reason"))} for s in self._sending.values()
             ],
+            "activity": [
+                {k: (wire_reason(e[k]) if k == "reason" else e[k]) for k in ("direction", "stage", "percent", "reason")}
+                for e in await self.replication_activity()
+            ],
+            "news": [m.get("type") for _peer, m in (self._news.sent if self._news else [])],
         }
 
     async def export_diagnostics(self, frontend: dict[str, Any] | None = None) -> str:

@@ -10,6 +10,7 @@ import type {
   ConflictEntry,
   ConflictSide,
   FoundDevice,
+  GameTransfer,
   GameMatch,
   ImportAllStatus,
   LinkCheck,
@@ -963,6 +964,7 @@ async function devices(main: HTMLElement, found: FoundDevice[] | null = null): P
     main,
     h("h1", {}, "Devices"),
     h("p", {}, "Keepsake links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once by checking that both screens show the same code."),
+    transfersDashboard(offered.activity ?? [], main),
     offersCard(offered, main),
     linked.length ? linksCard(linked, main) : null,
     transfers.jobs.length ? transfersCard(transfers, main) : null,
@@ -1030,7 +1032,9 @@ async function devices(main: HTMLElement, found: FoundDevice[] | null = null): P
       status.peers.length ? h("ul", { class: "list" }, ...status.peers.map((peer) => peerItem(peer, main))) : h("p", {}, "None yet."),
     ),
   );
-  const moving = transfers.jobs.some((j) => ["running", "verifying", "waiting"].includes(j.state));
+  const moving =
+    transfers.jobs.some((j) => ["running", "verifying", "waiting"].includes(j.state)) ||
+    (offered.activity ?? []).some((t) => MOVING_STAGES.includes(t.stage));
   if (status.pairings.some(pairingActive) || moving) {
     setTimeout(() => {
       if (document.getElementById("nav-devices")?.getAttribute("aria-current") === "true") void again().catch(() => undefined);
@@ -1045,22 +1049,6 @@ const offerStateText: Record<string, string> = {
   done: "ready in your library",
   failed: "stopped with a problem",
 };
-
-async function acceptOffer(offer: IncomingOffer, main: HTMLElement): Promise<void> {
-  const check = await call<{ problem?: string }>("replication_offer_check", offer.id, false);
-  let copyTool = false;
-  if (check.problem) {
-    if (!(offer.toolOffered && check.problem.includes("copy it"))) {
-      toast(check.problem);
-      return;
-    }
-    if (!window.confirm(`This device does not have ${offer.compatTool ?? "its tool"}. Copy it from ${offer.from} too? Steam finds it after a restart.`)) return;
-    copyTool = true;
-  }
-  await call("replication_accept", offer.id, copyTool);
-  toast(`Copying ${offer.title} from ${offer.from}.`);
-  await devices(main);
-}
 
 async function applyUpdate(offer: IncomingOffer, main: HTMLElement): Promise<void> {
   try {
@@ -1122,21 +1110,122 @@ function linksCard(linked: GameLink[], main: HTMLElement): HTMLElement {
   );
 }
 
+const STAGE_TEXT: Record<GameTransfer["stage"], string> = {
+  "checking-space": "Checking space",
+  preparing: "Preparing",
+  copying: "Copying",
+  verifying: "Verifying",
+  adding: "Adding to Steam",
+  done: "Done",
+  failed: "Failed",
+  paused: "Paused",
+  waiting: "Waiting",
+};
+const MOVING_STAGES = ["checking-space", "preparing", "copying", "verifying", "adding", "waiting"];
+
+function gibText(bytes: number): string {
+  return `${(bytes / 2 ** 30).toFixed(1)} GiB`;
+}
+
+function leftText(seconds: number | null): string {
+  if (seconds === null) return "";
+  if (seconds < 60) return "under a minute";
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
+  return `${Math.floor(seconds / 3600)} h ${Math.round((seconds % 3600) / 60)} min`;
+}
+
+// The transfer dashboard (ADR-0072): every game moving, either way, with its bar and Stop and remove.
+function transfersDashboard(items: GameTransfer[], main: HTMLElement): HTMLElement | null {
+  if (!items.length) return null;
+  const again = () => devices(main);
+  const row = (t: GameTransfer) => {
+    const bar = h("progress", { max: "100", value: String(t.percent), "aria-label": `${t.title} ${t.percent}%` });
+    return h(
+      "tr",
+      {},
+      h("td", {}, h("strong", {}, t.title), t.reason ? h("div", { class: t.stage === "failed" ? "warn" : "" }, t.reason) : null),
+      h("td", {}, t.direction === "sending" ? `To ${t.peer}` : `From ${t.peer}`),
+      h("td", {}, STAGE_TEXT[t.stage]),
+      h("td", {}, bar, ` ${t.percent}%`),
+      h("td", {}, t.total ? `${gibText(t.done)} of ${gibText(t.total)}` : ""),
+      h("td", {}, t.stage === "copying" && t.bytesPerSecond ? `${(t.bytesPerSecond / 1e6).toFixed(0)} MB/s` : ""),
+      h("td", {}, t.stage === "copying" ? leftText(t.secondsLeft) : ""),
+      h(
+        "td",
+        {},
+        t.canStop
+          ? button("Stop and remove", async () => {
+              const where = t.direction === "receiving" ? "Everything this copy made on this device is deleted." : `${t.peer} is asked to delete everything this copy made there. The game here is not touched.`;
+              if (!window.confirm(`Stop and remove ${t.title}? ${where}`)) return;
+              await call("replication_stop_game", t.id);
+              await again();
+            })
+          : null,
+        t.canClear ? button("Clear", async () => (await call("replication_clear_game", t.id), await again())) : null,
+      ),
+    );
+  };
+  return h(
+    "section",
+    { class: "card" },
+    h("h2", {}, "Games moving between devices"),
+    h(
+      "table",
+      {},
+      h("thead", {}, h("tr", {}, ...["Game", "Device", "Stage", "Progress", "Done", "Speed", "Time left", ""].map((c) => h("th", {}, c)))),
+      h("tbody", {}, ...items.map(row)),
+    ),
+  );
+}
+
+// "Games on <device>", kept across the page's refreshes while a copy runs.
+const peerGames: Record<string, { id: string; title: string }[]> = {};
+
+function peerGamesList(peer: PairedDevice, main: HTMLElement): HTMLElement | null {
+  const games = peerGames[peer.id];
+  if (!games) return null;
+  if (!games.length) return h("p", {}, `No non-Steam games on ${peer.name}.`);
+  return h(
+    "table",
+    {},
+    h("thead", {}, h("tr", {}, h("th", {}, `Games on ${peer.name}`), h("th", {}, ""))),
+    h(
+      "tbody",
+      {},
+      ...games.map((g) =>
+        h(
+          "tr",
+          {},
+          h("td", {}, g.title),
+          h(
+            "td",
+            {},
+            button("Get this game", async () => {
+              if (!window.confirm(`Get ${g.title} from ${peer.name}? Keepsake checks there is space here first. Nothing here is replaced.`)) return;
+              await call("replication_get_game", peer.id, g.id, g.title);
+              toast(`${g.title} is coming from ${peer.name}.`);
+              await devices(main);
+            }),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+// Updates waiting for a choice. New games start copying by themselves (ADR-0072).
 function offersCard(offered: OffersStatus, main: HTMLElement): HTMLElement | null {
-  const sending = Object.values(offered.sending).filter((s) => s.state !== "sent");
-  if (!offered.incoming.length && !offered.outgoing.length && !sending.length) return null;
+  const waiting = offered.incoming.filter((o) => o.update && o.state === "offered");
+  if (!waiting.length) return null;
   const again = () => devices(main);
   return h(
     "section",
     { class: "card" },
-    h("h2", {}, "Games between devices"),
+    h("h2", {}, "Updates from your other devices"),
     h(
       "ul",
       { class: "list" },
-      ...sending.map((s) =>
-        h("li", {}, h("strong", {}, `${s.title}: ${s.state === "preparing" ? "preparing to send" : "not sent"}`), h("p", {}, s.reason ?? s.warning ?? "Keepsake is checking every file.")),
-      ),
-      ...offered.incoming.map((offer) =>
+      ...waiting.map((offer) =>
         h(
           "li",
           {},
@@ -1155,29 +1244,7 @@ function offersCard(offered: OffersStatus, main: HTMLElement): HTMLElement | nul
             offer.state === "offered" && offer.update
               ? button("Keep mine", async () => (await call("replication_keep_mine", offer.id), await again()))
               : null,
-            offer.state === "offered" && !offer.update ? button("Accept", () => acceptOffer(offer, main), "primary") : null,
-            offer.state === "offered" && !offer.update ? button("Decline", async () => (await call("replication_decline", offer.id), await again())) : null,
-            offer.update && ["transferring", "failed"].includes(offer.state)
-              ? button("Stop update", async () => (await call("replication_remove_game", offer.id), await again()))
-              : null,
-            !offer.update && ["transferring", "registering", "failed"].includes(offer.state)
-              ? button("Stop and remove", async () => {
-                  if (!window.confirm(`Stop and remove ${offer.title}? Everything this copy made here is deleted: its folder, prefix, a copied tool and its Steam shortcut.`)) return;
-                  await call("replication_remove_game", offer.id);
-                  await again();
-                })
-              : null,
-            offer.state === "done" ? button("Clear from this list", async () => (await call("replication_dismiss", offer.id), await again())) : null,
           ),
-        ),
-      ),
-      ...offered.outgoing.map((offer) =>
-        h(
-          "li",
-          {},
-          h("strong", {}, outgoingText(offer)[0]),
-          h("p", {}, outgoingText(offer)[1]),
-          h("div", { class: "actions" }, button("Withdraw", async () => (await call("replication_withdraw", offer.id), await again()))),
         ),
       ),
     ),
@@ -1244,6 +1311,10 @@ function peerItem(peer: PairedDevice, main: HTMLElement): HTMLElement {
     h(
       "div",
       { class: "actions" },
+      button(`Games on ${peer.name}`, async () => {
+        peerGames[peer.id] = await call<{ id: string; title: string }[]>("replication_peer_games", peer.id);
+        await devices(main);
+      }),
       button("Check", async () => {
         const r = await call<LinkCheck>("replication_check", peer.id);
         const slow = r.slow ? (r.overlay ? " Slow: your VPN may be relaying this link." : " Slow.") : "";
@@ -1265,6 +1336,7 @@ function peerItem(peer: PairedDevice, main: HTMLElement): HTMLElement {
         },
       ),
     ),
+    peerGamesList(peer, main),
   );
 }
 
@@ -1328,23 +1400,3 @@ function start(): void {
 }
 
 start();
-
-// What the receiving device last said about an offer (v0.30.2): a failure shows here too.
-function outgoingText(offer: { title: string; remoteState?: string; remoteReason?: string | null }): [string, string] {
-  switch (offer.remoteState) {
-    case "transferring":
-      return [`${offer.title}: copying`, "The other device is copying it."];
-    case "registering":
-      return [`${offer.title}: adding to Steam`, "The other device is adding it to Steam."];
-    case "done":
-      return [`${offer.title}: arrived`, offer.remoteReason ? `Arrived. ${offer.remoteReason} You can withdraw the offer.` : "Arrived. You can withdraw the offer."];
-    case "failed":
-      return [`${offer.title}: did not arrive`, `${offer.remoteReason || "The other device could not copy it."} Withdraw the offer, or fix it and try again on the other device.`];
-    case "declined":
-      return [`${offer.title}: declined`, "The other device declined it. Withdraw the offer."];
-    case "removed":
-      return [`${offer.title}: removed`, "The other device stopped and removed it. Withdraw the offer."];
-    default:
-      return [`${offer.title}: offered`, "Waiting for the other device. Withdraw it once it has arrived."];
-  }
-}

@@ -101,7 +101,13 @@ def test_the_sender_records_news_only_about_its_own_offers_to_that_device(tmp_pa
     _game, _where, wire, _incoming, _manager, _ops, _places, outgoing = setup_pair(tmp_path)
     assert outgoing.list()[0]["remoteState"] == "offered"
     changed = outgoing.record_state(PEER, wire["id"], "failed", "/home/deck/Games/X already exists")
-    assert changed == {"id": wire["id"], "title": "Test Game", "state": "failed", "reason": "a folder already exists"}
+    assert changed == {
+        "id": wire["id"],
+        "title": "Test Game",
+        "state": "failed",
+        "reason": "a folder already exists",
+        "stateChanged": True,
+    }
     assert outgoing.record_state(PEER, wire["id"], "failed", "/home/deck/Games/X already exists") is None  # no change
     (listed,) = outgoing.list()
     assert listed["remoteState"] == "failed" and listed["remoteReason"] == "a folder already exists"
@@ -124,20 +130,28 @@ def test_the_app_accepts_on_the_loop_and_tells_the_sender(make_app, tmp_path, mo
         await app.set_module_enabled("replication", True)
         sent = []
 
-        async def tell(peer_id, message):
-            sent.append((peer_id, message))
+        class News:  # v0.31.0: the shared news sender
+            sent: list = []  # noqa: RUF012 - what the export reads
+
+            def tell(self, peer_id, about, message, final=False):
+                sent.append((peer_id, message))
+
+            async def close(self):
+                pass
 
         async def connect():
             return FakeConnection(outgoing.shares)
 
-        monkeypatch.setattr(app, "_tell_sender", tell)
+        app._news = News()
         places = receiving_places(tmp_path / "b-places")
         app.incoming.places = lambda: places
         app.transfers.connect_for = lambda _peer: connect
         try:
             await app.incoming.handle_offer(Session(SENDER, "127.0.0.1", None, None), {"offer": wire})
-            accepted = await app.replication_accept(wire["id"], True)
-            assert accepted["state"] == "transferring"
+            for _ in range(100):  # v0.31.0: no Accept, it starts by itself (ADR-0072)
+                await asyncio.sleep(0.01)
+                if app.transfers.tasks:
+                    break
             assert app.transfers.tasks  # the copy is running: the stall was "transferring" with no task
             while app.transfers.tasks:
                 await asyncio.gather(*list(app.transfers.tasks.values()))
@@ -145,7 +159,8 @@ def test_the_app_accepts_on_the_loop_and_tells_the_sender(make_app, tmp_path, mo
             for _ in range(5):
                 await asyncio.sleep(0)
             assert (await app.replication_offers())["incoming"][0]["state"] == "registering"
-            assert [m["state"] for _p, m in sent] == ["transferring", "registering"]
+            states = [m["state"] for _p, m in sent]
+            assert states[0] == "transferring" and states[-1] == "registering"
             assert all(p == SENDER and m["type"] == "offer-state" and m["id"] == wire["id"] for p, m in sent)
             # The Device checks' export carries the states, redacted.
             app._device_results["x"] = {"id": "x", "status": "pass", "found": ""}

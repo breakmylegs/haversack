@@ -92,3 +92,20 @@ The offer holds:
 - `gameKey` and `savesEnabled`.
 
 It never holds an absolute path.
+
+Later additions (each a new request type, or an optional field that older devices ignore; ADR-0072 section 8):
+
+| Request | Answer | Added |
+|---|---|---|
+| `{"type": "offer-state", "id", "state", "reason", "stage", "done", "total", "bytesPerSecond", "secondsLeft"}` | `{"type": "offer-state-received", "id"}` | v0.30.2 (state and reason); v0.31.0 (the bar's numbers, optional) |
+| `{"type": "space-check", "bytes": {scope: n}, "compatTool"}` | `{"type": "space", "ok", "needed", "free", "reason"}` | v0.31.0 |
+| `{"type": "offer-stop", "id"}` | `{"type": "offer-stopped", "id"}` | v0.31.0 |
+| `{"type": "games-list"}` | `{"type": "games", "games": [{"id": token, "title"}]}` | v0.31.0 |
+| `{"type": "pull-check", "game": token}` | `{"type": "pull-size", "title", "bytes", "compatTool"}` | v0.31.0 |
+| `{"type": "pull", "game": token}` | `{"type": "pull-started", "game": token}` | v0.31.0 |
+| `{"type": "pull-state", "game": token, "state": "failed", "reason"}` | `{"type": "pull-state-received", "game": token}` | v0.31.0 |
+
+- **Who may send them.** `offer-state` and `pull-state` are accepted only about something the receiving device made for, or asked of, the sender. `offer-stop` is accepted only from the device the game came from.
+- **Reasons** are one line of at most 300 characters, with any absolute path replaced by "a folder".
+- **Tokens** are 16 random hex characters, valid for 15 minutes, for the device they were listed to only, and used once.
+- **`offer`** may carry an optional `pull` (a token), tying it to the request it answers.

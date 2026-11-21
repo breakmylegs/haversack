@@ -260,6 +260,7 @@ export interface OffersStatus {
   incoming: IncomingOffer[];
   outgoing: { id: string; title: string; peer: string; created: number; remoteState?: string; remoteReason?: string | null }[];
   sending: Record<string, { state: "preparing" | "sent" | "failed"; title: string; peer: string; reason?: string; warning?: string | null }>;
+  activity?: GameTransfer[];
 }
 export const replicationSend = callable<[key: string, peerId: string], { state: string; title: string; droppedOptions: string[] }>("replication_send");
 export const replicationOffers = callable<[], OffersStatus>("replication_offers");
@@ -302,6 +303,30 @@ export const replicationSendUpdate = callable<[linkId: string], GameLink[]>("rep
 export const replicationApplyUpdate = callable<[offerId: string, takeTheirs: boolean], IncomingOffer>("replication_apply_update");
 export const replicationKeepMine = callable<[offerId: string], OffersStatus>("replication_keep_mine");
 export const replicationRemoveGame = callable<[offerId: string], OffersStatus>("replication_remove_game");
+
+// A game moving between devices, as one bar on either device (v0.31.0, ADR-0072).
+export type TransferStage = "checking-space" | "preparing" | "copying" | "verifying" | "adding" | "done" | "failed" | "paused" | "waiting";
+export type GameTransfer = {
+  id: string;
+  direction: "sending" | "receiving";
+  title: string;
+  peer: string;
+  stage: TransferStage;
+  done: number;
+  total: number;
+  percent: number;
+  bytesPerSecond: number;
+  secondsLeft: number | null;
+  reason: string | null;
+  update: boolean;
+  canStop: boolean;
+  canClear: boolean;
+};
+export const replicationActivity = callable<[], GameTransfer[]>("replication_activity");
+export const replicationStopGame = callable<[entryId: string], GameTransfer[]>("replication_stop_game");
+export const replicationClearGame = callable<[entryId: string], GameTransfer[]>("replication_clear_game");
+export const replicationPeerGames = callable<[peerId: string], { id: string; title: string }[]>("replication_peer_games");
+export const replicationGetGame = callable<[peerId: string, gameId: string, title: string], GameTransfer[]>("replication_get_game");
 
 export const installerStatus = callable<[], InstallerStatus>("installer_status");
 export const installerAddCdDrive = callable<[jobId: number], InstallJob>("installer_add_cd_drive");

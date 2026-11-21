@@ -282,6 +282,21 @@ class Plugin:
     async def replication_remove_game(self, offer_id: str) -> dict[str, Any]:
         return await self.app.replication_remove_game(offer_id)
 
+    async def replication_activity(self) -> list[dict[str, Any]]:
+        return await self.app.replication_activity()
+
+    async def replication_stop_game(self, entry_id: str) -> list[dict[str, Any]]:
+        return await self.app.replication_stop_game(entry_id)
+
+    async def replication_clear_game(self, entry_id: str) -> list[dict[str, Any]]:
+        return await self.app.replication_clear_game(entry_id)
+
+    async def replication_peer_games(self, peer_id: str) -> list[dict[str, Any]]:
+        return await self.app.replication_peer_games(peer_id)
+
+    async def replication_get_game(self, peer_id: str, game_id: str, title: str = "") -> list[dict[str, Any]]:
+        return await self.app.replication_get_game(peer_id, game_id, title)
+
     async def installer_status(self) -> dict[str, Any]:
         return await self.app.installer_status()
 

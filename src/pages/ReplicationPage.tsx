@@ -25,16 +25,12 @@ import {
   TransfersStatus,
   IncomingOffer,
   OffersStatus,
-  replicationAccept,
-  replicationDecline,
-  replicationDismiss,
-  replicationOfferCheck,
   replicationOffers,
-  replicationRemoveGame,
-  replicationWithdraw,
   replicationApplyUpdate,
   replicationKeepMine,
 } from "../backend";
+import { plainError } from "../format";
+import { GameTransfersSection, PeerGames } from "./GameTransfers";
 
 const REPLICATION_EVENT = "keepsake_replication";
 
@@ -107,6 +103,7 @@ export function ReplicationPage() {
         description="Keepsake links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once: send a request from one, accept it on the other, and type the code it shows."
       />
 
+      <GameTransfersSection />
       <OffersSection />
       <TransfersSection />
 
@@ -296,6 +293,7 @@ function PeerRow(props: { peer: PairedDevice; busy: boolean; run: (work: () => P
         <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void run(check)}>
           Check
         </DialogButton>
+        <PeerGames peerId={peer.id} peerName={peer.name} />
         {peer.canWake && (
           <DialogButton
             style={{ width: "auto" }}
@@ -430,6 +428,8 @@ const OFFER_TEXT: Record<string, string> = {
 };
 
 // Games offered to this device, and games this device offered (ADR-0059).
+// Updates waiting for a choice. New games start copying by themselves (ADR-0072), so their
+// bars are in GameTransfersSection, with Stop and remove.
 function OffersSection() {
   const [status, setStatus] = useState<OffersStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -440,8 +440,8 @@ function OffersSection() {
     return () => removeEventListener(REPLICATION_EVENT, listener);
   }, []);
   if (!status) return null;
-  const sending = Object.values(status.sending).filter((s) => s.state !== "sent");
-  if (!status.incoming.length && !status.outgoing.length && !sending.length) return null;
+  const waiting = status.incoming.filter((o) => o.update && o.state === "offered");
+  if (!waiting.length) return null;
 
   const act = async (work: () => Promise<unknown>, done?: string) => {
     setBusy(true);
@@ -449,31 +449,11 @@ function OffersSection() {
       await work();
       if (done) toaster.toast({ title: "Keepsake", body: done });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
       await refresh();
     }
-  };
-
-  const accept = async (offer: IncomingOffer) => {
-    const check = await replicationOfferCheck(offer.id, false);
-    const start = (copyTool: boolean) =>
-      act(() => replicationAccept(offer.id, copyTool), `Copying ${offer.title} from ${offer.from}.`);
-    if (!check.problem) return start(false);
-    if (offer.toolOffered && check.problem.includes("copy it")) {
-      showModal(
-        <ConfirmModal
-          strTitle={`Copy ${offer.compatTool} too?`}
-          strDescription={`This device does not have ${offer.compatTool}, which ${offer.title} uses. Keepsake can copy it from ${offer.from}. Steam finds it after a restart.`}
-          strOKButtonText="Copy it too"
-          strCancelButtonText="Cancel"
-          onOK={() => void start(true)}
-        />,
-      );
-      return;
-    }
-    toaster.toast({ title: "Keepsake", body: check.problem });
   };
 
   const applyUpdate = async (offer: IncomingOffer) => {
@@ -483,7 +463,7 @@ function OffersSection() {
       await refresh();
     } catch (err) {
       if (!String(err).includes("changed on this device too")) {
-        toaster.toast({ title: "Keepsake", body: String(err) });
+        toaster.toast({ title: "Keepsake", body: plainError(err) });
         return;
       }
       showModal(
@@ -499,111 +479,26 @@ function OffersSection() {
     }
   };
 
-  const removeGame = (offer: IncomingOffer) =>
-    showModal(
-      <ConfirmModal
-        strTitle={`Stop and remove ${offer.title}?`}
-        strDescription="Everything this copy made on this device is deleted: the game's folder, its prefix, a copied compatibility tool and its Steam shortcut. Nothing else is touched."
-        strOKButtonText="Stop and remove"
-        strCancelButtonText="Cancel"
-        onOK={() => void act(() => replicationRemoveGame(offer.id), `${offer.title} removed.`)}
-      />,
-    );
-
   return (
     <>
-      <Field label="Games between devices" />
-      {sending.map((s) => (
-        <Field
-          key={`sending-${s.title}`}
-          label={`${s.title}: ${s.state === "preparing" ? "preparing to send" : "not sent"}`}
-          description={s.reason ?? s.warning ?? "Keepsake is checking every file. A large game takes a few minutes."}
-        />
-      ))}
-      {status.incoming.map((offer) => (
+      <Field label="Updates from your other devices" />
+      {waiting.map((offer) => (
         <Field
           key={offer.id}
           label={`${offer.title} from ${offer.from}: ${OFFER_TEXT[offer.state] ?? offer.state}`}
-          description={[
-            size(offer.bytes),
-            offer.compatTool ? `uses ${offer.compatTool}` : "",
-            offer.droppedOptions.length ? `launch options left on the other device: ${offer.droppedOptions.join(" ")}` : "",
-            offer.reason ?? "",
-          ]
-            .filter(Boolean)
-            .join(". ")}
+          description={[size(offer.bytes), offer.reason ?? ""].filter(Boolean).join(". ")}
           childrenLayout="below"
         >
           <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {offer.state === "offered" && offer.update && (
-              <>
-                <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void applyUpdate(offer)}>
-                  Apply update
-                </DialogButton>
-                <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void act(() => replicationKeepMine(offer.id))}>
-                  Keep mine
-                </DialogButton>
-              </>
-            )}
-            {offer.state === "offered" && !offer.update && (
-              <>
-                <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void accept(offer)}>
-                  Accept
-                </DialogButton>
-                <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void act(() => replicationDecline(offer.id))}>
-                  Decline
-                </DialogButton>
-              </>
-            )}
-            {(offer.state === "transferring" || offer.state === "registering" || offer.state === "failed") && !offer.update && (
-              <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => removeGame(offer)}>
-                Stop and remove
-              </DialogButton>
-            )}
-            {(offer.state === "transferring" || offer.state === "failed") && offer.update && (
-              <DialogButton
-                style={{ width: "auto" }}
-                disabled={busy}
-                onClick={() => void act(() => replicationRemoveGame(offer.id), `The update to ${offer.title} stopped. The game is as it was.`)}
-              >
-                Stop update
-              </DialogButton>
-            )}
-            {offer.state === "done" && (
-              <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void act(() => replicationDismiss(offer.id))}>
-                Clear from this list
-              </DialogButton>
-            )}
+            <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void applyUpdate(offer)}>
+              Apply update
+            </DialogButton>
+            <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void act(() => replicationKeepMine(offer.id))}>
+              Keep mine
+            </DialogButton>
           </Focusable>
-        </Field>
-      ))}
-      {status.outgoing.map((offer) => (
-        <Field key={offer.id} label={outgoingText(offer)[0]} description={outgoingText(offer)[1]} childrenLayout="below">
-          <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void act(() => replicationWithdraw(offer.id))}>
-            Withdraw
-          </DialogButton>
         </Field>
       ))}
     </>
   );
-}
-
-// What the receiving device last said about an offer (v0.30.2): a failure shows here too.
-function outgoingText(offer: { title: string; remoteState?: string; remoteReason?: string | null }): [string, string] {
-  switch (offer.remoteState) {
-    case "transferring":
-      return [`${offer.title}: copying`, "The other device is copying it."];
-    case "registering":
-      return [`${offer.title}: adding to Steam`, "The other device is adding it to Steam."];
-    case "done":
-      return [`${offer.title}: arrived`, offer.remoteReason ? `Arrived. ${offer.remoteReason} You can withdraw the offer.` : "Arrived. You can withdraw the offer."];
-    case "failed":
-      return [`${offer.title}: did not arrive`, `${offer.remoteReason || "The other device could not copy it."} Withdraw the offer, or fix it and try again on the other device.`];
-    case "declined":
-      return [`${offer.title}: declined`, "The other device declined it. Withdraw the offer."];
-    case "removed":
-      return [`${offer.title}: removed`, "The other device stopped and removed it. Withdraw the offer."];
-    default:
-      return [`${offer.title}: offered`, "Waiting for the other device. Withdraw it once it has arrived."];
-  }
 }
