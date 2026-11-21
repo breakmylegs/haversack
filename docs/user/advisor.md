@@ -17,6 +17,14 @@ On a machine without a battery, such as a Steam Machine or a desktop, Advisor le
 
 Advisor recognises your device from its hardware (for example the Legion Go and Legion Go 2) and the tools you have installed, such as TDP tools, lsfg-vk and OptiScaler. It only reads them.
 
+## How your games ran on this device
+
+While you play, Advisor quietly measures how the game runs on this device: frame rate, power use, battery drain, CPU and GPU load, clocks, temperatures and whether it throttled, along with the TDP and Proton version you used. There is nothing to set up, and it only reads what the system already reports; it never changes the game. After you quit, the game's Advisor page shows a **Last session** card and your **Recent sessions**, even when the game is not running.
+
+These measurements feed the advice, marked "Measured on this device", and they count for more than community reports. For example: the frame rate dropped well under your frame cap, so lower the cap or raise the TDP; the GPU was flat out while the CPU idled, so lower the resolution or use FSR; you got the same frame rate at a lower TDP, so save the battery; or it throttled after 20 minutes.
+
+The frame rate comes from Steam's own performance overlay, or from MangoHud's logs if you already log with MangoHud. If neither is available, the card says "frame rate not available" and everything else is still measured. Only a summary of each session is kept, the last 20 per game, on this device only. If you ask for an AI explanation, only plain numbers from them are sent, never names, paths or launch options.
+
 ## Where its advice comes from
 
 Each source can be switched off, and each is contacted only while it is on:

@@ -1040,6 +1040,7 @@ export interface AdvisorView {
     options: Record<string, string[]>;
   };
   conflicts?: { kind: string; text: string }[];
+  sessions?: AdvisorSessions;
   game?: {
     appid: number;
     name: string;
@@ -1123,3 +1124,27 @@ export const uninstallStart = callable<[key: string, skipBackup: boolean], Unins
 export const uninstallSteam = callable<[key: string, backup: boolean], { op: number; backup: unknown }>("uninstall_steam");
 export const uninstallStatus = callable<[], UninstallJob | null>("uninstall_status");
 export const uninstallCancel = callable<[], UninstallJob | null>("uninstall_cancel");
+
+// How each game ran on this device (ADR-0069).
+export interface AdvisorSession {
+  start: number;
+  end: number;
+  seconds: number;
+  power: "plugged in" | "on battery" | "mixed";
+  fps?: { source: "steam" | "mangohud" | null; avg?: number; min5s?: number | null; low1?: number; low01?: number };
+  watts?: { socketAvg: number | null; socketPeak: number | null; cpuAvg: number | null; cpuPeak: number | null; gpuAvg: number | null; gpuPeak: number | null };
+  battery?: { drainW?: number; percentPerHour?: number; lifeHours?: number };
+  cpu?: { busyAvg: number | null; mhzAvg: number | null; tempAvg: number | null; tempPeak: number | null };
+  gpu?: { busyAvg: number | null; mhzAvg: number | null; tempAvg: number | null; tempPeak: number | null };
+  memory?: { ramPeakMiB: number | null; vramPeakMiB: number | null };
+  throttle?: { seen: boolean; afterMinutes: number | null };
+  settings?: { tdp: number | null; tdpTool: string | null; frameCap: number | null; protonVersion: string | null; frameGen: string | null };
+}
+export interface AdvisorSessions {
+  last: AdvisorSession | null;
+  recent: AdvisorSession[];
+  total: { sessions: number; seconds: number; fpsAvg?: number } | null;
+  advice: { id: string; text: string; source: string; measured: boolean }[];
+}
+export const advisorPerfSample = callable<[diagnosticB64: string], { ok: boolean; fps?: number | null }>("advisor_perf_sample");
+export const onResume = callable<[], { ok: boolean }>("on_resume");

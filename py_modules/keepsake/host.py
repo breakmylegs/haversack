@@ -161,6 +161,8 @@ CALLABLES = frozenset(
         "steam_ops_file",
         "enable_steam_without_cloud",
         "on_suspend",
+        "on_resume",
+        "advisor_perf_sample",
         "ludusavi_scan",
         "ludusavi_import",
         "ludusavi_import_all",

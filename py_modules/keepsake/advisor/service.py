@@ -21,7 +21,7 @@ from typing import Any
 
 from .. import devices
 from ..fsutil import atomic_write_json, read_json
-from . import ai, anticheat, compat, current, deckverified, pcgw, protondb, recommend, stack
+from . import ai, anticheat, compat, current, deckverified, pcgw, protondb, recommend, sessions, stack
 from .cache import SourceCache
 
 SETTINGS_FILE = "advisor.json"
@@ -92,6 +92,21 @@ class Advisor:
         self.reports: list[dict[str, Any]] = []
         self.source_state: dict[str, Any] = {"enabled": True, "cached": False, "error": None, "fetchedAt": None}
         self.ac_state: dict[str, Any] = {"enabled": True, "error": None, "entry": None}
+        # How each game ran on this device (ADR-0069): summaries only, in Keepsake's own folder.
+        self.sessions = sessions.SessionStore(os.path.join(cache_dir, "sessions"))
+
+    def session_view(self, appid: int | None) -> dict[str, Any]:
+        """The Last session card, the Recent sessions trend, and the advice measured here."""
+        if not appid:
+            return {"last": None, "recent": [], "total": None, "advice": []}
+        data = self.sessions.load(int(appid))
+        recent = data["sessions"]
+        return {
+            "last": recent[-1] if recent else None,
+            "recent": list(reversed(recent[-5:])),
+            "total": data.get("total"),
+            "advice": sessions.advice(recent),
+        }
 
     # Settings (the Advisor's own file)
 
@@ -359,6 +374,9 @@ class Advisor:
             body = ai.payload(
                 self.game["name"], self.device, selected, {t["id"]: t["name"] for t in self.tools.tools}, self.reports
             )
+            measured = sessions.ai_numbers(self.sessions.load(int(self.game["appid"]))["sessions"])
+            if measured:
+                body["measured_sessions"] = measured  # plain numbers only: no paths, names or launch options (P18)
             self.ai_usage.count()
             data = ai.parse_reply(provider.generate(key, model, ai.prompt(body)))
             rec, discarded = ai.to_recommendation(data, self.device)
@@ -421,6 +439,7 @@ class Advisor:
             "source": self.source_state,
             "anticheat": self.ac_state,
             "recommendations": recs,
+            "sessions": self.session_view(game.get("appid")),
             "pcgw": self.pcgw_state,
             "protondb": self.protondb_state,
             "attribution": [deckverified.ATTRIBUTION, anticheat.ATTRIBUTION]

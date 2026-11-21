@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 import time
 from collections.abc import Callable
 from typing import Any
@@ -19,6 +20,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "py_modules"))
 
 from keepsake import manifest, ordering, retention  # noqa: E402
+from keepsake.advisor import sessions  # noqa: E402
 from keepsake.snapshot import FileEntry, content_hash  # noqa: E402
 
 GAMES = 500
@@ -33,7 +35,34 @@ BUDGETS = {
     "order 500 games": 0.25,
     "retention plan over 10,000 snapshots": 1.0,
     "content hash of 10,000 files": 0.25,
+    # Advisor sessions (ADR-0069): sampling runs once a second while a game plays, so it must stay tiny.
+    "100 session readings": 1.5,  # about 3.4 ms a reading on the laptop (far less on sysfs): once a second
+    "an hour of session samples summarised": 0.25,
 }
+
+
+def fake_sys(root: str) -> None:
+    """A handheld's sysfs files as the session sampler reads them."""
+    gpu = os.path.join(root, "class", "drm", "card0", "device")
+    files = {
+        os.path.join(gpu, "vendor"): "0x1002",
+        os.path.join(gpu, "gpu_busy_percent"): "97",
+        os.path.join(gpu, "mem_info_vram_used"): str(2 * 1024**3),
+        os.path.join(gpu, "hwmon", "hwmon3", "power1_average"): "15000000",
+        os.path.join(gpu, "hwmon", "hwmon3", "temp1_input"): "71000",
+        os.path.join(root, "class", "hwmon", "hwmon1", "name"): "k10temp",
+        os.path.join(root, "class", "hwmon", "hwmon1", "temp1_input"): "68000",
+        os.path.join(root, "class", "power_supply", "BAT0", "type"): "Battery",
+        os.path.join(root, "class", "power_supply", "BAT0", "capacity"): "77",
+        os.path.join(root, "class", "power_supply", "BAT0", "power_now"): "17000000",
+        os.path.join(root, "class", "power_supply", "BAT0", "status"): "Discharging",
+    }
+    for cpu in range(16):
+        files[os.path.join(root, "devices", "system", "cpu", f"cpu{cpu}", "cpufreq", "scaling_cur_freq")] = "2800000"
+    for path, text in files.items():
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(text)
 
 
 def manifest_lines(titles: int) -> list[str]:
@@ -113,6 +142,20 @@ def run() -> dict[str, float]:
     )
     entries = [FileEntry("winLocalAppData", f"Game/save{n:05d}.sav", n, f"{n:064x}") for n in range(FILES)]
     results["content hash of 10,000 files"] = measure(lambda: content_hash(entries))
+    with tempfile.TemporaryDirectory() as root:
+        fake_sys(root)
+        sensors = sessions.Sensors(root, root)  # found once per session, as the recorder does
+        results["100 session readings"] = measure(lambda: [sensors.read() for _ in range(100)])
+        sample = sensors.read()
+
+    def an_hour() -> None:
+        acc = sessions.Accumulator(0.0)
+        for second in range(3600):
+            acc.add(sample, float(second), (second * 50, second * 100))
+            acc.add_fps(55.0 + second % 7, 18.0)
+        acc.summary()
+
+    results["an hour of session samples summarised"] = measure(an_hour)
     if len(matched) != GAMES or not all(m.get("title") for m in matched):
         raise SystemExit("perf budget: the synthetic games did not all match; the benchmark is broken")
     return results

@@ -344,6 +344,12 @@ class Plugin:
     async def on_suspend(self) -> dict[str, Any]:
         return await self.app.on_suspend()
 
+    async def on_resume(self) -> dict[str, Any]:
+        return await self.app.on_resume()
+
+    async def advisor_perf_sample(self, diagnostic_b64: str) -> dict[str, Any]:
+        return await self.app.advisor_perf_sample(diagnostic_b64)
+
     async def ludusavi_scan(self, root: str) -> dict[str, Any]:
         return await self.app.ludusavi_scan(root)
 
