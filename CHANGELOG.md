@@ -4,6 +4,11 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Fixed
+
+- **Send's confirmation was out of date.** It said nothing is copied until the game is accepted on the other device. Since 0.31.0 a game starts copying by itself, so it now says that, and that either device can stop and remove it. Gaming Mode and the desktop app.
+- **The device-run list** labelled a 0.30.2 step as 0.31.0.
+
 ## [0.31.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
