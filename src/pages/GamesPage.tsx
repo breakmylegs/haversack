@@ -23,6 +23,7 @@ import {
 import { newerText, SYNC_LABELS } from "../format";
 import { GameDetail } from "./GameDetail";
 import { askApproveMatch } from "../matchApproval";
+import { TidyCopies } from "./TidyCopies";
 
 type Filter = "enabled" | "shortcuts" | "steam" | "launchers" | "emulators" | "all";
 
@@ -368,6 +369,7 @@ export function GamesPage() {
           )}
         </Field>
       )}
+      <TidyCopies onChange={() => void scan(false)} />
       {error && <Field label="Scan failed" description={error} />}
       {result && result.roots.length === 0 && <Field label="No Steam installation found" />}
       {waiting.length > 0 && (
@@ -391,6 +393,7 @@ export function GamesPage() {
         const mismatch = game.key in (result?.mismatches ?? {}) || "_unreadable" in (result?.mismatches ?? {});
         const running = runningAppId !== undefined && runningAppId === game.appid;
         const flags = [
+          game.presence === "unsure" ? "not found on this device" : "",
           game.kind === "shortcut" && !game.is_default_user ? "other Steam user" : "",
           mismatch ? "PREFIX MISMATCH, sync blocked" : "",
           running ? "running" : "",

@@ -46,6 +46,11 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
    - Turn one of the automatic ones off, rescan, and check it stays off.
    - Play an automatic one on the Go and quit. Start it on the Go 2: it should load the save, and History should show it on both.
 
+2. **Games you can stream from another device.** With Steam running on both handhelds:
+   - On the Go, run the Device check **Games you can stream from another device**. It should count the Go 2's non-Steam games, and list "Split Fiction" as also installed here.
+   - On the Games page, every non-Steam game installed on the Go should be listed, Split Fiction once, and none of the Go 2's games. **Show games you can stream from another device** should list them.
+   - **Hidden test (A201).** In Steam on the Go, open the menu of one streaming tile and choose Hide (Manage, Hide this game). On the Go 2, check that the same game is still in the library and shows **Play**. Tell me the result. Then on the Go, show it again from Steam's Hidden collection.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

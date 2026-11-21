@@ -43,6 +43,7 @@ from . import (
     power,
     procs,
     registry,
+    remotecopies,
     resolve,
     restore,
     retention,
@@ -307,6 +308,7 @@ class KeepsakeApp:
         self.paths = paths
         self.home = home
         self._games: dict[str, Any] | None = None
+        self.remote_copies = remotecopies.RemoteCopies(paths.runtime_dir)
         self.manifest = manifest.ManifestStore(paths.runtime_dir, download=download)
         self.game_configs = GameConfigStore(paths.settings_dir)
         self._auto_refresh_manifest = auto_refresh_manifest
@@ -637,6 +639,7 @@ class KeepsakeApp:
     def _advisor_map_game(self, appid: int) -> dict[str, Any]:
         """For Advisor (worker thread): a game's name and, for a shortcut, the Steam app ID of its manifest entry."""
         games = (self._games or discovery.discover(self.home, self.host))["games"]
+        # A streaming entry (ADR-0064) is not in shortcuts.vdf, so its app ID finds nothing here.
         game = next((g for g in games if g["appid"] == appid), None)
         if game is None and self._games is not None:
             # Installed since the last scan, perhaps: look once more before giving up.
@@ -762,7 +765,10 @@ class KeepsakeApp:
                 counts[game["kind"]] = counts.get(game["kind"], 0) + 1
             log_event(logging.INFO, "discovery.scan", "Scanned games", roots=len(self._games["roots"]), **counts)
         mismatches = await asyncio.to_thread(discovery.load_mismatches, self.paths.runtime_dir)
-        return {**self._games, "mismatches": mismatches}
+        # Each shortcut's presence from the file and Steam's install state (ADR-0064). Steam Remote Play's
+        # streaming entries are not in shortcuts.vdf, so they never reach this list.
+        games = await asyncio.to_thread(self.remote_copies.apply, self._games["games"])
+        return {**self._games, "games": games, "mismatches": mismatches}
 
     def _emulator_defaults(self, games: list[dict[str, Any]]) -> None:
         """An emulator found for the first time gets its save folders and a game key shared by every device.
@@ -2894,6 +2900,106 @@ class KeepsakeApp:
         await self.emit("keepsake_steam_ops")
         return {"id": op_id}
 
+    # Games you can stream from another device: Steam Remote Play's entries (ADR-0064)
+
+    async def remote_copies_report(self, entries: Any) -> dict[str, Any]:
+        """The frontend's reading of Steam's library. Warns about local shortcuts hidden from elsewhere."""
+        outcome = await asyncio.to_thread(self.remote_copies.save_report, entries)
+        for found in outcome["newlyHidden"][:3]:
+            await self.emit(
+                "keepsake_toast",
+                f"{found['name']} was hidden in Steam, perhaps from your other device. "
+                "Open Keepsake's Games page to show it again.",
+            )
+        outcome["tidied"] = 0
+        if self.settings.get("tidyAutomatically") and self.settings.get("streamTidyVerified"):
+            log = await asyncio.to_thread(self.remote_copies.tidy_log)
+            left = {int(k) for k, v in log["hidden"].items() if v.get("state") == "undone"}
+            fresh = [c["appid"] for c in await self._copies() if c["presence"] == discovery.REMOTE and not c["hidden"]]
+            fresh = [a for a in fresh if a not in left]  # a copy the user brought back stays
+            if fresh:
+                outcome["tidied"] = (await self.tidy_copies(fresh, automatic=True))["queued"]
+        return outcome
+
+    async def _copies(self) -> list[dict[str, Any]]:
+        games = (await self.discover_games())["games"]
+        return await asyncio.to_thread(self.remote_copies.copies, games)
+
+    async def remote_copies_status(self) -> dict[str, Any]:
+        """Every streaming entry, the tidy-up log, and whether Steam has reported yet."""
+        report = await asyncio.to_thread(self.remote_copies.report)
+        log = await asyncio.to_thread(self.remote_copies.tidy_log)
+        return {
+            "reportAt": report.get("at"),
+            "copies": await self._copies(),
+            "log": log["hidden"],
+            "automatic": bool(self.settings.get("tidyAutomatically")),
+            "tidyAvailable": bool(self.settings.get("streamTidyVerified")),  # off until A201 is verified
+            "newlyHidden": [
+                {"appid": e["appid"], "name": e["name"]}
+                for e in report["entries"]
+                if e["steam"] == discovery.LOCAL and e["hidden"]
+            ],
+        }
+
+    async def tidy_copies(self, appids: list[int], automatic: bool = False) -> dict[str, Any]:
+        """Hide the chosen streaming entries in Steam. Only entries Steam itself says are on another device."""
+        if not self.settings.get("streamTidyVerified"):
+            raise ValueError("hiding streaming entries is not available yet: it may hide the game on your other device")
+        if not isinstance(appids, list) or not appids:
+            raise ValueError("choose at least one game")
+        certain = {c["appid"]: c for c in await self._copies() if c["presence"] == discovery.REMOTE}
+        refused = [a for a in appids if a not in certain]
+        if refused and not automatic:
+            raise ValueError("some of those are not certainly streamed from another device, so nothing was changed")
+        queued = 0
+        for appid in [a for a in appids if a in certain]:
+            op_id = await asyncio.to_thread(
+                self._ops().enqueue, "core", "set-hidden", {"appid": int(appid), "hidden": True}
+            )
+            await asyncio.to_thread(self.remote_copies.record, int(appid), certain[appid]["name"], "pending", op_id)
+            queued += 1
+        if queued:
+            await self.emit("keepsake_steam_ops")
+        log_event(logging.INFO, "remotecopies.tidy", "Tidy-up queued", count=queued, automatic=automatic)
+        return {"queued": queued}
+
+    async def undo_tidy(self) -> dict[str, Any]:
+        """Show again everything a tidy-up hid, and remember not to hide those again by itself."""
+        log = await asyncio.to_thread(self.remote_copies.tidy_log)
+        queued = 0
+        for key, entry in log["hidden"].items():
+            if entry.get("state") in ("pending", "hidden", "came-back"):
+                op_id = await asyncio.to_thread(
+                    self._ops().enqueue, "core", "set-hidden", {"appid": int(key), "hidden": False}
+                )
+                await asyncio.to_thread(
+                    self.remote_copies.record, int(key), str(entry.get("name", "")), "undone", op_id
+                )
+                queued += 1
+        if queued:
+            await self.emit("keepsake_steam_ops")
+        log_event(logging.INFO, "remotecopies.undo", "Tidy-up undone", count=queued)
+        return {"queued": queued}
+
+    async def unhide_local(self, appid: int) -> dict[str, Any]:
+        """Show a hidden local shortcut again (the guard's one-press fix). Only shortcuts Steam says are local."""
+        verdict = (await asyncio.to_thread(self.remote_copies.steam_verdicts)).get(int(appid))
+        if not verdict or verdict["steam"] != discovery.LOCAL:
+            raise ValueError("that is not a shortcut on this device")
+        op_id = await asyncio.to_thread(
+            self._ops().enqueue, "core", "set-hidden", {"appid": int(appid), "hidden": False}
+        )
+        await self.emit("keepsake_steam_ops")
+        return {"id": op_id}
+
+    async def _remote_shortcuts_probe(self) -> dict[str, Any]:
+        games = (await self.discover_games())["games"]
+        copies = await asyncio.to_thread(self.remote_copies.copies, games)
+        log = await asyncio.to_thread(self.remote_copies.tidy_log)
+        found = remotecopies.check(copies, games, lambda key: bool(self.game_configs.get(key).get("enabled")), log)
+        return {**found, "reportAt": (await asyncio.to_thread(self.remote_copies.report)).get("at")}
+
     async def steam_ops_claim(self) -> dict[str, Any] | None:
         if self.steam_ops is None:
             return None
@@ -2903,6 +3009,14 @@ class KeepsakeApp:
         await asyncio.to_thread(self._ops().finish, int(op_id), bool(ok), dict(result))
         log_event(logging.INFO, "steamops.finished", "Steam operation finished", id=int(op_id), ok=bool(ok))
         op = await asyncio.to_thread(self._ops().get, int(op_id))
+        if op and op["kind"] == "set-hidden" and op["payload"].get("hidden") is True:
+            appid = int(op["payload"]["appid"])
+            log = await asyncio.to_thread(self.remote_copies.tidy_log)
+            entry = log["hidden"].get(str(appid))
+            if entry and entry.get("op") == int(op_id):  # read back: Steam now says it is hidden
+                hidden = bool(ok and dict(result).get("readBack") is True)
+                state = "hidden" if hidden else "failed"
+                await asyncio.to_thread(self.remote_copies.record, appid, str(entry.get("name", "")), state)
         if op and op["module"] == "replication" and self.incoming:
             offer = await asyncio.to_thread(self.incoming.op_finished, int(op_id), bool(ok), dict(result))
             if offer and offer["state"] == "done":
@@ -3930,6 +4044,7 @@ class KeepsakeApp:
             work_dir=os.path.join(self.paths.runtime_dir, "device-checks"),
             links=self.links,
             connect_for=self._replication_connect_for if self.links else None,
+            probes={"remote-shortcuts": self._remote_shortcuts_probe},
         )
 
     async def device_checks(self) -> dict[str, Any]:

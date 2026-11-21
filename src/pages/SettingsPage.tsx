@@ -6,6 +6,7 @@ import { ROUTE_PATH, SETUP_PATH } from "../routes";
 import { CloudSection } from "./CloudSection";
 import { ExportSection } from "./ExportSection";
 import { ModulesSection } from "./ModulesSection";
+import { TidyCopies } from "./TidyCopies";
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -115,6 +116,7 @@ export function SettingsPage() {
         disabled={locked || !(settings?.steamCloudDetection ?? true)}
         onChange={(on) => void save("steamAutoSync", on, on ? "Steam games without Steam Cloud sync automatically." : "Steam games only sync when you turn them on.")}
       />
+      <TidyCopies />
       <ToggleField
         label="Registry keys"
         description="Allow games to sync the Proton registry keys their manifest entry lists. Each game still has to turn it on."

@@ -51,6 +51,8 @@ class Context:
     work_dir: str
     links: Any = None  # replication.service.Links, when Replication runs
     connect_for: Callable[[str], Callable[[], Awaitable[Any]]] | None = None
+    # Findings only the app can gather (its games, settings and Steam's report), by check id.
+    probes: dict[str, Callable[[], Awaitable[dict[str, Any]]]] = field(default_factory=dict)
 
 
 @dataclass
@@ -473,6 +475,31 @@ async def check_find(ctx: Context) -> dict[str, Any]:
     )
 
 
+async def check_remote_shortcuts(ctx: Context) -> dict[str, Any]:
+    """Games you can stream from another device: Steam Remote Play's entries (ADR-0064). No device names."""
+    probe = ctx.probes.get("remote-shortcuts")
+    if probe is None:
+        return result("skip", "Switch on the Saves module, then run it again.")
+    found = await probe()
+    if found.get("reportAt") is None:
+        return result("skip", "Steam has not reported its library yet: open the Games page once, then run it again.")
+    counts = {k: found[k] for k in ("local", "remote", "unsure", "hidden", "cameBack")}
+    clashes = list(found["clashes"])
+    text = (
+        f"{found['local']} shortcuts installed here, {found['remote']} games you can stream from another device"
+        + (f", {found['unsure']} not sure" if found["unsure"] else "")
+        + (f", {found['hidden']} hidden by a tidy-up" if found["hidden"] else "")
+        + (f", {found['cameBack']} came back after hiding" if found["cameBack"] else "")
+        + "."
+        + (f" Also installed here: {', '.join(clashes[:5])}." if clashes else "")
+    )
+    if found["syncedOnCopy"]:
+        names = ", ".join(found["syncedOnCopy"][:5])
+        return result("fail", f"{text} Synced games Steam says stream: {names}.", clashes=len(clashes), **counts)
+    status = "warn" if found["cameBack"] else "pass"
+    return result(status, text, clashes=len(clashes), **counts)
+
+
 _SPEED_BLOCK = b""
 
 
@@ -509,6 +536,9 @@ CHECKS = [
         "speed", "Link speed to the other handheld", "both", "replication_measure.py send and serve", check_link_speed
     ),
     Check("find", "Finding the other handheld", "both", "A190", check_find),
+    Check(
+        "remote-shortcuts", "Games you can stream from another device", "one", "A199 to A201", check_remote_shortcuts
+    ),
 ]
 BY_ID = {c.id: c for c in CHECKS}
 

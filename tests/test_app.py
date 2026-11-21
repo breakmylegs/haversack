@@ -129,7 +129,7 @@ def test_startup_notice_after_update_is_given_once(tmp_path):
         return await app.take_startup_notice(), await app.take_startup_notice()
 
     first, second = asyncio.run(run())
-    assert first == {"from": "0.2.0", "to": "0.2.1"}
+    assert {k: first[k] for k in ("from", "to")} == {"from": "0.2.0", "to": "0.2.1"}  # plus What's new notes
     assert second is None
 
 

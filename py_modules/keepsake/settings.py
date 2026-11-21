@@ -61,6 +61,11 @@ DEFAULTS: dict[str, Any] = {
     # to every home network and VPN address, or to the one address chosen here.
     "replicationListener": False,
     "replicationAddress": "",
+    # Hide streaming entries as they appear (ADR-0064). Off until the user chooses.
+    "tidyAutomatically": False,
+    # The tidy-up stays off and unseen until a device run shows hiding a streaming entry leaves the real game
+    # on the other device visible (A201). Not a user setting: a later version turns it on once verified.
+    "streamTidyVerified": False,
 }
 SIGNIN_METHODS = ("browser", "phone")
 MODULE_NAMES = ("saves", "advisor", "replication", "installer", "desktop")
@@ -90,6 +95,7 @@ USER_KEYS = frozenset(
         "otherLaunchers",
         "replicationListener",
         "replicationAddress",
+        "tidyAutomatically",
     }
 )
 IDLE_MINUTES_RANGE = (10, 240)
@@ -212,6 +218,7 @@ def _validate(key: str, value: Any) -> Any:
         "tipsDismissed",
         "otherLaunchers",
         "replicationListener",
+        "tidyAutomatically",
     ):
         if not isinstance(value, bool):
             raise SettingsError("must be true or false")

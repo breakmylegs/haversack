@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import glob
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -359,6 +359,8 @@ class GameEntry:
     icon: str = ""
     # "windows" for a native Windows game on a Windows host (resolve.platform_of uses it, ADR-0038).
     os: str = "linux"
+    # Shortcuts: "local" or "unsure" from the file; "remote" only from Steam's report (ADR-0064).
+    presence: str = "local"
 
     def public(self) -> dict[str, Any]:
         return asdict(self)
@@ -385,6 +387,27 @@ def shortcut_base_dir(shortcut: Shortcut) -> str | None:
         return os.path.realpath(start)
     exe = _unquote(shortcut.exe)
     return os.path.realpath(os.path.dirname(exe)) if exe else None
+
+
+LOCAL = "local"
+REMOTE = "remote"
+UNSURE = "unsure"
+
+
+def shortcut_presence(
+    exe: str, start_dir: str, prefix: str | None, exists: Callable[[str], bool] = os.path.exists
+) -> str:
+    """What the file alone says about a shortcut in ``shortcuts.vdf`` (ADR-0064).
+
+    Steam Remote Play's streaming entries for games on another device come from that device's
+    running Steam and are not in this file, so the file never makes a shortcut ``remote``:
+    - ``local``: the exe or the start folder exists, or there is a Proton prefix;
+    - ``unsure``: none of them is here (an unusual exe path, a removed SD card, a game deleted
+      by hand). It stays in every list; only Steam's own install state can say otherwise.
+    """
+    if prefix or any(exists(p) for p in (exe, start_dir) if p):
+        return LOCAL
+    return UNSURE
 
 
 def discover(home: str | None = None, host: str = "decky", windows_paths: list[str] | None = None) -> dict[str, Any]:
@@ -443,6 +466,7 @@ def discover(home: str | None = None, host: str = "decky", windows_paths: list[s
                         artwork=artwork_files(root, user, sc.appid_unsigned),
                         icon=_unquote(sc.icon),
                         os="windows" if windows else "linux",
+                        presence=LOCAL if windows else shortcut_presence(exe, _unquote(sc.start_dir), prefix),
                     )
                 )
 

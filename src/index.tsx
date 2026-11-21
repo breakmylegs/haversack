@@ -16,6 +16,7 @@ import { agoText, BACKEND_LABELS, HEALTH_COLOURS, HEALTH_LABELS, newerText, SYNC
 import { startLifecycle } from "./lifecycle";
 import { startProbes } from "./probes";
 import { startSteamOps } from "./steamops";
+import { startRemoteCopies } from "./remotecopies";
 import { AdvisorQam } from "./pages/AdvisorQam";
 import { openCheckpointModal } from "./pages/CheckpointModal";
 import { openWhatsNew } from "./pages/WhatsNewModal";
@@ -214,6 +215,7 @@ export default definePlugin(() => {
   const stopProbes = startProbes();
   const stopLifecycle = startLifecycle();
   const stopSteamOps = startSteamOps();
+  const stopRemoteCopies = startRemoteCopies();
   // Messages from the backend, such as "Recovered missed exit backup for <game>".
   const toastListener = addEventListener<[string]>("keepsake_toast", (body) =>
     toaster.toast({ title: "Keepsake", body }),
@@ -229,6 +231,7 @@ export default definePlugin(() => {
       stopProbes();
       stopLifecycle();
       stopSteamOps();
+      stopRemoteCopies();
       removeEventListener("keepsake_toast", toastListener);
       routerHook.removeRoute(ROUTE_PATH);
       routerHook.removeRoute(SETUP_PATH);
