@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import functools
 import json
 import logging
@@ -16,10 +17,12 @@ import re
 import secrets
 import shutil
 import sys
+import threading
 import time
 import uuid
 import zipfile
 from collections.abc import Callable, Coroutine, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -59,6 +62,7 @@ from .advisor.service import Advisor, AdvisorError
 from .auth import GOOGLE, AuthError, DeviceCodeFlow, TokenManager, TokenStore
 from .backends import BackendConfigError, CredentialStore
 from .bus import EventBus
+from .desktop import dbus as desktop_dbus
 from .desktop import entries as desktop_entries
 from .engine import SnapshotEngine
 from .freeze import Freezer
@@ -155,6 +159,16 @@ async def _no_emit(event: str, *args: Any) -> None:
 
 
 # Games whose launch Keepsake cannot see: newer saves come in from the idle pass (ADR-0051).
+SCAN_WAIT = 20.0  # seconds a game scan may take before the last list is used
+
+
+def low_priority() -> None:
+    """A disk thread runs at a lower CPU priority (Linux: per thread). I/O priority would need ioprio_set,
+    which the standard library does not offer; the kernel's scheduler still favours interactive work."""
+    with contextlib.suppress(AttributeError, OSError):
+        os.setpriority(os.PRIO_PROCESS, threading.get_native_id(), 10)  # type: ignore[attr-defined, unused-ignore]
+
+
 AUTO_PULL_KINDS = ("heroic", "lutris", "bottles", "emulator")
 AUTO_SYNC_METHODS = ("steam-id", "title", "manual")  # matches with known save locations (ADR-0063)
 SCRUB_FILE = "integrity.json"
@@ -317,6 +331,11 @@ class KeepsakeApp:
         self.paths = paths
         self.home = home
         self._games: dict[str, Any] | None = None
+        # Disk work on its own low-priority threads, so a slow or offline disk never ties up the shared pool
+        # or the event loop (v0.30.1); one game scan at a time.
+        self._disk = ThreadPoolExecutor(max_workers=3, thread_name_prefix="keepsake-disk", initializer=low_priority)
+        self._scan_future: asyncio.Future[dict[str, Any]] | None = None
+        self._scan_slow = False
         self.remote_copies = remotecopies.RemoteCopies(paths.runtime_dir)
         self.manifest = manifest.ManifestStore(paths.runtime_dir, download=download)
         self.game_configs = GameConfigStore(paths.settings_dir)
@@ -755,12 +774,17 @@ class KeepsakeApp:
 
     # Status and updates
 
-    async def get_status(self) -> dict[str, Any]:
+    def status_now(self) -> dict[str, Any]:
+        """The status from memory only: no disk and no event loop, so it answers at once from any thread (v0.30.1)."""
         return {
             "version": self.version,
             "safeMode": self.settings.read_only,
             "busy": self.jobs.busy_reason(),
+            "scanSlow": self._scan_slow,
         }
+
+    async def get_status(self) -> dict[str, Any]:
+        return self.status_now()
 
     async def take_startup_notice(self) -> dict[str, Any] | None:
         """Once after an update: the versions and that version's changelog section ("What's new", ADR-0049)."""
@@ -795,14 +819,41 @@ class KeepsakeApp:
 
     # Discovery
 
+    def _scan_all(self) -> dict[str, Any]:
+        """Disk thread: Steam's libraries, then the other launchers (a slow or absent disk only slows this)."""
+        found = discovery.discover(self.home, self.host)
+        if self.host != "windows" and self.settings.get("otherLaunchers"):
+            others = launchers.discover_all(discovery.real_home(self.home))
+            found = {**found, "games": [*found["games"], *others]}
+            self._emulator_defaults(others)
+        return found
+
+    async def _scan(self) -> dict[str, Any]:
+        """One scan at a time, on the low-priority disk threads, bounded in time (v0.30.1).
+
+        A disk that is slow, spinning up or gone can hold a scan in the kernel; then the last list is
+        used and the status says so, and nothing else waits on it.
+        """
+        loop = asyncio.get_running_loop()
+        if self._scan_future is None or self._scan_future.done():
+            self._scan_future = loop.run_in_executor(self._disk, self._scan_all)
+        try:
+            found = await asyncio.wait_for(asyncio.shield(self._scan_future), SCAN_WAIT)
+        except TimeoutError:
+            if self._games is None:
+                raise ValueError(
+                    "the game scan is taking a long time (a disk may be slow or offline); try again"
+                ) from None
+            self._scan_slow = True
+            log_event(logging.WARNING, "discovery.slow", "Game scan is slow; using the last list")
+            return self._games
+        self._scan_slow = False
+        return found
+
     async def discover_games(self, refresh: bool = False) -> dict[str, Any]:
         """Scan Steam on this device. Cached until ``refresh``."""
         if self._games is None or refresh:
-            self._games = await asyncio.to_thread(discovery.discover, self.home, self.host)
-            if self.host != "windows" and self.settings.get("otherLaunchers"):
-                found = await asyncio.to_thread(launchers.discover_all, discovery.real_home(self.home))
-                self._games = {**self._games, "games": [*self._games["games"], *found]}
-                await asyncio.to_thread(self._emulator_defaults, found)
+            self._games = await self._scan()
             counts: dict[str, int] = {}
             for game in self._games["games"]:
                 counts[game["kind"]] = counts.get(game["kind"], 0) + 1
@@ -1161,14 +1212,17 @@ class KeepsakeApp:
         return records
 
     async def identity_candidates(self, game: dict[str, Any], index: dict[str, Any] | None) -> list[dict[str, Any]]:
-        roots = resolve.logical_roots(game, home=self.home)
-        windows_paths = resolve.platform_of(game) in resolve.WINDOWS_PLATFORMS  # case-insensitive names
-        probe = identity.probe_for(roots, lambda root: windows_paths and root in resolve.WIN_ROOTS, resolve.expand)
         records = await self._identities()
         device_id = str(self.settings.get("deviceId"))
-        return await asyncio.to_thread(
-            identity.candidates, identity.local_hints(game), index, records, probe, device_id
-        )
+
+        def ranked() -> list[dict[str, Any]]:
+            # On a disk thread: roots and probes touch the game's folders, which may be on a slow disk.
+            roots = resolve.logical_roots(game, home=self.home)
+            windows_paths = resolve.platform_of(game) in resolve.WINDOWS_PLATFORMS  # case-insensitive names
+            probe = identity.probe_for(roots, lambda root: windows_paths and root in resolve.WIN_ROOTS, resolve.expand)
+            return identity.candidates(identity.local_hints(game), index, records, probe, device_id)
+
+        return await asyncio.get_running_loop().run_in_executor(self._disk, ranked)
 
     def _taken_keys(self, games: list[dict[str, Any]], index: dict[str, Any] | None, except_key: str) -> set[str]:
         taken = set()
@@ -2572,6 +2626,65 @@ class KeepsakeApp:
                 os.unlink(os.path.join(self.paths.runtime_dir, loopback.STATE_FILE))  # no token left behind
             except OSError:
                 pass
+
+    async def _tray_probe(self) -> dict[str, Any]:
+        """Desktop tray responsive (v0.30.1): how fast the tray answers D-Bus and the page answers get_status."""
+
+        def probe() -> dict[str, Any]:
+            uid = os.getuid() if hasattr(os, "getuid") else 0
+            out: dict[str, Any] = {
+                "trayMs": None,
+                "statusMs": None,
+                "tray": False,
+                "page": self._desktop_server is not None,
+            }
+            bus_path = f"/run/user/{uid}/bus"
+            if os.path.exists(bus_path):
+                try:
+                    conn = desktop_dbus.Connection(f"unix:path={bus_path}", timeout=1.0)
+                    try:
+                        names = conn.call(
+                            "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "ListNames"
+                        )[0]
+                        items = [n for n in names if str(n).startswith("org.kde.StatusNotifierItem-")]
+                        out["tray"] = bool(items)
+                        slowest = 0.0
+                        for name in items[:4]:
+                            started = time.perf_counter()
+                            conn.call(
+                                name,
+                                "/StatusNotifierItem",
+                                "org.freedesktop.DBus.Properties",
+                                "GetAll",
+                                "s",
+                                ["org.kde.StatusNotifierItem"],
+                            )
+                            slowest = max(slowest, time.perf_counter() - started)
+                        out["trayMs"] = round(slowest * 1000, 1) if items else None
+                    finally:
+                        conn.close()
+                except (desktop_dbus.DBusError, OSError) as exc:
+                    out["trayError"] = type(exc).__name__
+            state = read_json(os.path.join(self.paths.runtime_dir, "host.json"), default={})
+            if isinstance(state, dict) and state.get("port") and state.get("token"):
+                import urllib.request
+
+                request = urllib.request.Request(
+                    f"http://127.0.0.1:{int(state['port'])}/api/call/get_status",
+                    data=b'{"args": []}',
+                    headers={"Content-Type": "application/json", "X-Keepsake-Token": str(state["token"])},
+                    method="POST",
+                )
+                started = time.perf_counter()
+                try:
+                    with urllib.request.urlopen(request, timeout=2) as response:  # our own loopback page
+                        response.read(4096)
+                    out["statusMs"] = round((time.perf_counter() - started) * 1000, 1)
+                except OSError as exc:
+                    out["statusError"] = type(exc).__name__
+            return out
+
+        return await asyncio.to_thread(probe)
 
     async def _desktop_probe(self) -> dict[str, Any]:
         def probe() -> dict[str, Any]:
@@ -4574,6 +4687,7 @@ class KeepsakeApp:
     async def stop(self) -> None:
         for task in self._background:
             task.cancel()
+        self._disk.shutdown(wait=False, cancel_futures=True)  # a scan held by a slow disk is left behind
         await asyncio.to_thread(self.freezer.resume_all, "unload")
         await self.registry.stop_all()
         if self.db is not None:
@@ -4659,6 +4773,7 @@ class KeepsakeApp:
                 "smb-find": lambda: asyncio.to_thread(lanfind.find_servers, 2.5, self._lan_sockets),
                 "network-iso": self._network_iso_probe,
                 "session-sources": self._session_sources_probe,
+                "tray-responsive": self._tray_probe,
                 **({"desktop-app": self._desktop_probe} if self.registry.enabled("desktop") else {}),
             },
         )

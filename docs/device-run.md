@@ -80,6 +80,8 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
 
 8. **Two save locations.** On the Go, open the Cloud page and add a second save location (for example **Directly between my devices** next to OneDrive). Play and quit a synced game. Both locations should list it as reached, with nothing left to copy. Turn the Wi-Fi off, play and quit again (it should not block), turn it back on, and after a few minutes the Cloud page should show nothing left to copy.
 
+9. **Desktop tray responsive.** With the USB disk attached (and the EmuDeck folders on it), switch to Desktop Mode. Open the Keepsake tray menu repeatedly and use the taskbar and start menu for a minute: nothing should freeze. Run the Device check **Desktop tray responsive** from the desktop page's Diagnostics: it should pass, with both times under 200 ms.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

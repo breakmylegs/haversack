@@ -4,6 +4,22 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Desktop Mode taskbar could freeze** (plasmashell stopped responding while KWin and Konsole kept working, until the plugin was stopped). Cause:
+  - Plasma asks a tray icon for its properties and menu and waits for the answer.
+  - Keepsake's tray checked the plugin over HTTP, with up to 3 seconds' wait, on the same thread that answers Plasma: when its menu was about to open, and every 30 seconds.
+  - When the plugin was slow, for example while a disk on a dock was slow or offline, every check held Plasma up.
+  - Clicking the icon also had two threads reading the tray's D-Bus connection.
+
+  Now:
+  - the tray answers Plasma at once from what it last knew;
+  - it checks the plugin on a separate thread, one check at a time, with a 1-second limit;
+  - it opens the window over a connection of its own;
+  - it signals Plasma only when its status changes, at most every 2 seconds.
+
+  The plugin's page also gives its status without waiting for anything. Game scans run on their own low-priority threads, one at a time; a disk that is slow, spinning up or gone no longer holds anything up, and the last list of games is used. A new Device check, "Desktop tray responsive", times both and fails above 200 ms.
+
 ## [0.30.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

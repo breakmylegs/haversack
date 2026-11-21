@@ -198,6 +198,7 @@ def call(member, iface, path, body=()):
 def test_tray_properties_menu_and_events(tmp_path, monkeypatch):
     conn = FakeConn()
     item = tray.Tray(runtime_with_state(tmp_path), "/plugin", conn, opener_for({"conflicts": 0}))
+    item.refresh()  # the refresher's first check
     props = item.handle(call("GetAll", tray.PROPS_IFACE, tray.ITEM_PATH, [tray.ITEM_IFACE]))[1][0]
     assert props["Status"] == ("s", "Active") and props["Menu"] == ("o", tray.MENU_PATH)
     assert props["IconThemePath"] == ("s", os.path.join("/plugin", "assets", "icons"))
@@ -206,14 +207,12 @@ def test_tray_properties_menu_and_events(tmp_path, monkeypatch):
     labels = [child[1][1].get("label", ("s", "-"))[1] for child in layout[2]]
     assert labels == ["Keepsake is running", "-", "Open Keepsake", "Quit"]
     assert layout[2][2][1][1]["enabled"] == ("b", True)
-    opened = []
-    monkeypatch.setattr(item, "open_window", lambda: opened.append(True))
     item.handle(call("Event", tray.MENU_IFACE, tray.MENU_PATH, [tray.MENU_OPEN, "clicked", ("s", ""), 0]))
+    assert item.open_after and item.wanted.is_set()  # the refresher opens it, never the D-Bus thread
+    item.open_after = False
+    item.wanted.clear()
     item.handle(call("Activate", tray.ITEM_IFACE, tray.ITEM_PATH, [0, 0]))
-    import time
-
-    time.sleep(0.05)
-    assert len(opened) == 2
+    assert item.open_after and item.wanted.is_set()
     assert item.running is True
     item.handle(call("EventGroup", tray.MENU_IFACE, tray.MENU_PATH, [[(tray.MENU_QUIT, "clicked", ("s", ""), 0)]]))
     assert item.running is False  # Quit stops the tray
@@ -229,6 +228,7 @@ def test_unreachable_backend_says_so_and_greys_out_open(tmp_path):
         raise OSError
 
     item = tray.Tray(str(tmp_path), "/plugin", FakeConn(), refused)
+    item.refresh()
     layout = item.handle(call("GetLayout", tray.MENU_IFACE, tray.MENU_PATH, [0, -1, []]))[1][1]
     assert layout[2][0][1][1]["label"] == ("s", tray.NOT_REACHABLE)
     assert layout[2][2][1][1]["enabled"] == ("b", False)
@@ -239,19 +239,29 @@ def test_refresh_signals_only_on_change_and_window_opens_through_the_portal(tmp_
     conn = FakeConn()
     runtime = runtime_with_state(tmp_path)
     status = {"conflicts": 0}
-    item = tray.Tray(runtime, "/plugin", conn, lambda r, timeout: opener_for(status)(r, timeout))
-    assert item.refresh() is False and conn.signals == []
+    now = [0.0]
+    opened = []
+    item = tray.Tray(
+        runtime,
+        "/plugin",
+        conn,
+        lambda r, timeout: opener_for(status)(r, timeout),
+        portal=lambda link: opened.append(link) or True,
+        clock=lambda: now[0],
+    )
+    assert item.refresh() is True and conn.signals[0][2] == "LayoutUpdated" and item.revision == 2  # first status
+    assert item.refresh() is False and len(conn.signals) == 2  # unchanged: nothing sent
     status["conflicts"] = 1
-    assert item.refresh() is True and conn.signals[0][2] == "LayoutUpdated" and item.revision == 2
+    now[0] += 5
+    assert item.refresh() is True and len(conn.signals) == 4 and item.revision == 3
     assert item.open_window() is True
-    portal = next(c for c in conn.calls if c[0] == "org.freedesktop.portal.Desktop")
-    assert portal[3] == "OpenURI" and portal[5][1] == "http://127.0.0.1:47120/#token=tok"
+    assert opened == ["http://127.0.0.1:47120/#token=tok"]  # through the portal, on its own connection
 
 
 def test_window_falls_back_to_the_desktops_browser(tmp_path, monkeypatch):
     opened = []
     monkeypatch.setattr("webbrowser.open", lambda url: opened.append(url) or True)
-    item = tray.Tray(runtime_with_state(tmp_path), "/plugin", FakeConn(portal_fails=True), opener_for({}))
+    item = tray.Tray(runtime_with_state(tmp_path), "/plugin", FakeConn(), opener_for({}), portal=lambda link: False)
     assert item.open_window() is True and opened == ["http://127.0.0.1:47120/#token=tok"]
 
 
@@ -382,3 +392,28 @@ def test_device_check_needs_the_page_running():
     ctx = devicechecks.Context("", "", "", "", {}, "", probes={"desktop-app": probe})
     outcome = asyncio.run(devicechecks.run("desktop-app", ctx))
     assert outcome["status"] == "warn" and "page is not running" in outcome["found"]
+
+
+def test_the_portal_uses_its_own_connection_and_reports_failure(monkeypatch):
+    calls = []
+
+    class Conn:
+        def __init__(self, timeout):
+            calls.append(("open", timeout))
+
+        def call(self, *args):
+            calls.append(args[3])
+            return []
+
+        def close(self):
+            calls.append("close")
+
+    monkeypatch.setattr(dbus, "Connection", Conn)
+    assert tray.open_with_portal("http://127.0.0.1:1/#token=t") is True
+    assert calls == [("open", 2.0), "OpenURI", "close"]
+
+    def no_bus(timeout):
+        raise dbus.DBusError("no session bus")
+
+    monkeypatch.setattr(dbus, "Connection", no_bus)
+    assert tray.open_with_portal("http://127.0.0.1:1/#token=t") is False

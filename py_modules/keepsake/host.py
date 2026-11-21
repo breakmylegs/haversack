@@ -403,6 +403,8 @@ class Api:
         return name in CALLABLES or (name in HOST_CALLABLES and self.control is not None)
 
     def call(self, name: str, args: list[Any]) -> Any:
+        if name == "get_status" and hasattr(self.app, "status_now"):
+            return self.app.status_now()  # from memory, never waiting on the event loop (v0.30.1)
         target = self.control if name in HOST_CALLABLES else self.app
         method: Callable[..., Coroutine[Any, Any, Any]] = getattr(target, name)
         return asyncio.run_coroutine_threadsafe(method(*args), self.loop).result(CALL_TIMEOUT)
