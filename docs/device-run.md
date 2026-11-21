@@ -82,7 +82,7 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
 
 9. **Desktop tray responsive.** With the USB disk attached (and the EmuDeck folders on it), switch to Desktop Mode. Open the Keepsake tray menu repeatedly and use the taskbar and start menu for a minute: nothing should freeze. Run the Device check **Desktop tray responsive** from the desktop page's Diagnostics: it should pass, with both times under 200 ms.
 
-10. **Sending a game, both sides (v0.31.0).**
+10. **Sending a game, both sides (v0.30.2).**
     - Send Factorio (or any non-Steam game) from the Go to the Go 2 and accept it on the Go 2.
     - The Go's Devices page should change from "offered" to "copying", then "adding to Steam", then "arrived".
     - Send another game, and on the Go 2 choose a library folder without enough space, or pull the SD card while it copies. The Go 2 should show it as failed with the reason. The Go should show "did not arrive" with the same reason, and a toast.

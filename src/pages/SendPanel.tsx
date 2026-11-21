@@ -2,6 +2,7 @@ import { ConfirmModal, DialogButton, Field, Focusable, showModal } from "@decky/
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { PairedDevice, replicationSend, replicationStatus } from "../backend";
+import { plainError } from "../format";
 
 // "Send to <device>" on a non-Steam game's page (ADR-0059). Shown only while Replication runs.
 export function SendPanel({ gameKey, gameName }: { gameKey: string; gameName: string }) {
@@ -24,8 +25,9 @@ export function SendPanel({ gameKey, gameName }: { gameKey: string; gameName: st
       <ConfirmModal
         strTitle={`Send ${gameName} to ${peer.name}?`}
         strDescription={
-          "Keepsake offers the game, its Proton prefix, its compatibility tool and its artwork to that device. " +
-          "Nothing is copied until you accept it there. If Saves syncs this game, the newest saves go first."
+          "Keepsake checks that device has space, then copies the game, its Proton prefix, its compatibility tool " +
+          "and its artwork there, and adds it to Steam. It starts by itself; either device can stop and remove it. " +
+          "If Saves syncs this game, the newest saves go first."
         }
         strOKButtonText="Send"
         strCancelButtonText="Cancel"
@@ -38,7 +40,7 @@ export function SendPanel({ gameKey, gameName }: { gameKey: string; gameName: st
               : "";
             toaster.toast({ title: "Keepsake", body: `Preparing ${result.title} for ${peer.name}.${dropped}` });
           } catch (err) {
-            toaster.toast({ title: "Keepsake", body: String(err) });
+            toaster.toast({ title: "Keepsake", body: plainError(err) });
           } finally {
             setBusy(false);
           }

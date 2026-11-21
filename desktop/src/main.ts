@@ -419,7 +419,7 @@ function sendButtons(g: GameMatch, peers: PairedDevice[]): HTMLElement | null {
     ...peers.map((peer) =>
       button(`Send to ${peer.name}`, async () => {
         const ok = window.confirm(
-          `Send ${g.name} to ${peer.name}? Keepsake offers the game, its prefix, its compatibility tool and its artwork. Nothing is copied until it is accepted there.`,
+          `Send ${g.name} to ${peer.name}? Keepsake checks it has space, then copies the game, its prefix, its compatibility tool and its artwork there and adds it to Steam. It starts by itself; either device can stop and remove it.`,
         );
         if (!ok) return;
         const r = await call<{ title: string; droppedOptions: string[] }>("replication_send", g.key, peer.id);

@@ -126,3 +126,7 @@ In `docs/device-run.md`, part 4:
 - **Step 16:** Get this game.
 - **Step 17:** Stop and remove from each side.
 - **Step 18:** the desktop table.
+
+## Patch 0.31.1
+
+Send's confirmation, in Gaming Mode and the desktop app, still said nothing is copied until the game is accepted on the other device. It now says the game starts by itself, after a space check, and that either device can stop and remove it. The device-run list's step 10 label is back to 0.30.2: the release script's version update had changed it, and the script now touches only the install lines. These are wording changes only, with no backend change, so they are covered by the type check, lint and the build. Threat model: no change, because nothing behaves differently.
