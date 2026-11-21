@@ -2,10 +2,10 @@
 
 No SSH, terminal or laptop is needed. Do the first two parts on each handheld, then the rest with both. "Go" is the Legion Go and "Go 2" the Legion Go 2.
 
-## 1. Install v0.30.0 (each handheld)
+## 1. Install v0.31.0 (each handheld)
 
 1. Open the Quick Access Menu, then Decky, then Keepsake, then the full Keepsake page.
-2. Open **Updates**, press **Check for updates**, then **Update now**. Confirm Decky's prompt to install v0.30.0, and Decky reloads Keepsake.
+2. Open **Updates**, press **Check for updates**, then **Update now**. Confirm Decky's prompt to install v0.31.0, and Decky reloads Keepsake.
 3. In **Settings**, then **Modules**, switch on **Replication**. On **Devices**, switch on **Let other devices reach this one**.
 
 ## 2. Device checks (each handheld)
@@ -82,13 +82,13 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
 
 9. **Desktop tray responsive.** With the USB disk attached (and the EmuDeck folders on it), switch to Desktop Mode. Open the Keepsake tray menu repeatedly and use the taskbar and start menu for a minute: nothing should freeze. Run the Device check **Desktop tray responsive** from the desktop page's Diagnostics: it should pass, with both times under 200 ms.
 
-10. **Sending a game, both sides (v0.30.2).**
+10. **Sending a game, both sides (v0.31.0).**
     - Send Factorio (or any non-Steam game) from the Go to the Go 2 and accept it on the Go 2.
     - The Go's Devices page should change from "offered" to "copying", then "adding to Steam", then "arrived".
     - Send another game, and on the Go 2 choose a library folder without enough space, or pull the SD card while it copies. The Go 2 should show it as failed with the reason. The Go should show "did not arrive" with the same reason, and a toast.
     - On the Go 2, run **Device checks** and press **Export results**. The file should have a "replication" part with the states, and no game titles.
 
-11. **OneDrive sign-in (v0.30.2).**
+11. **OneDrive sign-in (v0.31.0).**
     - On the Cloud page, press **Sign in with OneDrive** and finish in Steam's browser. It should end on "You're signed in", never a "cannot connect" page.
     - Reload that page within 2 minutes: it should still say "You're signed in".
     - Start again. While the browser is open, press **Use your phone instead** and finish on your phone. The toast should say "Signed in with your phone". If you go back to the browser tab, it should say you signed in on your phone.
