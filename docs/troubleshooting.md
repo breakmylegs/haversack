@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Start with Keepsake, Diagnostics, **Run checks**. Each check says what is wrong and what to do. The Quick Access Menu badge shows the worst result.
+Start with Keepsake, Diagnostics, Health, **Run checks**. Each check says what is wrong and what to do. The Quick Access Menu badge shows the worst result.
 
 | What you see | What it means | What to do |
 |---|---|---|
@@ -32,8 +32,8 @@ Decky runs plugins with its own built-in Python, which only includes the standar
 
 ## Getting details off the device
 
-Diagnostics, **Export diagnostics** writes one JSON file in `~/homebrew/settings/Keepsake/`. It is redacted (no tokens, passwords or account names) but lists your games. Logs are in `~/homebrew/logs/Keepsake/`. Over SSH: `scp deck@<address>:homebrew/settings/Keepsake/diagnostics-*.json .`
+Diagnostics, Tools, **Export diagnostics** writes one JSON file in `~/homebrew/settings/Keepsake/`. It is redacted (no tokens, passwords or account names) but lists your games. Logs are in `~/homebrew/logs/Keepsake/`. Over SSH: `scp deck@<address>:homebrew/settings/Keepsake/diagnostics-*.json .`
 
 ## Starting again on one device
 
-Settings, Run setup again walks through every step. Your cloud history is never deleted by setup.
+Settings, General, Run setup again walks through every step. Your cloud history is never deleted by setup.

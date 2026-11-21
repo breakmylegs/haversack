@@ -39,7 +39,7 @@ Once a week, Keepsake checks that the cloud copies of each game's important snap
 
 ## Exporting your saves
 
-You can take your saves out of Keepsake at any time. In **Settings**, **Export snapshots** copies them as plain zip files to a folder you choose, such as an SD card or a USB drive: either the latest snapshot of each game, or every snapshot. The export folder also holds a list of what each zip contains, and a short note explaining the folder names inside the zips. Nothing already in that folder is overwritten.
+You can take your saves out of Keepsake at any time. In **Saves**, **Import and export**, **Export snapshots** copies them as plain zip files to a folder you choose, such as an SD card or a USB drive: either the latest snapshot of each game, or every snapshot. The export folder also holds a list of what each zip contains, and a short note explaining the folder names inside the zips. Nothing already in that folder is overwritten.
 
 ## Clean-up
 

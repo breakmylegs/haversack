@@ -323,6 +323,20 @@ export type GameTransfer = {
   canClear: boolean;
 };
 export const replicationActivity = callable<[], GameTransfer[]>("replication_activity");
+
+// This handheld, for Device's Status tab (layout v3, ADR-0073).
+export interface DeviceStatus {
+  model: string;
+  vendor: string;
+  profile: string;
+  how: "detected" | "generic" | "override";
+  apu: string;
+  tdp: { min?: number; max?: number; default?: number };
+  display: { width?: number | null; height?: number | null; refresh_hz_max?: number | null; vrr?: boolean };
+  facts: Record<string, string>;
+  battery: { percent: number | null; mains: boolean | null; present: boolean };
+}
+export const deviceStatus = callable<[], DeviceStatus>("device_status");
 export const replicationStopGame = callable<[entryId: string], GameTransfer[]>("replication_stop_game");
 export const replicationClearGame = callable<[entryId: string], GameTransfer[]>("replication_clear_game");
 export const replicationPeerGames = callable<[peerId: string], { id: string; title: string }[]>("replication_peer_games");

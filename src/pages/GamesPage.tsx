@@ -20,7 +20,7 @@ import {
   updateGameConfig,
   bringNewer,
 } from "../backend";
-import { newerText, SYNC_LABELS } from "../format";
+import { newerText, plainError, SYNC_LABELS } from "../format";
 import { GameDetail } from "./GameDetail";
 import { askApproveMatch } from "../matchApproval";
 import { TidyCopies } from "./TidyCopies";
@@ -181,7 +181,7 @@ export function GamesPage() {
           : `Manifest not updated: ${MANIFEST_REASONS[outcome.reason ?? ""] ?? outcome.reason}.`,
       });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Manifest not updated: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Manifest not updated: ${plainError(err)}` });
     } finally {
       setRefreshing(false);
       setProgress(null);
@@ -250,7 +250,7 @@ export function GamesPage() {
               done += 1;
             }
           } catch (err) {
-            toaster.toast({ title: "Keepsake", body: `Stopped after ${done} games: ${err}` });
+            toaster.toast({ title: "Keepsake", body: `Stopped after ${done} games: ${plainError(err)}` });
           } finally {
             setBulkBusy(false);
             toaster.toast({ title: "Keepsake", body: on ? `${done} games now sync.` : `${done} games no longer sync.` });
@@ -279,7 +279,7 @@ export function GamesPage() {
                 : `${name} is already up to date.`;
       toaster.toast({ title: "Keepsake", body });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBulkBusy(false);
       void scan(false);

@@ -2,15 +2,23 @@
 // Plain TypeScript and the DOM: no framework, no third-party code, nothing from another origin.
 
 import { ApiError, call, hasToken, initialPage, onEvents } from "./api.js";
+import { lineChart } from "./charts.js";
 import { h, replace, size, when } from "./dom.js";
+import { sortableTable } from "./table.js";
 import type {
   ActivityEntry,
   CloudStatus,
   ConflictDetails,
   ConflictEntry,
   ConflictSide,
+  AdvisorDesk,
+  AdvisorSessionDesk,
+  DeviceCheckDesk,
+  DeviceCheckResultDesk,
+  DeviceStatusDesk,
   FoundDevice,
   GameTransfer,
+  LogRecordDesk,
   GameMatch,
   ImportAllStatus,
   LinkCheck,
@@ -33,7 +41,7 @@ import type {
   UpdateCheck,
 } from "./types.js";
 
-type Page = { id: string; title: string; render: (main: HTMLElement) => Promise<void> };
+type Page = { id: string; title: string; group: string; render: (main: HTMLElement) => Promise<void> };
 
 const storeNames: Record<string, string> = {
   local: "Test store on this device",
@@ -375,13 +383,39 @@ const matchText: Record<string, string> = {
   "no-manifest": "save database not downloaded yet",
 };
 
+// Games shown with their full card under the table row (layout v3, ADR-0073).
+const openGames = new Set<string>();
+let gameState = "all";
+
+const GAME_STATES: Record<string, (g: GameMatch) => boolean> = {
+  all: () => true,
+  syncing: (g) => g.enabled,
+  off: (g) => !g.enabled,
+  choice: (g) => Boolean(g.proposal) || g.method === "ambiguous" || g.method === "none",
+  newer: (g) => Boolean(g.newer),
+};
+
 async function games(main: HTMLElement, filter = ""): Promise<void> {
   const all = await call<GameMatch[]>("match_games");
   // Paired devices, for "Send to" on non-Steam games (ADR-0059). None while Replication is off.
   const peers = await call<ReplicationStatus>("replication_status").then((s) => s.peers, () => [] as PairedDevice[]);
-  const shown = all.filter((g) => g.name.toLowerCase().includes(filter.toLowerCase()));
+  const shown = all.filter((g) => g.name.toLowerCase().includes(filter.toLowerCase()) && (GAME_STATES[gameState] ?? GAME_STATES.all)(g));
   const search = h("input", { type: "search", placeholder: "Find a game", value: filter, "aria-label": "Find a game" }) as HTMLInputElement;
-  search.addEventListener("change", () => void games(main, search.value));
+  search.addEventListener("input", () => void games(main, search.value).then(() => {
+    const again = document.querySelector<HTMLInputElement>('input[aria-label="Find a game"]');
+    again?.focus();
+    again?.setSelectionRange(again.value.length, again.value.length);
+  }));
+  const state = h("select", { "aria-label": "Show" }) as HTMLSelectElement;
+  for (const [value, label] of [["all", "All games"], ["syncing", "Syncing"], ["off", "Not syncing"], ["choice", "Needs a choice"], ["newer", "Newer save elsewhere"]]) {
+    const option = h("option", { value }, label) as HTMLOptionElement;
+    option.selected = value === gameState;
+    state.append(option);
+  }
+  state.addEventListener("change", () => {
+    gameState = state.value;
+    void games(main, filter);
+  });
   // Bulk actions (ADR-0048): only shown games whose save data is known.
   const syncable = shown.filter((g) => !g.proposal && ["manual", "manual-key", "steam-id", "title"].includes(g.method));
   const bulk = (on: boolean) =>
@@ -404,10 +438,30 @@ async function games(main: HTMLElement, filter = ""): Promise<void> {
     main,
     h("h1", {}, "Games"),
     h("p", {}, "Turn sync on for the games whose saves should follow you. Keepsake finds each game's saves from the Ludusavi manifest."),
-    h("div", { class: "actions" }, search, syncable.length ? bulk(true) : null, syncable.length ? bulk(false) : null),
+    h("div", { class: "actions" }, search, state, syncable.length ? bulk(true) : null, syncable.length ? bulk(false) : null),
     shown.length
-      ? h("ul", { class: "list" }, ...shown.map((g) => h("li", {}, gameCard(g, main, filter, peers))))
-      : h("p", { class: "empty" }, filter ? "No game matches that name." : "No games found yet."),
+      ? sortableTable(
+          "games",
+          [
+            { title: "Game", value: (g) => g.name, cell: (g) => h("strong", {}, g.name) },
+            { title: "Kind", value: (g) => kindText[g.kind] ?? g.kind, cell: (g) => kindText[g.kind] ?? "Game" },
+            { title: "Sync", value: (g) => (g.enabled ? 1 : 0), cell: (g) => (g.enabled ? "On" : "Off") },
+            { title: "State", value: (g) => syncText[g.sync] ?? g.sync, cell: (g) => (g.newer ? `${syncText[g.sync] ?? g.sync}; newer elsewhere` : (syncText[g.sync] ?? g.sync)) },
+            { title: "Save data", value: (g) => matchText[g.method] ?? g.method, cell: (g) => (g.proposal ? "Needs a choice" : (matchText[g.method] ?? g.method)) },
+            {
+              title: "",
+              cell: (g) =>
+                button(openGames.has(g.key) ? "Close" : "Details", async () => {
+                  if (openGames.has(g.key)) openGames.delete(g.key);
+                  else openGames.add(g.key);
+                  await games(main, filter);
+                }),
+            },
+          ],
+          shown,
+          (g) => (openGames.has(g.key) ? gameCard(g, main, filter, peers) : null),
+        )
+      : h("p", { class: "empty" }, filter || gameState !== "all" ? "No game matches." : "No games found yet."),
   );
 }
 
@@ -1138,42 +1192,37 @@ function leftText(seconds: number | null): string {
 function transfersDashboard(items: GameTransfer[], main: HTMLElement): HTMLElement | null {
   if (!items.length) return null;
   const again = () => devices(main);
-  const row = (t: GameTransfer) => {
-    const bar = h("progress", { max: "100", value: String(t.percent), "aria-label": `${t.title} ${t.percent}%` });
-    return h(
-      "tr",
-      {},
-      h("td", {}, h("strong", {}, t.title), t.reason ? h("div", { class: t.stage === "failed" ? "warn" : "" }, t.reason) : null),
-      h("td", {}, t.direction === "sending" ? `To ${t.peer}` : `From ${t.peer}`),
-      h("td", {}, STAGE_TEXT[t.stage]),
-      h("td", {}, bar, ` ${t.percent}%`),
-      h("td", {}, t.total ? `${gibText(t.done)} of ${gibText(t.total)}` : ""),
-      h("td", {}, t.stage === "copying" && t.bytesPerSecond ? `${(t.bytesPerSecond / 1e6).toFixed(0)} MB/s` : ""),
-      h("td", {}, t.stage === "copying" ? leftText(t.secondsLeft) : ""),
-      h(
-        "td",
-        {},
-        t.canStop
-          ? button("Stop and remove", async () => {
-              const where = t.direction === "receiving" ? "Everything this copy made on this device is deleted." : `${t.peer} is asked to delete everything this copy made there. The game here is not touched.`;
-              if (!window.confirm(`Stop and remove ${t.title}? ${where}`)) return;
-              await call("replication_stop_game", t.id);
-              await again();
-            })
-          : null,
-        t.canClear ? button("Clear", async () => (await call("replication_clear_game", t.id), await again())) : null,
-      ),
+  const actionsFor = (t: GameTransfer) =>
+    h(
+      "div",
+      { class: "actions" },
+      t.canStop
+        ? button("Stop and remove", async () => {
+            const where = t.direction === "receiving" ? "Everything this copy made on this device is deleted." : `${t.peer} is asked to delete everything this copy made there. The game here is not touched.`;
+            if (!window.confirm(`Stop and remove ${t.title}? ${where}`)) return;
+            await call("replication_stop_game", t.id);
+            await again();
+          })
+        : null,
+      t.canClear ? button("Clear", async () => (await call("replication_clear_game", t.id), await again())) : null,
     );
-  };
   return h(
     "section",
     { class: "card" },
     h("h2", {}, "Games moving between devices"),
-    h(
-      "table",
-      {},
-      h("thead", {}, h("tr", {}, ...["Game", "Device", "Stage", "Progress", "Done", "Speed", "Time left", ""].map((c) => h("th", {}, c)))),
-      h("tbody", {}, ...items.map(row)),
+    sortableTable(
+      "transfers",
+      [
+        { title: "Game", value: (t) => t.title, cell: (t) => h("div", {}, h("strong", {}, t.title), t.reason ? h("div", { class: t.stage === "failed" ? "warn" : "" }, t.reason) : null) },
+        { title: "Device", value: (t) => t.peer, cell: (t) => (t.direction === "sending" ? `To ${t.peer}` : `From ${t.peer}`) },
+        { title: "Stage", value: (t) => STAGE_TEXT[t.stage], cell: (t) => STAGE_TEXT[t.stage] },
+        { title: "Progress", value: (t) => t.percent, cell: (t) => h("span", {}, h("progress", { max: "100", value: String(t.percent), "aria-label": `${t.title} ${t.percent}%` }), ` ${t.percent}%`) },
+        { title: "Done", value: (t) => t.done, cell: (t) => (t.total ? `${gibText(t.done)} of ${gibText(t.total)}` : "") },
+        { title: "Speed", value: (t) => t.bytesPerSecond, cell: (t) => (t.stage === "copying" && t.bytesPerSecond ? `${(t.bytesPerSecond / 1e6).toFixed(0)} MB/s` : "") },
+        { title: "Time left", value: (t) => t.secondsLeft ?? Number.MAX_SAFE_INTEGER, cell: (t) => (t.stage === "copying" ? leftText(t.secondsLeft) : "") },
+        { title: "", cell: (t) => actionsFor(t) },
+      ],
+      items,
     ),
   );
 }
@@ -1342,20 +1391,184 @@ function peerItem(peer: PairedDevice, main: HTMLElement): HTMLElement {
 
 // The shell
 
+// Layout v3 (ADR-0073, docs/design/layout-v3.md): the seven sections of Gaming Mode, in the same
+// order, each a group of pages. Install stays in Gaming Mode for now.
 const PAGES: Page[] = [
-  { id: "overview", title: "Overview", render: overview },
-  { id: "conflicts", title: "Conflicts", render: conflicts },
-  { id: "games", title: "Games", render: (main) => games(main) },
-  { id: "cloud", title: "Cloud", render: cloud },
-  { id: "import", title: "Import", render: importPage },
-  { id: "devices", title: "Devices", render: (main) => devices(main) },
-  { id: "history", title: "History", render: history },
-  { id: "activity", title: "Activity", render: activityPage },
-  { id: "health", title: "Health", render: health },
-  { id: "modules", title: "Modules", render: modules },
-  { id: "updates", title: "Updates", render: (main) => updates(main) },
-  { id: "settings", title: "Settings", render: settingsPage },
+  { id: "overview", title: "Overview", group: "", render: overview },
+  { id: "advisor", title: "Advisor", group: "Play", render: advisorPage },
+  { id: "games", title: "Games", group: "Saves", render: (main) => games(main) },
+  { id: "conflicts", title: "Conflicts", group: "Saves", render: conflicts },
+  { id: "history", title: "History", group: "Saves", render: history },
+  { id: "activity", title: "Activity", group: "Saves", render: activityPage },
+  { id: "import", title: "Import", group: "Saves", render: importPage },
+  { id: "devices", title: "Moving games and devices", group: "Games and devices", render: (main) => devices(main) },
+  { id: "device", title: "Status", group: "Device", render: deviceStatusPage },
+  { id: "settings", title: "General and sync", group: "Settings", render: settingsPage },
+  { id: "cloud", title: "Cloud", group: "Settings", render: cloud },
+  { id: "modules", title: "Modules", group: "Settings", render: modules },
+  { id: "updates", title: "Updates", group: "Settings", render: (main) => updates(main) },
+  { id: "health", title: "Health", group: "Diagnostics", render: health },
+  { id: "checks", title: "Device checks", group: "Diagnostics", render: deviceChecksPage },
+  { id: "logs", title: "Logs", group: "Diagnostics", render: logsPage },
 ];
+
+// The settings search: every setting's label and the page it is on. Choosing one opens that
+// page and highlights the setting.
+const SETTINGS_INDEX: { label: string; page: string }[] = [
+  ["Device name", "settings"], ["Background sync", "settings"], ["Show a message after each save", "settings"],
+  ["Safety gates", "settings"], ["Refuse if more than", "settings"], ["Refuse if the total size", "settings"],
+  ["Launch check timeout", "settings"], ["Steam games", "settings"], ["Registry keys", "settings"],
+  ["Detect Steam Cloud", "settings"], ["Snapshot when the device sleeps", "settings"], ["Other launchers", "settings"],
+  ["Save locations", "cloud"], ["OneDrive", "cloud"], ["Google Drive", "cloud"], ["WebDAV", "cloud"], ["S3", "cloud"],
+  ["Sign in", "cloud"], ["Modules", "modules"], ["Replication", "modules"], ["Advisor", "modules"], ["Installer", "modules"],
+  ["Pre-releases", "updates"], ["Check for updates", "updates"], ["Roll back", "updates"],
+  ["Let other devices reach this one", "devices"], ["Pair a device", "devices"], ["Listen on", "devices"],
+].map(([label, page]) => ({ label, page }));
+
+function settingsSearch(): HTMLElement {
+  const input = h("input", { type: "search", placeholder: "Search settings", "aria-label": "Search settings", list: "settings-index" }) as HTMLInputElement;
+  const options = h("datalist", { id: "settings-index" }, ...SETTINGS_INDEX.map((s) => h("option", { value: s.label })));
+  const go = async () => {
+    const wanted = input.value.trim().toLowerCase();
+    const hit = SETTINGS_INDEX.find((s) => s.label.toLowerCase() === wanted) ?? SETTINGS_INDEX.find((s) => s.label.toLowerCase().includes(wanted));
+    if (!wanted || !hit) {
+      if (wanted) toast("No setting by that name.");
+      return;
+    }
+    await show(hit.page);
+    const main = document.getElementById("main") as HTMLElement;
+    const target = [...main.querySelectorAll("label, h2, h3, strong, th, button")].find((e) => e.textContent?.toLowerCase().includes(hit.label.toLowerCase()));
+    if (target) {
+      target.scrollIntoView({ block: "center" });
+      target.classList.add("found");
+      setTimeout(() => target.classList.remove("found"), 2500);
+    }
+  };
+  input.addEventListener("change", () => void go());
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") void go();
+  });
+  return h("div", { class: "search" }, input, options);
+}
+
+// Play: Advisor, with the last sessions as charts (layout v3)
+async function advisorPage(main: HTMLElement): Promise<void> {
+  const view = await call<AdvisorDesk>("advisor_view");
+  if (!view.running) {
+    replace(main, h("h1", {}, "Advisor"), h("p", {}, "Switch on Advisor in Modules to see recommendations and session history here."));
+    return;
+  }
+  const recent = [...(view.sessions?.recent ?? [])].reverse(); // oldest first, left to right
+  const labels = recent.map((s) => new Date(s.start * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short" }));
+  const pick = (f: (s: AdvisorSessionDesk) => number | null | undefined) => recent.map((s) => {
+    const v = f(s);
+    return typeof v === "number" ? Math.round(v * 10) / 10 : null;
+  });
+  const top = view.recommendations?.[0];
+  const lines = top ? [...top.lines.power, ...top.lines.display, ...top.lines.scaling] : [];
+  replace(
+    main,
+    h("h1", {}, "Advisor"),
+    h("p", {}, view.game ? `For ${view.game.name}. Advisor only reads and suggests; it never changes a setting.` : "Start a game for advice about it. Advisor only reads and suggests."),
+    lines.length ? h("section", { class: "card" }, h("h2", {}, "Suggested"), h("ul", {}, ...lines.map((l) => h("li", {}, l)))) : null,
+    (view.sessions?.advice ?? []).length
+      ? h("section", { class: "card" }, h("h2", {}, "From your sessions"), h("ul", {}, ...(view.sessions?.advice ?? []).map((a) => h("li", {}, a.text))))
+      : null,
+    h(
+      "section",
+      { class: "card charts" },
+      h("h2", {}, `Last ${recent.length} sessions`),
+      lineChart("Power", "W", labels, [
+        { label: "Average", className: "series-1", points: pick((s) => s.watts?.socketAvg) },
+        { label: "Peak", className: "series-2", points: pick((s) => s.watts?.socketPeak) },
+      ]),
+      lineChart("Temperature", "°C", labels, [
+        { label: "CPU peak", className: "series-3", points: pick((s) => s.cpu?.tempPeak) },
+        { label: "GPU peak", className: "series-4", points: pick((s) => s.gpu?.tempPeak) },
+      ]),
+      lineChart("Frame rate", "fps", labels, [
+        { label: "Average", className: "series-1", points: pick((s) => s.fps?.avg) },
+        { label: "1% low", className: "series-2", points: pick((s) => s.fps?.low1) },
+      ]),
+      lineChart("Battery", "% an hour", labels, [{ label: "Used", className: "series-3", points: pick((s) => s.battery?.percentPerHour) }]),
+    ),
+  );
+}
+
+// Device: Status (layout v3; the controls arrive with R21)
+async function deviceStatusPage(main: HTMLElement): Promise<void> {
+  const s = await call<DeviceStatusDesk>("device_status");
+  const battery = !s.battery.present ? "No battery: mains power." : `${s.battery.percent ?? "Unknown"}%${s.battery.mains ? ", on mains power" : ", on battery"}`;
+  replace(
+    main,
+    h("h1", {}, `${s.vendor ? `${s.vendor} ` : ""}${s.model}`),
+    h(
+      "table",
+      {},
+      h("tbody", {},
+        h("tr", {}, h("th", {}, "Profile"), h("td", {}, s.how === "generic" ? "Generic (no profile for this model)" : s.profile)),
+        h("tr", {}, h("th", {}, "Processor"), h("td", {}, s.apu || "Unknown")),
+        h("tr", {}, h("th", {}, "Power range"), h("td", {}, s.tdp.min != null && s.tdp.max != null ? `${s.tdp.min} to ${s.tdp.max} W` : "Unknown")),
+        h("tr", {}, h("th", {}, "Battery"), h("td", {}, battery)),
+      ),
+    ),
+    h("p", { class: "small" }, "Power, fan, battery, controller and display controls arrive here in the next releases."),
+  );
+}
+
+// Diagnostics: Device checks, as in Gaming Mode (Run all, Export results)
+async function deviceChecksPage(main: HTMLElement): Promise<void> {
+  const data = await call<{ checks: DeviceCheckDesk[]; results: DeviceCheckResultDesk[] }>("device_checks");
+  const results = new Map(data.results.map((r) => [r.id, r]));
+  replace(
+    main,
+    h("h1", {}, "Device checks"),
+    h("p", {}, "Each check tries one thing on this device and says what it found. Checks marked (both) need your other device too."),
+    h(
+      "div",
+      { class: "actions" },
+      button("Run all", async () => (await call("device_checks_run_all"), await deviceChecksPage(main)), "primary"),
+      button("Export results", async () => {
+        const r = await call<{ where: string }>("device_checks_export");
+        toast(`Saved as ${r.where}.`);
+      }),
+    ),
+    h(
+      "ul",
+      { class: "list" },
+      ...data.checks.map((c) => {
+        const r = results.get(c.id);
+        return h(
+          "li",
+          { class: `check ${r ? (r.status === "pass" ? "ok" : r.status === "skip" ? "info" : r.status === "warn" ? "warn" : "fail") : ""}` },
+          h("strong", {}, `${c.title}${c.needs === "both" ? " (both)" : ""}`),
+          h("p", {}, r ? `${r.status.toUpperCase()}: ${r.found}` : "Not run yet."),
+          button("Run", async () => (await call("device_check_run", c.id), await deviceChecksPage(main))),
+        );
+      }),
+    ),
+  );
+}
+
+// Diagnostics: Logs
+async function logsPage(main: HTMLElement): Promise<void> {
+  const records = await call<LogRecordDesk[]>("get_logs", 300);
+  replace(
+    main,
+    h("h1", {}, "Logs"),
+    h("p", {}, "Keepsake's own log, newest first. It never holds passwords, tokens or the contents of your saves."),
+    sortableTable(
+      "logs",
+      [
+        { title: "Time", value: (r) => r.ts, cell: (r) => r.ts.replace("T", " ").slice(0, 19) },
+        { title: "Level", value: (r) => r.level, cell: (r) => r.level },
+        { title: "Event", value: (r) => r.event, cell: (r) => r.event },
+        { title: "Message", value: (r) => r.msg, cell: (r) => r.msg },
+      ],
+      [...records].reverse(),
+    ),
+  );
+}
 
 async function show(id: string): Promise<void> {
   const page = PAGES.find((p) => p.id === id) ?? PAGES[0];
@@ -1379,14 +1592,18 @@ function start(): void {
     );
     return;
   }
-  replace(
-    nav,
-    ...PAGES.map((p) => {
-      const item = h("button", { type: "button", id: `nav-${p.id}` }, p.title);
-      item.addEventListener("click", () => void show(p.id));
-      return item;
-    }),
-  );
+  const groups: HTMLElement[] = [];
+  let current = "";
+  for (const p of PAGES) {
+    if (p.group !== current) {
+      current = p.group;
+      if (current) groups.push(h("h3", { class: "group" }, current));
+    }
+    const item = h("button", { type: "button", id: `nav-${p.id}` }, p.title);
+    item.addEventListener("click", () => void show(p.id));
+    groups.push(item);
+  }
+  replace(nav, settingsSearch(), ...groups);
   onEvents((event, args) => {
     if (event === "keepsake_toast" && typeof args[0] === "string") toast(args[0]);
     if (event === "keepsake_replication" && document.getElementById("nav-devices")?.getAttribute("aria-current") === "true") void show("devices");

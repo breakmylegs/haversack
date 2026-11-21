@@ -1,6 +1,7 @@
 import { ConfirmModal, DialogButton, Field, Focusable, showModal } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { GameConfig, strictUnwrap, strictWrap, updateGameConfig } from "../backend";
+import { plainError } from "../format";
 
 type Mode = GameConfig["launchGate"];
 
@@ -30,7 +31,7 @@ export function LaunchGatePanel({ gameKey, appid, mode, onMode }: { gameKey: str
             onMode("strict");
             toaster.toast({ title: "Keepsake", body: "Strict launch gate on." });
           } catch (err) {
-            toaster.toast({ title: "Keepsake", body: `Not changed: ${err}` });
+            toaster.toast({ title: "Keepsake", body: `Not changed: ${plainError(err)}` });
           }
         }}
       />,
@@ -51,7 +52,7 @@ export function LaunchGatePanel({ gameKey, appid, mode, onMode }: { gameKey: str
       }
       onMode(next);
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not changed: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Not changed: ${plainError(err)}` });
     }
   };
 

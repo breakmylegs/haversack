@@ -7,13 +7,12 @@ import {
   getStatus,
   qamSummary,
   QamSummary,
-  setSetting,
   syncNow,
   takeStartupNotice,
   UpdateStatus,
   replicationAnswer,
 } from "./backend";
-import { agoText, BACKEND_LABELS, HEALTH_COLOURS, HEALTH_LABELS, newerText, SYNC_LABELS } from "./format";
+import { agoText, BACKEND_LABELS, HEALTH_COLOURS, HEALTH_LABELS, newerText, plainError, SYNC_LABELS } from "./format";
 import { startLifecycle } from "./lifecycle";
 import { startProbes } from "./probes";
 import { startSteamOps } from "./steamops";
@@ -24,7 +23,7 @@ import { openCheckpointModal } from "./pages/CheckpointModal";
 import { openWhatsNew } from "./pages/WhatsNewModal";
 import { KeepsakeRoute } from "./pages/KeepsakeRoute";
 import { SetupWizard } from "./pages/SetupWizard";
-import { ROUTE_PATH, SETUP_PATH } from "./routes";
+import { openSection, ROUTE_PATH, SETUP_PATH } from "./routes";
 
 function openRoute(path: string) {
   Navigation.Navigate(path);
@@ -75,125 +74,90 @@ function Content() {
         : "Keepsake is busy with another job. Try again in a moment.";
       toaster.toast({ title: "Keepsake", body });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Sync failed: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Sync failed: ${plainError(err)}` });
     } finally {
       setSyncing(false);
       void refresh();
     }
   };
 
+  // Layout v3 (ADR-0073): one screen. Now playing, moving games, at most three things that need
+  // attention, then the status line and the two buttons. Nothing deeper.
+  const attention: { key: string; text: string; open: () => void }[] = [];
+  if (summary && !summary.setupComplete) attention.push({ key: "setup", text: "Set up Keepsake", open: () => openRoute(SETUP_PATH) });
+  if (summary && summary.conflicts > 0) {
+    const text = summary.conflicts === 1 ? "1 conflict needs your choice" : `${summary.conflicts} conflicts need your choice`;
+    attention.push({ key: "conflicts", text, open: () => openSection("saves", "conflicts") });
+  }
+  if (safeMode) attention.push({ key: "safe", text: "Safe mode: settings come from a newer version. Please update.", open: () => openSection("settings", "updates") });
+  for (const problem of summary?.problems ?? []) attention.push({ key: `p-${problem}`, text: `Check: ${problem}`, open: () => openSection("diagnostics", "health") });
+  for (const n of summary?.newer ?? []) attention.push({ key: `n-${n.key}`, text: `${n.name}: ${newerText(n)}`, open: () => openSection("saves", "games") });
+  if (update?.updateAvailable && update.latest) {
+    attention.push({ key: "update", text: `Update available: v${update.latest.version}`, open: () => openSection("settings", "updates") });
+  }
+
   return (
     <>
-    <PanelSection title="Status">
-      <PanelSectionRow>
-        <div style={{ fontSize: 12 }}>
-          {failed && "Backend not responding."}
-          {!failed && !summary && "Loading"}
-          {summary && (
-            <>
-              <span style={{ color: HEALTH_COLOURS[summary.health] }}>{"●"} </span>
-              {HEALTH_LABELS[summary.health]}
-              {`  |  ${storeText(summary)}  |  Last sync ${agoText(summary.lastSync)}`}
-              {version ? `  |  v${version}` : ""}
-            </>
-          )}
-        </div>
-      </PanelSectionRow>
-      {summary && summary.problems.length > 0 && (
-        <PanelSectionRow>
-          <div style={{ fontSize: 12 }}>Check: {summary.problems.slice(0, 3).join(", ")}</div>
-        </PanelSectionRow>
-      )}
-      {summary && !summary.setupComplete && (
-        <PanelSectionRow>
-          <ButtonItem layout="below" onClick={() => openRoute(SETUP_PATH)}>
-            Set up Keepsake
-          </ButtonItem>
-        </PanelSectionRow>
-      )}
       {summary?.currentGame && (
-        <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            description={SYNC_LABELS[summary.currentGame.status]}
-            onClick={() => openRoute(`${ROUTE_PATH}/games`)}
-          >
-            Playing: {summary.currentGame.name}
-          </ButtonItem>
-        </PanelSectionRow>
+        <PanelSection title="Now playing">
+          <PanelSectionRow>
+            <ButtonItem
+              layout="below"
+              description={SYNC_LABELS[summary.currentGame.status]}
+              onClick={() => openSection("play", "now")}
+            >
+              {summary.currentGame.name}
+            </ButtonItem>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <ButtonItem
+              layout="below"
+              onClick={() => summary.currentGame && openCheckpointModal(summary.currentGame.key, summary.currentGame.name)}
+            >
+              Save checkpoint
+            </ButtonItem>
+          </PanelSectionRow>
+          <AdvisorQam onOpen={() => openSection("play", "advisor")} />
+        </PanelSection>
       )}
-      {summary?.currentGame && (
+      <PanelSection title="Keepsake">
+        <GameTransfersCompact onOpen={() => openSection("games", "moving")} />
+        {attention.slice(0, 3).map((a) => (
+          <PanelSectionRow key={a.key}>
+            <ButtonItem layout="below" onClick={a.open}>
+              {a.text}
+            </ButtonItem>
+          </PanelSectionRow>
+        ))}
         <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            description="Save in the game first, then keep a named copy of that save."
-            onClick={() => summary.currentGame && openCheckpointModal(summary.currentGame.key, summary.currentGame.name)}
-          >
-            Save checkpoint
-          </ButtonItem>
-        </PanelSectionRow>
-      )}
-      {(summary?.newer ?? []).map((n) => (
-        <PanelSectionRow key={n.key}>
-          <ButtonItem
-            layout="below"
-            description="Brought in when you start the game, or now from Games."
-            onClick={() => openRoute(`${ROUTE_PATH}/games`)}
-          >
-            {n.name}: {newerText(n)}
-          </ButtonItem>
-        </PanelSectionRow>
-      ))}
-      {summary?.setupComplete && !summary.tipsDismissed && (
-        <PanelSectionRow>
-          <div style={{ fontSize: 12, marginBottom: 4 }}>
-            Tip: while you play, Save checkpoint keeps a named copy of your save. In a game&apos;s History you can bring back
-            older saves, even single files.
+          <div style={{ fontSize: 12 }}>
+            {failed && "Backend not responding."}
+            {!failed && !summary && "Loading"}
+            {summary && (
+              <>
+                <span style={{ color: HEALTH_COLOURS[summary.health] }}>{"●"} </span>
+                {HEALTH_LABELS[summary.health]}
+                {`  |  ${storeText(summary)}  |  Last sync ${agoText(summary.lastSync)}`}
+                {version ? `  |  v${version}` : ""}
+              </>
+            )}
           </div>
+        </PanelSectionRow>
+        <PanelSectionRow>
           <ButtonItem
             layout="below"
-            onClick={() => void setSetting("tipsDismissed", true).then(() => setSummary({ ...summary, tipsDismissed: true }))}
+            disabled={syncing || !summary || summary.enabledGames === 0 || Boolean(summary.busy)}
+            onClick={() => void runSync()}
           >
-            Got it
+            {syncing ? "Syncing" : "Sync now"}
           </ButtonItem>
         </PanelSectionRow>
-      )}
-      <GameTransfersCompact onOpen={() => openRoute(`${ROUTE_PATH}/devices`)} />
-      {summary && summary.conflicts > 0 && (
         <PanelSectionRow>
-          <ButtonItem layout="below" onClick={() => openRoute(`${ROUTE_PATH}/conflicts`)}>
-            {summary.conflicts === 1 ? "1 conflict needs your choice" : `${summary.conflicts} conflicts need your choice`}
+          <ButtonItem layout="below" onClick={() => openSection(summary?.currentGame ? "play" : "saves")}>
+            Open Keepsake
           </ButtonItem>
         </PanelSectionRow>
-      )}
-      {safeMode && (
-        <PanelSectionRow>
-          <div style={{ fontSize: 12 }}>Safe mode: settings come from a newer version. Please update.</div>
-        </PanelSectionRow>
-      )}
-      {update?.updateAvailable && update.latest && (
-        <PanelSectionRow>
-          <ButtonItem layout="below" onClick={() => openRoute(`${ROUTE_PATH}/updates`)}>
-            Update available: v{update.latest.version}
-          </ButtonItem>
-        </PanelSectionRow>
-      )}
-      <PanelSectionRow>
-        <ButtonItem
-          layout="below"
-          disabled={syncing || !summary || summary.enabledGames === 0 || Boolean(summary.busy)}
-          onClick={() => void runSync()}
-        >
-          {syncing ? "Syncing" : "Sync now"}
-        </ButtonItem>
-      </PanelSectionRow>
-      <PanelSectionRow>
-        <ButtonItem layout="below" onClick={() => openRoute(`${ROUTE_PATH}/games`)}>
-          Open Keepsake
-        </ButtonItem>
-      </PanelSectionRow>
-    </PanelSection>
-    <AdvisorQam onOpen={() => openRoute(`${ROUTE_PATH}/advisor`)} />
+      </PanelSection>
     </>
   );
 }

@@ -3,6 +3,7 @@ import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { DeviceCheck, DeviceCheckResult, deviceCheckRun, deviceChecks, deviceChecksExport, deviceChecksRunAll } from "../backend";
 import { QrCode } from "./QrCode";
+import { plainError } from "../format";
 
 const LABEL: Record<DeviceCheckResult["status"], string> = { pass: "Pass", warn: "Check", fail: "Fail", skip: "Skipped" };
 
@@ -28,7 +29,7 @@ export function DeviceChecks() {
       const outcome = await deviceCheckRun(id);
       setResults((prev) => ({ ...prev, [id]: outcome }));
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(null);
     }
@@ -40,7 +41,7 @@ export function DeviceChecks() {
       const s = await deviceChecksRunAll();
       setResults(Object.fromEntries(s.results.map((r) => [r.id, r])));
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(null);
     }
@@ -50,7 +51,7 @@ export function DeviceChecks() {
     try {
       setExported(await deviceChecksExport());
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     }
   };
 

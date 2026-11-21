@@ -15,7 +15,7 @@ import {
   SnapshotSummary,
   undoRestore,
 } from "../backend";
-import { kindText } from "../format";
+import { kindText, plainError } from "../format";
 import { openCheckpointModal } from "./CheckpointModal";
 
 const ACTION_WORD = { create: "would come back", replace: "would be replaced", delete: "would be removed" } as const;
@@ -43,7 +43,7 @@ export function SnapshotsPanel({ gameKey, gameName }: { gameKey: string; gameNam
     try {
       setListing(await listSnapshots(gameKey));
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Could not list snapshots: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Could not list snapshots: ${plainError(err)}` });
     }
   };
 
@@ -56,7 +56,7 @@ export function SnapshotsPanel({ gameKey, gameName }: { gameKey: string; gameNam
     try {
       toaster.toast({ title: "Keepsake", body: await work() });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
       await refresh();

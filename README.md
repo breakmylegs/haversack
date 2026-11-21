@@ -13,7 +13,7 @@ It is built for non-Steam shortcuts installed into their own Proton prefixes, wh
 - Keeps a history of snapshots with restore, pin and undo. Suspicious saves (many files gone) are kept on the device instead of being uploaded.
 - Works with OneDrive, Google Drive, WebDAV (for example Nextcloud) and S3.
 - Imports old Ludusavi backups, syncs registry keys for games that need them, and leaves Steam games with Steam Cloud alone.
-- Updates itself from its own Updates page.
+- Updates itself from Settings, Updates.
 
 ## Principles
 
@@ -33,7 +33,7 @@ https://github.com/breakmylegs/keepsake/releases/latest/download/Keepsake.zip
 
 1. In Decky Loader, open Settings, General, and enable Developer mode (once per device).
 2. Open Decky, Settings, Developer, Install Plugin from URL, and paste the URL above.
-3. After that, updates come through Keepsake's Updates page.
+3. After that, updates come through Keepsake's Settings, Updates.
 
 The URL always gives the newest stable release; pre-releases are only offered through the Updates page on the Pre-release channel. Each release also has a versioned copy, `Keepsake-v<version>.zip`, with the same bytes, and `SHA256SUMS` lists both names.
 
@@ -62,7 +62,7 @@ If an installer asks for the disc, press **Installer wants a disc drive** and st
 ## Help
 
 - [docs/troubleshooting.md](docs/troubleshooting.md): what each message means and what to do.
-- Keepsake, Diagnostics, Run checks: health checks for sign-in, sync, conflicts, prefixes and the manifest.
+- Keepsake, Diagnostics, Health, Run checks: health checks for sign-in, sync, conflicts, prefixes and the manifest.
 - [CHANGELOG.md](CHANGELOG.md): what changed in each version.
 
 ## Development

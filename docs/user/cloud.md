@@ -34,7 +34,7 @@ Enter the address, user name and password (or access keys) on the Cloud page in 
 
 If you would rather not use a cloud account, your devices can keep your saves in step with each other directly.
 
-1. Switch on **Replication** in Settings, **Modules**, and pair your devices in **Devices**. See [Replication](replication.md).
+1. Switch on **Replication** in Settings, **Modules**, and pair your devices in **Other devices**. See [Replication](replication.md).
 2. On each device, open the Cloud page, choose **Directly between my devices**, and press **Use Directly between my devices for snapshots**.
 
 Each device then keeps its own copy of your saves' history. When your devices can reach each other, each one fetches what it is missing:

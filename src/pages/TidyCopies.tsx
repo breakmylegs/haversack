@@ -6,6 +6,7 @@ import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { RemoteCopiesStatus, remoteCopiesStatus, setSetting, tidyCopies, undoTidy, unhideLocal } from "../backend";
 import { reportRemoteCopies } from "../remotecopies";
+import { plainError } from "../format";
 
 function TidyModal({ status, closeModal, onDone }: { status: RemoteCopiesStatus; closeModal?: () => void; onDone: () => void }) {
   const certain = status.copies.filter((c) => c.presence === "remote" && !c.hidden);
@@ -26,7 +27,7 @@ function TidyModal({ status, closeModal, onDone }: { status: RemoteCopiesStatus;
       onDone();
       closeModal?.();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
     }

@@ -2,7 +2,7 @@ import { ConfirmModal, DialogButton, Field, Focusable, showModal } from "@decky/
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { HistoryItem, pinSnapshot, recentHistory, releaseQuarantine, restoreSnapshot } from "../backend";
-import { isoText, kindText, sizeText } from "../format";
+import { isoText, kindText, plainError, sizeText } from "../format";
 
 function describe(s: HistoryItem): string {
   const flags = [
@@ -38,7 +38,7 @@ export function HistoryPage() {
     try {
       toaster.toast({ title: "Keepsake", body: await work() });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
       await refresh();

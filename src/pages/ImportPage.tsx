@@ -11,6 +11,7 @@ import {
   ludusaviScan,
   LudusaviGame,
 } from "../backend";
+import { plainError } from "../format";
 
 const IMPORT_EVENT = "keepsake_import_progress";
 
@@ -72,7 +73,7 @@ export function ImportPage() {
         onOK={() =>
           void ludusaviImportAll(root, mode)
             .then(setBatch)
-            .catch((err) => toaster.toast({ title: "Keepsake", body: `Import not started: ${err}` }))
+            .catch((err) => toaster.toast({ title: "Keepsake", body: `Import not started: ${plainError(err)}` }))
         }
       />,
     );
@@ -84,7 +85,7 @@ export function ImportPage() {
       setRoot(found.root);
       setGames(found.games);
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Could not read the folder: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Could not read the folder: ${plainError(err)}` });
     } finally {
       setBusy(false);
     }
@@ -95,7 +96,7 @@ export function ImportPage() {
       const picked = await openFilePicker(FOLDER, root.startsWith("/") ? root : "/home", false, true);
       await scan(picked.realpath || picked.path);
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `No folder chosen: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `No folder chosen: ${plainError(err)}` });
     }
   };
 
@@ -113,7 +114,7 @@ export function ImportPage() {
             setResults((r) => ({ ...r, [game.folder]: outcome.results }));
             toaster.toast({ title: game.name, body: summary(outcome.results) });
           } catch (err) {
-            toaster.toast({ title: "Keepsake", body: `Import failed: ${err}` });
+            toaster.toast({ title: "Keepsake", body: `Import failed: ${plainError(err)}` });
           } finally {
             setBusy(false);
           }

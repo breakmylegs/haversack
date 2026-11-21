@@ -6,7 +6,7 @@ import { DialogButton, Field, Focusable, ModalRoot, ToggleField, showModal } fro
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { UninstallJob, UninstallPlan, uninstallCancel, uninstallPlan, uninstallStart, uninstallStatus, uninstallSteam } from "../backend";
-import { sizeText } from "../format";
+import { plainError, sizeText } from "../format";
 
 const STATES: Record<string, string> = {
   starting: "Starting",
@@ -39,7 +39,7 @@ function ConfirmModal({ plan, closeModal, onStarted }: { plan: UninstallPlan; cl
       }
       closeModal?.();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -111,7 +111,7 @@ export function UninstallPanel({ gameKey, onGone }: { gameKey: string; onGone: (
       const plan = await uninstallPlan(gameKey);
       showModal(<ConfirmModal plan={plan} onStarted={() => void uninstallStatus().then(setJob)} />);
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     }
   };
   const running = job && !["done", "failed", "cancelled"].includes(job.state);

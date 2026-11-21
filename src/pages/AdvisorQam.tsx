@@ -1,9 +1,10 @@
-import { ButtonItem, PanelSection, PanelSectionRow } from "@decky/ui";
+import { ButtonItem, PanelSectionRow } from "@decky/ui";
 import { addEventListener, removeEventListener } from "@decky/api";
 import { useEffect, useState } from "react";
 import { advisorView, AdvisorView } from "../backend";
 
-// Advisor in the Quick Access Menu: the top advice for the game being played. Read-only (P16).
+// Advisor in the Quick Access Menu: the top advice for the game being played, two lines inside
+// Now playing (layout v3, ADR-0073). Read-only (P16).
 
 const ADVISOR_EVENT = "keepsake_advisor";
 
@@ -22,26 +23,13 @@ export function AdvisorQam({ onOpen }: { onOpen: () => void }) {
 
   if (!view?.running || !view.recommendations?.length) return null;
   const top = view.recommendations[0];
-  const lines = [...top.lines.power, ...top.lines.display, ...top.lines.scaling].slice(0, 4);
+  const lines = [...top.lines.power, ...top.lines.display, ...top.lines.scaling].slice(0, 2);
+  const where = top.source === "fallback" ? "general advice" : `from ${top.device_reported}, ${top.confidence} confidence`;
   return (
-    <PanelSection title="Advisor">
-      <PanelSectionRow>
-        <div style={{ fontSize: 12 }}>
-          {view.game ? `${view.game.name}: ` : `${view.device?.name}: `}
-          {top.source === "fallback" ? "general advice" : `from ${top.device_reported} (${top.matchLabel})`}, {top.confidence}{" "}
-          confidence
-        </div>
-      </PanelSectionRow>
-      {lines.map((line) => (
-        <PanelSectionRow key={line}>
-          <div style={{ fontSize: 12 }}>{line}</div>
-        </PanelSectionRow>
-      ))}
-      <PanelSectionRow>
-        <ButtonItem layout="below" onClick={onOpen}>
-          All advice
-        </ButtonItem>
-      </PanelSectionRow>
-    </PanelSection>
+    <PanelSectionRow>
+      <ButtonItem layout="below" description={lines.join(" ")} onClick={onOpen}>
+        Advisor ({where})
+      </ButtonItem>
+    </PanelSectionRow>
   );
 }

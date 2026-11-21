@@ -31,6 +31,7 @@ from . import (
     clients,
     configrev,
     devicechecks,
+    devices,
     diagnostics,
     directsync,
     discovery,
@@ -5357,6 +5358,33 @@ class KeepsakeApp:
         for check in devicechecks.CHECKS:
             await self.device_check_run(check.id)
         return await self.device_checks()
+
+    async def device_status(self) -> dict[str, Any]:
+        """This handheld, for Device's Status tab (layout v3, ADR-0073). Read-only, Core only.
+
+        The profile Keepsake detected from the model strings (never a serial number), battery and
+        charging. The device controls (R21) add their own tabs and readings.
+        """
+
+        def read() -> dict[str, Any]:
+            facts = devices.read_facts(self.power_root)
+            profile, how = devices.resolve(devices.load_profiles(), facts)
+            # A captured dump (tests) is read as Linux, as read_facts does; "/" is this device, on any system.
+            root = self.power_root
+            percent, mains = power.battery_state(root) if root == "/" else power.linux_battery_state(root)
+            return {
+                "model": str(profile.get("model") or "Unknown device"),
+                "vendor": str(profile.get("vendor") or ""),
+                "profile": str(profile.get("id") or "generic"),
+                "how": how,
+                "apu": str(profile.get("apu") or ""),
+                "tdp": dict(profile.get("tdp_w") or {}),
+                "display": dict(profile.get("display") or {}),
+                "facts": devices.public_facts(facts),
+                "battery": {"percent": percent, "mains": mains, "present": bool(facts.get("battery"))},
+            }
+
+        return await asyncio.to_thread(read)
 
     async def device_checks_export(self) -> dict[str, Any]:
         """Save the results as one redacted file, and give a short summary for the screen and a QR code."""

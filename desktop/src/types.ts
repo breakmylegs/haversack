@@ -274,3 +274,43 @@ export interface GameLink {
   policy: string;
   state: string;
 }
+
+// Layout v3 (ADR-0073): what the new desktop pages read.
+export interface DeviceStatusDesk {
+  model: string;
+  vendor: string;
+  profile: string;
+  how: string;
+  apu: string;
+  tdp: { min?: number; max?: number };
+  battery: { percent: number | null; mains: boolean | null; present: boolean };
+}
+export interface DeviceCheckDesk {
+  id: string;
+  title: string;
+  needs: "one" | "both";
+}
+export interface DeviceCheckResultDesk extends DeviceCheckDesk {
+  status: "pass" | "warn" | "fail" | "skip";
+  found: string;
+}
+export interface LogRecordDesk {
+  ts: string;
+  level: string;
+  event: string;
+  msg: string;
+}
+export interface AdvisorSessionDesk {
+  start: number;
+  watts?: { socketAvg: number | null; socketPeak: number | null };
+  cpu?: { tempPeak: number | null };
+  gpu?: { tempPeak: number | null };
+  fps?: { avg?: number; low1?: number };
+  battery?: { percentPerHour?: number };
+}
+export interface AdvisorDesk {
+  running: boolean;
+  game?: { name: string } | null;
+  recommendations?: { lines: { power: string[]; display: string[]; scaling: string[] } }[];
+  sessions?: { recent: AdvisorSessionDesk[]; advice: { text: string }[] };
+}

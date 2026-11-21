@@ -119,6 +119,21 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
 
 18. **Desktop app (v0.31.0).** In Desktop Mode, open Keepsake's Devices page during a copy. The table should show the game, device, stage, a moving progress bar, GiB, speed and time left, with **Stop and remove**.
 
+19. **New layout (v0.32.0).**
+    - Open Keepsake. The sidebar should show Play, Saves, Games and devices, Device, Install, Settings and Diagnostics, with lines between the groups.
+    - In each, the tabs along the top should move with the D-pad and open their page.
+    - Open the quick access menu while a game runs. Now playing, then Keepsake, should fit on one screen without scrolling.
+    - From the quick access menu, press a conflict or update line: it should open the right tab.
+
+20. **Device, Status (v0.32.0).** It should name the Legion Go or Legion Go 2 (not "generic"), its power range, its screen and the battery level and charging state.
+
+21. **Desktop app (v0.32.0).** In Desktop Mode, open Keepsake:
+    - The sidebar should have the same groups.
+    - Type "Background" in Search settings and press Enter: the setting should be highlighted.
+    - In Games, sort by each column and filter by state.
+    - Advisor should show charts of your last sessions.
+    - Diagnostics, Device checks, Run all should work, and **Desktop tray responsive** (step 9) can be run here.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

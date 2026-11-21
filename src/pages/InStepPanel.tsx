@@ -2,6 +2,7 @@ import { DialogButton, DropdownItem, Field, Focusable } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { GameLink, replicationCheckGame, replicationGames, replicationSendUpdate, replicationSetPolicy } from "../backend";
+import { plainError } from "../format";
 
 const STATE_TEXT: Record<GameLink["state"], string> = {
   "in-sync": "In step with the other device.",
@@ -29,7 +30,7 @@ export function InStepPanel({ appid }: { appid: number }) {
       await work();
       if (done) toaster.toast({ title: "Keepsake", body: done });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
       await load();

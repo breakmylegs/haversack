@@ -1,6 +1,6 @@
 # Storage
 
-Keepsake's **Storage** page, on a handheld, shows how much space each game uses: the game, its Proton prefix, its shader cache and its saves. **Count disk use** lists the biggest first. Quit a game before changing anything here.
+Keepsake's **Disk use** tab (in **Games and devices**), on a handheld, shows how much space each game uses: the game, its Proton prefix, its shader cache and its saves. **Count disk use** lists the biggest first. Quit a game before changing anything here.
 
 ## Clear the shader cache
 

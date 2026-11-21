@@ -23,7 +23,7 @@ import {
   locationsStatus,
   removeLocation,
 } from "../backend";
-import { BACKEND_LABELS } from "../format";
+import { BACKEND_LABELS, plainError } from "../format";
 import { QrCode } from "./QrCode";
 
 const SIGNIN_EVENT = "keepsake_signin";
@@ -139,7 +139,7 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
       const message = await work();
       if (message) toaster.toast({ title: "Keepsake", body: message });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
       await refresh();
