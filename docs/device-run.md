@@ -16,9 +16,11 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
 
 ## 3. Both handhelds
 
-1. **Pair.** On the Go, press **Let a device pair with this one**. On the Go 2, press **Find devices** and choose the Go.
-   - Check that both screens show the same 6-digit code.
-   - Press **The codes match** on both.
+1. **Pair** (both with **Let other devices reach this one** on). First run the Device check **The other handheld can be seen** on each.
+   - On the Go 2, press **Find devices**, choose the Go and press **Pair**. The Go 2 should say "Waiting for Legion Go to accept".
+   - The Go should show "Legion Go 2 wants to pair" with its address. Press **Accept**. The Go 2 should say "Legion Go accepted. Enter the code shown on it."
+   - Type the Go's 6-digit code on the Go 2's number pad with the controller and press **OK**. Both should show **Paired**.
+   - Also try once: a wrong code (both should say it was wrong), **Decline** on the Go, and a request while a game runs on the Go (only a notification; answer it afterwards under Devices).
 2. **Two-device checks.** On the Go 2, run **Link speed to the other handheld** and **Finding the other handheld**, then **Export results** again. Photograph it.
 3. **Reconnect.** Restart the Go. On the Go 2, go to Devices and press **Check** on the Go: it should say reachable.
 4. **Send a game.** On the Go 2, open an ISO-installed non-Steam game in Keepsake's Games and press **Send to Legion Go**. On the Go, go to Devices and press **Accept**. If it offers to copy the compatibility tool, say yes.

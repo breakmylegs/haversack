@@ -21,6 +21,7 @@ from .peers import PeerStore
 HOSTNAME = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9]([A-Za-z0-9-]{0,62})(\.[A-Za-z0-9]([A-Za-z0-9-]{0,62}))*\.?$")
 OVERLAY_NETWORKS = (ipaddress.ip_network("100.64.0.0/10"), ipaddress.ip_network("fd7a:115c:a1e0::/48"))
 KEEP_ENDED = 8
+ACTIVE_STATES = ("connecting", "waiting-accept", "enter-code", "request", "show-code", "checking")
 
 
 class ReplicationError(Exception):
@@ -150,25 +151,17 @@ class Links:
             task.cancel()
         await self.set_listener(False)
 
-    def open_pairing(self) -> dict[str, Any]:
-        if self.listener is None:
-            raise ReplicationError("switch on Replication's listener first, so the other device can reach this one")
-        self.listener.open_pairing()
-        return self.status()
-
-    def close_pairing(self) -> dict[str, Any]:
-        if self.listener is not None:
-            self.listener.close_pairing()
-        return self.status()
-
     def pair_with(self, address: str) -> dict[str, Any]:
+        """Send a pairing request (ADR-0070). The other device accepts it and shows the code to type here."""
         host, port = parse_address(address)
-        if any(p.state in ("connecting", "compare", "waiting") for p in self.initiated.values()):
+        if any(p.state in ACTIVE_STATES for p in self.initiated.values()):
             raise ReplicationError("a pairing is already under way")
         pairing = link.Pairing(secrets.token_hex(8), "initiator", f"{host}:{port}")
         self.initiated[pairing.id] = pairing
         self._trim(self.initiated)
-        task = asyncio.create_task(link.pair_as_initiator(self.me, self.store, pairing, host, port))
+        task = asyncio.create_task(
+            link.pair_as_initiator(self.me, self.store, pairing, host, port, changed=self.on_change)
+        )
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
         return pairing.public()
@@ -182,8 +175,17 @@ class Links:
         return pairing
 
     def answer(self, pairing_id: str, ok: bool) -> dict[str, Any]:
+        """Accept or Decline a pairing request on this device."""
         try:
             link.answer(self._pairing(pairing_id), ok)
+        except link.LinkError as exc:
+            raise ReplicationError(str(exc)) from exc
+        return self.status()
+
+    def enter_code(self, pairing_id: str, code: str) -> dict[str, Any]:
+        """The code shown on the other device, typed here. One entry per attempt."""
+        try:
+            link.enter_code(self._pairing(pairing_id), code)
         except link.LinkError as exc:
             raise ReplicationError(str(exc)) from exc
         return self.status()
@@ -210,8 +212,7 @@ class Links:
                 "on": listener is not None,
                 "addresses": self.hosts() if listener else [],
                 "port": listener.bound_port if listener else self.port,
-                "pairingOpen": bool(listener and listener.pairing_open()),
-                "pairingSecondsLeft": listener.window_seconds_left() if listener else 0,
+                "acceptsRequests": listener is not None,  # pairing requests come in while it is on (ADR-0070)
             },
             "discovery": {"on": self.responder is not None, "problem": self.discovery_problem if listener else None},
             "peers": self.store.list(),

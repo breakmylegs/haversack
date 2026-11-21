@@ -16,14 +16,17 @@ def test_the_transport_constants():
     assert link.PROTOCOL == 1
     assert link.DEFAULT_PORT == 47110
     assert link.CIPHERS == "ECDHE-PSK-CHACHA20-POLY1305"
-    assert link.PAIR_IDENTITY == "keepsake-pair/1"
-    assert link.PAIR_KEY.hex() == "7d88b8a8b1937f83bd5b45a9872162f3005b4b924c3d97e754f8eb9bb86f3049"
+    # Pairing by code (ADR-0070) replaced pairing v1: its own identity and key, so old devices refuse it cleanly.
+    assert link.PAIR_IDENTITY == "keepsake-pair/2" and link.PAIR_PROTOCOL == 2
+    assert link.PAIR_KEY.hex() == "c5ff742ed08423d07bcea36ee85791db04618a2caac6f0a4cf78c36e16b72bca"
+    assert link.CODE_BITS == 20 and link.REQUEST_LIMIT == 3 and link.REQUEST_WINDOW == 120.0
+    assert link.LOCKOUT_FAILURES == 5 and link.LOCKOUT_SECONDS == 600.0
     assert link.MAX_FRAME == 64 * 1024 and link.MAX_BLOB == 64 * 1024 * 1024
 
 
-def test_the_comparison_code():
-    code = link.comparison_code(b"\x01" * 12, b"\x02" * 32, b"\x03" * 32, "device-aaaa-0001", "device-bbbb-0002")
-    assert code == "526937"
+def test_the_pairing_commitment():
+    mac = link.commitment(b"\x02" * 16, b"\x01" * 12, "device-aaaa-0001", "device-bbbb-0002", "req", 0, 1)
+    assert mac.hex() == "8995242a1aa009cdcf2f216f24c035e7d0c62c35afc6ee767ff46a1a5df29ae4"
 
 
 def test_the_manifest_format_and_root_hash():

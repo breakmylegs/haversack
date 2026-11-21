@@ -8,7 +8,7 @@ Version 1, **frozen** at the end of slice 18 (ADR-0058). `tests/test_replication
 - TLS 1.2, cipher `ECDHE-PSK-CHACHA20-POLY1305` only, with no compression.
 - The PSK identity is the connecting device's ID:
   - for a paired device, the key is the 256-bit link key agreed at pairing;
-  - for pairing, the identity is `keepsake-pair/1` with a public key, accepted only while the pairing window is open.
+  - for pairing, the identity is `keepsake-pair/2` with a public key, accepted while the listener is on, at most 3 in 2 minutes, never from a locked-out address (ADR-0070).
 
 ## Frames
 
@@ -16,24 +16,25 @@ Version 1, **frozen** at the end of slice 18 (ADR-0058). `tests/test_replication
 - **Raw bytes:** an answer may be `{"type": "blob", "size": n, ...}` followed by exactly *n* raw bytes, at most 64 MiB.
 - **Refusals:** an `error` frame (`{"type": "error", "reason": "..."}`) is a refusal. The reason never holds a local path.
 
-## Pairing (ADR-0054)
+## Pairing (ADR-0070, pairing protocol 2)
 
 | Step | From | Frame |
 |---|---|---|
-| 1 | initiator | `pair-commit`: `v`, `deviceId`, `name`, `commit` (hex SHA-256 of a 32-byte nonce) |
-| 2 | responder | `pair-nonce`: `deviceId`, `name`, `nonce` (hex, 32 bytes) |
-| 3 | initiator | `pair-reveal`: `nonce` (checked against the commitment) |
-| 4 | both | `pair-confirm`: `ok`, once the user has compared the code |
-| 5 | initiator | `pair-key`: `key` (hex, 32 bytes), only if both said yes |
-| 6 | responder | `pair-done` |
+| 1 | requester | `pair-request`: `v` (2), `deviceId`, `name` |
+| 2 | receiver | `pair-accepted`: `deviceId`, `name`, once the user pressed Accept; or `pair-declined`: `reason` (`declined`, `timed out`) |
+| 3 | both | twenty rounds, *i* = 0 to 19, one per bit of the code: requester `pair-c` (`i`, `c`), receiver `pair-c`, requester `pair-n` (`i`, `n`), then the receiver checks and sends its `pair-n`, and the requester checks |
+| 4 | requester | `pair-key`: `key` (hex, 32 bytes), only once every round matched |
+| 5 | receiver | `pair-done` |
 
-The code is computed like this:
+The code is a random 6-digit number shown only on the receiver and typed on the requester. Bit *i* is `(code >> i) & 1`. Each commitment is:
 
 ```
-SHA-256("keepsake sas v1" || len||tls-unique || len||nonce_i || len||nonce_r || len||id_i || len||id_r)
+HMAC-SHA256(key = nonce (16 random bytes),
+            "keepsake passkey v1" || len||tls-unique || len||requester id || len||receiver id
+            || len||role ("req" or "recv") || len||(i, bit as two big-endian uint32))
 ```
 
-Each `len` is a 4-byte big-endian length. The first 8 bytes of the digest are read as a big-endian number, and the code is that number modulo 1,000,000, written as 6 digits.
+Lengths are 4-byte big-endian. A commitment that does not match the sender's revealed nonce and the checker's own bit ends the attempt with `error` ("the code was wrong").
 
 ## Session
 

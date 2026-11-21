@@ -901,7 +901,7 @@ async function updates(main: HTMLElement, check?: UpdateCheck, installed?: strin
 // Devices: Replication's links and pairing (ADR-0054, ADR-0056)
 
 function pairingActive(p: Pairing): boolean {
-  return p.state === "connecting" || p.state === "compare" || p.state === "waiting";
+  return ["connecting", "waiting-accept", "enter-code", "request", "show-code", "checking"].includes(p.state);
 }
 
 async function devices(main: HTMLElement, found: FoundDevice[] | null = null): Promise<void> {
@@ -916,31 +916,40 @@ async function devices(main: HTMLElement, found: FoundDevice[] | null = null): P
   }
   const listener = status.listener;
   const address = h("input", { type: "text", "aria-label": "Device address", placeholder: "192.168.1.20" }) as HTMLInputElement;
+  // Pairing by code (ADR-0070): the receiver accepts and shows a code; the requester types it.
   const pairingCards = status.pairings
-    .filter((p) => pairingActive(p) || p.state === "failed")
+    .filter((p) => pairingActive(p) || p.state === "failed" || p.state === "declined")
     .map((p) => {
       const who = p.peerName ?? p.address;
+      const cancel = button("Cancel", async () => (await call("replication_cancel", p.id), await again()));
       if (p.state === "failed") return h("li", { class: "check warn" }, h("strong", {}, `Pairing with ${who} did not finish`), h("p", {}, p.reason ?? ""));
-      if (p.state === "compare")
+      if (p.state === "declined") return h("li", { class: "check warn" }, h("strong", {}, `Not paired with ${who}`), h("p", {}, p.reason ?? "Declined."));
+      if (p.state === "request")
         return h(
           "li",
           { class: "check info" },
-          h("strong", {}, `Pair with ${who}? Code ${p.code ?? ""}`),
-          h("p", {}, "Check that the other device shows exactly the same code. If it differs, say so: someone else may be on the network."),
+          h("strong", {}, `${who} wants to pair`),
+          h("p", {}, `From ${p.address}. Accept only if you are pairing your own device right now.`),
           h(
             "div",
             { class: "actions" },
-            button("The codes match", async () => (await call("replication_answer", p.id, true), await again())),
-            button("They differ", async () => (await call("replication_answer", p.id, false), await again())),
+            button("Accept", async () => (await call("replication_answer", p.id, true), await again())),
+            button("Decline", async () => (await call("replication_answer", p.id, false), await again())),
           ),
         );
-      return h(
-        "li",
-        { class: "check info" },
-        h("strong", {}, p.state === "waiting" ? `Code ${p.code ?? ""}` : `Connecting to ${who}`),
-        h("p", {}, p.state === "waiting" ? `Waiting for ${who} to confirm.` : ""),
-        p.state === "connecting" ? button("Cancel", async () => (await call("replication_cancel", p.id), await again())) : null,
-      );
+      if (p.state === "show-code")
+        return h("li", { class: "check info" }, h("strong", {}, `Code: ${p.code ?? ""}`), h("p", {}, `Type this code on ${who}.`), cancel);
+      if (p.state === "enter-code") {
+        const code = h("input", { type: "text", inputmode: "numeric", maxlength: "6", "aria-label": "Code" }) as HTMLInputElement;
+        return h(
+          "li",
+          { class: "check info" },
+          h("strong", {}, `${who} accepted. Enter the code shown on it.`),
+          h("div", { class: "actions" }, code, button("Pair", async () => (await call("replication_enter_code", p.id, code.value), await again())), cancel),
+        );
+      }
+      const text = p.state === "waiting-accept" ? `Waiting for ${who} to accept` : p.state === "checking" ? `Checking the code with ${who}` : `Connecting to ${who}`;
+      return h("li", { class: "check info" }, h("strong", {}, text), p.state === "checking" ? null : cancel);
     });
   const choice = h("select", { "aria-label": "Listen on" }) as HTMLSelectElement;
   for (const option of [{ address: "", kind: "all" }, ...status.addressesAvailable]) {
@@ -977,12 +986,6 @@ async function devices(main: HTMLElement, found: FoundDevice[] | null = null): P
           await call("replication_set_listener", !listener.on);
           await again();
         }),
-        listener.on
-          ? button(listener.pairingOpen ? `Stop accepting (${listener.pairingSecondsLeft} s)` : "Let a device pair with this one", async () => {
-              await call(listener.pairingOpen ? "replication_close_pairing" : "replication_open_pairing");
-              await again();
-            })
-          : null,
       ),
       status.addressesAvailable.length > 1 ? h("label", {}, "Listen on ", choice) : null,
     ),
@@ -1028,7 +1031,7 @@ async function devices(main: HTMLElement, found: FoundDevice[] | null = null): P
     ),
   );
   const moving = transfers.jobs.some((j) => ["running", "verifying", "waiting"].includes(j.state));
-  if (listener.pairingOpen || status.pairings.some(pairingActive) || moving) {
+  if (status.pairings.some(pairingActive) || moving) {
     setTimeout(() => {
       if (document.getElementById("nav-devices")?.getAttribute("aria-current") === "true") void again().catch(() => undefined);
     }, 1000);

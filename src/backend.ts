@@ -174,7 +174,8 @@ export interface Pairing {
   id: string;
   role: "initiator" | "responder";
   address: string;
-  state: "connecting" | "compare" | "waiting" | "paired" | "failed" | "cancelled";
+  // ADR-0070: the requester waits for Accept, then takes the code; the receiver answers, then shows it.
+  state: "connecting" | "waiting-accept" | "enter-code" | "request" | "show-code" | "checking" | "paired" | "declined" | "failed" | "cancelled";
   code: string | null;
   peerName: string | null;
   reason: string | null;
@@ -188,7 +189,7 @@ export interface FoundDevice {
 }
 export interface ReplicationStatus {
   available: boolean;
-  listener: { on: boolean; addresses: string[]; port: number; pairingOpen: boolean; pairingSecondsLeft: number };
+  listener: { on: boolean; addresses: string[]; port: number; acceptsRequests: boolean };
   discovery: { on: boolean; problem: string | null };
   peers: PairedDevice[];
   pairings: Pairing[];
@@ -207,10 +208,9 @@ export interface LinkCheck {
 export const replicationStatus = callable<[], ReplicationStatus>("replication_status");
 export const replicationSetListener = callable<[on: boolean], ReplicationStatus>("replication_set_listener");
 export const replicationSetAddress = callable<[address: string], ReplicationStatus>("replication_set_address");
-export const replicationOpenPairing = callable<[], ReplicationStatus>("replication_open_pairing");
-export const replicationClosePairing = callable<[], ReplicationStatus>("replication_close_pairing");
 export const replicationPair = callable<[address: string], Pairing>("replication_pair");
 export const replicationAnswer = callable<[pairingId: string, ok: boolean], ReplicationStatus>("replication_answer");
+export const replicationEnterCode = callable<[pairingId: string, code: string], ReplicationStatus>("replication_enter_code");
 export const replicationCancel = callable<[pairingId: string], ReplicationStatus>("replication_cancel");
 export const replicationFind = callable<[], FoundDevice[]>("replication_find");
 export const replicationCheck = callable<[peerId: string], LinkCheck>("replication_check");

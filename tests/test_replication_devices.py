@@ -259,19 +259,25 @@ def test_two_apps_pair_through_their_callables(make_app, monkeypatch):
             assert b.settings.get("replicationListener") is True
             assert status["listener"]["addresses"] == ["127.0.0.1"]
             assert status["discovery"]["on"] is False and "automatically" in status["discovery"]["problem"]
-            await b.replication_open_pairing()
             port = b.links.listener.bound_port
-            started = await a.replication_pair(f"127.0.0.1:{port}")
+            started = await a.replication_pair(f"127.0.0.1:{port}")  # no window to open first (ADR-0070)
             for _ in range(250):
-                theirs = [p for p in (await b.replication_status())["pairings"] if p["state"] == "compare"]
-                mine = [p for p in (await a.replication_status())["pairings"] if p["state"] == "compare"]
-                if theirs and mine:
+                theirs = [p for p in (await b.replication_status())["pairings"] if p["state"] == "request"]
+                if theirs:
                     break
                 await asyncio.sleep(0.02)
-            assert theirs[0]["code"] == mine[0]["code"] and theirs[0]["peerName"] == "Test device A"
-            assert any(e == "keepsake_toast" and "wants to pair" in args[0] for e, args in events)
-            await a.replication_answer(started["id"], True)
-            await b.replication_answer(theirs[0]["id"], True)
+            assert theirs[0]["peerName"] == "Test device A" and theirs[0]["address"].startswith("127.0.0.1")
+            requests = [args[0] for e, args in events if e == "keepsake_pair_request"]
+            assert requests == [{"id": theirs[0]["id"], "name": "Test device A", "address": theirs[0]["address"]}]
+            await b.replication_answer(theirs[0]["id"], True)  # Accept
+            for _ in range(250):
+                shown = [p for p in (await b.replication_status())["pairings"] if p["state"] == "show-code"]
+                mine = [p for p in (await a.replication_status())["pairings"] if p["state"] == "enter-code"]
+                if shown and mine:
+                    break
+                await asyncio.sleep(0.02)
+            assert mine[0]["code"] is None and len(shown[0]["code"]) == 6
+            await a.replication_enter_code(started["id"], shown[0]["code"])
             for _ in range(250):
                 if (await a.replication_status())["peers"] and (await b.replication_status())["peers"]:
                     break

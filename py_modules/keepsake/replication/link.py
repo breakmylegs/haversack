@@ -1,14 +1,24 @@
-"""Replication's encrypted link and pairing (slice 17, ADR-0054).
+"""Replication's encrypted link and pairing (slice 17, ADR-0054, pairing by code ADR-0070).
 
 Every connection is TLS 1.2 with ``ECDHE-PSK-CHACHA20-POLY1305`` from stdlib ``ssl``: a fresh
 key exchange each time (forward secret), authenticated by a 256-bit key the two devices
 agreed at pairing. Nothing is compressed (ADR-0045).
 
-Pairing runs over the same cipher with a public key, so it is an unauthenticated key
-exchange until the user confirms. Both screens then show a 6-digit code bound to this TLS
-session (``tls-unique``) and to two nonces, one committed before the other is revealed. A
-device in the middle has one chance in a million per attempt, and cannot try codes offline.
-Only after both users confirm does the initiator send the new link key.
+Pairing (ADR-0070) runs over the same cipher with a public key, so it is an unauthenticated
+key exchange until the code checks out:
+
+1. The requester sends a pairing request. The receiver accepts requests whenever its listener
+   is on, at most three in two minutes, and an address or device ID with five failed attempts
+   is locked out for ten minutes.
+2. The receiver's user presses Accept (or Decline; no answer in 120 seconds declines).
+3. The receiver shows a random 6-digit code, and the user types it on the requester.
+4. The two devices prove they hold the same code without sending it: twenty rounds, one per
+   bit, each a commitment (HMAC under a fresh nonce, bound to this TLS session's
+   ``tls-unique``, both device IDs, the sender's role and the round) sent before either nonce
+   is revealed, compared in constant time. A device in the middle has to guess each bit
+   before it can learn it, so it has one chance in about a million per attempt, and nothing
+   to try offline. Both devices check every round.
+5. Only then does the requester send the new link key.
 
 Frames are a 4-byte big-endian length and a JSON object with a ``type``.
 """
@@ -34,14 +44,18 @@ from .peers import KEY_BYTES, PeerError, PeerStore, check_device_id, clean_name
 PROTOCOL = 1
 DEFAULT_PORT = 47110  # clear of 8080, 8384, 27040 and 1714 to 1764
 CIPHERS = "ECDHE-PSK-CHACHA20-POLY1305"
-PAIR_IDENTITY = "keepsake-pair/1"
-PAIR_KEY = hashlib.sha256(b"keepsake pairing v1").digest()  # public on purpose: the code carries the trust
+PAIR_IDENTITY = "keepsake-pair/2"  # pairing by code (ADR-0070); devices with the old pairing refuse cleanly
+PAIR_KEY = hashlib.sha256(b"keepsake pairing v2").digest()  # public on purpose: the code carries the trust
+PAIR_PROTOCOL = 2
 MAX_FRAME = 64 * 1024
 HANDSHAKE_TIMEOUT = 10.0
 FRAME_TIMEOUT = 30.0
-PAIR_WINDOW = 120.0
-PAIR_ATTEMPTS = 3
-CONFIRM_TIMEOUT = 120.0
+CONFIRM_TIMEOUT = 120.0  # to accept a request, and to type the code
+REQUEST_LIMIT = 3  # pairing requests a receiver takes ...
+REQUEST_WINDOW = 120.0  # ... in this many seconds
+LOCKOUT_FAILURES = 5  # failed pairing attempts from one address or device ID ...
+LOCKOUT_SECONDS = 600.0  # ... lock it out for this long
+CODE_BITS = 20  # 10**6 < 2**20: one round per bit of the code
 MAX_CONNECTIONS = 8
 FAILURE_LIMIT = 5  # failed handshakes from one address ...
 FAILURE_WINDOW = 60.0  # ... within this many seconds block it for the same time
@@ -139,12 +153,62 @@ async def expect(reader: asyncio.StreamReader, kind: str, timeout: float = FRAME
     return message
 
 
-def comparison_code(binding: bytes, nonce_i: bytes, nonce_r: bytes, id_i: str, id_r: str) -> str:
-    """The 6 digits both screens show. Every part is length-prefixed so no two inputs collide."""
-    digest = hashlib.sha256(b"keepsake sas v1")
-    for part in (binding, nonce_i, nonce_r, id_i.encode(), id_r.encode()):
-        digest.update(struct.pack(">I", len(part)) + part)
-    return f"{int.from_bytes(digest.digest()[:8], 'big') % 1_000_000:06d}"
+def new_code() -> str:
+    """The receiver's 6-digit code: random, shown only on its screen, never sent."""
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def check_code(text: Any) -> str:
+    code = "".join(str(text or "").split())
+    if len(code) != 6 or not code.isdigit():
+        raise LinkError("the code is 6 digits")
+    return code
+
+
+def commitment(nonce: bytes, binding: bytes, id_req: str, id_recv: str, role: str, index: int, bit: int) -> bytes:
+    """One round's commitment. Every part is length-prefixed so no two inputs collide."""
+    mac = hmac.new(nonce, b"keepsake passkey v1", hashlib.sha256)
+    for part in (binding, id_req.encode(), id_recv.encode(), role.encode(), struct.pack(">II", index, bit)):
+        mac.update(struct.pack(">I", len(part)) + part)
+    return mac.digest()
+
+
+async def prove_code(
+    reader: asyncio.StreamReader,
+    writer: asyncio.StreamWriter,
+    code: str,
+    binding: bytes,
+    id_req: str,
+    id_recv: str,
+    role: str,
+    first_timeout: float = FRAME_TIMEOUT,
+) -> None:
+    """Twenty commit-then-reveal rounds proving both devices hold ``code``; raises on the first mismatch."""
+    value = int(check_code(code))
+    other = "recv" if role == "req" else "req"
+    for index in range(CODE_BITS):
+        bit = (value >> index) & 1
+        nonce = secrets.token_bytes(16)
+        mine = {"type": "pair-c", "i": index, "c": commitment(nonce, binding, id_req, id_recv, role, index, bit).hex()}
+        timeout = first_timeout if index == 0 else FRAME_TIMEOUT
+        if role == "req":
+            await send_frame(writer, mine)
+            theirs = await expect(reader, "pair-c", timeout)
+            await send_frame(writer, {"type": "pair-n", "i": index, "n": nonce.hex()})
+            revealed = await expect(reader, "pair-n")
+        else:
+            theirs = await expect(reader, "pair-c", timeout)
+            await send_frame(writer, mine)
+            revealed = await expect(reader, "pair-n")
+        if theirs.get("i") != index or revealed.get("i") != index:
+            raise LinkError("the other device's pairing answer was out of order")
+        expected = commitment(_hex(revealed, "n", 16), binding, id_req, id_recv, other, index, bit)
+        if not hmac.compare_digest(expected, _hex(theirs, "c", 32)):
+            with contextlib.suppress(Exception):
+                await send_frame(writer, {"type": "error", "reason": "the code was wrong"})
+            raise LinkError("the code was wrong")
+        if role == "recv":
+            await send_frame(writer, {"type": "pair-n", "i": index, "n": nonce.hex()})
 
 
 def _hex(message: dict[str, Any], name: str, size: int) -> bytes:
@@ -162,14 +226,16 @@ class Pairing:
     """One pairing attempt, shown to the user until it ends."""
 
     id: str
-    role: str  # "initiator" (typed the address) or "responder" (opened the window)
+    role: str  # "initiator" (sent the request) or "responder" (received it)
     address: str
-    state: str = "connecting"  # connecting, compare, waiting, paired, failed, cancelled
-    code: str | None = None
+    # connecting, waiting-accept, enter-code, request, show-code, checking, paired, declined, failed, cancelled
+    state: str = "connecting"
+    code: str | None = None  # the responder's code, shown only while it waits for it to be typed
     peer_id: str | None = None
     peer_name: str | None = None
     reason: str | None = None
-    confirmed: asyncio.Future[bool] | None = None
+    answer: asyncio.Future[bool] | None = None  # the responder's Accept or Decline
+    entered: asyncio.Future[str | None] | None = None  # the code typed on the initiator
     ended_at: float | None = None
     announced: bool = False  # the app has told the user about this request
 
@@ -179,25 +245,33 @@ class Pairing:
             "role": self.role,
             "address": self.address,
             "state": self.state,
-            "code": self.code if self.state in ("compare", "waiting") else None,
+            "code": self.code,  # set only on the receiver, and cleared when the attempt ends
             "peerName": self.peer_name,
             "reason": self.reason,
         }
 
 
 def answer(pairing: Pairing, ok: bool) -> None:
-    """The user's answer to "do both screens show this code?"."""
-    if pairing.state != "compare" or pairing.confirmed is None or pairing.confirmed.done():
-        raise LinkError("this pairing is not waiting for an answer")
-    pairing.confirmed.set_result(bool(ok))
+    """The receiving user's Accept or Decline."""
+    if pairing.state != "request" or pairing.answer is None or pairing.answer.done():
+        raise LinkError("this pairing request is not waiting for an answer")
+    pairing.answer.set_result(bool(ok))
+
+
+def enter_code(pairing: Pairing, code: Any) -> None:
+    """The code the user typed on the requesting device. One entry per attempt."""
+    if pairing.state != "enter-code" or pairing.entered is None or pairing.entered.done():
+        raise LinkError("this pairing is not waiting for a code")
+    pairing.entered.set_result(check_code(code))
 
 
 def cancel(pairing: Pairing) -> None:
-    if pairing.state in ("paired", "failed", "cancelled"):
+    if pairing.state in ("paired", "failed", "cancelled", "declined"):
         return
     pairing.state, pairing.reason = "cancelled", "Cancelled on this device."
-    if pairing.confirmed is not None and not pairing.confirmed.done():
-        pairing.confirmed.set_result(False)
+    for future in (pairing.answer, pairing.entered):
+        if future is not None and not future.done():
+            future.set_result(None if future is pairing.entered else False)  # type: ignore[arg-type]
 
 
 @dataclass
@@ -207,36 +281,11 @@ class Identity:
     wake: list[str] = field(default_factory=list)  # hardware addresses, for Wake-on-LAN (ADR-0056)
 
 
-async def _await_user(pairing: Pairing, timeout: float) -> bool:
-    assert pairing.confirmed is not None
+async def _await(future: asyncio.Future[Any], timeout: float) -> Any:
     try:
-        return await asyncio.wait_for(asyncio.shield(pairing.confirmed), timeout)
+        return await asyncio.wait_for(asyncio.shield(future), timeout)
     except TimeoutError:
-        return False
-
-
-async def _compare(
-    pairing: Pairing,
-    reader: asyncio.StreamReader,
-    writer: asyncio.StreamWriter,
-    code: str,
-    confirm_timeout: float,
-    changed: Callable[[], None] | None = None,
-) -> None:
-    """Show the code, send this user's answer, read the other's. Both must say the codes match."""
-    pairing.code = code
-    pairing.confirmed = asyncio.get_running_loop().create_future()
-    pairing.state = "compare"
-    if changed:
-        changed()  # the code is ready to show
-    ours = await _await_user(pairing, confirm_timeout)
-    await send_frame(writer, {"type": "pair-confirm", "ok": ours})
-    if not ours:
-        raise LinkError("the codes were not confirmed on this device")
-    pairing.state = "waiting"
-    theirs = await expect(reader, "pair-confirm", confirm_timeout + FRAME_TIMEOUT)
-    if theirs.get("ok") is not True:
-        raise LinkError("the other device said the codes did not match")
+        return None
 
 
 async def _dial(
@@ -262,37 +311,53 @@ async def pair_as_initiator(
     host: str,
     port: int = DEFAULT_PORT,
     confirm_timeout: float = CONFIRM_TIMEOUT,
+    changed: Callable[[], None] | None = None,
 ) -> None:
-    """Pair with a device whose pairing window is open. Ends with ``pairing.state`` set."""
+    """Send a pairing request; once accepted, take the typed code and prove it. Ends with ``pairing.state`` set."""
     writer: asyncio.StreamWriter | None = None
+
+    def show(state: str) -> None:
+        pairing.state = state
+        if changed:
+            changed()
+
     try:
         reader, writer = await _dial(
             host,
             port,
             client_context(PAIR_IDENTITY, PAIR_KEY),
-            f"{host}:{port} did not accept pairing; open its pairing window and try again",
+            f"{host}:{port} did not take the request: switch on Let other devices reach this one there, "
+            "update Keepsake on both, or wait two minutes and try again",
         )
         binding = checked_session(writer)
-        nonce_i = secrets.token_bytes(32)
         await send_frame(
-            writer,
-            {
-                "type": "pair-commit",
-                "v": PROTOCOL,
-                "deviceId": me.device_id,
-                "name": me.name,
-                "commit": hashlib.sha256(nonce_i).hexdigest(),
-            },
+            writer, {"type": "pair-request", "v": PAIR_PROTOCOL, "deviceId": me.device_id, "name": me.name}
         )
-        answer = await expect(reader, "pair-nonce")
-        peer_id = check_device_id(answer.get("deviceId"))
+        show("waiting-accept")
+        reply = await read_frame(reader, confirm_timeout + FRAME_TIMEOUT)
+        if reply.get("type") == "pair-declined":
+            pairing.state = "declined"
+            pairing.reason = (
+                "The other device did not answer in time."
+                if reply.get("reason") == "timed out"
+                else "The other device declined."
+            )
+            return
+        if reply.get("type") == "error":
+            raise LinkError(str(reply.get("reason") or "the other device ended the pairing"))
+        if reply.get("type") != "pair-accepted":
+            raise LinkError("the other device sent something unexpected")
+        peer_id = check_device_id(reply.get("deviceId"))
         if peer_id == me.device_id:
             raise LinkError("a device cannot pair with itself")
-        nonce_r = _hex(answer, "nonce", 32)
-        pairing.peer_id, pairing.peer_name = peer_id, clean_name(answer.get("name"))
-        await send_frame(writer, {"type": "pair-reveal", "nonce": nonce_i.hex()})
-        code = comparison_code(binding, nonce_i, nonce_r, me.device_id, peer_id)
-        await _compare(pairing, reader, writer, code, confirm_timeout)
+        pairing.peer_id, pairing.peer_name = peer_id, clean_name(reply.get("name"))
+        pairing.entered = asyncio.get_running_loop().create_future()
+        show("enter-code")
+        code = await _await(pairing.entered, confirm_timeout)
+        if code is None:
+            raise LinkError("no code was entered in time" if pairing.state != "cancelled" else "cancelled")
+        show("checking")
+        await prove_code(reader, writer, code, binding, me.device_id, peer_id, "req")
         key = secrets.token_bytes(KEY_BYTES)
         await send_frame(writer, {"type": "pair-key", "key": key.hex()})
         await expect(reader, "pair-done")
@@ -308,6 +373,8 @@ async def pair_as_initiator(
     finally:
         await _close(writer)
         pairing.ended_at = time.monotonic()
+        if changed:
+            changed()
 
 
 def _fail(pairing: Pairing, reason: str) -> None:
@@ -356,8 +423,8 @@ class Listener:
     handlers: dict[str, Handler] = field(default_factory=dict)
     on_change: Callable[[], None] | None = None
     _server: asyncio.Server | None = None
-    _window_until: float = 0.0
-    _attempts_left: int = 0
+    _requests: list[float] = field(default_factory=list)
+    _pair_failures: dict[str, list[float]] = field(default_factory=dict)
     _failures: dict[str, list[float]] = field(default_factory=dict)
     _sessions: set[Session] = field(default_factory=set)
     _connections: int = 0
@@ -375,7 +442,7 @@ class Listener:
         return int(self._server.sockets[0].getsockname()[1])
 
     async def stop(self) -> None:
-        self.close_pairing()
+        self.end_requests()
         if self._server is not None:
             self._server.close()
             for session in list(self._sessions):
@@ -384,25 +451,31 @@ class Listener:
                 await asyncio.wait_for(self._server.wait_closed(), 5)
             self._server = None
 
-    # The pairing window
+    # Pairing requests (ADR-0070): taken whenever the listener is on, within limits
 
-    def open_pairing(self, seconds: float = PAIR_WINDOW) -> float:
-        """Accept up to ``PAIR_ATTEMPTS`` pairing handshakes for ``seconds``. Only from a user action."""
-        self._window_until = self.clock() + seconds
-        self._attempts_left = PAIR_ATTEMPTS
-        return self._window_until
-
-    def close_pairing(self) -> None:
-        self._window_until, self._attempts_left = 0.0, 0
+    def end_requests(self) -> None:
+        """The listener is going: every waiting request is declined."""
         for pairing in self.pairings.values():
-            if pairing.confirmed is not None and not pairing.confirmed.done():
-                pairing.confirmed.set_result(False)
+            cancel(pairing)
 
-    def pairing_open(self) -> bool:
-        return self._attempts_left > 0 and self.clock() < self._window_until
+    def locked(self, key: str) -> bool:
+        """Five failed pairing attempts from one address or device ID in ten minutes lock it out."""
+        now = self.clock()
+        recent = [t for t in self._pair_failures.get(key, []) if now - t < LOCKOUT_SECONDS]
+        self._pair_failures[key] = recent
+        return len(recent) >= LOCKOUT_FAILURES
 
-    def window_seconds_left(self) -> int:
-        return max(0, int(self._window_until - self.clock())) if self.pairing_open() else 0
+    def _pair_failed(self, address: str, peer_id: str | None) -> None:
+        for key in [f"address:{address}"] + ([f"device:{peer_id}"] if peer_id else []):
+            self._pair_failures.setdefault(key, []).append(self.clock())
+
+    def _take_request(self, address: str) -> bool:
+        now = self.clock()
+        self._requests = [t for t in self._requests if now - t < REQUEST_WINDOW]
+        if self.locked(f"address:{address}") or len(self._requests) >= REQUEST_LIMIT:
+            return False
+        self._requests.append(now)
+        return True
 
     # Authentication
 
@@ -415,14 +488,11 @@ class Listener:
     def _failed(self, address: str) -> None:
         self._failures.setdefault(address, []).append(self.clock())
 
-    def _lookup(self, seen: dict[str, str]) -> Callable[[str | None], bytes | None]:
+    def _lookup(self, seen: dict[str, str], address: str) -> Callable[[str | None], bytes | None]:
         def lookup(identity: str | None) -> bytes | None:
             seen["identity"] = identity or ""
             if identity == PAIR_IDENTITY:
-                if not self.pairing_open():
-                    return None
-                self._attempts_left -= 1
-                return PAIR_KEY
+                return PAIR_KEY if self._take_request(address) else None
             return self.store.key(identity)
 
         return lookup
@@ -437,7 +507,7 @@ class Listener:
         seen: dict[str, str] = {}
         try:
             try:
-                await asyncio.wait_for(writer.start_tls(server_context(self._lookup(seen))), HANDSHAKE_TIMEOUT)
+                await asyncio.wait_for(writer.start_tls(server_context(self._lookup(seen, address))), HANDSHAKE_TIMEOUT)
                 binding = checked_session(writer)
             except (OSError, TimeoutError, ssl.SSLError, LinkError, policy.PolicyError):
                 self._failed(address)
@@ -451,45 +521,57 @@ class Listener:
             self._connections -= 1
             await _close(writer)
 
-    # Responding to a pairing
+    # Responding to a pairing request
 
     async def _pair(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, binding: bytes, address: str
     ) -> None:
         pairing = Pairing(secrets.token_hex(8), "responder", address)
         self.pairings[pairing.id] = pairing
-        self._changed()
         try:
-            commit = await expect(reader, "pair-commit")
-            if commit.get("v") != PROTOCOL:
+            request = await expect(reader, "pair-request")
+            if request.get("v") != PAIR_PROTOCOL:
                 raise LinkError("the other device runs a different Keepsake version; update both")
-            peer_id = check_device_id(commit.get("deviceId"))
+            peer_id = check_device_id(request.get("deviceId"))
             if peer_id == self.me.device_id:
                 raise LinkError("a device cannot pair with itself")
-            committed = _hex(commit, "commit", 32)
-            pairing.peer_id, pairing.peer_name = peer_id, clean_name(commit.get("name"))
-            nonce_r = secrets.token_bytes(32)
-            await send_frame(
-                writer,
-                {"type": "pair-nonce", "deviceId": self.me.device_id, "name": self.me.name, "nonce": nonce_r.hex()},
+            if self.locked(f"device:{peer_id}"):
+                raise LinkError("too many failed pairing attempts from that device; wait ten minutes")
+            pairing.peer_id, pairing.peer_name = peer_id, clean_name(request.get("name"))
+            pairing.answer = asyncio.get_running_loop().create_future()
+            pairing.state = "request"
+            self._changed()  # "<name> wants to pair": Accept or Decline
+            accepted = await _await(pairing.answer, self.confirm_timeout)
+            if not accepted:
+                timed_out = accepted is None and pairing.state == "request"
+                await send_frame(writer, {"type": "pair-declined", "reason": "timed out" if timed_out else "declined"})
+                if pairing.state != "cancelled":
+                    pairing.state = "declined"
+                    pairing.reason = "No answer in time." if timed_out else "Declined on this device."
+                self._pair_failed(address, peer_id)
+                return
+            await send_frame(writer, {"type": "pair-accepted", "deviceId": self.me.device_id, "name": self.me.name})
+            pairing.code = new_code()
+            pairing.state = "show-code"
+            self._changed()
+            await prove_code(
+                reader, writer, pairing.code, binding, peer_id, self.me.device_id, "recv", self.confirm_timeout
             )
-            nonce_i = _hex(await expect(reader, "pair-reveal"), "nonce", 32)
-            if not hmac.compare_digest(hashlib.sha256(nonce_i).digest(), committed):
-                raise LinkError("the other device's pairing answer did not match what it promised")
-            code = comparison_code(binding, nonce_i, nonce_r, peer_id, self.me.device_id)
-            await _compare(pairing, reader, writer, code, self.confirm_timeout, self._changed)
+            pairing.state = "checking"
             key = _hex(await expect(reader, "pair-key"), "key", KEY_BYTES)
             self.store.add(peer_id, pairing.peer_name, key, address)
             await send_frame(writer, {"type": "pair-done"})
             pairing.state = "paired"
-            self.close_pairing()
         except (OSError, ssl.SSLError) as exc:
             _fail(pairing, f"the connection dropped ({type(exc).__name__})")
+            self._pair_failed(address, pairing.peer_id)
         except (LinkError, PeerError, policy.PolicyError) as exc:
             _fail(pairing, str(exc))
-            with contextlib.suppress(Exception):  # tell the initiator why, if it is still there
+            self._pair_failed(address, pairing.peer_id)
+            with contextlib.suppress(Exception):  # tell the requester why, if it is still there
                 await send_frame(writer, {"type": "error", "reason": str(exc)})
         finally:
+            pairing.code = None if pairing.state != "show-code" else pairing.code
             pairing.ended_at = self.clock()
             self._changed()
 
