@@ -2,6 +2,19 @@
 
 Keepsake keeps your PC game saves in step between your devices: SteamOS and Bazzite handhelds, Linux PCs and Windows PCs. It stores them in your own cloud storage. It never overwrites a save without asking, and every save it replaces can be brought back.
 
+## Where things are
+
+Keepsake's page has seven sections, each with tabs along the top:
+- **Play:** Now playing and Advisor.
+- **Saves:** Games, Conflicts, History, Activity, Import and export.
+- **Games and devices:** Moving games, Other devices, Disk use.
+- **Device:** this handheld.
+- **Install.**
+- **Settings:** General, Cloud, Sync and safety, Modules, Updates.
+- **Diagnostics:** Health, Device checks, Tools, Logs.
+
+The quick access menu shows the game you are playing, games on their way between your devices, and anything that needs you. The desktop app has the same sections down the left.
+
 ## Getting started
 
 Pick the guide for your device:

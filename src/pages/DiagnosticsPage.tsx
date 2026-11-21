@@ -14,10 +14,9 @@ import {
   steamProbe,
 } from "../backend";
 import { deckyMechanisms, runningAppDetails } from "../probes";
-import { HealthSection } from "./HealthSection";
+import { plainError } from "../format";
 import { JsonBlock } from "./JsonBlock";
 import { SigninProbe } from "./SigninProbe";
-import { DeviceChecks } from "./DeviceChecks";
 
 type Section = "environment" | "steam" | "processes" | "frontend" | "https" | "steamops" | "export" | "integrity";
 
@@ -35,7 +34,7 @@ export function DiagnosticsPage() {
       const value = await work();
       setResults((prev) => ({ ...prev, [section]: value }));
     } catch (err) {
-      setResults((prev) => ({ ...prev, [section]: { error: String(err) } }));
+      setResults((prev) => ({ ...prev, [section]: { error: plainError(err) } }));
     } finally {
       setBusy(null);
     }
@@ -77,8 +76,6 @@ export function DiagnosticsPage() {
 
   return (
     <div>
-      <HealthSection />
-      <DeviceChecks />
       <Field
         label="Diagnostics"
         description="Facts about this device for troubleshooting. The export is saved in Keepsake's settings folder on this device and includes the health checks."

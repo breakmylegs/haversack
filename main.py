@@ -282,6 +282,9 @@ class Plugin:
     async def replication_remove_game(self, offer_id: str) -> dict[str, Any]:
         return await self.app.replication_remove_game(offer_id)
 
+    async def device_status(self) -> dict[str, Any]:
+        return await self.app.device_status()
+
     async def replication_activity(self) -> list[dict[str, Any]]:
         return await self.app.replication_activity()
 

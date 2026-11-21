@@ -2,7 +2,7 @@ import { DialogButton, Focusable, ModalRoot, showModal } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { ConflictDetails, ConflictSide, conflictDetails, resolveConflict } from "../backend";
-import { CONFLICT_TEXT, isoText, sizeText } from "../format";
+import { CONFLICT_TEXT, isoText, plainError, sizeText } from "../format";
 
 // Build prompt section 14: initial focus on "Decide later", B means "Decide later", and the
 // choices that replace files need a second, explicit press. Closing the modal any other way
@@ -67,7 +67,7 @@ function ConflictModal({ gameKey, onDone, closeModal }: { gameKey: string; onDon
       closeModal?.();
       onDone();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not resolved: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Not resolved: ${plainError(err)}` });
       setArmed(null);
       setBusy(false);
     }

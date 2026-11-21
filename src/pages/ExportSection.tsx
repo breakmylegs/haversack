@@ -2,6 +2,7 @@ import { DialogButton, Field, Focusable } from "@decky/ui";
 import { openFilePicker, toaster } from "@decky/api";
 import { useState } from "react";
 import { exportSnapshots } from "../backend";
+import { plainError } from "../format";
 
 // Folder mode for the file picker (FileSelectionType.FOLDER in @decky/api).
 const FOLDER = 1 as unknown as Parameters<typeof openFilePicker>[0];
@@ -26,7 +27,7 @@ export function ExportSection() {
         body: `Exported ${result.snapshots} snapshots of ${result.games} games to ${result.folder}.`,
       });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not exported: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Not exported: ${plainError(err)}` });
     } finally {
       setBusy(false);
     }

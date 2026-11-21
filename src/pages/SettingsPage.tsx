@@ -2,13 +2,17 @@ import { DialogButton, Field, Focusable, Navigation, SliderField, TextField, Tog
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { getSettings, setSetting, Settings } from "../backend";
-import { ROUTE_PATH, SETUP_PATH } from "../routes";
+import { plainError } from "../format";
+import { SETUP_PATH } from "../routes";
 import { CloudSection } from "./CloudSection";
-import { ExportSection } from "./ExportSection";
 import { ModulesSection } from "./ModulesSection";
 import { TidyCopies } from "./TidyCopies";
+import { UpdatesPage } from "./UpdatesPage";
 
-export function SettingsPage() {
+// Settings has a tab per part (layout v3, ADR-0073): what is everyone's, not one module's.
+export type SettingsPart = "general" | "sync" | "cloud" | "modules" | "updates";
+
+export function SettingsPage({ part = "general" }: { part?: SettingsPart }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [name, setName] = useState("");
 
@@ -18,7 +22,7 @@ export function SettingsPage() {
         setSettings(s);
         setName(s.deviceName);
       })
-      .catch((err) => toaster.toast({ title: "Keepsake", body: `Could not load settings: ${err}` }));
+      .catch((err) => toaster.toast({ title: "Keepsake", body: `Could not load settings: ${plainError(err)}` }));
   }, []);
 
   const save = async (key: string, value: unknown, done: string) => {
@@ -28,35 +32,60 @@ export function SettingsPage() {
       setName(updated.deviceName);
       toaster.toast({ title: "Keepsake", body: done });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Could not save: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Could not save: ${plainError(err)}` });
     }
   };
 
   const locked = !settings || settings.readOnly;
+  const safeMode = settings?.readOnly && (
+    <Field
+      label="Read-only safe mode"
+      description="These settings were written by a newer Keepsake. Nothing can be changed until you update to that version or later."
+    />
+  );
+
+  if (part === "cloud") return <div>{safeMode}{settings && <CloudSection settings={settings} onSettings={setSettings} />}</div>;
+  if (part === "modules") return <div>{safeMode}<ModulesSection locked={locked} /></div>;
+  if (part === "updates") {
+    return (
+      <div>
+        {safeMode}
+        <ToggleField
+          label="Include pre-releases"
+          description="Offer beta versions as updates. Off means the Stable channel."
+          checked={settings?.updateChannel === "prerelease"}
+          disabled={locked}
+          onChange={(on) => void save("updateChannel", on ? "prerelease" : "stable", on ? "Pre-release channel on." : "Stable channel on.")}
+        />
+        <UpdatesPage />
+      </div>
+    );
+  }
+  if (part === "general") {
+    return (
+      <div>
+        {safeMode}
+        <Field label="Device name" description="Shown on other devices next to snapshots from this one." childrenLayout="below">
+          <TextField value={name} disabled={locked} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Focusable style={{ display: "flex", gap: 8, margin: "8px 0" }}>
+          <DialogButton style={{ width: "auto" }} disabled={locked} onClick={() => void save("deviceName", name, "Device name saved.")}>
+            Save
+          </DialogButton>
+        </Focusable>
+        <Field label="Setup" description="Walk through device name, sign-in, scanning and choosing games again." childrenLayout="inline">
+          <DialogButton style={{ width: "auto" }} disabled={locked} onClick={() => Navigation.Navigate(SETUP_PATH)}>
+            Run setup again
+          </DialogButton>
+        </Field>
+        {settings && <Field label="Device ID" description={settings.deviceId} />}
+      </div>
+    );
+  }
 
   return (
     <div>
-      {settings?.readOnly && (
-        <Field
-          label="Read-only safe mode"
-          description="These settings were written by a newer Keepsake. Nothing can be changed until you update to that version or later."
-        />
-      )}
-      <Field label="Device name" description="Shown on other devices next to snapshots from this one." childrenLayout="below">
-        <TextField value={name} disabled={locked} onChange={(e) => setName(e.target.value)} />
-      </Field>
-      <Focusable style={{ display: "flex", gap: 8, margin: "8px 0" }}>
-        <DialogButton style={{ width: "auto" }} disabled={locked} onClick={() => void save("deviceName", name, "Device name saved.")}>
-          Save
-        </DialogButton>
-      </Focusable>
-      <ToggleField
-        label="Include pre-releases"
-        description="Offer beta versions as updates. Off means the Stable channel."
-        checked={settings?.updateChannel === "prerelease"}
-        disabled={locked}
-        onChange={(on) => void save("updateChannel", on ? "prerelease" : "stable", on ? "Pre-release channel on." : "Stable channel on.")}
-      />
+      {safeMode}
       <Field
         label="Safety gates"
         description="Snapshots that remove or shrink too much are kept on this device instead of being uploaded. You can make these stricter, not looser."
@@ -145,20 +174,6 @@ export function SettingsPage() {
         disabled={locked}
         onChange={(on) => void save("otherLaunchers", on, on ? "Other launchers shown. Rescan Games to see them." : "Other launchers hidden.")}
       />
-      {settings && <CloudSection settings={settings} onSettings={setSettings} />}
-      <ExportSection />
-      <Field label="Updates" description="Check for updates, read release notes or go back to an earlier version." childrenLayout="inline">
-        <DialogButton style={{ width: "auto" }} onClick={() => Navigation.Navigate(`${ROUTE_PATH}/updates`)}>
-          Open Updates
-        </DialogButton>
-      </Field>
-      <Field label="Setup" description="Walk through device name, sign-in, scanning and choosing games again." childrenLayout="inline">
-        <DialogButton style={{ width: "auto" }} disabled={locked} onClick={() => Navigation.Navigate(SETUP_PATH)}>
-          Run setup again
-        </DialogButton>
-      </Field>
-      <ModulesSection locked={locked} />
-      {settings && <Field label="Device ID" description={settings.deviceId} />}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { DialogButton, Focusable, ModalRoot, TextField, showModal } from "@decky
 import { toaster } from "@decky/api";
 import { useState } from "react";
 import { snapshotGame } from "../backend";
+import { plainError } from "../format";
 
 // A named checkpoint (ADR-0048): a new snapshot, pinned with its name, kept by retention.
 export function openCheckpointModal(gameKey: string, gameName: string, onDone?: () => void) {
@@ -42,7 +43,7 @@ function CheckpointModal({
       closeModal?.();
       onDone?.();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Checkpoint not saved: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Checkpoint not saved: ${plainError(err)}` });
       setBusy(false);
     }
   };

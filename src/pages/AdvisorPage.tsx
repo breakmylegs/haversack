@@ -17,6 +17,7 @@ import {
   saveAiKey,
   savePcgwLogin,
 } from "../backend";
+import { plainError } from "../format";
 
 // Advisor is read-only (P16, ADR-0019): this page shows advice and copies text. It never changes a setting.
 
@@ -142,7 +143,7 @@ function PcgwSection({ view, busy, act }: { view: AdvisorView; busy: boolean; ac
       await act(advisorRefresh);
       toaster.toast({ title: "Keepsake", body: "PCGamingWiki login saved." });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     }
   };
 
@@ -219,7 +220,7 @@ function AiSection({ view, busy, act }: { view: AdvisorView; busy: boolean; act:
       await act(advisorView);
       toaster.toast({ title: "Keepsake", body: `${provider.name} key saved.` });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     }
   };
 
@@ -228,7 +229,7 @@ function AiSection({ view, busy, act }: { view: AdvisorView; busy: boolean; act:
     try {
       setModels(await advisorAiModels(provider.id));
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     }
   };
 
@@ -304,7 +305,7 @@ export function AdvisorPage() {
     try {
       setView(await work());
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -325,7 +326,7 @@ export function AdvisorPage() {
       const found = await discoverGames(false);
       setGames(found.games);
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Could not list games: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Could not list games: ${plainError(err)}` });
     }
   };
 

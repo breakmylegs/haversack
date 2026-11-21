@@ -4,7 +4,7 @@ If you used [Ludusavi](https://github.com/mtkennerly/ludusavi) before, Keepsake 
 
 ![The Import page on a PC](images/desktop-import.png)
 
-1. Open **Import saves** (handheld) or **Import** (PC).
+1. Open **Saves**, **Import and export** (handheld) or **Import** (PC).
 2. Enter the folder of your Ludusavi backups (`~/ludusavi-backup` by default) and choose **Find backups**.
 3. Keepsake lists each game with the number of backups it found.
 4. Choose **Import the latest backup of each game**, or **Import every backup** to bring the whole history.

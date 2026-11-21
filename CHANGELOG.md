@@ -4,6 +4,36 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Changed
+
+- **A new layout** (ADR-0073, `docs/design/layout-v3.md`). Keepsake's full page now has seven sections, each with tabs along the top. Every page from before is still there, as a tab, and old links still open it:
+  - **Play:** Now playing, Advisor.
+  - **Saves:** Games, Conflicts, History, Activity, Import and export.
+  - **Games and devices:** Moving games, Other devices, Disk use.
+  - **Device:** Status.
+  - **Install.**
+  - **Settings:** General, Cloud, Sync and safety, Modules, Updates.
+  - **Diagnostics:** Health, Device checks, Tools, Logs.
+- **The quick access menu fits on one screen.**
+  - **Now playing:** the game, its saves, Save checkpoint, and the Advisor's top advice as one row.
+  - **Moving games.**
+  - **Up to three things that need you.**
+  - **The status line,** then **Sync now** and **Open Keepsake**.
+- **Renamed:** "Devices" is **Other devices**, "Storage" is **Disk use**, and "Import saves" is **Import and export**, which now also holds the zip export.
+- **Errors are plain sentences everywhere,** never "Python ValueError: ...".
+- **The desktop app** now uses the same sections in a sidebar, with:
+  - a settings search;
+  - a Games table you can sort and filter;
+  - a sortable transfer table;
+  - Advisor, with charts of your last sessions (power, temperatures, frame rate, battery);
+  - Device, Status;
+  - Device checks;
+  - Logs.
+
+### Added
+
+- **Device, Status:** this handheld as Keepsake sees it, with its model and profile, power range, screen, battery and charging. The device controls arrive here next.
+
 ## [0.31.1]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

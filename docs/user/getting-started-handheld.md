@@ -9,7 +9,7 @@ For SteamOS and Bazzite handhelds with [Decky Loader](https://github.com/SteamDe
    ```
    https://github.com/breakmylegs/keepsake/releases/latest/download/Keepsake.zip
    ```
-3. After that, Keepsake updates itself from its own **Updates** page ([Updates](updates.md)).
+3. After that, Keepsake updates itself from its own **Settings**, **Updates** tab ([Updates](updates.md)).
 
 ## 2. Set it up
 

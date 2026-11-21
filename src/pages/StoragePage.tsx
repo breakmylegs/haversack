@@ -2,6 +2,7 @@ import { ConfirmModal, DialogButton, Field, Focusable, showModal } from "@decky/
 import { toaster } from "@decky/api";
 import { useState } from "react";
 import { cancelPrefixReset, clearShaderCache, deleteOldPrefix, resetPrefix, StorageRow, storageUsage } from "../backend";
+import { plainError } from "../format";
 
 function size(bytes: number): string {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
@@ -32,7 +33,7 @@ export function StoragePage() {
       setRows(result.games);
       setNotMeasured(result.notMeasured);
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -50,7 +51,7 @@ export function StoragePage() {
           try {
             toaster.toast({ title: "Keepsake", body: await work() });
           } catch (err) {
-            toaster.toast({ title: "Keepsake", body: String(err) });
+            toaster.toast({ title: "Keepsake", body: plainError(err) });
           } finally {
             setBusy(false);
             await measure();

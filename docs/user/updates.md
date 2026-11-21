@@ -4,7 +4,7 @@ Every Keepsake release is signed, and lists every third-party component it conta
 
 ## On a handheld
 
-Open **Updates** in Keepsake. When a new version is available, the Quick Access Menu also says so. Choose the version and install it: Keepsake hands the checked download to Decky's own installer. You can also go back to an earlier version from the same page.
+Open **Settings**, **Updates** in Keepsake. When a new version is available, the Quick Access Menu also says so. Choose the version and install it: Keepsake hands the checked download to Decky's own installer. You can also go back to an earlier version from the same page.
 
 The **Channel** setting chooses between stable releases only, or test releases too.
 

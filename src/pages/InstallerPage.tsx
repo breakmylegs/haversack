@@ -1,4 +1,4 @@
-import { ConfirmModal, DialogButton, Field, Focusable, Navigation, showModal, TextField } from "@decky/ui";
+import { ConfirmModal, DialogButton, Field, Focusable, showModal, TextField } from "@decky/ui";
 import { openFilePicker, toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import {
@@ -20,8 +20,9 @@ import {
   setSetting,
   updateGameConfig,
 } from "../backend";
-import { ROUTE_PATH } from "../routes";
+import { openSection } from "../routes";
 import { NetworkSource } from "./NetworkSource";
+import { plainError } from "../format";
 
 // FileSelectionType in @decky/api is a type-only const enum: FILE is 0, FOLDER is 1.
 const FILE = 0 as unknown as Parameters<typeof openFilePicker>[0];
@@ -71,7 +72,7 @@ export function InstallerPage() {
       await work();
       if (done) toaster.toast({ title: "Keepsake", body: done });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
       await refresh();
@@ -95,7 +96,7 @@ export function InstallerPage() {
         busyInstall ? "Added to the queue. It starts when the current install ends." : "Ready. Choose the installer program.",
       );
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Nothing chosen: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Nothing chosen: ${plainError(err)}` });
     }
   };
 
@@ -104,7 +105,7 @@ export function InstallerPage() {
       const picked = await openFilePicker(FOLDER, status?.libraryRoot ?? "/home", false, true);
       await act(() => setSetting("libraryRoot", picked.realpath || picked.path), "Games will be installed there.");
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Nothing chosen: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Nothing chosen: ${plainError(err)}` });
     }
   };
 
@@ -112,7 +113,7 @@ export function InstallerPage() {
     act(async () => {
       const { key } = await installerHandoff(job.id);
       await updateGameConfig(key, { enabled: true });
-      Navigation.Navigate(`${ROUTE_PATH}/games`);
+      openSection("saves", "games");
     }, `Save sync switched on for ${job.title}. Check its match in Games.`);
 
   const findArtwork = (job: InstallJob) =>

@@ -1,4 +1,4 @@
-import { DialogButton, Field, Focusable, Navigation, TextField, ToggleField } from "@decky/ui";
+import { DialogButton, Field, Focusable, TextField, ToggleField } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import {
@@ -14,8 +14,8 @@ import {
   setSetting,
   Settings,
 } from "../backend";
-import { PLAN_LABELS } from "../format";
-import { ROUTE_PATH } from "../routes";
+import { plainError, PLAN_LABELS } from "../format";
+import { openSection } from "../routes";
 import { CloudSection } from "./CloudSection";
 
 const STEPS = ["Device name", "Cloud", "Scan games", "Review matches", "Choose games", "Dry run", "Confirm"];
@@ -44,7 +44,7 @@ export function SetupWizard() {
         setSettings(s);
         setName(s.deviceName);
       })
-      .catch((err) => toaster.toast({ title: "Keepsake", body: `Could not load settings: ${err}` }));
+      .catch((err) => toaster.toast({ title: "Keepsake", body: `Could not load settings: ${plainError(err)}` }));
   }, []);
 
   const work = async (task: () => Promise<void>) => {
@@ -52,7 +52,7 @@ export function SetupWizard() {
     try {
       await task();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -65,7 +65,7 @@ export function SetupWizard() {
   };
 
   const leave = () => {
-    Navigation.Navigate(`${ROUTE_PATH}/games`);
+    openSection("saves", "games");
   };
 
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));

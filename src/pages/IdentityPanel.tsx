@@ -1,6 +1,7 @@
 import { DialogButton, Field, Focusable } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { GameConfig, IdentitySuggestion, MatchInfo, newGameKey, setGameKey } from "../backend";
+import { plainError } from "../format";
 
 const SIGNAL_TEXT: Record<string, string> = {
   exe: "same program file",
@@ -36,7 +37,7 @@ export function IdentityPanel({
       toaster.toast({ title: "Keepsake", body: done });
       onChanged();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not changed: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Not changed: ${plainError(err)}` });
     }
   };
 

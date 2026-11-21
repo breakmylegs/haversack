@@ -11,7 +11,7 @@ import {
   syncStatus,
   updateGameConfig,
 } from "../backend";
-import { agoText, CONFLICT_TEXT } from "../format";
+import { agoText, CONFLICT_TEXT, plainError } from "../format";
 import { openConflictModal } from "./ConflictModal";
 
 function sharedText(info: ConfigSyncInfo | null): string {
@@ -50,7 +50,7 @@ export function SyncPanel({
     try {
       toaster.toast({ title: "Keepsake", body: await work() });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
       await refresh();

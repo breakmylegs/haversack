@@ -2,7 +2,7 @@ import { DialogButton, Field, ToggleField } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { modulesStatus, ModulesStatus, resetModule, setModuleEnabled } from "../backend";
-import { HEALTH_LABELS } from "../format";
+import { HEALTH_LABELS, plainError } from "../format";
 
 // v2 spec 7.3: each module with its switch, health and what it writes. A switched-off module runs nothing.
 export function ModulesSection({ locked }: { locked: boolean }) {
@@ -21,7 +21,7 @@ export function ModulesSection({ locked }: { locked: boolean }) {
       setStatus(await work());
       toaster.toast({ title: "Keepsake", body: done });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not changed: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Not changed: ${plainError(err)}` });
     } finally {
       setBusy(false);
     }

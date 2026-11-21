@@ -3,7 +3,7 @@ import { Field, ToggleField } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { Backend, GameConfig, locationsStatus, setGameLocations } from "../backend";
-import { BACKEND_LABELS } from "../format";
+import { BACKEND_LABELS, plainError } from "../format";
 
 export function GameLocations({ gameKey, config, onConfig }: { gameKey: string; config: GameConfig; onConfig: (c: GameConfig) => void }) {
   const [inUse, setInUse] = useState<Backend[]>([]);
@@ -23,7 +23,7 @@ export function GameLocations({ gameKey, config, onConfig }: { gameKey: string; 
     const all = inUse.every((b) => next.includes(b));
     void setGameLocations(gameKey, all ? null : next)
       .then(onConfig)
-      .catch((err) => toaster.toast({ title: "Keepsake", body: String(err) }));
+      .catch((err) => toaster.toast({ title: "Keepsake", body: plainError(err) }));
   };
   return (
     <>

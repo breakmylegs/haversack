@@ -1,6 +1,7 @@
 import { ConfirmModal, showModal } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { approveMatch } from "./backend";
+import { plainError } from "./format";
 
 type Candidate = { gameKey: string; title: string | null };
 
@@ -19,7 +20,7 @@ export function askApproveMatch(gameKey: string, gameName: string, candidate: Ca
             toaster.toast({ title: "Keepsake", body: `${gameName} now syncs as ${label}.` });
             onChanged();
           })
-          .catch((err) => toaster.toast({ title: "Keepsake", body: `Not changed: ${err}` }))
+          .catch((err) => toaster.toast({ title: "Keepsake", body: `Not changed: ${plainError(err)}` }))
       }
     />,
   );

@@ -45,7 +45,8 @@ function active(p: Pairing): boolean {
 }
 
 // Paired devices, pairing by a confirmed code, and the listener (ADR-0054, ADR-0056).
-export function ReplicationPage() {
+// Games and devices (layout v3, ADR-0073): "moving" is the Moving games tab, "devices" is Other devices.
+export function ReplicationPage({ part = "devices" }: { part?: "moving" | "devices" }) {
   const [status, setStatus] = useState<ReplicationStatus | null>(null);
   const [found, setFound] = useState<FoundDevice[] | null>(null);
   const [address, setAddress] = useState("");
@@ -54,7 +55,7 @@ export function ReplicationPage() {
   const refresh = () =>
     replicationStatus()
       .then(setStatus)
-      .catch((err) => toaster.toast({ title: "Keepsake", body: String(err) }));
+      .catch((err) => toaster.toast({ title: "Keepsake", body: plainError(err) }));
 
   useEffect(() => {
     void refresh();
@@ -78,12 +79,22 @@ export function ReplicationPage() {
       else await refresh();
       if (done) toaster.toast({ title: "Keepsake", body: done });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
     }
   };
 
+  if (part === "moving") {
+    return (
+      <div>
+        <GameTransfersSection />
+        <OffersSection />
+        <TransfersSection />
+        <Field description="Send a game from its page in Saves, Games, or get one from another device in Other devices." />
+      </div>
+    );
+  }
   if (!status) return <Field label="Devices" description="Loading" />;
   if (!status.available) {
     return (
@@ -103,9 +114,6 @@ export function ReplicationPage() {
         description="Keepsake links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once: send a request from one, accept it on the other, and type the code it shows."
       />
 
-      <GameTransfersSection />
-      <OffersSection />
-      <TransfersSection />
 
       {pairings.map((p) => (
         <PairingCard key={p.id} pairing={p} busy={busy} run={run} />
@@ -372,7 +380,7 @@ function TransfersSection() {
     try {
       setStatus(await work());
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
     }

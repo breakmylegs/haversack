@@ -3,6 +3,7 @@ import { toaster } from "@decky/api";
 import { useState } from "react";
 import { IdentitySuggestion, MatchProposal, rejectMatch, setGameKey } from "../backend";
 import { askApproveMatch } from "../matchApproval";
+import { plainError } from "../format";
 
 const SIGNAL_TEXT: Record<string, string> = {
   exe: "same program file",
@@ -42,7 +43,7 @@ export function ProposalCard({
       toaster.toast({ title: "Keepsake", body: done });
       onChanged();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not changed: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Not changed: ${plainError(err)}` });
     }
   };
 

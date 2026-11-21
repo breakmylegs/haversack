@@ -26,6 +26,7 @@ import { SendPanel } from "./SendPanel";
 import { InStepPanel } from "./InStepPanel";
 import { UninstallPanel } from "./UninstallPanel";
 import { GameLocations } from "./GameLocations";
+import { plainError } from "../format";
 
 // FileSelectionType.FOLDER in @decky/api is a type-only const enum (value 1).
 const FOLDER = 1 as unknown as Parameters<typeof openFilePicker>[0];
@@ -86,7 +87,7 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
     try {
       setPreview(await previewGame(gameKey));
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Preview failed: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Preview failed: ${plainError(err)}` });
     } finally {
       setBusy(false);
     }
@@ -98,7 +99,7 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
       .catch(() => setPlayed(null)); // offline or not synced: simply not shown
     load()
       .then(runPreview)
-      .catch((err) => toaster.toast({ title: "Keepsake", body: String(err) }));
+      .catch((err) => toaster.toast({ title: "Keepsake", body: plainError(err) }));
   }, [gameKey]);
 
   const change = async (changes: Partial<GameConfig>, done: string) => {
@@ -108,7 +109,7 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
       await load();
       await runPreview();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not saved: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Not saved: ${plainError(err)}` });
     }
   };
 
@@ -120,7 +121,7 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
       toaster.toast({ title: "Keepsake", body: "Custom path added." });
       await runPreview();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not added: ${err}` });
+      toaster.toast({ title: "Keepsake", body: `Not added: ${plainError(err)}` });
     }
   };
 
