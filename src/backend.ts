@@ -258,7 +258,7 @@ export interface IncomingOffer {
 }
 export interface OffersStatus {
   incoming: IncomingOffer[];
-  outgoing: { id: string; title: string; peer: string; created: number }[];
+  outgoing: { id: string; title: string; peer: string; created: number; remoteState?: string; remoteReason?: string | null }[];
   sending: Record<string, { state: "preparing" | "sent" | "failed"; title: string; peer: string; reason?: string; warning?: string | null }>;
 }
 export const replicationSend = callable<[key: string, peerId: string], { state: string; title: string; droppedOptions: string[] }>("replication_send");

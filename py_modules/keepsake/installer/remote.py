@@ -444,7 +444,7 @@ class LocationStore:
         """Remember a location. An empty password keeps the stored one."""
         from . import smbshare, webdav  # both import this module; pysmb itself loads only on use
 
-        smb = str(url).strip().lower().startswith("smb://")
+        smb = smbshare.is_smb(url)
         dav = webdav.is_dav(url)
         if smb:
             url = smbshare.parse(url).url()

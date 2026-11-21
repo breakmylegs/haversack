@@ -238,7 +238,7 @@ def test_both_sides_changed_asks_the_user(make_app, monkeypatch):  # noqa: F811
                 "keepsake.app.scan_game", lambda scopes, keep: {"install": {"root": "b" * 64}}
             )  # this device changed too
             accepted = []
-            monkeypatch.setattr(app.incoming, "accept_update", lambda *a: accepted.append(a) or {"id": a[0]})
+            monkeypatch.setattr(app.incoming, "begin_update", lambda *a: accepted.append(a) or [])
             with pytest.raises(ValueError, match="changed on this device too"):
                 await app.replication_apply_update("abcdefabcdefabcd")
             assert app.game_links.get("1234567812345678")["state"] == "both-changed" and accepted == []

@@ -1,4 +1,4 @@
-# Device run for v0.30.0
+# Device run for v0.30.x
 
 No SSH, terminal or laptop is needed. Do the first two parts on each handheld, then the rest with both. "Go" is the Legion Go and "Go 2" the Legion Go 2.
 
@@ -81,6 +81,22 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
 8. **Two save locations.** On the Go, open the Cloud page and add a second save location (for example **Directly between my devices** next to OneDrive). Play and quit a synced game. Both locations should list it as reached, with nothing left to copy. Turn the Wi-Fi off, play and quit again (it should not block), turn it back on, and after a few minutes the Cloud page should show nothing left to copy.
 
 9. **Desktop tray responsive.** With the USB disk attached (and the EmuDeck folders on it), switch to Desktop Mode. Open the Keepsake tray menu repeatedly and use the taskbar and start menu for a minute: nothing should freeze. Run the Device check **Desktop tray responsive** from the desktop page's Diagnostics: it should pass, with both times under 200 ms.
+
+10. **Sending a game, both sides (v0.30.2).**
+    - Send Factorio (or any non-Steam game) from the Go to the Go 2 and accept it on the Go 2.
+    - The Go's Devices page should change from "offered" to "copying", then "adding to Steam", then "arrived".
+    - Send another game, and on the Go 2 choose a library folder without enough space, or pull the SD card while it copies. The Go 2 should show it as failed with the reason. The Go should show "did not arrive" with the same reason, and a toast.
+    - On the Go 2, run **Device checks** and press **Export results**. The file should have a "replication" part with the states, and no game titles.
+
+11. **OneDrive sign-in (v0.30.2).**
+    - On the Cloud page, press **Sign in with OneDrive** and finish in Steam's browser. It should end on "You're signed in", never a "cannot connect" page.
+    - Reload that page within 2 minutes: it should still say "You're signed in".
+    - Start again. While the browser is open, press **Use your phone instead** and finish on your phone. The toast should say "Signed in with your phone". If you go back to the browser tab, it should say you signed in on your phone.
+
+12. **Windows share, Windows-style (v0.30.2).**
+    - In Install, then From a network location, then Windows share (SMB), press **Find shares** and pick your server. Its shares should be listed, or a plain sentence should say why (for example that it needs a user name and password). There should be no "Python" or error-type text.
+    - Type the address the Windows way, `\\yourserver\yourshare`, with your user name (try `YOURPC\yourname` if the PC is not on a domain) and password, and turn on **Remember this location**. Press **Browse**: its folders should be listed.
+    - Come back later, pick the remembered location and press **Browse** again: it should list the same folders.
 
 ## 5. Send back
 

@@ -578,7 +578,7 @@ function OffersSection() {
         </Field>
       ))}
       {status.outgoing.map((offer) => (
-        <Field key={offer.id} label={`${offer.title}: offered`} description="Waiting for the other device. Withdraw it once it has arrived." childrenLayout="below">
+        <Field key={offer.id} label={outgoingText(offer)[0]} description={outgoingText(offer)[1]} childrenLayout="below">
           <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void act(() => replicationWithdraw(offer.id))}>
             Withdraw
           </DialogButton>
@@ -586,4 +586,24 @@ function OffersSection() {
       ))}
     </>
   );
+}
+
+// What the receiving device last said about an offer (v0.30.2): a failure shows here too.
+function outgoingText(offer: { title: string; remoteState?: string; remoteReason?: string | null }): [string, string] {
+  switch (offer.remoteState) {
+    case "transferring":
+      return [`${offer.title}: copying`, "The other device is copying it."];
+    case "registering":
+      return [`${offer.title}: adding to Steam`, "The other device is adding it to Steam."];
+    case "done":
+      return [`${offer.title}: arrived`, offer.remoteReason ? `Arrived. ${offer.remoteReason} You can withdraw the offer.` : "Arrived. You can withdraw the offer."];
+    case "failed":
+      return [`${offer.title}: did not arrive`, `${offer.remoteReason || "The other device could not copy it."} Withdraw the offer, or fix it and try again on the other device.`];
+    case "declined":
+      return [`${offer.title}: declined`, "The other device declined it. Withdraw the offer."];
+    case "removed":
+      return [`${offer.title}: removed`, "The other device stopped and removed it. Withdraw the offer."];
+    default:
+      return [`${offer.title}: offered`, "Waiting for the other device. Withdraw it once it has arrived."];
+  }
 }

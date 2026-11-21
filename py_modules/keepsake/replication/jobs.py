@@ -122,7 +122,14 @@ class Transfers:
         os.makedirs(job.staging, exist_ok=True)
         self._remember(job)
         self.jobs[job.id] = job
-        self._run(job)
+        try:
+            self._run(job)
+        except RuntimeError:
+            # Off the event loop (the v0.30.1 stall): nothing may stay listed as if it were running.
+            self.jobs.pop(job.id, None)
+            self._forget(job.id)
+            transfer.remove_staging(job.staging)
+            raise
         return job.public()
 
     def _run(self, job: transfer.Job) -> None:
@@ -130,8 +137,13 @@ class Transfers:
         receiver = transfer.Receiver(
             job, sources, retries=self.retries, on_progress=lambda _job: self._changed(), hold=self.conditions
         )
+        run = receiver.run()
+        try:
+            task = asyncio.create_task(run)
+        except RuntimeError:
+            run.close()
+            raise
         self.guard.acquire()
-        task = asyncio.create_task(receiver.run())
         self.tasks[job.id] = task
         job_id = job.id
 

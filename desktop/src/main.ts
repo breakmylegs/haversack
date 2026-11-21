@@ -1175,8 +1175,8 @@ function offersCard(offered: OffersStatus, main: HTMLElement): HTMLElement | nul
         h(
           "li",
           {},
-          h("strong", {}, `${offer.title}: offered`),
-          h("p", {}, "Waiting for the other device. Withdraw it once it has arrived."),
+          h("strong", {}, outgoingText(offer)[0]),
+          h("p", {}, outgoingText(offer)[1]),
           h("div", { class: "actions" }, button("Withdraw", async () => (await call("replication_withdraw", offer.id), await again()))),
         ),
       ),
@@ -1319,8 +1319,8 @@ function start(): void {
     if (event === "keepsake_toast" && typeof args[0] === "string") toast(args[0]);
     if (event === "keepsake_replication" && document.getElementById("nav-devices")?.getAttribute("aria-current") === "true") void show("devices");
     if (event === "keepsake_signin") {
-      const result = args[0] as { status?: string; reason?: string } | undefined;
-      toast(result?.status === "signed-in" ? "Signed in." : `Sign-in did not complete: ${result?.reason ?? "unknown reason"}`);
+      const result = args[0] as { status?: string; reason?: string; method?: string } | undefined;
+      toast(result?.status !== "signed-in" ? `Sign-in did not complete: ${result?.reason ?? "unknown reason"}` : result.method === "phone" ? "Signed in with your phone. Keepsake is signed in; you can close any sign-in tab left open." : "Signed in.");
       if (document.getElementById("nav-cloud")?.getAttribute("aria-current") === "true") void show("cloud");
     }
   }, ["keepsake_toast", "keepsake_signin", "keepsake_replication"]);
@@ -1328,3 +1328,23 @@ function start(): void {
 }
 
 start();
+
+// What the receiving device last said about an offer (v0.30.2): a failure shows here too.
+function outgoingText(offer: { title: string; remoteState?: string; remoteReason?: string | null }): [string, string] {
+  switch (offer.remoteState) {
+    case "transferring":
+      return [`${offer.title}: copying`, "The other device is copying it."];
+    case "registering":
+      return [`${offer.title}: adding to Steam`, "The other device is adding it to Steam."];
+    case "done":
+      return [`${offer.title}: arrived`, offer.remoteReason ? `Arrived. ${offer.remoteReason} You can withdraw the offer.` : "Arrived. You can withdraw the offer."];
+    case "failed":
+      return [`${offer.title}: did not arrive`, `${offer.remoteReason || "The other device could not copy it."} Withdraw the offer, or fix it and try again on the other device.`];
+    case "declined":
+      return [`${offer.title}: declined`, "The other device declined it. Withdraw the offer."];
+    case "removed":
+      return [`${offer.title}: removed`, "The other device stopped and removed it. Withdraw the offer."];
+    default:
+      return [`${offer.title}: offered`, "Waiting for the other device. Withdraw it once it has arrived."];
+  }
+}

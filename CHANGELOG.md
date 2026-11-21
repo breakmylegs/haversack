@@ -4,6 +4,22 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sending a game could stall for ever** (seen with Factorio). Cause: accepting an offer started the copy from a worker thread, where it cannot start. The offer then said "transferring" with nothing running, a failed copy never changed its state, and the sending device was never told.
+  - The copy now starts on the plugin's own event loop. Anything that stops it marks the offer **failed** with a plain reason, and nothing is left half-started.
+  - Both devices now see what happened. The receiving device tells the sending one each change (copying, adding to Steam, arrived, failed, declined, removed), without any folder paths. The sending device's list and a toast show it.
+  - The sending device also no longer says "preparing" for ever when an unexpected error stops an offer.
+  - The Device checks' **Export results** now includes the offer and transfer states, redacted: no titles, device names or paths.
+- **OneDrive sign-in could end on a "cannot connect to localhost" page.**
+  - Keepsake now keeps answering the sign-in address for 2 minutes after sign-in ends, so a browser that loads it again sees "You're signed in".
+  - If you finished on your phone instead, an open tab now says so plainly, and the toast says "Signed in with your phone".
+  - Keepsake listens on IPv6 (`::1`) as well as IPv4, on the same port. If that port is taken on IPv6, it picks another one, so a browser that looks up `localhost` as IPv6 still arrives.
+- **Windows shares: Find shares and Browse showed raw errors.**
+  - Addresses written the Windows way now work, as File Explorer shows them (`\\server\share\folder`). Before, the backslashes ended up in the server or folder name.
+  - User names written `DOMAIN\user` or `PC-NAME\user` now sign in, with the domain sent separately.
+  - Errors on the Install page are now plain sentences, never "Python ValueError: ...". Anything unexpected names itself once and points to diagnostics.
+
 ## [0.30.1]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

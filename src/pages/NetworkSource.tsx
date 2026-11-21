@@ -1,6 +1,7 @@
 import { ConfirmModal, DialogButton, Field, Focusable, showModal, TextField, ToggleField } from "@decky/ui";
 import { addEventListener, removeEventListener, toaster } from "@decky/api";
 import { useEffect, useState } from "react";
+import { plainError } from "../format";
 import {
   installerNetBrowse,
   installerNetCancel,
@@ -145,7 +146,7 @@ export function NetworkSource({
     try {
       await work();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: String(err) });
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
     } finally {
       setBusy(false);
     }

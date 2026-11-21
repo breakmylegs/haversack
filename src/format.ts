@@ -85,3 +85,24 @@ export const CONFLICT_TEXT = {
   fork: "Two devices saved different progress from the same starting point.",
   "both-changed": "This device and the cloud both have new progress.",
 };
+
+/**
+ * A backend error as a plain sentence (v0.30.2). Decky raises a Python error as "Python ValueError:
+ * <message>"; Keepsake's ValueErrors are already plain, so only the message is shown. Anything
+ * else is a fault, named once with a pointer to diagnostics, never a raw exception.
+ */
+export function plainError(err: unknown): string {
+  if (err instanceof Error && err.name.startsWith("Python ")) {
+    if (err.name === "Python ValueError" && err.message) return sentence(err.message);
+    return `Something went wrong in Keepsake (${err.name.slice(7)}). If it keeps happening, export diagnostics from Settings.`;
+  }
+  const text = err instanceof Error ? err.message : String(err);
+  return sentence(text.replace(/^(Python )?[A-Za-z]*Error: /, ""));
+}
+
+function sentence(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return "That did not work.";
+  const first = trimmed[0].toUpperCase() + trimmed.slice(1);
+  return /[.!?]$/.test(first) ? first : `${first}.`;
+}

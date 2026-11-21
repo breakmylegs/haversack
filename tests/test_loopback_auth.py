@@ -99,6 +99,10 @@ def test_a_valid_callback_signs_in_and_only_the_right_state_counts(tmp_path):
     assert form["redirect_uri"] == params["redirect_uri"] and form["client_secret"] == "not-secret"
     challenge = base64.urlsafe_b64encode(hashlib.sha256(form["code_verifier"].encode()).digest()).rstrip(b"=")
     assert challenge.decode() == params["code_challenge"]
+    # v0.30.2: it answers for a grace period with the signed-in page, and takes no second code.
+    assert visit(port, f"/?state={params['state']}&code=again") == (200, page)
+    assert len(transport.calls) == 1
+    flow.close()
     with pytest.raises(OSError):
         visit(port, f"/?state={params['state']}&code=again")  # the listener is gone
 
@@ -157,6 +161,8 @@ def test_a_cancel_or_the_timeout_closes_the_listener(tmp_path):
     flow.cancelled.set()
     thread.join(5)
     assert box == {"error": "cancelled"}
+    assert "moved to your phone" in visit(port, "/")[1]  # v0.30.2: a grace page, not a refused connection
+    flow.close()
     with pytest.raises(OSError):
         visit(port, "/")
 

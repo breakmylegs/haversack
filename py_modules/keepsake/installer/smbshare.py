@@ -78,9 +78,30 @@ class Address:
         return f"smb://{self.host}{port}/{tail}{'/' if folder and tail else ''}"
 
 
+def normalise(url: str) -> str:
+    """Windows ways of writing a share address, as ``smb://`` (v0.30.2).
+
+    ``\\\\server\\share\\folder``, ``smb:\\\\server\\share`` and ``smb://server\\share`` are what
+    File Explorer shows; backslashes are never part of a server or folder name on a share.
+    """
+    text = str(url).strip()
+    lower = text.lower()
+    for prefix in ("smb://\\\\", "smb:\\\\", "smb:/\\", "\\\\"):
+        if lower.startswith(prefix):
+            text = "smb://" + text[len(prefix) :]
+            break
+    if text.lower().startswith("smb://"):
+        text = "smb://" + text[6:].replace("\\", "/")
+    return text
+
+
+def is_smb(url: str) -> bool:
+    return normalise(url).lower().startswith("smb://")
+
+
 def parse(url: str) -> Address:
     """``smb://server[:port]/share/folder/...`` with no credentials, query or fragment."""
-    url = str(url).strip()
+    url = normalise(url)
     if not url or len(url) > URL_MAX or any(ord(c) < 32 or c == "\x7f" for c in url):
         raise RemoteError("enter an address such as smb://nas.local/games/")
     try:
@@ -104,15 +125,25 @@ def parse(url: str) -> Address:
 Connector = Callable[[str, int, str, str, str], Any]
 
 
+def split_user(username: str) -> tuple[str, str]:
+    """``DOMAIN\\user`` or ``PC-NAME\\user`` as (domain, user), as Windows writes it (v0.30.2).
+
+    ``user@example.com`` stays whole: a Microsoft account signs in to Windows shares that way.
+    """
+    domain, sep, user = str(username).partition("\\")
+    return (domain, user) if sep and domain and user else ("", str(username))
+
+
 def _connect(ip: str, port: int, host: str, username: str, password: str) -> Any:
     smb_connection = pysmb()
     remote_name = host.split(".")[0].upper()[:15] or "SERVER"
+    domain, user = split_user(username)
     conn = smb_connection(
-        username,
+        user,
         password,
         "KEEPSAKE",
         remote_name,
-        domain="",
+        domain=domain,
         use_ntlm_v2=True,
         sign_options=smb_connection.SIGN_WHEN_SUPPORTED,
         is_direct_tcp=True,
