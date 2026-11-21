@@ -36,7 +36,7 @@ BUDGETS = {
     "retention plan over 10,000 snapshots": 1.0,
     "content hash of 10,000 files": 0.25,
     # Advisor sessions (ADR-0069): sampling runs once a second while a game plays, so it must stay tiny.
-    "100 session readings": 1.5,  # about 3.4 ms a reading on the laptop (far less on sysfs): once a second
+    "100 session readings": 0.1,  # Keepsake's parsing per reading, file reads served from memory: once a second
     "an hour of session samples summarised": 0.25,
 }
 
@@ -145,8 +145,17 @@ def run() -> dict[str, float]:
     with tempfile.TemporaryDirectory() as root:
         fake_sys(root)
         sensors = sessions.Sensors(root, root)  # found once per session, as the recorder does
-        results["100 session readings"] = measure(lambda: [sensors.read() for _ in range(100)])
-        sample = sensors.read()
+        # Time Keepsake's own work, not the disk: on the handheld these are sysfs reads of microseconds, while on
+        # the laptop every open in the temp folder is scanned by the antivirus. The files are served from memory.
+        files: dict[str, str | None] = {}
+        real_text = sessions._text
+        sessions._text = lambda path: files[path] if path in files else files.setdefault(path, real_text(path))
+        try:
+            sensors.read()  # fills the cache
+            results["100 session readings"] = measure(lambda: [sensors.read() for _ in range(100)])
+            sample = sensors.read()
+        finally:
+            sessions._text = real_text
 
     def an_hour() -> None:
         acc = sessions.Accumulator(0.0)
