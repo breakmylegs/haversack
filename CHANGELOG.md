@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.30.2]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Fixed
 
 - **Sending a game could stall for ever** (seen with Factorio). Cause: accepting an offer started the copy from a worker thread, where it cannot start. The offer then said "transferring" with nothing running, a failed copy never changed its state, and the sending device was never told.
