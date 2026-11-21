@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.28.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Added
 
 - Advisor remembers how each game ran on this device. While you play, it measures frame rate, power, battery drain, load, clocks, temperatures and throttling, read only and with nothing to set up, and the game's Advisor page shows a **Last session** card and **Recent sessions**, even when the game is not running. Advice "Measured on this device" comes first, for example lowering a frame cap the game cannot hold, or a lower TDP that gives the same frame rate. The frame rate comes from Steam's own overlay or your MangoHud logs; otherwise the card says it is not available. A new Device check, "Session stats sources" (ADR-0069).
