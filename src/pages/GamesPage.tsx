@@ -117,8 +117,7 @@ export function GamesPage() {
   const [result, setResult] = useState<DiscoveryResult | null>(null);
   const [matches, setMatches] = useState<Record<string, GameMatch>>({});
   const [status, setStatus] = useState<ManifestStatus | null>(null);
-  const [filter, setFilter] = useState<Filter>("shortcuts");
-  const [showSteam, setShowSteam] = useState(false);
+  const [filter, setFilter] = useState<Filter>("all");
   const [cloudDetection, setCloudDetection] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -148,7 +147,6 @@ export function GamesPage() {
   useEffect(() => {
     getSettings()
       .then((s) => {
-        setShowSteam(s.showSteamApps);
         setCloudDetection(s.steamCloudDetection);
       })
       .catch(() => undefined);
@@ -202,9 +200,11 @@ export function GamesPage() {
   }
 
   const runningAppId = SteamUIStore?.MainRunningAppID;
-  // Steam apps are off by default because Steam Cloud covers them (build prompt section 14).
-  const filters = (Object.keys(FILTER_LABELS) as Filter[]).filter((f) => showSteam || f !== "steam");
-  const visible = (result?.games ?? []).filter((g) => showSteam || g.kind !== "steam");
+  // Steam games are always listed beside non-Steam shortcuts (ADR-0063).
+  const filters = Object.keys(FILTER_LABELS) as Filter[];
+  const visible = result?.games ?? [];
+  const steamAuto = Object.values(matches).filter((m) => m.kind === "steam" && m.enabled && m.enabledSource === "auto").length;
+  const steamCloudOff = Object.values(matches).filter((m) => m.kind === "steam" && m.steamCloud === "cloud" && !m.enabled).length;
   // Needs approval first, then prefix mismatch, conflict, quarantined, then by name: the backend's order,
   // kept under every filter. Games not matched yet go last.
   const rank = new Map(order.map((key, i) => [key, i]));
@@ -336,7 +336,7 @@ export function GamesPage() {
         </DialogButton>
       </Focusable>
       {progress && <Field label="Updating the save-location manifest" description={manifestProgressText(progress)} />}
-      {showSteam && cloudDetection && Object.values(matches).some((m) => m.steamCloud === "no-cloud" && !m.enabled) && (
+      {cloudDetection && Object.values(matches).some((m) => m.steamCloud === "no-cloud" && !m.enabled) && (
         <Field
           label={`${Object.values(matches).filter((m) => m.steamCloud === "no-cloud" && !m.enabled).length} Steam games have no Steam Cloud saves`}
           description="Keepsake can sync them like your non-Steam games."
@@ -355,6 +355,19 @@ export function GamesPage() {
           </DialogButton>
         </Field>
       )}
+      {result && result.games.some((g) => g.kind === "steam") && (
+        <Field
+          label="Steam games can sync too"
+          description={`Saves of Steam games are snapshotted, synced and restored exactly like non-Steam games. ${steamAuto ? `${steamAuto} sync automatically because Steam Cloud does not back them up. ` : ""}${steamCloudOff ? `${steamCloudOff} use Steam Cloud and stay off unless you turn them on. ` : ""}Open a game to turn sync on or off.`}
+          childrenLayout="inline"
+        >
+          {filter !== "steam" && (
+            <DialogButton style={{ width: "auto" }} onClick={() => setFilter("steam")}>
+              Show Steam games
+            </DialogButton>
+          )}
+        </Field>
+      )}
       {error && <Field label="Scan failed" description={error} />}
       {result && result.roots.length === 0 && <Field label="No Steam installation found" />}
       {waiting.length > 0 && (
@@ -371,7 +384,7 @@ export function GamesPage() {
       {result && (
         <Field
           label={`${games.length} shown`}
-          description={`${result.games.length} found on this device.${showSteam ? "" : " Steam games are hidden (Settings, Show Steam games)."}`}
+          description={`${result.games.length} found on this device.`}
         />
       )}
       {games.map((game) => {
@@ -381,8 +394,9 @@ export function GamesPage() {
           game.kind === "shortcut" && !game.is_default_user ? "other Steam user" : "",
           mismatch ? "PREFIX MISMATCH, sync blocked" : "",
           running ? "running" : "",
-          matches[game.key]?.steamCloud === "cloud" ? "uses Steam Cloud" : "",
-          matches[game.key]?.steamCloud === "no-cloud" ? "no Steam Cloud" : "",
+          matches[game.key]?.steamCloud === "cloud" ? (matches[game.key]?.enabled ? "uses Steam Cloud" : "uses Steam Cloud, off until you turn it on") : "",
+          matches[game.key]?.steamCloud === "no-cloud" ? (matches[game.key]?.enabledSource === "auto" ? "no Steam Cloud, synced automatically" : "no Steam Cloud") : "",
+          game.kind === "steam" && !matches[game.key]?.steamCloud && !matches[game.key]?.enabled ? "Steam game, can be synced" : "",
           ...game.notes,
         ].filter(Boolean);
         return (

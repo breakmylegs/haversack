@@ -43,6 +43,8 @@ DEFAULTS: dict[str, Any] = {
     # Slice 11 features, each behind its own setting.
     "registrySync": True,  # available; each game still opts in (off by default per game)
     "steamCloudDetection": True,
+    # Played Steam games without Steam Cloud saves start syncing on their own (ADR-0063).
+    "steamAutoSync": True,
     "suspendSnapshots": False,
     # v2 module flags (slice 13); missing names use modules.DEFAULT_FLAGS.
     "moduleFlags": {},
@@ -79,6 +81,7 @@ USER_KEYS = frozenset(
         "setupComplete",
         "registrySync",
         "steamCloudDetection",
+        "steamAutoSync",
         "suspendSnapshots",
         "moduleFlags",
         "libraryRoot",
@@ -204,6 +207,7 @@ def _validate(key: str, value: Any) -> Any:
         "setupComplete",
         "registrySync",
         "steamCloudDetection",
+        "steamAutoSync",
         "suspendSnapshots",
         "tipsDismissed",
         "otherLaunchers",

@@ -143,6 +143,7 @@ def test_bulk_enable_turns_on_only_played_steam_games_without_cloud(tmp_path):
         'Local Game:\n  files:\n    "<base>/save":\n      tags:\n        - save\n'
     )
     app.manifest.import_file(str(manifest))
+    app.settings.set("steamAutoSync", False)  # the manual "Sync them all" button (ADR-0063 does it on its own)
 
     async def go():
         labels = {m["name"]: m["steamCloud"] for m in await app.match_games()}
@@ -159,6 +160,76 @@ def test_bulk_enable_turns_on_only_played_steam_games_without_cloud(tmp_path):
     assert set(hidden.values()) == {None}
     with pytest.raises(ValueError, match="detection is off"):
         asyncio.run(app.enable_steam_without_cloud())
+
+
+def _steam_app(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    root = make_fake_steam(
+        home,
+        users={"7": [shortcut_entry(-123456789, "Example Quest", "/g.exe")]},
+        apps=[
+            (None, 1000010, "Cloudy Game", "Cloudy"),
+            (None, 1000020, "Local Game", "Local"),
+            (None, 1000030, "Unknown Game", "Unknown"),
+        ],
+        most_recent="7",
+    )
+    (root / "userdata" / "7" / "1000010").mkdir(parents=True)
+    (root / "userdata" / "7" / "1000010" / "remotecache.vdf").write_text("x")
+    paths = PluginPaths(*(str(tmp_path / n) for n in ("settings", "runtime", "logs", "plugin")))
+    app = KeepsakeApp(
+        paths, proc_root=str(tmp_path / "proc"), version="0.27.0", home=str(home), auto_refresh_manifest=False
+    )
+    manifest = tmp_path / "m.yaml"
+    manifest.write_text(
+        '---\nCloudy Game:\n  files:\n    "<base>/save":\n      tags:\n        - save\n'
+        'Local Game:\n  files:\n    "<base>/save":\n      tags:\n        - save\n'
+    )
+    app.manifest.import_file(str(manifest))
+    return app
+
+
+def test_played_steam_games_without_cloud_sync_automatically_once(tmp_path):
+    app = _steam_app(tmp_path)
+    # A key of its own but no known save locations: nothing Keepsake could sync, so it stays off.
+    app.game_configs.update("steam:1000030", {"gameKey": "unknown-game"})
+    toasts = []
+    app.emit = lambda event, payload=None: _record(toasts, event, payload)
+
+    async def go():
+        first = {m["name"]: (m["enabled"], m["enabledSource"]) for m in await app.match_games()}
+        await app.update_game_config("steam:1000020", {"enabled": False})  # the user turns it off
+        second = {m["name"]: (m["enabled"], m["enabledSource"]) for m in await app.match_games()}
+        return first, second
+
+    first, second = asyncio.run(go())
+    # Steam Cloud game stays off; the no-manifest game has nothing to sync; the shortcut is not a Steam game.
+    assert first["Local Game"] == (True, "auto")
+    assert first["Cloudy Game"] == (False, None)
+    assert first["Unknown Game"] == (False, None)
+    assert first["Example Quest"][0] is False
+    assert second["Local Game"] == (False, "user")  # a game the user turned off stays off
+    assert [p for e, p in toasts if e == "keepsake_toast" and "Local Game" in str(p)]
+    assert len([p for e, p in toasts if e == "keepsake_toast"]) == 1
+
+
+def test_automatic_steam_sync_has_a_switch_and_needs_saves_and_detection(tmp_path):
+    app = _steam_app(tmp_path)
+    app.settings.set("steamAutoSync", False)
+    assert {m["name"]: m["enabled"] for m in asyncio.run(app.match_games())}["Local Game"] is False
+    app.settings.set("steamAutoSync", True)
+    app.settings.set("steamCloudDetection", False)
+    assert {m["name"]: m["enabled"] for m in asyncio.run(app.match_games())}["Local Game"] is False
+    app.settings.set("steamCloudDetection", True)
+    asyncio.run(app.set_module_enabled("saves", False))
+    assert {m["name"]: m["enabled"] for m in asyncio.run(app.match_games())}["Local Game"] is False
+    asyncio.run(app.set_module_enabled("saves", True))
+    assert {m["name"]: m["enabled"] for m in asyncio.run(app.match_games())}["Local Game"] is True
+
+
+async def _record(store, event, payload):
+    store.append((event, payload))
 
 
 # Suspend snapshots

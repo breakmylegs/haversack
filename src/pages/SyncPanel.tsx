@@ -67,7 +67,7 @@ export function SyncPanel({
         label="Sync this game"
         description={
           kind === "steam"
-            ? "Steam Cloud usually covers Steam games. Turn this on only if this game has no Steam Cloud saves."
+            ? "Steam games sync, back up and restore exactly like non-Steam games. If this game also uses Steam Cloud, Steam keeps a copy too, and Keepsake asks you whenever the two disagree."
             : "Keep this game's saves in step between your devices."
         }
         checked={enabled}

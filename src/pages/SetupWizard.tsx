@@ -60,7 +60,8 @@ export function SetupWizard() {
 
   const loadMatches = async () => {
     const list = await matchGames();
-    setMatches(list.filter((m) => m.kind === "shortcut" || settings?.showSteamApps));
+    // Steam games sit beside non-Steam shortcuts (ADR-0063); other launchers are listed on the Games page.
+    setMatches(list.filter((m) => m.kind === "shortcut" || m.kind === "steam"));
   };
 
   const leave = () => {
@@ -174,11 +175,7 @@ export function SetupWizard() {
       {step === 2 && (
         <Field
           label={matches ? `${matches.length} games found` : "Find the games on this device"}
-          description={
-            settings?.showSteamApps
-              ? "Non-Steam shortcuts and Steam games are listed."
-              : "Non-Steam shortcuts are listed. Steam games are hidden because Steam Cloud usually covers them (Settings can show them)."
-          }
+          description="Non-Steam shortcuts and Steam games are listed. Steam games that Steam Cloud does not back up are synced automatically; ones that use Steam Cloud stay off unless you choose them."
           childrenLayout="below"
         >
           <DialogButton

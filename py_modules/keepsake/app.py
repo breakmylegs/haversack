@@ -148,6 +148,7 @@ async def _no_emit(event: str, *args: Any) -> None:
 
 # Games whose launch Keepsake cannot see: newer saves come in from the idle pass (ADR-0051).
 AUTO_PULL_KINDS = ("heroic", "lutris", "bottles", "emulator")
+AUTO_SYNC_METHODS = ("steam-id", "title", "manual")  # matches with known save locations (ADR-0063)
 SCRUB_FILE = "integrity.json"
 SCRUB_INTERVAL = 7 * 24 * 3600
 EXPORT_README = """Keepsake export
@@ -856,6 +857,7 @@ class KeepsakeApp:
         index = await asyncio.to_thread(self.manifest.load)
         states = self._sync().state.games()
         out = []
+        auto_enabled: list[str] = []
         for game in games:
             config = self.game_configs.get(game["key"])
             match = manifest.match_game(index, game, config)
@@ -869,6 +871,9 @@ class KeepsakeApp:
             elif game["key"] in self._proposals().get("open", {}):
                 self._clear_proposal(game["key"])  # resolved some other way
             config = self.game_configs.get(game["key"])
+            if self._auto_sync_candidate(game, match, config, proposal):
+                config = await self.update_game_config(game["key"], {"enabled": True, "enabledSource": "auto"})
+                auto_enabled.append(game["name"])
             state = states.get(match.get("gameKey") or "") or {}
             out.append(
                 {
@@ -881,10 +886,19 @@ class KeepsakeApp:
                     "sync": status_word(state) if config.get("enabled") else "off",
                     "newer": newer_save(state) if config.get("enabled") else None,
                     "steamCloud": self._steam_cloud(game),
+                    "enabledSource": config.get("enabledSource"),
                     "hasRegistry": bool(
                         index and match.get("title") and index["games"].get(match["title"], {}).get("r")
                     ),
                 }
+            )
+        if auto_enabled:
+            count = len(auto_enabled)
+            log_event(logging.INFO, "steamcloud.auto_enable", "Synced Steam games without Steam Cloud", count=count)
+            names = ", ".join(auto_enabled[:3]) + (f" and {count - 3} more" if count > 3 else "")
+            await self.emit(
+                "keepsake_toast",
+                f"Now syncing {names}: Steam does not back up their saves. Turn any off in Keepsake's Games list.",
             )
         # Games needing attention first, then by name (Peter, 16 November 2026).
         mismatched = await asyncio.to_thread(discovery.load_mismatches, self.paths.runtime_dir)
@@ -896,6 +910,25 @@ class KeepsakeApp:
             return None
         return steamcloud.cloud_state(
             game.get("steam_root"), game.get("default_user"), int(game["appid"]), int(game.get("last_played") or 0)
+        )
+
+    def _auto_sync_candidate(
+        self, game: dict[str, Any], match: dict[str, Any], config: dict[str, Any], proposal: Any
+    ) -> bool:
+        """A played Steam game with no Steam Cloud saves and known save locations, never switched by anyone.
+
+        Steam games whose saves Steam Cloud keeps stay off until the user turns them on (ADR-0063).
+        Only Steam games have a Steam Cloud state, so ``_steam_cloud`` also limits this to them.
+        """
+        return bool(
+            self.settings.get("steamAutoSync")
+            and self.registry.enabled("saves")
+            and not config.get("enabled")
+            and config.get("enabledSource") is None
+            and proposal is None
+            and match.get("gameKey")
+            and match.get("method") in AUTO_SYNC_METHODS
+            and self._steam_cloud(game) == steamcloud.NO_CLOUD
         )
 
     async def enable_steam_without_cloud(self) -> dict[str, Any]:
@@ -1107,7 +1140,10 @@ class KeepsakeApp:
             index = await asyncio.to_thread(self.manifest.load)
             if not index or changes["matchTitle"] not in index.get("games", {}):
                 raise ValueError("that title is not in the manifest")
-        config = await asyncio.to_thread(self.game_configs.update, key, dict(changes))
+        changes = dict(changes)
+        if "enabled" in changes:
+            changes.setdefault("enabledSource", "user")  # automatic switching on never overrides this (ADR-0063)
+        config = await asyncio.to_thread(self.game_configs.update, key, changes)
         log_event(logging.INFO, "game.config", "Game settings changed", key=key, fields=sorted(changes))
         if config.get("enabled") and (changes.get("enabled") or set(changes) & set(configrev.SHARED_FIELDS)):
             game_key = await self._game_key_of(key)

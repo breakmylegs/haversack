@@ -4,7 +4,7 @@
 Yes, on a handheld or a Linux PC. See [How syncing works](how-sync-works.md#heroic-lutris-bottles-and-emulators).
 
 **Does Keepsake replace Steam Cloud?**
-No. Steam games that use Steam Cloud are left to Steam, and hidden in Keepsake's list by default. Keepsake is for everything Steam Cloud does not cover: non-Steam games, and Steam games without cloud saves.
+No, it works beside it. Steam games are listed with your non-Steam games, and their saves are snapshotted, synced, restored and kept in History in exactly the same way. A Steam game you have played that has no Steam Cloud saves starts syncing on its own, and Keepsake tells you when it does. Games that use Steam Cloud stay off unless you turn them on, because Steam already keeps their saves. Turn any game on or off on its page; one you turn off stays off. Settings has **Sync Steam games that Steam Cloud does not back up** to stop the automatic part.
 
 **My non-Steam game has a different shortcut ID on each device. Will it still sync?**
 Yes. That is what Keepsake is built for. Saves are stored under neutral locations rather than prefix numbers. The same game is recognised on each device by its save data and title, and by your confirmation when Keepsake is not sure.
