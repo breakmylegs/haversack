@@ -573,6 +573,33 @@ async def check_network_iso(ctx: Context) -> dict[str, Any]:
     )
 
 
+async def check_desktop_app(ctx: Context) -> dict[str, Any]:
+    """Desktop app ready (ADR-0068): both entries for this version, the tray's python3, and a session bus."""
+    probe = ctx.probes.get("desktop-app")
+    if probe is None:
+        return result("skip", "Switch on the Desktop module in Settings, Modules, then run it again.")
+    found = await probe()
+    problems = [f"{name}: {', '.join(issues)}" for name, issues in found["entries"].items() if issues]
+    if not found["python3"]:
+        problems.append("python3 is missing, so the tray cannot run")
+    if not found["sessionBus"]:
+        problems.append("no desktop session bus was found (normal in Gaming Mode: run this in Desktop Mode)")
+    details = {
+        "entries": not any(found["entries"].values()),
+        "python3": found["python3"],
+        "sessionBus": found["sessionBus"],
+        "page": found["page"],
+    }
+    if not problems and found["page"]:
+        return result(
+            "pass",
+            "Both Desktop Mode entries are there for this version; python3 and the session bus are ready.",
+            **details,
+        )
+    status = "warn" if found["python3"] and not any(found["entries"].values()) else "fail"
+    return result(status, "; ".join(problems) or "The Desktop Mode page is not running.", **details)
+
+
 _SPEED_BLOCK = b""
 
 
@@ -614,6 +641,7 @@ CHECKS = [
     ),
     Check("smb-find", "Find shares on my network", "one", "A206", check_smb_find),
     Check("network-iso", "Network ISO in place", "one", "A158, network_mount_probe.py --loop-test", check_network_iso),
+    Check("desktop-app", "Desktop app ready", "one", "A208, A209", check_desktop_app),
 ]
 BY_ID = {c.id: c for c in CHECKS}
 

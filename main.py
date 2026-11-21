@@ -21,7 +21,14 @@ class Plugin:
     async def _uninstall(self) -> None:
         # Decky calls this on every update as well as on uninstall (it uninstalls
         # the old version first). It must never delete settings, tokens or state.
-        pass
+        # The Desktop Mode entries go (ADR-0068, T52); a new version writes its own when it starts.
+        from keepsake.desktop import entries
+        from keepsake.discovery import real_home
+
+        try:
+            entries.remove(real_home())
+        except OSError:
+            pass
 
     async def get_status(self) -> dict[str, Any]:
         return await self.app.get_status()

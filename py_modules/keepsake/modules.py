@@ -17,7 +17,7 @@ from typing import Any
 from .bus import EventBus, Handler
 from .log import log_event
 
-DEFAULT_FLAGS = {"saves": True, "advisor": True, "replication": False, "installer": True, "desktop": False}
+DEFAULT_FLAGS = {"saves": True, "advisor": True, "replication": False, "installer": True, "desktop": True}
 
 
 @dataclass

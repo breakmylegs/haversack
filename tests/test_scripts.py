@@ -35,6 +35,9 @@ def make_repo(root, version="1.2.3", changelog=None, plugin_extra=None):
     for name in ("index.html", "app.css", "install.pyw"):
         (root / "desktop" / name).write_text(name)
     (root / "desktop" / "dist" / "main.js").write_text("export {};")
+    icon = root / "assets" / "icons" / "hicolor" / "256x256" / "apps"
+    icon.mkdir(parents=True)
+    (icon / "keepsake-tray.png").write_bytes(b"png")  # the tray's icon (ADR-0068)
     (root / "docs").mkdir()
     (root / "docs" / "pc-host.md").write_text("pc")
     # The vendored libraries' manifest, which the SBOM reads (ADR-0050).
@@ -81,6 +84,11 @@ def test_package_layout_modes_and_determinism(tmp_path, monkeypatch):
         assert (gate.external_attr >> 16) & 0o777 == 0o755
         assert archive.read("Keepsake/bin/keepsake-gate") == b'#!/bin/sh\nexec "$@"\n'
         assert (archive.getinfo("Keepsake/main.py").external_attr >> 16) & 0o777 == 0o644
+        # Desktop Mode: the plugin serves the desktop interface and ships the tray's icon (ADR-0068).
+        for shipped in ("desktop/index.html", "desktop/app.css", "desktop/dist/main.js"):
+            assert f"Keepsake/{shipped}" in names
+        assert "Keepsake/assets/icons/hicolor/256x256/apps/keepsake-tray.png" in names
+        assert "Keepsake/desktop/install.pyw" not in names  # the PC installer stays in the PC package
 
 
 def test_the_pc_package_is_deterministic_and_holds_the_core_and_the_desktop_ui(tmp_path, monkeypatch):

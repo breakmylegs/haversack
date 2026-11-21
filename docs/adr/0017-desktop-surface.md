@@ -1,6 +1,6 @@
 # ADR-0017: Desktop surface
 
-- Status: proposed (slice C0, awaiting Peter's approval)
+- Status: proposed (slice C0); the default and the tray are amended by ADR-0068: Desktop is on by default, and the tray uses Keepsake's own D-Bus client instead of jeepney
 - Date: 15 November 2026
 - Deciders: Peter (owner)
 - Sources: `docs/build-prompt-v2.md` sections 4 (P7), 6.2 to 6.4, 8.4 and 12 (slices 23 and 24); research section 6.1
