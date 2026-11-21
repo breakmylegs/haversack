@@ -24,20 +24,20 @@ Released up to v0.24.0. Merged since, not yet released: network install (#38 to 
 | Network install follow-ons (ADR-0033, ADR-0034) | HTTP, HTTPS, SMB and WebDAV built; NFS needs a mount; SFTP not offered (needs a compiled library or a binary); the network probe waits for device runs |
 ## Peter's queue of 21 November 2026
 
-Each item is merged on its own and then published as its own signed pre-release (`docs/releasing.md`, release cadence).
+Each item is merged on its own and then published as its own signed **stable** release, a new minor version per feature (`docs/releasing.md`, release cadence; Peter's second instruction of 21 November 2026 replaced pre-releases). 0.27.0-beta.1 and -beta.2 were published before that and are superseded by 0.27.0.
 
 | Item | State |
 |---|---|
-| R8 Steam games sync like non-Steam games (ADR-0063) | merged (#81), in 0.27.0-beta.1 |
-| R9 Games you can stream from another device (ADR-0064) | merged (#82), in 0.27.0-beta.1; the hide tidy-up waits for the device run (A201) |
-| R10 Uninstall (ADR-0065) | merged (#83), in 0.27.0-beta.1 |
-| R11 Find Windows shares (ADR-0066) | merged (#84), in 0.27.0-beta.1 |
-| R12 Network ISOs in place (ADR-0067) | merged (#85), in 0.27.0-beta.1; the in-place mount for shares that are not mounted waits for Peter's approval of `fusermount3` |
-| R13 Desktop app with the plugin, in the tray (slices 23 and 24 brought forward) | next |
-| R14 Advisor session stats | queued |
+| R8 Steam games sync like non-Steam games (ADR-0063) | merged (#81), in 0.27.0 |
+| R9 Games you can stream from another device (ADR-0064) | merged (#82), in 0.27.0; the hide tidy-up waits for the device run (A201) |
+| R10 Uninstall (ADR-0065) | merged (#83), in 0.27.0 |
+| R11 Find Windows shares (ADR-0066) | merged (#84), in 0.27.0 |
+| R12 Network ISOs in place (ADR-0067) | merged (#85), in 0.27.0; the in-place mount for shares that are not mounted waits for Peter's approval of `fusermount3` |
+| R13 Desktop app with the plugin, in the tray (slices 23 and 24 brought forward) | merged (#88), in 0.27.0 |
+| R14 Advisor session stats | next, as 0.28.0 |
 | R15 Pairing by code | queued |
 | R16 Several save locations, newest wins | queued |
-| R17 Battery charge limit (Legion Go, Legion Go 2) | queued |
+| R17 Battery charge limit (Legion Go, Legion Go 2) | queued, its own stable release |
 | R18 Library badges and artwork for streaming tiles | queued, last |
 
 ## Section 10 amendments: where each is delivered

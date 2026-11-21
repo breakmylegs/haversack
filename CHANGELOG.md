@@ -4,6 +4,22 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.27.0]
+
+> **Not yet tested on a device.** Everything since 0.26.0, published as a stable release before the device run, at the owner's request. It supersedes 0.27.0-beta.1 and -beta.2. Report anything that misbehaves on the Releases page.
+
+### Added
+
+- The desktop app comes with the plugin: on SteamOS and Bazzite, Keepsake now starts with Desktop Mode, minimised to the system tray. Click the icon, or **Open Keepsake** in its menu, to open it; closing the window leaves it in the tray, and **Quit** stops it until you next log in. Keepsake is also in the app menu, which brings up the running one. Nothing to install and nothing to switch on; Settings, Modules can turn it off. A new Device check, "Desktop app ready" (ADR-0068).
+- An ISO on a share that is already mounted is opened where it is; if the share does not allow that, Keepsake now copies it to the device by itself and installs from the copy, instead of failing. A new Device check, "Network ISO in place", tests opening an ISO on a mounted share, replacing the old SSH loop test. Installing straight from a share that is not mounted is built and waits for approval of `fusermount3` in the System Binary Register; until then those ISOs are copied first as before (ADR-0067).
+- **Find shares on my network** under Install, From a network location, Windows share (SMB): lists the Windows PCs, NAS boxes and Macs sharing folders on your local network (found by mDNS, NetBIOS and WS-Discovery, with no extra software), and picking one lists its shares. A new Device check of the same name says which ways work on your network (ADR-0066).
+- **Uninstall** on each game's page. Steam games: an optional final backup of the saves, then Steam's own uninstall. Non-Steam games: a confirmation screen listing every folder to delete with its size and the free space after (Cancel selected first), then a final backup if the game syncs, the shortcut and its artwork removed from Steam, the Proton prefix and game folder deleted in the background with progress and **Stop**, and Keepsake's records of the game cleared. Home folders, Steam libraries, folders other games use, links and drives are never deleted, and running games and games you stream from another device are refused (ADR-0065).
+- Games you can stream from another device (Steam Remote Play's tiles with **Stream** instead of **Play**) are recognised from Steam's own install state and never treated as games on this device: not synced, sent, replicated, advised on or uninstalled. Real shortcuts always stay listed, even with an unusual path. **Show games you can stream from another device** lists them, and a new Device check, "Games you can stream from another device", counts them and flags any synced game that streams. To keep the library tidy, use Steam's **Installed** tab (ADR-0064).
+
+### Changed
+
+- Steam games are always listed on the Games page beside your non-Steam games, and their saves sync, back up and restore in exactly the same way. A Steam game you have played that has no Steam Cloud saves now starts syncing by itself, and Keepsake tells you which. Games that use Steam Cloud stay off unless you turn them on, and a game you turn off stays off. Settings has **Sync Steam games that Steam Cloud does not back up** to stop it (ADR-0063).
+
 ## [0.27.0-beta.2]
 
 > **Not yet tested on a device.** A pre-release, offered only on the Pre-release update channel. Report anything that misbehaves on the Releases page.
