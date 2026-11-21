@@ -500,6 +500,33 @@ async def check_remote_shortcuts(ctx: Context) -> dict[str, Any]:
     return result(status, text, clashes=len(clashes), **counts)
 
 
+async def check_smb_find(ctx: Context) -> dict[str, Any]:
+    """Find shares on my network (ADR-0066): which ways of finding SMB servers answer here. No names reported."""
+    probe = ctx.probes.get("smb-find")
+    if probe is None:
+        return result("skip", "Switch on the Installer module, then run it again.")
+    found = await probe()
+    methods = found["methods"]
+    labels = {"mdns": "mDNS", "netbios": "NetBIOS", "wsd": "WS-Discovery"}
+    parts = [
+        f"{labels[k]} {v if isinstance(v, int) else v.replace('error: ', 'not available: ')}"
+        for k, v in methods.items()
+    ]
+    count = len(found["servers"])
+    text = f"{count} Windows share servers found ({', '.join(parts)})."
+    details = {"servers": count, **{k: v if isinstance(v, int) else "error" for k, v in methods.items()}}
+    if count:
+        return result("pass", text, **details)
+    if all(isinstance(v, str) for v in methods.values()):
+        return result("fail", f"{text} This device could not send the searches.", **details)
+    return result(
+        "warn",
+        f"{text} If you have a NAS or a PC sharing folders, check it is on and on the same network; typing its "
+        "address still works.",
+        **details,
+    )
+
+
 _SPEED_BLOCK = b""
 
 
@@ -539,6 +566,7 @@ CHECKS = [
     Check(
         "remote-shortcuts", "Games you can stream from another device", "one", "A199 to A201", check_remote_shortcuts
     ),
+    Check("smb-find", "Find shares on my network", "one", "A206", check_smb_find),
 ]
 BY_ID = {c.id: c for c in CHECKS}
 

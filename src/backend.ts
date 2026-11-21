@@ -146,6 +146,16 @@ export const installerNetBrowse = callable<
   [access: NetAccess, url: string],
   { url: string; entries: NetEntry[]; redirectHost?: string; error?: string }
 >("installer_net_browse");
+// Find shares on my network (ADR-0066).
+export interface SmbServer {
+  name: string;
+  address: string;
+  url: string;
+  via: ("mdns" | "netbios" | "wsd")[];
+}
+export const installerNetFindSmb = callable<[], { servers: SmbServer[]; methods: Record<string, number | string> }>(
+  "installer_net_find_smb",
+);
 export const installerNetDownload = callable<[access: NetAccess, url: string, title: string, sha256: string], NetDownload>(
   "installer_net_download",
 );

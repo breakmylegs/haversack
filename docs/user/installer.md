@@ -32,7 +32,7 @@ If the game comes with runtime installers, such as Visual C++, DirectX or .NET, 
 Choose **From a network location** to install from a NAS or server that is not mounted:
 
 - **Web server:** `https://` addresses anywhere. Plain `http://` only on your local network, and never with a password.
-- **Windows share (SMB):** `smb://nas.local/` lists the shares, and `smb://nas.local/Games/` opens one. SMB 2 or 3 on your local network only.
+- **Windows share (SMB):** press **Find shares** to list the Windows PCs, NAS boxes and Macs sharing folders on your network, then pick one to see its shares. Or type an address: `smb://nas.local/` lists the shares, and `smb://nas.local/Games/` opens one. SMB 2 or 3 on your local network only. If nothing is found, your network may block the search (some mesh and guest Wi-Fi do); typing the address still works.
 - **WebDAV:** for example `davs://cloud.example/remote.php/dav/files/me/Games/`.
 
 Browse to an ISO and pick it. Keepsake downloads it with progress and a cancel button, resumes after a dropped connection, checks it, and installs it as above. The download is deleted when the install ends. **Remember this location** keeps the address; the password stays on the device.

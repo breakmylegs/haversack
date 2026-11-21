@@ -64,7 +64,7 @@ from .fsutil import atomic_write_json, read_json
 from .gameconfig import DEFAULT as GAME_DEFAULTS
 from .gameconfig import GameConfigStore, custom_path_from_absolute
 from .importers import ludusavi
-from .installer import artwork, remote, smbshare, udisks, webdav
+from .installer import artwork, lanfind, remote, smbshare, udisks, webdav
 from .installer import files as installer_files
 from .installer.artwork import SteamGridDB
 from .installer.service import Installer, InstallerError
@@ -323,6 +323,7 @@ class KeepsakeApp:
         self._net_cancel = False
         self._net_connect: remote.Connector = remote._connect  # tests use a scripted server
         self._smb_connect: smbshare.Connector = smbshare._connect  # and a fake share
+        self._lan_sockets: lanfind.SocketFactory = lanfind._udp  # and fake answers (ADR-0066)
         self._net_resolve: remote.Resolver = remote._resolve
         self._pc_processes: Callable[[], list[str]] = pcwatch.list_processes  # PC hosts only; tests use a fake
         self._manifest_progress: dict[str, Any] = {"stage": "idle", "running": False}
@@ -4045,6 +4046,13 @@ class KeepsakeApp:
         folder = target if target.endswith("/") else target + "/"
         return {"url": webdav.to_dav(folder) if isinstance(session, webdav.DavSession) else folder, "entries": entries}
 
+    async def installer_net_find_smb(self) -> dict[str, Any]:
+        """User action: SMB servers answering on the local network (ADR-0066). Read only; nothing is mounted."""
+        self._installer()
+        found = await asyncio.to_thread(lanfind.find_servers, 2.5, self._lan_sockets)
+        log_event(logging.INFO, "installer.smb_find", "Looked for Windows shares", servers=len(found["servers"]))
+        return found
+
     async def installer_net_status(self) -> dict[str, Any]:
         return dict(self._net)
 
@@ -4253,7 +4261,10 @@ class KeepsakeApp:
             work_dir=os.path.join(self.paths.runtime_dir, "device-checks"),
             links=self.links,
             connect_for=self._replication_connect_for if self.links else None,
-            probes={"remote-shortcuts": self._remote_shortcuts_probe},
+            probes={
+                "remote-shortcuts": self._remote_shortcuts_probe,
+                "smb-find": lambda: asyncio.to_thread(lanfind.find_servers, 2.5, self._lan_sockets),
+            },
         )
 
     async def device_checks(self) -> dict[str, Any]:

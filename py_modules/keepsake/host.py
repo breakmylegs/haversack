@@ -144,6 +144,7 @@ CALLABLES = frozenset(
         "installer_net_remember",
         "installer_net_forget",
         "installer_net_browse",
+        "installer_net_find_smb",
         "installer_net_download",
         "installer_net_cancel",
         "installer_net_status",
