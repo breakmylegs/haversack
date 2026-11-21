@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.32.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Changed
 
 - **A new layout** (ADR-0073, `docs/design/layout-v3.md`). Keepsake's full page now has seven sections, each with tabs along the top. Every page from before is still there, as a tab, and old links still open it:
