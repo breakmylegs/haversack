@@ -38,7 +38,15 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
    4. Play on both while apart, then bring them together. A conflict should appear and resolve as usual.
 9. **Remove.** On the Go, go to Devices and press **Remove** on the Go 2. On the Go 2, **Check** should say to pair again.
 
-## 4. Send back
+## 4. New in 0.27.0
+
+1. **Steam games.** Open Keepsake's Games page on the Go.
+   - It should open on **All**, show Steam games, and have a note saying how many sync automatically.
+   - A Steam game you have played that has no Steam Cloud saves should say "no Steam Cloud, synced automatically". One that uses Steam Cloud should say "off until you turn it on".
+   - Turn one of the automatic ones off, rescan, and check it stays off.
+   - Play an automatic one on the Go and quit. Start it on the Go 2: it should load the save, and History should show it on both.
+
+## 5. Send back
 
 - The photos or files from parts 2 and 3.
 - Any written step above that did not behave as described, with its number.

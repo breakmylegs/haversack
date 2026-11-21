@@ -20,6 +20,7 @@ export interface Settings {
   setupComplete: boolean;
   registrySync: boolean;
   steamCloudDetection: boolean;
+  steamAutoSync: boolean;
   suspendSnapshots: boolean;
   libraryRoot: string;
   /** ADR-0044: how each provider signs in from Gaming Mode. */
@@ -605,6 +606,8 @@ export interface GameMatch extends MatchInfo {
   enabled: boolean;
   sync: SyncWord;
   steamCloud: SteamCloud;
+  /** ADR-0063: who last switched sync: never, the user, or Keepsake for a Steam game without Steam Cloud. */
+  enabledSource?: "user" | "auto" | null;
   hasRegistry: boolean;
   /** ADR-0049: a newer save from another device, not taken in yet. */
   newer?: NewerSave | null;

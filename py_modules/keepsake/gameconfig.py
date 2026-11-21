@@ -32,6 +32,9 @@ DEFAULT: dict[str, Any] = {
     "customPaths": [],
     "exclusions": [],
     "enabled": False,
+    # Who last set "enabled": None (never set), "user", or "auto" (a Steam game without Steam Cloud, ADR-0063).
+    # Keepsake only ever switches on a game whose source is None, so a game the user turned off stays off.
+    "enabledSource": None,
     "launchGate": "freeze",
     "gameKey": None,
     "gameKeySource": None,
@@ -98,6 +101,9 @@ def validate(config: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(config.get("enabled", False), bool):
         raise GameConfigError("enabled must be true or false")
     out["enabled"] = config.get("enabled", False)
+    if config.get("enabledSource") not in (None, "user", "auto"):
+        raise GameConfigError("invalid enabled source")
+    out["enabledSource"] = config.get("enabledSource")
     gate = config.get("launchGate", "freeze")
     if gate not in ("freeze", "strict", "off"):
         raise GameConfigError("launch gate must be freeze, strict or off")

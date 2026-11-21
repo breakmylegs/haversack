@@ -109,11 +109,11 @@ export function SettingsPage() {
         onChange={(on) => void save("toastOnSync", on, on ? "Save messages on." : "Save messages off.")}
       />
       <ToggleField
-        label="Show Steam games"
-        description="Off by default because Steam Cloud usually covers them. When on, Steam games are listed and can be synced one by one. Non-Steam shortcuts are always listed."
-        checked={settings?.showSteamApps ?? false}
-        disabled={locked}
-        onChange={(on) => void save("showSteamApps", on, on ? "Steam games shown." : "Steam games hidden.")}
+        label="Sync Steam games that Steam Cloud does not back up"
+        description="A Steam game you have played with no Steam Cloud saves starts syncing on its own, like your non-Steam games. Games that use Steam Cloud stay off unless you turn them on. A game you turn off stays off."
+        checked={settings?.steamAutoSync ?? true}
+        disabled={locked || !(settings?.steamCloudDetection ?? true)}
+        onChange={(on) => void save("steamAutoSync", on, on ? "Steam games without Steam Cloud sync automatically." : "Steam games only sync when you turn them on.")}
       />
       <ToggleField
         label="Registry keys"

@@ -18,7 +18,7 @@ Open Keepsake from the Quick Access Menu and choose **Set up Keepsake**. The wiz
 1. **Device name.** It is shown next to this device's saves on your other devices.
 2. **Cloud.** Choose OneDrive, Google Drive, WebDAV or S3, and sign in ([Cloud storage and sign-in](cloud.md)).
 3. **Scan games** and **review matches.** Keepsake finds your Steam games and non-Steam shortcuts and looks up where each one keeps its saves. Approve any match it is not sure about.
-4. **Choose games** to sync. Steam games that use Steam Cloud are hidden by default, because Steam already syncs them.
+4. **Choose games** to sync. Steam games are listed too. Played Steam games with no Steam Cloud saves are synced automatically; ones that use Steam Cloud stay off unless you choose them, because Steam already keeps their saves.
 5. **Dry run.** See what the first sync will do for each game. Nothing changes until you confirm.
 
 ## 3. Play
