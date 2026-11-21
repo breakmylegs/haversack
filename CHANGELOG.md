@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- Games you can stream from another device (Steam Remote Play's tiles with **Stream** instead of **Play**) are recognised from Steam's own install state and never treated as games on this device: not synced, sent, replicated, advised on or uninstalled. Real shortcuts always stay listed, even with an unusual path. **Show games you can stream from another device** lists them, and a new Device check, "Games you can stream from another device", counts them and flags any synced game that streams. To keep the library tidy, use Steam's **Installed** tab (ADR-0064).
+
 ### Changed
 
 - Steam games are always listed on the Games page beside your non-Steam games, and their saves sync, back up and restore in exactly the same way. A Steam game you have played that has no Steam Cloud saves now starts syncing by itself, and Keepsake tells you which. Games that use Steam Cloud stay off unless you turn them on, and a game you turn off stays off. Settings has **Sync Steam games that Steam Cloud does not back up** to stop it (ADR-0063).

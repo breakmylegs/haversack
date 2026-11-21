@@ -30,6 +30,7 @@ KINDS = (
     "set-compat-tool",
     "remove-shortcut",  # payload: appid; only for a shortcut the module itself created
     "set-artwork",  # payload: appid, assetType (0 to 3), imageType (png or jpg), file (a staged image's name)
+    "set-hidden",  # payload: appid, hidden; only Steam's copies of other devices' shortcuts (ADR-0064)
 )
 _STAGED_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 STATES = ("pending", "claimed", "done", "failed")
@@ -75,6 +76,8 @@ class SteamOps:
             or not _STAGED_NAME.match(str(payload.get("file", "")))  # no "/" and no leading dot, so no ".."
         ):
             raise SteamOpsError("artwork needs an asset type, a PNG or JPEG and a staged file name")
+        if kind == "set-hidden" and not isinstance(payload.get("hidden"), bool):
+            raise SteamOpsError("hiding needs hidden true or false")
         now = self.clock()
         self.db.execute(
             "INSERT INTO core_steam_ops (module, kind, payload, state, created, updated) "

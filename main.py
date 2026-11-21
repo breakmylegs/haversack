@@ -38,6 +38,21 @@ class Plugin:
     async def discover_games(self, refresh: bool = False) -> dict[str, Any]:
         return await self.app.discover_games(refresh)
 
+    async def remote_copies_report(self, entries: Any) -> dict[str, Any]:
+        return await self.app.remote_copies_report(entries)
+
+    async def remote_copies_status(self) -> dict[str, Any]:
+        return await self.app.remote_copies_status()
+
+    async def tidy_copies(self, appids: list[int]) -> dict[str, Any]:
+        return await self.app.tidy_copies(appids)
+
+    async def undo_tidy(self) -> dict[str, Any]:
+        return await self.app.undo_tidy()
+
+    async def unhide_local(self, appid: int) -> dict[str, Any]:
+        return await self.app.unhide_local(appid)
+
     async def check_running_prefix(self, key: str) -> dict[str, Any]:
         return await self.app.check_running_prefix(key)
 

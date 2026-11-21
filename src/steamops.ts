@@ -102,6 +102,18 @@ async function setArtwork(op: SteamOp): Promise<Outcome> {
   return { ok: true, result: { appid, assetType, readBack: "not available" } };
 }
 
+// Hides or shows an app through Steam's hidden collection (ADR-0064): only Steam's copies of other
+// devices' shortcuts (backend checks), or a local one the guard shows again. Read back with BIsHidden.
+async function setHidden(op: SteamOp): Promise<Outcome> {
+  const appid = Number(op.payload.appid);
+  const hidden = op.payload.hidden === true;
+  const original = collectionStore.BIsHidden(appid);
+  collectionStore.SetAppsAsHidden([appid], hidden);
+  await sleep(SETTLE_MS);
+  const readBack = collectionStore.BIsHidden(appid);
+  return { ok: readBack === hidden, result: { appid, original, readBack, wanted: hidden } };
+}
+
 async function execute(op: SteamOp): Promise<Outcome> {
   const appid = Number(op.payload.appid);
   const value = String(op.payload.value ?? "");
@@ -114,6 +126,8 @@ async function execute(op: SteamOp): Promise<Outcome> {
       return removeShortcut(appid);
     case "set-artwork":
       return setArtwork(op);
+    case "set-hidden":
+      return setHidden(op);
     case "set-launch-options":
       return applyAndReadBack(appid, () => details(appid)?.strLaunchOptions, () => SteamClient.Apps.SetAppLaunchOptions(appid, value), value);
     case "set-shortcut-name":

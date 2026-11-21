@@ -21,6 +21,7 @@ export interface Settings {
   registrySync: boolean;
   steamCloudDetection: boolean;
   steamAutoSync: boolean;
+  tidyAutomatically: boolean;
   suspendSnapshots: boolean;
   libraryRoot: string;
   /** ADR-0044: how each provider signs in from Gaming Mode. */
@@ -565,6 +566,8 @@ export interface GameEntry {
   wine_prefix?: string | null;
   emulator?: string;
   states_paths?: CustomPath[];
+  /** ADR-0064: shortcuts only; "remote" is a Steam Remote Play entry for a game on another device. */
+  presence?: "local" | "remote" | "unsure";
 }
 
 export interface DiscoveryResult {
@@ -898,6 +901,38 @@ export const updateGameConfig = callable<[key: string, changes: Partial<GameConf
 export const addCustomPath = callable<[key: string, absolutePath: string], GameConfig>("add_custom_path");
 export const previewGame = callable<[key: string], Preview>("preview_game");
 export const discoverGames = callable<[refresh: boolean], DiscoveryResult>("discover_games");
+
+// Games you can stream from another device: Steam Remote Play's entries (ADR-0064).
+export interface RemoteCopyReport {
+  appid: number;
+  name: string;
+  steam: "local" | "remote" | "unsure";
+  clients: string[];
+  hidden: boolean;
+}
+export interface RemoteCopy {
+  appid: number;
+  name: string;
+  presence: "remote" | "unsure";
+  from: string[];
+  clash: boolean;
+  hidden: boolean;
+}
+export interface RemoteCopiesStatus {
+  reportAt: number | null;
+  copies: RemoteCopy[];
+  log: Record<string, { name: string; state: "pending" | "hidden" | "failed" | "undone" | "came-back"; at: number }>;
+  automatic: boolean;
+  tidyAvailable: boolean;
+  newlyHidden: { appid: number; name: string }[];
+}
+export const remoteCopiesReport = callable<[entries: RemoteCopyReport[]], { newlyHidden: { appid: number; name: string }[]; tidied: number }>(
+  "remote_copies_report",
+);
+export const remoteCopiesStatus = callable<[], RemoteCopiesStatus>("remote_copies_status");
+export const tidyCopies = callable<[appids: number[]], { queued: number }>("tidy_copies");
+export const undoTidy = callable<[], { queued: number }>("undo_tidy");
+export const unhideLocal = callable<[appid: number], { id: number }>("unhide_local");
 export const checkRunningPrefix = callable<[key: string], CrossCheck>("check_running_prefix");
 export const getStatus = callable<[], Status>("get_status");
 export const takeStartupNotice = callable<[], StartupNotice | null>("take_startup_notice");

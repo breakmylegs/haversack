@@ -186,8 +186,8 @@ def test_a_game_installed_inside_its_prefix_is_never_reset(app_and_save, monkeyp
     prefix = prefix_of(app)
 
     async def go():
-        games = (await app.discover_games())["games"]
-        for game in games:
+        await app.discover_games()
+        for game in app._games["games"]:  # the cached scan: discover_games hands out copies (ADR-0064)
             game["exe_inside_prefix"] = True
         with pytest.raises(ValueError, match="installed inside its prefix"):
             await app.reset_prefix(KEY)
