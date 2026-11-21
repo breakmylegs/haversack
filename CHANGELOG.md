@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.27.0-beta.1]
+
+> **Not yet tested on a device.** A pre-release with the changes merged since 0.26.0. It is offered only on the Pre-release update channel. Report anything that misbehaves on the Releases page.
+
 ### Added
 
 - An ISO on a share that is already mounted is opened where it is; if the share does not allow that, Keepsake now copies it to the device by itself and installs from the copy, instead of failing. A new Device check, "Network ISO in place", tests opening an ISO on a mounted share, replacing the old SSH loop test. Installing straight from a share that is not mounted is built and waits for approval of `fusermount3` in the System Binary Register; until then those ISOs are copied first as before (ADR-0067).

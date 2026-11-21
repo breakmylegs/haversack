@@ -22,6 +22,24 @@ Released up to v0.24.0. Merged since, not yet released: network install (#38 to 
 | 24 Desktop II | after 23 |
 | 25 v2 hardening | parser fuzzing done; the rest after the other slices |
 | Network install follow-ons (ADR-0033, ADR-0034) | HTTP, HTTPS, SMB and WebDAV built; NFS needs a mount; SFTP not offered (needs a compiled library or a binary); the network probe waits for device runs |
+## Peter's queue of 21 November 2026
+
+Each item is merged on its own and then published as its own signed pre-release (`docs/releasing.md`, release cadence).
+
+| Item | State |
+|---|---|
+| R8 Steam games sync like non-Steam games (ADR-0063) | merged (#81), in 0.27.0-beta.1 |
+| R9 Games you can stream from another device (ADR-0064) | merged (#82), in 0.27.0-beta.1; the hide tidy-up waits for the device run (A201) |
+| R10 Uninstall (ADR-0065) | merged (#83), in 0.27.0-beta.1 |
+| R11 Find Windows shares (ADR-0066) | merged (#84), in 0.27.0-beta.1 |
+| R12 Network ISOs in place (ADR-0067) | merged (#85), in 0.27.0-beta.1; the in-place mount for shares that are not mounted waits for Peter's approval of `fusermount3` |
+| R13 Desktop app with the plugin, in the tray (slices 23 and 24 brought forward) | next |
+| R14 Advisor session stats | queued |
+| R15 Pairing by code | queued |
+| R16 Several save locations, newest wins | queued |
+| R17 Battery charge limit (Legion Go, Legion Go 2) | queued |
+| R18 Library badges and artwork for streaming tiles | queued, last |
+
 ## Section 10 amendments: where each is delivered
 
 Spec section 10 applies amendments to v1 slices not yet merged, and moves them to slice 13 for merged slices. Slices 3, 4 and 8 are complete and awaiting on-device checks, but not merged. Reopening them would invalidate checks already prepared, so their amendments are delivered as follows (decision under Peter's delegation; c0-report Q6 lets him reverse it).
