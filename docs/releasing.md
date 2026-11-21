@@ -109,7 +109,14 @@ The `protondb-index` tag is not a `v*` tag. The updater ignores it, and `v*` tag
 
 ## Pre-releases
 
-Use a version like `0.3.0-beta.1`. It is published as a GitHub pre-release and only offered to devices on the Pre-release channel.
+Use a version like `0.3.0-beta.1`. It is published as a GitHub pre-release and only offered to devices on the Pre-release channel. The updater since v0.25.0 reads only `X.Y.Z` and `X.Y.Z-beta.N`, so no other suffix is used.
+
+## Release cadence (Peter, 21 November 2026)
+
+- **One pre-release per item.** After each queued item is merged and the full gate passes, publish an installable signed pre-release for it: the next `-beta.N` of the coming minor version (`0.27.0-beta.1`, `0.27.0-beta.2`, and so on).
+- **Notes:** the item's changelog lines, and a statement that it has not been tested on a device. Publish with `--accept-untested`, so the notes also say the device tests were not run.
+- **Big items are split.** An item that would take more than a day is split into installable steps, and each step is published.
+- **Stable releases** (`X.Y.Z`) are promoted when Peter reports a device run, or when he asks for one.
 
 ## Mistakes
 
