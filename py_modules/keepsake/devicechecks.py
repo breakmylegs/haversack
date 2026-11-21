@@ -600,6 +600,37 @@ async def check_desktop_app(ctx: Context) -> dict[str, Any]:
     return result(status, "; ".join(problems) or "The Desktop Mode page is not running.", **details)
 
 
+async def check_session_sources(ctx: Context) -> dict[str, Any]:
+    """Session stats sources (ADR-0069): which readings this handheld gives the Advisor's session record."""
+    probe = ctx.probes.get("session-sources")
+    if probe is None:
+        return result("skip", "Switch on the Advisor module, then run it again.")
+    found = await probe()
+    labels = {
+        "frameRate": "frame rate",
+        "socketPower": "APU power",
+        "cpuPower": "CPU power",
+        "gpuPower": "GPU power",
+        "battery": "battery",
+        "temperatures": "temperatures",
+        "load": "GPU load",
+    }
+    have = [labels[k] for k in labels if found.get(k)]
+    missing = [labels[k] for k in labels if not found.get(k)]
+    text = f"Available: {', '.join(have) or 'nothing'}." + (f" Not available: {', '.join(missing)}." if missing else "")
+    if not found.get("frameRate"):
+        text += (
+            " The frame rate comes from Steam's performance overlay while a game runs: play a game for a minute, "
+            "then run this again."
+        )
+        if found.get("mangohudConfig"):
+            text += " MangoHud's own logs are also read when it logs."
+    details = {k: bool(found.get(k)) for k in labels}
+    if not found.get("socketPower") and not found.get("battery"):
+        return result("fail", text, **details)
+    return result("pass" if found.get("frameRate") else "warn", text, **details)
+
+
 _SPEED_BLOCK = b""
 
 
@@ -642,6 +673,7 @@ CHECKS = [
     Check("smb-find", "Find shares on my network", "one", "A206", check_smb_find),
     Check("network-iso", "Network ISO in place", "one", "A158, network_mount_probe.py --loop-test", check_network_iso),
     Check("desktop-app", "Desktop app ready", "one", "A208, A209", check_desktop_app),
+    Check("session-sources", "Session stats sources", "one", "A211, A212", check_session_sources),
 ]
 BY_ID = {c.id: c for c in CHECKS}
 

@@ -52,7 +52,7 @@ from . import (
     storage,
     uninstall,
 )
-from .advisor import anticheat, deckverified
+from .advisor import anticheat, current, deckverified, sessions
 from .advisor import compat as advisor_compat
 from .advisor.pcgw import PcgwClient
 from .advisor.service import Advisor, AdvisorError
@@ -387,6 +387,9 @@ class KeepsakeApp:
             )
         )
         self.advisor: Advisor | None = None
+        self.session_recorder = sessions.Recorder(
+            sessions.SessionStore(os.path.join(self.paths.runtime_dir, "advisor-cache", "sessions"))
+        )
 
         async def advisor_start() -> None:
             home = discovery.real_home(self.home)
@@ -407,6 +410,7 @@ class KeepsakeApp:
             self.advisor = advisor
 
         async def advisor_stop() -> None:
+            await asyncio.to_thread(self.session_recorder.stop_sampling)
             self.advisor = None
 
         async def advisor_load(advisor: Advisor, appid: int) -> None:
@@ -422,6 +426,11 @@ class KeepsakeApp:
             # gate, so the work runs as a task and the handler returns at once: advice never delays a game.
             if self.advisor is not None:
                 self._background.append(asyncio.create_task(advisor_load(self.advisor, int(payload["appid"]))))
+                self._background.append(asyncio.create_task(self._session_start(self.advisor, int(payload["appid"]))))
+
+        async def advisor_game_exited(payload: dict[str, Any]) -> None:
+            if self.advisor is not None:
+                self._background.append(asyncio.create_task(self._session_finish(int(payload["appid"]))))
 
         async def advisor_health() -> list[dict[str, Any]]:
             return self.advisor.health() if self.advisor else []
@@ -435,7 +444,7 @@ class KeepsakeApp:
                 start=advisor_start,
                 stop=advisor_stop,
                 health=advisor_health,
-                listeners={"game_started": advisor_game_started},
+                listeners={"game_started": advisor_game_started, "game_exited": advisor_game_exited},
                 # Its advice is built on handheld power and screen profiles: off by default on PCs (ADR-0038).
                 default=None if self.host == "decky" else False,
             )
@@ -981,8 +990,74 @@ class KeepsakeApp:
 
     # Suspend snapshots (slice 11, ADR-0022)
 
+    # Play sessions (ADR-0069): measured while a game runs, read only, summaries kept for the Advisor
+
+    async def _session_start(self, advisor: Advisor, appid: int) -> None:
+        def settings_in_force() -> dict[str, Any]:
+            games = (self._games or {"games": []})["games"]
+            game: dict[str, Any] = next((g for g in games if g.get("appid") == appid), {})
+            now = current.read(advisor.selected(), advisor.detected, advisor.decky_home, advisor.user_home, appid)
+            display = advisor.device.get("display") or {}
+            return {
+                "device": f"{advisor.device.get('vendor', '')} {advisor.device.get('model', '')}".strip(),
+                "display": {k: display.get(k) for k in ("width", "height", "refresh_hz") if display.get(k)},
+                "settings": {
+                    "tdp": (now.get("power") or {}).get("tdp"),
+                    "tdpTool": (now.get("power") or {}).get("tool"),
+                    "frameCap": None,  # Steam's frame limit is not readable yet (A213)
+                    "protonVersion": game.get("compat_tool"),
+                    "launchOptions": game.get("launch_options") or "",  # kept on this device; never sent to AI
+                    "frameGen": (now.get("framegen") or {}).get("tool"),
+                    "upscaler": None,
+                },
+            }
+
+        try:
+            extra = await asyncio.to_thread(settings_in_force)
+        except Exception as exc:  # noqa: BLE001 - measuring must never disturb the game or Saves
+            log_event(logging.WARNING, "sessions.start_failed", "Session not recorded", error=type(exc).__name__)
+            return
+        recorder = self.session_recorder
+        recorder.sys_root, recorder.proc_root = self.sys_root, self.proc_root  # the app's roots (tests use fakes)
+        await asyncio.to_thread(recorder.start, appid, extra)
+
+    async def _session_finish(self, appid: int) -> None:
+        home = discovery.real_home(self.home)
+        folders = sessions.mangohud_folders(home)
+
+        def frames(since: float, until: float) -> list[float]:
+            return sessions.mangohud_frametimes(folders, since, until)
+
+        summary = await asyncio.to_thread(self.session_recorder.finish, appid, frames)
+        if summary is not None:
+            log_event(logging.INFO, "sessions.kept", "Play session recorded", seconds=summary["seconds"])
+            await self.emit(ADVISOR_EVENT)
+
+    async def advisor_perf_sample(self, diagnostic_b64: str) -> dict[str, Any]:
+        """Steam's performance diagnostic entries from the frontend, at most once a second (ADR-0069)."""
+        try:
+            raw = base64.b64decode(str(diagnostic_b64)[:65536], validate=True)
+        except ValueError:
+            return {"ok": False}
+        fps, frametime = sessions.steam_fps(raw)
+        self.session_recorder.feed_fps(fps, frametime)
+        return {"ok": True, "fps": fps}
+
+    async def _session_sources_probe(self) -> dict[str, Any]:
+        sample = await asyncio.to_thread(sessions.read_sample, self.sys_root, self.proc_root)
+        found: dict[str, Any] = sessions.sources(sample, self.session_recorder.fps_seen)
+        home = discovery.real_home(self.home)
+        found["mangohudConfig"] = os.path.isfile(os.path.join(home, ".config", "MangoHud", "MangoHud.conf"))
+        return found
+
+    async def on_resume(self) -> dict[str, Any]:
+        """The device woke: session sampling carries on (ADR-0069)."""
+        self.session_recorder.paused.clear()
+        return {"ok": True}
+
     async def on_suspend(self) -> dict[str, Any]:
         """The device is about to sleep: snapshot running synced games as provisional snapshots."""
+        self.session_recorder.paused.set()  # no sampling while asleep (ADR-0069)
         if not self.settings.get("suspendSnapshots") or not self.registry.enabled("saves"):
             return {"started": 0}
         states = self._sync().state.games()
@@ -4499,6 +4574,7 @@ class KeepsakeApp:
                 "remote-shortcuts": self._remote_shortcuts_probe,
                 "smb-find": lambda: asyncio.to_thread(lanfind.find_servers, 2.5, self._lan_sockets),
                 "network-iso": self._network_iso_probe,
+                "session-sources": self._session_sources_probe,
                 **({"desktop-app": self._desktop_probe} if self.registry.enabled("desktop") else {}),
             },
         )

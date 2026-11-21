@@ -6,7 +6,7 @@ Read-only tuning recommendations for the game being played or selected.
 |---|---|
 | Flag default | On |
 | Spec | `docs/build-prompt-v2.md` sections 4 (P16, P18), 6.2, 8.1 and 9; research sections 6.3 and 6.4 |
-| ADRs | 0012, 0013, 0014, 0019, 0028, 0029, 0031 |
+| ADRs | 0012, 0013, 0014, 0019, 0028, 0029, 0031, 0069 |
 | Code | `py_modules/keepsake/advisor/`, `src/pages/AdvisorPage.tsx`, `src/pages/AdvisorQam.tsx`. Device profiles in Core: `py_modules/keepsake/devices.py` |
 | Origin | Port of Peter's Tuning Advisor, subject to the audit in `docs/advisor-port-audit.md` |
 | Slices | 14 (Advisor I), 15 (Advisor II, minor release) |
@@ -20,10 +20,11 @@ Read-only tuning recommendations for the game being played or selected.
 - Proton signal order: the tool configured and working on the paired peer for the same `gameKey` (when Replication is on), then data sources, then the latest installed GE-Proton for non-Steam titles.
 - Every recommendation shows its source and confidence. Launch options offer "Copy" only.
 - Optional AI explanations with the user's own Anthropic, OpenAI or Gemini key, with an offline rule-based fallback.
+- Play sessions (ADR-0069): while a game runs, it samples power, battery, load, clocks, temperatures and throttling once a second, read only, and the frame rate from Steam's own performance overlay or the user's MangoHud logs, never by changing the game. Only a summary of each session is kept (the last 20 per game). The Last session card, the Recent sessions trend and advice "Measured on this device" come from them, ahead of community data.
 
 ## What it writes
 
-Nothing outside its own cache and settings in Keepsake's folders (P16). Never Steam settings, other plugins' files, game files, prefixes or config files. Never the Lossless Scaling DLL. A test guards this.
+Nothing outside its own cache and settings in Keepsake's folders (P16), which include its session summaries (`advisor-cache/sessions/<appid>.json`). Never Steam settings, other plugins' files, game files, prefixes or config files. Never the Lossless Scaling DLL. A test guards this.
 
 ## Network (each only when its source or provider is enabled)
 

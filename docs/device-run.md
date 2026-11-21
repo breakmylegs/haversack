@@ -74,6 +74,8 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
    - Right-click the icon and press **Quit**: the icon goes. Log out and back in: it comes back.
    - In Diagnostics (in the browser page), run **Desktop app ready** again: it should pass.
 
+7. **Advisor sessions.** Run the Device check **Session stats sources** and photograph it. Then play any game for 5 minutes on battery and quit. Open Keepsake's Advisor page for that game: it should show a **Last session** card with watts, temperatures and battery, and a frame rate or "frame rate not available". Run **Session stats sources** again: it should now say whether a frame rate was seen.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

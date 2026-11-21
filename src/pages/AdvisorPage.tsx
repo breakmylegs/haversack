@@ -1,4 +1,5 @@
 import { DialogButton, DropdownItem, Field, Focusable, Navigation, TextField, ToggleField } from "@decky/ui";
+import { SessionCards } from "./SessionCards";
 import { addEventListener, removeEventListener, toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import {
@@ -447,6 +448,7 @@ export function AdvisorPage() {
           description={`${view.anticheat.entry.meaning}${view.anticheat.entry.blocked ? " Settings cannot help online play." : ""}`}
         />
       )}
+      <SessionCards sessions={view.sessions} />
       {view.source?.error && <Field label="Community reports" description={view.source.error} />}
       {(view.recommendations ?? []).map((rec, i) => (
         <Recommendation key={`${rec.source}-${rec.source_url}-${i}`} rec={rec} />
