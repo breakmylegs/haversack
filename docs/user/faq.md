@@ -43,3 +43,10 @@ Open an issue on [GitHub](https://github.com/breakmylegs/keepsake/issues). For a
 That is Steam Remote Play. When your other device is on with Steam running, Steam lists the games installed there in this device's library, so you can stream them. A non-Steam game installed on the other device shows as a tile with **Stream**. If you have the same game on both, you may see it twice. Keepsake never treats these as games on this device: they are left out of the Games list, save sync, Send to, Replication, Advisor and Uninstall. Keepsake's Games page says how many there are, and **Show games you can stream from another device** lists them.
 
 To see only the games installed on this device, use the **Installed** tab in Steam's library, or switch off Remote Play in Steam's settings. Keepsake does not hide them for you yet: Steam may share hidden games between your devices, so hiding one here could hide the real game on your other handheld. If a game on this device ever becomes hidden, Keepsake tells you and offers **Show it again**.
+
+**How do I uninstall a game?**
+Open the game in Keepsake's Games page and press **Uninstall**.
+- **A Steam game:** if it syncs, Keepsake first offers a final backup of its saves, then opens Steam's own uninstall. Steam removes the game, as it always does.
+- **A non-Steam game:** Keepsake shows exactly which folders it will delete (the game's Proton prefix and its game folder), how big they are and how much space you will have after. Cancel is selected first; nothing happens until you press **Uninstall**. If the game syncs, a final backup of its saves goes to your cloud or your other devices first, and Keepsake tells you where to restore it from: the game's History on any of your devices. Then the shortcut and its artwork leave Steam, the folders are deleted with progress and a **Stop** button, and Keepsake forgets the game on this device.
+
+Keepsake never deletes your home folder, a Steam library, a folder another game uses, a link or a drive, and it will not uninstall a game while it is running or one you can only stream from another device. Anything it will not delete is listed with the reason.

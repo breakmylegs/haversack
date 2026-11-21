@@ -592,3 +592,23 @@ def test_app_announces_the_installed_game_and_hands_off_to_saves(tmp_path, monke
     assert ("keepsake_toast", ("Folder Game is installed. Start it from your library.",)) in a.events
     installer = next(m for m in health["modules"] if m["name"] == "installer")
     assert {c["id"] for c in installer["health"]} >= {"udisksctl", "installer-discs", "installer-shortcuts"}
+
+
+def test_forget_appid_removes_only_finished_installs_of_that_game(env):
+    installer, _ops, _tmp, _prefix, _library = env
+
+    def job(state, appid):
+        installer.db.execute(
+            "INSERT INTO installer_jobs (title, state, data, created, updated) VALUES (?, ?, ?, 0, 0)",
+            ("Example Quest", state, json.dumps({"appid": appid})),
+        )
+
+    job("done", 3000000001)
+    job("failed", 3000000001)
+    job("run-installer", 3000000001)  # still running: kept
+    job("done", 3000000002)  # another game: kept
+    assert installer.forget_appid(3000000001) == 2  # ADR-0065
+    assert sorted((j["state"], j["appid"]) for j in installer.jobs()) == [
+        ("done", 3000000002),
+        ("run-installer", 3000000001),
+    ]

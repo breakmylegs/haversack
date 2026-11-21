@@ -1080,3 +1080,36 @@ export const saveAiKey = callable<[kind: "anthropic" | "openai" | "gemini", valu
 export const savePcgwLogin = callable<[kind: "pcgw", values: { username: string; password: string }], { configured: boolean }>(
   "set_backend_config",
 );
+
+// Uninstall (ADR-0065).
+export interface UninstallPlan {
+  key: string;
+  name: string;
+  kind: GameKind;
+  appid: number;
+  synced: boolean;
+  gameKey: string | null;
+  steam: boolean;
+  store?: string;
+  folders: { path: string; kind: "prefix" | "install"; size: number; freeAfter: number }[];
+  kept: { path: string; reason: string }[];
+}
+export interface UninstallJob {
+  key: string;
+  name: string;
+  appid: number;
+  state: "starting" | "backing-up" | "removing-shortcut" | "deleting" | "cleaning" | "done" | "failed" | "cancelled";
+  folders: UninstallPlan["folders"];
+  kept: UninstallPlan["kept"];
+  done: number;
+  total: number;
+  removed: string[];
+  error: string | null;
+  backup: string | null;
+  restoreFrom: string | null;
+}
+export const uninstallPlan = callable<[key: string], UninstallPlan>("uninstall_plan");
+export const uninstallStart = callable<[key: string, skipBackup: boolean], UninstallJob>("uninstall_start");
+export const uninstallSteam = callable<[key: string, backup: boolean], { op: number; backup: unknown }>("uninstall_steam");
+export const uninstallStatus = callable<[], UninstallJob | null>("uninstall_status");
+export const uninstallCancel = callable<[], UninstallJob | null>("uninstall_cancel");

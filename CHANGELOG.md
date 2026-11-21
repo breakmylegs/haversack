@@ -6,6 +6,7 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ### Added
 
+- **Uninstall** on each game's page. Steam games: an optional final backup of the saves, then Steam's own uninstall. Non-Steam games: a confirmation screen listing every folder to delete with its size and the free space after (Cancel selected first), then a final backup if the game syncs, the shortcut and its artwork removed from Steam, the Proton prefix and game folder deleted in the background with progress and **Stop**, and Keepsake's records of the game cleared. Home folders, Steam libraries, folders other games use, links and drives are never deleted, and running games and games you stream from another device are refused (ADR-0065).
 - Games you can stream from another device (Steam Remote Play's tiles with **Stream** instead of **Play**) are recognised from Steam's own install state and never treated as games on this device: not synced, sent, replicated, advised on or uninstalled. Real shortcuts always stay listed, even with an unusual path. **Show games you can stream from another device** lists them, and a new Device check, "Games you can stream from another device", counts them and flags any synced game that streams. To keep the library tidy, use Steam's **Installed** tab (ADR-0064).
 
 ### Changed
