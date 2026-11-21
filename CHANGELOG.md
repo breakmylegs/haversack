@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.30.1]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Fixed
 
 - **The Desktop Mode taskbar could freeze** (plasmashell stopped responding while KWin and Konsole kept working, until the plugin was stopped). Cause:
