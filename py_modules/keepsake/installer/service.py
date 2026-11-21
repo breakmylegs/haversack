@@ -28,7 +28,7 @@ from typing import Any
 
 from ..statedb import StateDB
 from ..steamops import SteamOps
-from . import cdrom, files, udisks
+from . import cdrom, files, inplace, udisks
 from .artwork import ArtworkError, SteamGridDB
 
 MIGRATIONS = [
@@ -53,6 +53,14 @@ _ROW = ("id", "title", "state", "created", "updated")
 
 class InstallerError(ValueError):
     pass
+
+
+class InPlaceFailed(InstallerError):
+    """An ISO on a network share could not be opened where it is: copy it to staging first (ADR-0067)."""
+
+    def __init__(self, source: str, fstype: str, reason: str) -> None:
+        super().__init__(f"the ISO could not be opened on the share ({fstype}): {reason}")
+        self.source, self.fstype = source, fstype
 
 
 def windows_path(linux_path: str) -> str:
@@ -154,6 +162,9 @@ class Installer:
         self.work_dir = work_dir
         self.art = art
         self.symlink = symlink
+        self.mounts_file = "/proc/self/mounts"
+        # Called with a job's data when its disc is released: the app closes a network ISO's mount (ADR-0067).
+        self.on_released: Callable[[dict[str, Any]], None] = lambda data: None
         db.migrate("installer", MIGRATIONS)
 
     # Storage
@@ -222,17 +233,20 @@ class Installer:
                 pass
             data["stagedRemoved"] = True
 
-    def start(self, source: str, title: str, staged: bool = False, queue: bool = False) -> dict[str, Any]:
+    def start(
+        self, source: str, title: str, staged: bool = False, queue: bool = False, net_mount: str | None = None
+    ) -> dict[str, Any]:
         """Prepare an install from an ISO or a folder; mounts an ISO read-only.
 
         ``staged`` marks a downloaded ISO in :meth:`downloads_dir`, deleted when the install ends.
         ``queue`` (ADR-0053) adds it to the install queue instead: it starts by itself when no other
-        install is active, and the queue survives a restart.
+        install is active, and the queue survives a restart. ``net_mount`` names Keepsake's own mount of
+        a network ISO (ADR-0067), released with the disc.
         """
         if queue:
             return self._enqueue(source, title, staged)
         try:
-            return self._start(source, title, staged)
+            return self._start(source, title, staged, net_mount=net_mount)
         except Exception:
             if staged:
                 self._drop_staged({"staged": source})
@@ -271,7 +285,9 @@ class Installer:
                 self._save(job["id"], "failed", data)
         return None
 
-    def _start(self, source: str, title: str, staged: bool, job_id: int | None = None) -> dict[str, Any]:
+    def _start(
+        self, source: str, title: str, staged: bool, job_id: int | None = None, net_mount: str | None = None
+    ) -> dict[str, Any]:
         title = " ".join(str(title).split())
         if not _TITLE.match(title):
             raise InstallerError('the title is 1 to 80 characters without / \\ : * ? " < > |')
@@ -285,10 +301,20 @@ class Installer:
                 raise InstallerError(
                     "udisksctl is not available on this system, so ISO files cannot be opened; use a folder"
                 )
-            device, mount = udisks.mount_iso(source, self.runner)
+            fstype = inplace.network_filesystem(source, self.mounts_file)
+            try:
+                device, mount = udisks.mount_iso(source, self.runner)
+            except udisks.UdisksError as exc:
+                if fstype and not net_mount:
+                    raise InPlaceFailed(source, fstype, str(exc)) from exc  # option A: copy, then try again
+                raise
             data.update(kind="iso", device=device, mount=mount, contents=mount)
+            if fstype:
+                data["inPlace"] = fstype  # opened on the share, not copied (ADR-0067)
+            if net_mount:
+                data["netMount"] = net_mount
             # A set of discs (ADR-0053): the other ISOs beside this one can be swapped in later.
-            data["otherDiscs"] = [] if staged else files.sibling_discs(source)
+            data["otherDiscs"] = [] if staged or net_mount else files.sibling_discs(source)
         elif os.path.isdir(source):
             data.update(kind="folder", contents=source)
         else:
@@ -301,6 +327,7 @@ class Installer:
         except ValueError as exc:
             if data.get("device"):
                 udisks.detach(data["device"], self.runner)
+                self.on_released(data)
             raise InstallerError(str(exc)) from exc
         data.update(
             target=target,
@@ -590,6 +617,7 @@ class Installer:
         if data.get("device"):
             udisks.detach(data["device"], self.runner)
             data["unmounted"] = True
+            self.on_released(data)
         self._drop_staged(data)
         self._save(job_id, state, data)
         self.promote()  # the next queued install, if any (ADR-0053)

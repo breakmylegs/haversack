@@ -4,10 +4,11 @@ import asyncio
 import hashlib
 import os
 import socket
+from typing import ClassVar
 
 import pytest
 
-from keepsake.installer import remote, smbshare
+from keepsake.installer import remote, smbshare, udisks
 from keepsake.installer.remote import Cancelled, RemoteError
 from keepsake.installer.smbshare import Share
 from keepsake.store import LocalFolderStore
@@ -282,3 +283,128 @@ def test_app_installs_from_a_share(device, monkeypatch):
     assert listing["url"] == "smb://nas.local/Games/"
     job = a.app.installer.get(status["job"])
     assert job["state"] == "choose-installer" and os.path.basename(job["staged"]) == "Disc One.iso"
+
+
+class FakeMount:
+    """Keepsake's network ISO mount (ADR-0067), as a plain file: what udisks would see."""
+
+    made: ClassVar[list["FakeMount"]] = []
+
+    def __init__(self, point, handler, fail=False):
+        self.point, self.handler, self.fail, self.closed = point, handler, fail, False
+        FakeMount.made.append(self)
+
+    def start(self):
+        if self.fail:
+            from keepsake.installer.netfuse import FuseError
+
+            raise FuseError("fusermount3 did not mount the share")
+        os.makedirs(self.point, exist_ok=True)
+        path = os.path.join(self.point, self.handler.name.decode())
+        with open(path, "wb") as handle:
+            handle.write(self.handler.reader.read(0, 16))  # reads go through the share
+        return path
+
+    def close(self):
+        self.closed = True
+
+
+async def _finish(app):
+    for _ in range(400):
+        status = await app.installer_net_status()
+        if not status["running"]:
+            return status
+        await asyncio.sleep(0.02)
+    raise AssertionError("did not finish")
+
+
+def test_app_installs_from_a_share_in_place_once_approved(device):
+    a = device
+    a.app._smb_connect = FakeServer()
+    a.app._net_resolve = LAN
+    a.app._netfuse_available = lambda: None  # as if fusermount3 were approved and present
+    a.app._netfuse_mount = FakeMount
+    a.app.installer.on_released = a.app._net_mount_released
+    FakeMount.made.clear()
+    access = {"url": "smb://nas.local/", "username": "player", "password": "pw"}
+
+    async def go():
+        listing = await a.app.installer_net_browse(access, "smb://nas.local/Games/")
+        await a.app.installer_net_download(access, listing["entries"][1]["url"], "Disc One")
+        return await _finish(a.app)
+
+    status = asyncio.run(go())
+    assert status.get("inPlace") is True
+    job = a.app.installer.get(status["job"])
+    assert job["netMount"] and "staged" not in job  # nothing was copied
+    assert not os.listdir(a.app.installer.downloads_dir())
+    a.app.installer.cancel(job["id"])
+    assert FakeMount.made[-1].closed and not a.app._net_mounts  # released with the disc
+
+
+def test_app_copies_when_the_in_place_mount_fails(device):
+    a = device
+    a.app._smb_connect = FakeServer()
+    a.app._net_resolve = LAN
+    a.app._netfuse_available = lambda: None
+    a.app._netfuse_mount = lambda point, handler: FakeMount(point, handler, fail=True)
+    access = {"url": "smb://nas.local/", "username": "player", "password": "pw"}
+
+    async def go():
+        listing = await a.app.installer_net_browse(access, "smb://nas.local/Games/")
+        await a.app.installer_net_download(access, listing["entries"][1]["url"], "Disc One")
+        return await _finish(a.app)
+
+    status = asyncio.run(go())
+    job = a.app.installer.get(status["job"])
+    assert os.path.basename(job["staged"]) == "Disc One.iso" and not a.app._net_mounts and FakeMount.made[-1].closed
+
+
+def test_until_approved_the_iso_is_copied(device):
+    a = device
+    a.app._smb_connect = FakeServer()
+    a.app._net_resolve = LAN
+    a.app._netfuse_mount = lambda point, handler: pytest.fail("nothing is mounted before approval")
+    access = {"url": "smb://nas.local/", "username": "player", "password": "pw"}
+
+    async def go():
+        listing = await a.app.installer_net_browse(access, "smb://nas.local/Games/")
+        await a.app.installer_net_download(access, listing["entries"][1]["url"], "Disc One")
+        return await _finish(a.app)
+
+    status = asyncio.run(go())
+    assert "staged" in a.app.installer.get(status["job"])
+
+
+def test_an_iso_a_mounted_share_will_not_open_in_place_is_copied_then_installed(device, tmp_path):
+    a = device
+    share = tmp_path / "mnt" / "nas"
+    share.mkdir(parents=True)
+    (share / "Disc Two.iso").write_bytes(b"disc two" * 1000)
+    mounts = tmp_path / "mounts"
+    mounts.write_text(f"//nas/games {share.as_posix()} cifs rw 0 0\n")
+    a.app.installer.mounts_file = str(mounts)
+    working = a.app.installer.runner
+
+    def refuse_share(command):
+        if command[1] == "loop-setup" and "/mnt/nas/" in command[-1]:
+            raise udisks.UdisksError("Error opening file: Operation not permitted")
+        return working(command)
+
+    a.app.installer.runner = refuse_share
+    toasts = []
+
+    async def emit(event, *args):
+        toasts.append((event, args))
+
+    a.app.emit = emit
+
+    async def go():
+        started = await a.app.installer_start(str(share / "Disc Two.iso"), "Disc Two")
+        return started, await _finish(a.app)
+
+    started, status = asyncio.run(go())
+    assert started["copying"] is True
+    job = a.app.installer.get(status["job"])
+    assert os.path.basename(job["staged"]) == "Disc Two.iso" and job["state"] == "choose-installer"
+    assert any("copied to this device first" in str(args) for event, args in toasts if event == "keepsake_toast")
