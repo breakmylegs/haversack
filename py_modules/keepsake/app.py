@@ -49,6 +49,7 @@ from . import (
     retention,
     steamcloud,
     storage,
+    uninstall,
 )
 from .advisor import anticheat, deckverified
 from .advisor import compat as advisor_compat
@@ -274,6 +275,8 @@ def _read_bytes(path: str) -> bytes:
 
 
 class KeepsakeApp:
+    UNINSTALL_OP_TIMEOUT = 300.0  # seconds to wait for Steam to remove a shortcut before giving up (nothing deleted)
+
     def __init__(
         self,
         paths: PluginPaths,
@@ -354,6 +357,9 @@ class KeepsakeApp:
         # v2 Core (slice 13, ADR-0012, ADR-0024): lifecycle bus, per-game locks, module registry, state database.
         self.bus = EventBus()
         self.locks = GameLocks()
+        self._uninstall_job: dict[str, Any] | None = None
+        self._uninstall_cancel = False
+        self._op_waiters: dict[int, asyncio.Future[tuple[bool, dict[str, Any]]]] = {}
         self.registry = ModuleRegistry(self.bus, lambda: dict(self.settings.get("moduleFlags")))
         self.db: StateDB | None = None
         self.steam_ops: SteamOps | None = None
@@ -3000,6 +3006,206 @@ class KeepsakeApp:
         found = remotecopies.check(copies, games, lambda key: bool(self.game_configs.get(key).get("enabled")), log)
         return {**found, "reportAt": (await asyncio.to_thread(self.remote_copies.report)).get("at")}
 
+    # Uninstall (ADR-0065): Steam games through Steam's own uninstall; non-Steam games here, folder by folder
+
+    def _uninstall_places(self) -> uninstall.Places:
+        home = discovery.real_home(self.home)
+        roots = discovery.steam_roots(self.home, self.host)
+        libraries = [lib for root in roots for lib in discovery.library_folders(root)]
+        removable = []
+        try:
+            with open(os.path.join(self.proc_root, "self", "mounts"), encoding="utf-8", errors="replace") as handle:
+                for line in handle:
+                    parts = line.split()
+                    if len(parts) >= 2 and parts[1].startswith(("/run/media/", "/media/")):
+                        removable.append(parts[1].replace("\\040", " "))
+        except OSError:
+            pass
+        extra = [self.paths.settings_dir, self.paths.runtime_dir, self.paths.log_dir, self._library_root()]
+        return uninstall.Places(
+            home=home, libraries=libraries, steam_roots=roots, extra_protected=extra, removable=removable
+        )
+
+    @staticmethod
+    def _uninstall_others(game: dict[str, Any], games: list[dict[str, Any]]) -> list[str]:
+        """Every folder and file another game uses: the guards never delete around them."""
+        others: list[str] = []
+        for other in games:
+            if other["key"] == game["key"]:
+                continue
+            others += [str(p) for p in (other.get("base_dir"), other.get("exe"), other.get("prefix")) if p]
+            others += [str(p) for p in (other.get("wine_prefix"), other.get("start_dir")) if p]
+        return others
+
+    async def _uninstall_target(self, key: str) -> dict[str, Any]:
+        game = await self._game(key)
+        if game["kind"] not in ("shortcut", "steam"):
+            raise ValueError("only Steam games and non-Steam shortcuts can be uninstalled here")
+        if game["kind"] == "shortcut":
+            verdict = (await asyncio.to_thread(self.remote_copies.steam_verdicts)).get(int(game["appid"]), {})
+            if verdict.get("steam") == discovery.REMOTE:
+                raise ValueError("Steam says this game is installed on another device, so it is not uninstalled here")
+        prefix = game.get("prefix")
+        running = await asyncio.to_thread(find_game_processes, int(game["appid"]), prefix, self.proc_root)
+        if running:
+            raise ValueError("quit the game first")
+        return game
+
+    async def uninstall_plan(self, key: str) -> dict[str, Any]:
+        """What uninstalling would do, for the confirmation screen. Changes nothing."""
+        game = await self._uninstall_target(key)
+        config = self.game_configs.get(key)
+        game_key = await self._game_key_of(key)
+        synced = bool(config.get("enabled") and game_key)
+        base = {"key": key, "name": game["name"], "kind": game["kind"], "synced": synced, "gameKey": game_key}
+        if game["kind"] == "steam":
+            return {**base, "appid": int(game["appid"]), "folders": [], "kept": [], "steam": True}
+        games = (await self.discover_games())["games"]
+        found = await asyncio.to_thread(
+            uninstall.plan, game, self._uninstall_places(), self._uninstall_others(game, games)
+        )
+        return {**base, **found, "steam": False, "store": self.settings.get("snapshotStore")}
+
+    async def _final_backup(self, key: str) -> dict[str, Any]:
+        result = await self.sync_push(key)
+        if result.get("status") not in ("published", "published-fork", "no-change", "nothing-to-save"):
+            raise ValueError(
+                "the final backup could not be saved (the cloud or your other device is not reachable); "
+                "try again, or uninstall without a final backup"
+            )
+        return result
+
+    async def uninstall_steam(self, key: str, backup: bool = True) -> dict[str, Any]:
+        """Steam games: an optional final backup, then Steam's own uninstall wizard. Keepsake deletes nothing."""
+        plan_ = await self.uninstall_plan(key)
+        if not plan_["steam"]:
+            raise ValueError("this is not a Steam game")
+        backed_up = None
+        if backup and plan_["synced"]:
+            backed_up = await self._final_backup(key)
+        op_id = await asyncio.to_thread(self._ops().enqueue, "uninstall", "open-uninstall", {"appid": plan_["appid"]})
+        await self.emit("keepsake_steam_ops")
+        log_event(logging.INFO, "uninstall.steam", "Opened Steam's uninstall", appid=plan_["appid"])
+        return {"op": op_id, "backup": backed_up}
+
+    async def uninstall_start(self, key: str, skip_backup: bool = False) -> dict[str, Any]:
+        """Non-Steam games: start the uninstall in the background. Only after the confirmation screen."""
+        if self._uninstall_job and self._uninstall_job["state"] in uninstall.RUNNING:
+            raise ValueError("an uninstall is already running")
+        plan_ = await self.uninstall_plan(key)
+        if plan_["steam"]:
+            raise ValueError("Steam uninstalls its own games: use Uninstall in Steam")
+        self._uninstall_job = {
+            "key": key,
+            "name": plan_["name"],
+            "appid": plan_["appid"],
+            "state": "starting",
+            "folders": plan_["folders"],
+            "kept": plan_["kept"],
+            "done": 0,
+            "total": sum(f["size"] for f in plan_["folders"]),
+            "removed": [],
+            "error": None,
+            "backup": None,
+            "restoreFrom": None,
+        }
+        self._uninstall_cancel = False
+        task = asyncio.create_task(self._uninstall_run(plan_, bool(skip_backup)))
+        self._background.append(task)
+        return dict(self._uninstall_job)
+
+    async def uninstall_status(self) -> dict[str, Any] | None:
+        return dict(self._uninstall_job) if self._uninstall_job else None
+
+    async def uninstall_cancel(self) -> dict[str, Any] | None:
+        """Stop between files. What is already deleted stays deleted; the rest is kept."""
+        self._uninstall_cancel = True
+        return await self.uninstall_status()
+
+    def _uninstall_set(self, **changes: Any) -> None:
+        if self._uninstall_job is not None:
+            self._uninstall_job.update(changes)
+
+    async def _wait_op(self, op_id: int, timeout: float = 300.0) -> tuple[bool, dict[str, Any]]:
+        future: asyncio.Future[tuple[bool, dict[str, Any]]] = asyncio.get_running_loop().create_future()
+        self._op_waiters[op_id] = future
+        try:
+            return await asyncio.wait_for(future, timeout)
+        finally:
+            self._op_waiters.pop(op_id, None)
+
+    async def _uninstall_run(self, plan_: dict[str, Any], skip_backup: bool) -> None:
+        key, appid = plan_["key"], int(plan_["appid"])
+        try:
+            async with self.locks.hold(plan_.get("gameKey") or key, "uninstall"):
+                # 1. A final snapshot, so the saves can come back on any device.
+                if plan_["synced"] and not skip_backup:
+                    self._uninstall_set(state="backing-up")
+                    result = await self._final_backup(key)
+                    where = "your other devices" if self.settings.get("snapshotStore") == "direct" else "the cloud"
+                    self._uninstall_set(
+                        backup=result.get("snapId") or result.get("status"),
+                        restoreFrom=f"History of {plan_['name']} on any device that syncs with {where}",
+                    )
+                if self._uninstall_cancel:
+                    raise uninstall.Cancelled("cancelled before anything was removed")
+                # 2. The shortcut and its artwork, through Steam, read back (ADR-0015, ADR-0065).
+                self._uninstall_set(state="removing-shortcut")
+                op_id = await asyncio.to_thread(
+                    self._ops().enqueue, "uninstall", "remove-shortcut", {"appid": appid, "clearArtwork": True}
+                )
+                await self.emit("keepsake_steam_ops")
+                try:
+                    ok, result = await self._wait_op(op_id, self.UNINSTALL_OP_TIMEOUT)
+                except TimeoutError as exc:
+                    raise ValueError("Steam did not remove the shortcut; open Gaming Mode and try again") from exc
+                if not ok or result.get("readBack") is not None:
+                    raise ValueError("Steam still lists the shortcut, so nothing was deleted")
+                # 3. The prefix and the install folder, each checked again just before.
+                self._uninstall_set(state="deleting")
+                games = (await self.discover_games(refresh=True))["games"]
+                others = self._uninstall_others({"key": key}, games)
+                places = self._uninstall_places()
+                for item in plan_["folders"]:
+                    problem = await asyncio.to_thread(uninstall.recheck, item, appid, places, others)
+                    job = self._uninstall_job or {}
+                    if problem:
+                        self._uninstall_set(kept=[*job.get("kept", []), {"path": item["path"], "reason": problem}])
+                        continue
+                    start = int(job.get("done", 0))
+
+                    def progress(done: int, start: int = start) -> None:
+                        self._uninstall_set(done=start + done)
+
+                    removed = await asyncio.to_thread(
+                        uninstall.delete_tree, item["path"], lambda: self._uninstall_cancel, progress
+                    )
+                    job = self._uninstall_job or {}
+                    self._uninstall_set(done=start + removed, removed=[*job.get("removed", []), item["path"]])
+                # 4. Keepsake's own records of the game on this device.
+                self._uninstall_set(state="cleaning")
+                await asyncio.to_thread(self._uninstall_forget, key, appid)
+            self._uninstall_set(state="done")
+            log_event(logging.INFO, "uninstall.done", "Uninstalled a game", appid=appid)
+            await self.emit("keepsake_toast", f"{plan_['name']} is uninstalled.")
+        except uninstall.Cancelled as exc:
+            self._uninstall_set(state="cancelled", error=str(exc))
+            log_event(logging.WARNING, "uninstall.cancelled", "Uninstall stopped", appid=appid)
+        except (ValueError, OSError, StoreError, SnapshotError) as exc:
+            self._uninstall_set(state="failed", error=str(exc))
+            log_event(logging.ERROR, "uninstall.failed", "Uninstall failed", appid=appid, error=str(exc))
+
+    def _uninstall_forget(self, key: str, appid: int) -> None:
+        self.game_configs.remove(key)
+        self._clear_proposal(key)
+        if self.game_links:
+            found = self.game_links.for_appid(appid)
+            if found:
+                self.game_links.remove(found[0])
+        if self.installer:
+            self.installer.forget_appid(appid)
+        self._games = None  # the next scan no longer finds it
+
     async def steam_ops_claim(self) -> dict[str, Any] | None:
         if self.steam_ops is None:
             return None
@@ -3009,6 +3215,9 @@ class KeepsakeApp:
         await asyncio.to_thread(self._ops().finish, int(op_id), bool(ok), dict(result))
         log_event(logging.INFO, "steamops.finished", "Steam operation finished", id=int(op_id), ok=bool(ok))
         op = await asyncio.to_thread(self._ops().get, int(op_id))
+        waiter = self._op_waiters.get(int(op_id))
+        if waiter and not waiter.done():
+            waiter.set_result((bool(ok), dict(result)))
         if op and op["kind"] == "set-hidden" and op["payload"].get("hidden") is True:
             appid = int(op["payload"]["appid"])
             log = await asyncio.to_thread(self.remote_copies.tidy_log)

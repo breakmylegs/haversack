@@ -524,6 +524,15 @@ class Installer:
         self.promote()
         return resumed
 
+    def forget_appid(self, appid: int) -> int:
+        """Forget finished installs of a game that was uninstalled (ADR-0065). Active ones are kept."""
+        forgotten = 0
+        for job in self.jobs():
+            if job.get("appid") == int(appid) and job["state"] in FINAL:
+                self.db.execute("DELETE FROM installer_jobs WHERE id = ?", (int(job["id"]),))
+                forgotten += 1
+        return forgotten
+
     def remove_shortcut(self, job_id: int) -> dict[str, Any]:
         """User action: remove the ``Install:`` shortcut a failed or cancelled install left in Steam."""
         job = self.get(job_id)

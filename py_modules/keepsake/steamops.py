@@ -28,9 +28,10 @@ KINDS = (
     "set-shortcut-exe",
     "set-shortcut-start-dir",
     "set-compat-tool",
-    "remove-shortcut",  # payload: appid; only for a shortcut the module itself created
+    "remove-shortcut",  # payload: appid, clearArtwork; the installer's own shortcuts, or Uninstall (ADR-0065)
     "set-artwork",  # payload: appid, assetType (0 to 3), imageType (png or jpg), file (a staged image's name)
     "set-hidden",  # payload: appid, hidden; only Steam's copies of other devices' shortcuts (ADR-0064)
+    "open-uninstall",  # payload: appid; opens Steam's own uninstall for a Steam game (ADR-0065)
 )
 _STAGED_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 STATES = ("pending", "claimed", "done", "failed")

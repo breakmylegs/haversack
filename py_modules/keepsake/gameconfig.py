@@ -170,6 +170,13 @@ class GameConfigStore:
             data = self._all()
         return any(isinstance(v, dict) and v.get("enabled") is True for v in data.values())
 
+    def remove(self, key: str) -> None:
+        """Forget a game's settings on this device (Uninstall, ADR-0065). Shared settings in the cloud stay."""
+        with self._lock:
+            data = self._all()
+            if data.pop(key, None) is not None:
+                atomic_write_json(self._path, data)
+
     def update(self, key: str, changes: dict[str, Any]) -> dict[str, Any]:
         if not key or len(key) > MAX_TEXT:
             raise GameConfigError("invalid game key")

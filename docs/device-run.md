@@ -51,6 +51,16 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
    - On the Games page, every non-Steam game installed on the Go should be listed, Split Fiction once, and none of the Go 2's games. **Show games you can stream from another device** should list them.
    - **Hidden test (A201).** In Steam on the Go, open the menu of one streaming tile and choose Hide (Manage, Hide this game). On the Go 2, check that the same game is still in the library and shows **Play**. Tell me the result. Then on the Go, show it again from Steam's Hidden collection.
 
+3. **Uninstall** (use games you do not mind losing, ideally small test installs).
+   - **Non-Steam:** on the Go, open a synced non-Steam game in Keepsake and press **Uninstall**.
+     - The screen should list the Proton prefix and the game folder with sizes and free space after.
+     - **Cancel** should be selected first. Press **Uninstall**.
+     - Watch the progress. The tile and its artwork should leave Steam, the folders should be gone, and the job should say where to restore the saves.
+     - On the Go 2, the game's History should show the final backup.
+   - **Stop:** start an uninstall of a bigger game and press **Stop** part way. It should stop and say what was kept.
+   - **Refusals:** try it while the game runs (refused), and on a game you can stream from the Go 2 (it should not offer Uninstall, or refuse).
+   - **Steam game:** on a synced Steam game, press **Uninstall**. Take the final backup, then Steam's uninstall should open. Confirm it there.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

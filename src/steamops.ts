@@ -11,6 +11,7 @@ const PROBED = {
   Apps: [
     "AddShortcut",
     "RemoveShortcut",
+    "ClearCustomArtworkForApp",
     "SetShortcutName",
     "SetShortcutExe",
     "SetShortcutStartDir",
@@ -21,6 +22,7 @@ const PROBED = {
     "SetCustomArtworkForApp",
   ],
   System: ["RegisterForOnSuspendRequest", "RegisterForOnResumeFromSuspend"],
+  Installs: ["OpenUninstallWizard"],
   GameSessions: ["RegisterForAppLifetimeNotifications"],
 };
 
@@ -84,12 +86,28 @@ async function addShortcut(op: SteamOp): Promise<Outcome> {
   return { ok: true, result: { appid, compatTool: tool ?? null, readBack } };
 }
 
-// Removes a shortcut the module itself created (the backend refuses any other). Read back: the app is gone.
-async function removeShortcut(appid: number): Promise<Outcome> {
-  const before = details(appid)?.strDisplayName ?? null;
+// Removes a shortcut: one the Installer created, or a local game the user uninstalls (ADR-0065), never a
+// streaming entry (the backend checks). With clearArtwork, its custom artwork goes first
+// (ClearCustomArtworkForApp, asset types 0 to 4: capsule, hero, logo, header, icon). Read back: Steam no longer
+// lists the app (appStore overview, then app details); the backend deletes nothing unless readBack is null.
+async function removeShortcut(op: SteamOp): Promise<Outcome> {
+  const appid = Number(op.payload.appid);
+  const before = details(appid)?.strDisplayName ?? appStore?.GetAppOverviewByAppID(appid)?.display_name ?? null;
+  if (op.payload.clearArtwork === true) {
+    for (const assetType of [0, 1, 2, 3, 4]) {
+      await SteamClient.Apps.ClearCustomArtworkForApp(appid, assetType).catch(() => undefined);
+    }
+  }
   SteamClient.Apps.RemoveShortcut(appid);
   await sleep(SETTLE_MS);
-  return { ok: true, result: { appid, original: before, readBack: details(appid)?.strDisplayName ?? null } };
+  const readBack = appStore?.GetAppOverviewByAppID(appid)?.display_name ?? details(appid)?.strDisplayName ?? null;
+  return { ok: true, result: { appid, original: before, readBack } };
+}
+
+// Steam games: Steam's own uninstall wizard, which asks the user and removes the install itself (ADR-0065).
+function openUninstall(appid: number): Outcome {
+  SteamClient.Installs.OpenUninstallWizard([appid], false);
+  return { ok: true, result: { appid, readBack: "not available" } };
 }
 
 // Steam has no getter for custom artwork, so success means SetCustomArtworkForApp resolved (A139).
@@ -123,7 +141,9 @@ async function execute(op: SteamOp): Promise<Outcome> {
     case "add-shortcut":
       return addShortcut(op);
     case "remove-shortcut":
-      return removeShortcut(appid);
+      return removeShortcut(op);
+    case "open-uninstall":
+      return openUninstall(appid);
     case "set-artwork":
       return setArtwork(op);
     case "set-hidden":

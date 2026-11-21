@@ -41,6 +41,21 @@ class Plugin:
     async def remote_copies_report(self, entries: Any) -> dict[str, Any]:
         return await self.app.remote_copies_report(entries)
 
+    async def uninstall_plan(self, key: str) -> dict[str, Any]:
+        return await self.app.uninstall_plan(key)
+
+    async def uninstall_start(self, key: str, skip_backup: bool = False) -> dict[str, Any]:
+        return await self.app.uninstall_start(key, skip_backup)
+
+    async def uninstall_steam(self, key: str, backup: bool = True) -> dict[str, Any]:
+        return await self.app.uninstall_steam(key, backup)
+
+    async def uninstall_status(self) -> dict[str, Any] | None:
+        return await self.app.uninstall_status()
+
+    async def uninstall_cancel(self) -> dict[str, Any] | None:
+        return await self.app.uninstall_cancel()
+
     async def remote_copies_status(self) -> dict[str, Any]:
         return await self.app.remote_copies_status()
 
