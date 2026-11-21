@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.29.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Changed
 
 - Pairing is simpler: there is no window to open first. On one device press **Find devices**, choose the other and press **Pair**; the other device asks you to **Accept** or **Decline** (only a notification while a game runs), then shows a 6-digit code to type on the first with a number pad. Both devices check the code without sending it, so a device in the middle cannot pair with either; a wrong code ends the attempt on both, and a device that keeps trying is locked out for ten minutes. Both devices need this version to pair; devices already paired stay paired. A new Device check, "The other handheld can be seen" (ADR-0070).
