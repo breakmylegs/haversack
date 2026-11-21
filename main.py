@@ -287,6 +287,9 @@ class Plugin:
     async def installer_net_browse(self, access: dict[str, Any], url: str = "") -> dict[str, Any]:
         return await self.app.installer_net_browse(access, url)
 
+    async def installer_net_find_smb(self) -> dict[str, Any]:
+        return await self.app.installer_net_find_smb()
+
     async def installer_net_download(
         self, access: dict[str, Any], url: str, title: str, sha256: str = ""
     ) -> dict[str, Any]:

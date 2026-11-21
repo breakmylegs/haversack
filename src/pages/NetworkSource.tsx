@@ -5,12 +5,14 @@ import {
   installerNetBrowse,
   installerNetCancel,
   installerNetDownload,
+  installerNetFindSmb,
   installerNetForget,
   installerNetLocations,
   installerNetRemember,
   NetAccess,
   NetDownload,
   NetEntry,
+  SmbServer,
   NetLocation,
 } from "../backend";
 
@@ -100,6 +102,7 @@ export function NetworkSource({
   const [allowHosts, setAllowHosts] = useState<string[]>([]);
   const [download, setDownload] = useState<NetDownload>(initial);
   const [busy, setBusy] = useState(false);
+  const [servers, setServers] = useState<SmbServer[] | null>(null);
 
   useEffect(() => {
     installerNetLocations()
@@ -148,17 +151,17 @@ export function NetworkSource({
     }
   };
 
-  const browse = (target: string) =>
+  const browse = (target: string, override?: NetAccess) =>
     run(async () => {
       if (!chosen && remember) {
         const before = new Set(locations.map((l) => l.id));
-        const saved = await installerNetRemember({ url: fullUrl(), username, password });
+        const saved = await installerNetRemember({ url: override?.url ?? fullUrl(), username, password });
         setLocations(saved);
         const made = saved.find((l) => !before.has(l.id));
         if (made) setChosen(made.id);
         setRemember(false);
       }
-      const listing = await installerNetBrowse(access(), target);
+      const listing = await installerNetBrowse(override ?? access(), target);
       if (listing.redirectHost) {
         askRedirect(listing.redirectHost);
         return;
@@ -261,6 +264,48 @@ export function NetworkSource({
                 New location
               </DialogButton>
             </Focusable>
+          )}
+          {protocol === "smb" && !location && (
+            <>
+              <Field
+                label="Find shares on my network"
+                description="Looks for Windows shares, NAS boxes and Macs sharing folders on your local network. Pick one to list its shares, or type an address below."
+                childrenLayout="inline"
+              >
+                <DialogButton
+                  style={{ width: "auto" }}
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      const found = await installerNetFindSmb();
+                      setServers(found.servers);
+                      if (!found.servers.length) {
+                        toaster.toast({ title: "Keepsake", body: "No shares answered. Check the server is on, or type its address." });
+                      }
+                    })
+                  }
+                >
+                  {busy && servers === null ? "Looking" : servers ? "Look again" : "Find shares"}
+                </DialogButton>
+              </Field>
+              {servers && servers.length > 0 && (
+                <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                  {servers.map((s) => (
+                    <DialogButton
+                      key={s.address}
+                      style={{ width: "auto" }}
+                      disabled={busy}
+                      onClick={() => {
+                        setUrl(s.url);
+                        void browse(s.url, { url: s.url, username, password, allowHosts });
+                      }}
+                    >
+                      {s.name === s.address ? s.address : `${s.name} (${s.address})`}
+                    </DialogButton>
+                  ))}
+                </Focusable>
+              )}
+            </>
           )}
           {location ? (
             <Field label={location.url} description={location.username ? `User ${location.username}${location.passwordSet ? ", password saved" : ""}.` : "No sign-in."} childrenLayout="inline">

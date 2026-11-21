@@ -61,6 +61,10 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
    - **Refusals:** try it while the game runs (refused), and on a game you can stream from the Go 2 (it should not offer Uninstall, or refuse).
    - **Steam game:** on a synced Steam game, press **Uninstall**. Take the final backup, then Steam's uninstall should open. Confirm it there.
 
+4. **Find shares.** With a NAS or a Windows PC sharing a folder on the same network:
+   - Run the Device check **Find shares on my network**. It should find at least one server and say which ways answered.
+   - In Install, then From a network location, then Windows share (SMB), press **Find shares**. Pick your server: its shares should be listed. Open one and browse to an ISO, as before.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.
