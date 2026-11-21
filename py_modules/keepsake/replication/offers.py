@@ -12,6 +12,7 @@ undo exactly that and nothing else.
 
 from __future__ import annotations
 
+import asyncio
 import builtins
 import json
 import os
@@ -25,8 +26,8 @@ from collections.abc import Callable
 from typing import Any
 
 from ..fsutil import atomic_write_json, read_json
+from . import activity, ongoing, policy, sendgame, transfer
 from . import manifest as mf
-from . import ongoing, policy, sendgame, transfer
 from .jobs import Transfers
 from .link import ServeError, Session
 from .peers import clean_name
@@ -128,6 +129,9 @@ def validate(offer: Any) -> dict[str, Any]:
     game_key = offer.get("gameKey")
     if game_key is not None and not GAME_KEY.match(str(game_key)):
         raise OfferError("the offer's game key is not valid")
+    pull = offer.get("pull")  # the pull request this offer answers (v0.31.0)
+    if pull is not None and not OFFER_ID.match(str(pull)):
+        raise OfferError("the offer is not valid")
     return {
         "id": offer_id,
         "title": title,
@@ -142,7 +146,16 @@ def validate(offer: Any) -> dict[str, Any]:
         "art": art,
         "gameKey": game_key,
         "savesEnabled": bool(offer.get("savesEnabled")),
+        "pull": pull,
     }
+
+
+def _existing(folder: str) -> str:
+    """The nearest folder that exists, for a free-space reading before anything is made."""
+    path = os.path.abspath(folder)
+    while not os.path.isdir(path) and os.path.dirname(path) != path:
+        path = os.path.dirname(path)
+    return path
 
 
 def safe_folder(title: str) -> str:
@@ -277,7 +290,13 @@ class Outgoing:
             "update": {"link": link_id, "base": {s: base[s] for s in changed if s in base}},
             **extra,
         }
-        offers[offer_id] = {"peer": peer_id, "title": title, "shares": record_shares, "created": time.time()}
+        offers[offer_id] = {
+            "peer": peer_id,
+            "title": title,
+            "shares": record_shares,
+            "created": time.time(),
+            "update": True,
+        }
         self._save(offers)
         return wire, {s: m["root"] for s, m in manifests.items()}
 
@@ -294,10 +313,13 @@ class Outgoing:
             for k, v in sorted(self._load().items(), key=lambda kv: -float(kv[1].get("created") or 0))
         ]
 
-    def record_state(self, peer_id: str, offer_id: Any, state: Any, reason: Any) -> dict[str, Any] | None:
+    def record_state(
+        self, peer_id: str, offer_id: Any, state: Any, reason: Any, progress: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
         """The other device's news about an offer this device made to it, and only to it.
 
-        Returns the offer when its state changed, else None.
+        ``progress`` holds the bar's numbers (v0.31.0). Returns the offer with ``stateChanged``
+        when anything changed, else None.
         """
         if not isinstance(offer_id, str) or not OFFER_ID.match(offer_id) or state not in TOLD_STATES:
             raise ServeError("that is not an offer state")
@@ -306,11 +328,30 @@ class Outgoing:
         if record is None or record.get("peer") != peer_id:
             raise ServeError("no such offer was made to this device")
         reason = wire_reason(reason) if isinstance(reason, str) else None
-        if record.get("remoteState") == state and record.get("remoteReason") == reason:
+        numbers = activity.clean_progress(progress or {})
+        changed = record.get("remoteState") != state or record.get("remoteReason") != reason
+        if not changed and all(record.get(k) == v for k, v in numbers.items()):
             return None
-        record.update(remoteState=state, remoteReason=reason, remoteAt=time.time())
+        record.update(remoteState=state, remoteReason=reason, remoteAt=time.time(), **numbers)
         self._save(offers)
-        return {"id": offer_id, "title": record.get("title"), "state": state, "reason": reason}
+        return {
+            "id": offer_id,
+            "title": record.get("title"),
+            "state": state,
+            "reason": reason,
+            "stateChanged": changed,
+        }
+
+    def activity(self, peer_names: dict[str, str]) -> builtins.list[dict[str, Any]]:
+        """Each offer as a bar, as the receiving device last described it (v0.31.0)."""
+        return [
+            activity.sending(k, v, peer_names.get(str(v.get("peer")), "the other device"))
+            for k, v in sorted(self._load().items(), key=lambda kv: -float(kv[1].get("created") or 0))
+        ]
+
+    def peer_of(self, offer_id: str) -> str | None:
+        record = self._load().get(offer_id)
+        return str(record["peer"]) if record else None
 
     def redacted(self) -> builtins.list[dict[str, Any]]:
         """For the Device checks' export: states only, no titles, names or paths."""
@@ -467,6 +508,75 @@ class Incoming:
         self._save(offers)
         self._changed()
         self._tell(offer_id, {**record, "state": "declined", "reason": None})
+
+    def space_check(self, sizes: dict[str, int], tool: str | None) -> dict[str, Any]:
+        """Before the other device reads a game's files: does it fit here? (v0.31.0)
+
+        ``sizes`` is bytes per scope. Scopes on one file system add up; each needs the margin.
+        Writes nothing.
+        """
+        places = self.places()
+        if sizes.get("install") and (not places.get("library") or not os.path.isdir(places["library"])):
+            return {"ok": False, "reason": "choose where games are installed first (Settings, Install)"}
+        if sizes.get("prefix") and (not places.get("compatdata") or not os.path.isdir(places["compatdata"])):
+            return {"ok": False, "reason": "Steam's compatdata folder was not found on this device"}
+        tool_needed = (
+            bool(tool)
+            and not BUILT_IN_TOOLS.match(str(tool))
+            and not os.path.isdir(os.path.join(places.get("tools", ""), str(tool)))
+        )
+        where = {"install": places.get("library"), "prefix": places.get("compatdata"), "art": places.get("art")}
+        if tool_needed:
+            where["tool"] = places.get("tools")
+        by_device: dict[int, tuple[str, int]] = {}
+        for scope, size in sizes.items():
+            folder = where.get(scope)
+            if not folder or not size:
+                continue
+            existing = _existing(folder)
+            device = os.stat(existing).st_dev
+            known = by_device.get(device, (existing, 0))
+            by_device[device] = (known[0], known[1] + int(size))
+        needed_all = free_all = 0
+        for folder, size in by_device.values():
+            needed, free = policy.space_needed(size), shutil.disk_usage(folder).free
+            if free < needed:
+                return {"ok": False, "needed": needed, "free": free, "reason": None}
+            needed_all, free_all = needed_all + needed, max(free_all, free)
+        return {"ok": True, "needed": needed_all, "free": free_all, "reason": None}
+
+    async def handle_space(self, session: Session, message: dict[str, Any]) -> dict[str, Any]:
+        """The ``space-check`` request from a paired device about to send a game (v0.31.0)."""
+        sizes = message.get("bytes")
+        tool = message.get("compatTool")
+        if (
+            not isinstance(sizes, dict)
+            or set(sizes) - set(SCOPES)
+            or not all(isinstance(v, int) and not isinstance(v, bool) and 0 <= v < 2**53 for v in sizes.values())
+            or (tool is not None and not sendgame.TOOL_NAME.match(str(tool)))
+        ):
+            raise ServeError("that is not a space check")
+        result = await asyncio.to_thread(self.space_check, {str(k): int(v) for k, v in sizes.items()}, tool)
+        return {"type": "space", **result}
+
+    async def handle_stop(self, session: Session, message: dict[str, Any]) -> dict[str, Any]:
+        """The ``offer-stop`` request: the sending device pressed Stop and remove (v0.31.0)."""
+        offer_id = message.get("id")
+        record = self._load().get(offer_id) if isinstance(offer_id, str) and OFFER_ID.match(offer_id) else None
+        if record is None or record.get("peer") != session.peer_id:
+            raise ServeError("no such game is coming from your device")
+        await self.stop(str(offer_id))
+        return {"type": "offer-stopped", "id": offer_id}
+
+    def activity(self, peer_names: dict[str, str]) -> builtins.list[dict[str, Any]]:
+        """Each received offer as a bar (v0.31.0)."""
+        out = []
+        for offer_id, record in sorted(self._load().items(), key=lambda kv: -float(kv[1].get("received") or 0)):
+            jobs = {j: self.transfers.jobs[j] for j in record.get("jobs", {}).values() if j in self.transfers.jobs}
+            out.append(
+                activity.receiving(offer_id, record, jobs, peer_names.get(str(record["peer"]), record["offer"]["from"]))
+            )
+        return out
 
     def preflight(self, offer_id: str, copy_tool: bool) -> dict[str, Any]:
         """Where everything would go, and whether it fits. Raises OfferError when it cannot start."""

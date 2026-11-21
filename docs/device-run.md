@@ -98,6 +98,27 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Type the address the Windows way, `\\yourserver\yourshare`, with your user name (try `YOURPC\yourname` if the PC is not on a domain) and password, and turn on **Remember this location**. Press **Browse**: its folders should be listed.
     - Come back later, pick the remembered location and press **Browse** again: it should list the same folders.
 
+13. **Pairing both ways (v0.31.0).** If the Go and the Go 2 are already paired, remove each from the other first. On the Go, switch off **Let other devices reach this one**. Pair from the Go to the Go 2. When it finishes, the Go should show "Games can now go both ways between you", and its toggle should be on.
+
+14. **No Accept, and bars on both devices (v0.31.0).**
+    - Send a non-Steam game from the Go to the Go 2. The Go 2 should start copying by itself, with the toast "<game> is coming from Legion Go". There should be no Accept button.
+    - Both devices should show a bar on Devices: percentage, GiB done of the total, speed, time left, and the stage (Copying, then Verifying, then Adding to Steam, then Done).
+    - Open the quick access menu on each device: a compact line should show the same progress.
+    - Close the Keepsake page and open it again: the bar should carry on from where it was.
+
+15. **Space check (v0.31.0).** On the Go 2, choose an SD card or folder with too little space as the library. Send a large game from the Go. The Go should stop at once with "Legion Go 2 doesn't have enough space: needs ... GiB, has ... GiB free", before it reads the game's files.
+
+16. **Get this game (v0.31.0).** On the Go 2, on Devices, press **Games on Legion Go**, pick a game and press **Get this game**.
+    - The Go should toast "<game> is being copied to Legion Go 2".
+    - The Go 2's bar should go from Checking space to Preparing to Copying.
+    - The game should end up in the Go 2's library with its artwork, launch options and compatibility tool.
+
+17. **Stop and remove from each side (v0.31.0).**
+    - Start a copy and press **Stop and remove** on the sending device. The receiving device should stop and delete what it made, and both bars should go.
+    - Start another and press **Stop and remove** on the receiving device. The sending device should toast "<device> stopped and removed <game>".
+
+18. **Desktop app (v0.31.0).** In Desktop Mode, open Keepsake's Devices page during a copy. The table should show the game, device, stage, a moving progress bar, GiB, speed and time left, with **Stop and remove**.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

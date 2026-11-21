@@ -19,6 +19,7 @@ import { startProbes } from "./probes";
 import { startSteamOps } from "./steamops";
 import { startRemoteCopies } from "./remotecopies";
 import { AdvisorQam } from "./pages/AdvisorQam";
+import { GameTransfersCompact } from "./pages/GameTransfers";
 import { openCheckpointModal } from "./pages/CheckpointModal";
 import { openWhatsNew } from "./pages/WhatsNewModal";
 import { KeepsakeRoute } from "./pages/KeepsakeRoute";
@@ -157,6 +158,7 @@ function Content() {
           </ButtonItem>
         </PanelSectionRow>
       )}
+      <GameTransfersCompact onOpen={() => openRoute(`${ROUTE_PATH}/devices`)} />
       {summary && summary.conflicts > 0 && (
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={() => openRoute(`${ROUTE_PATH}/conflicts`)}>

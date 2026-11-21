@@ -4,6 +4,27 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **Get a game from another device.** On Devices, press **Games on Legion Go** (or your other device's name), then **Get this game**.
+  - Keepsake checks there is space on this device first.
+  - The other device then sends the game as if you had pressed Send there, with the same rules: nothing is replaced, a missing compatibility tool is copied, and the Steam shortcut, artwork and launch options are set up.
+  - The other device allows it automatically, because pairing is trust both ways, and shows a toast.
+- **Progress bars on both devices.** They show on the Devices page, as a compact line in the quick access menu, and as a table in the desktop app. Each bar shows:
+  - the percentage done, GiB done of the total, speed and time left;
+  - the stage (checking space, preparing, copying, verifying, adding to Steam, done, or failed with the reason);
+  - **Stop and remove**.
+
+  Several games each get their own bar, and the bars carry on while a page is closed and reopened.
+- **Stop and remove on either device.** Stopping on the sending device asks the receiving one to delete everything the copy made, then withdraws the offer. Stopping on the receiving device withdraws the offer on the sending one.
+- **A space check before sending.** Keepsake now asks the other device first and stops at once if the game will not fit, before it spends minutes reading the game's files. The message reads, for example, "Legion Go 2 doesn't have enough space: needs 41.2 GiB, has 12.0 GiB free".
+- **Toasts on both devices** when a game starts copying, arrives, fails, or is stopped and removed.
+
+### Changed
+
+- **New games no longer wait for Accept.** A game from a paired device starts copying as soon as it arrives, with the same checks as before. Updates to a game you already have still follow that game's own setting.
+- **Pairing works both ways.** When a pairing you started finishes, this device can be reached too, so games can go either way. "Let other devices reach this one" on Devices still switches that off.
+
 ## [0.30.2]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

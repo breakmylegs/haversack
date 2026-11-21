@@ -248,6 +248,24 @@ export interface OffersStatus {
   incoming: IncomingOffer[];
   outgoing: { id: string; title: string; peer: string; created: number; remoteState?: string; remoteReason?: string | null }[];
   sending: Record<string, { state: string; title: string; peer: string; reason?: string; warning?: string | null }>;
+  activity?: GameTransfer[];
+}
+// A game moving between devices, as one bar on either device (v0.31.0, ADR-0072).
+export interface GameTransfer {
+  id: string;
+  direction: "sending" | "receiving";
+  title: string;
+  peer: string;
+  stage: "checking-space" | "preparing" | "copying" | "verifying" | "adding" | "done" | "failed" | "paused" | "waiting";
+  done: number;
+  total: number;
+  percent: number;
+  bytesPerSecond: number;
+  secondsLeft: number | null;
+  reason: string | null;
+  update: boolean;
+  canStop: boolean;
+  canClear: boolean;
 }
 export interface GameLink {
   id: string;

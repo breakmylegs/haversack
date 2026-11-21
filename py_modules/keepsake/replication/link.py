@@ -238,6 +238,7 @@ class Pairing:
     entered: asyncio.Future[str | None] | None = None  # the code typed on the initiator
     ended_at: float | None = None
     announced: bool = False  # the app has told the user about this request
+    two_way: bool = False  # the app has made this device reachable after the pairing (ADR-0072)
 
     def public(self) -> dict[str, Any]:
         return {

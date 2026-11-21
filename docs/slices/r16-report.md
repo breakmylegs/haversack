@@ -1,6 +1,6 @@
 # R16 report: several save locations (step 1 of 2)
 
-Recorded in ADR-0071 (Peter's request of 21 November 2026). Step 2, taking the newest save when locations differ, follows as ADR-0072.
+Recorded in ADR-0071 (Peter's request of 21 November 2026). Step 2, taking the newest save when locations differ, follows in its own ADR.
 
 ## What changed
 
@@ -40,7 +40,7 @@ The simulator test with two locations dropping out in turn caught a real problem
 
 ## Known gaps
 
-- Taking the newest save on a real fork, the clock guard, and History showing locations are step 2 (ADR-0072).
+- Taking the newest save on a real fork, the clock guard, and History showing locations are step 2, in its own ADR.
 
 ## On-device checklist
 

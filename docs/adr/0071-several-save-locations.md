@@ -1,6 +1,6 @@
 # ADR-0071: Several save locations at once
 
-- Status: accepted (Peter's request of 21 November 2026, decided under ADR-0037). Step 1 of 2: this ADR covers using several locations; taking the newest save when they differ, with its clock guard, is ADR-0072.
+- Status: accepted (Peter's request of 21 November 2026, decided under ADR-0037). Step 1 of 2: this ADR covers using several locations; taking the newest save when they differ, with its clock guard, is step 2, in its own ADR.
 - Date: 21 November 2026
 - Deciders: Peter (owner)
 
@@ -36,7 +36,7 @@
    - respects each game's chosen locations.
 6. **Per-location status** in `<runtime>/locations.json`: last success, last problem, objects still to copy, and space used. The Cloud page shows them with **Remove** for each, which never deletes anything stored there, and "Add *X* as a save location", checked first for clouds (the same create-only check as before). A game's page shows **Save locations for this game** when there are several.
 7. **Direct device sync (ADR-0061)** runs whenever "direct" is one of the locations.
-8. **What does not change in this step:** a real fork is still a conflict for the user, as today. ADR-0072 adds taking the newest.
+8. **What does not change in this step:** a real fork is still a conflict for the user, as today. Step 2, in its own ADR, adds taking the newest.
 
 ## Consequences
 

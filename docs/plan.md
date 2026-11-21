@@ -34,11 +34,21 @@ Each item is merged on its own and then published as its own signed **stable** r
 | R11 Find Windows shares (ADR-0066) | merged (#84), in 0.27.0 |
 | R12 Network ISOs in place (ADR-0067) | merged (#85), in 0.27.0; the in-place mount for shares that are not mounted waits for Peter's approval of `fusermount3` |
 | R13 Desktop app with the plugin, in the tray (slices 23 and 24 brought forward) | merged (#88), in 0.27.0 |
-| R14 Advisor session stats | next, as 0.28.0 |
-| R15 Pairing by code | queued |
-| R16 Several save locations, newest wins | queued |
-| R17 Battery charge limit (Legion Go, Legion Go 2) | queued, its own stable release |
-| R18 Library badges and artwork for streaming tiles | queued, last |
+| R14 Advisor session stats (ADR-0069) | in 0.28.0 |
+| R15 Pairing by code (ADR-0070) | in 0.29.0 |
+| R16 Several save locations, step 1 (ADR-0071) | in 0.30.0; step 2 (take the newest save, clock guard, Undo) is queued below |
+| Tray freeze hotfix (r17 report) | in 0.30.1 |
+| Three fixes: offers that stall, sign-in localhost page, raw SMB errors (r18 report) | in 0.30.2 |
+
+Peter's new direction of 21 November 2026 sets the order from here:
+
+| Item | State |
+|---|---|
+| R19 Replication both ways: two-way pairing, space check, no Accept, pull, progress bars on every surface, Stop and remove on either side, toasts (ADR-0072) | this release, 0.31.0 |
+| R20 Layout review: `docs/design/layout-v3.md`, an ADR, and the new structure for the quick access menu, the full page and the desktop app, every feature still reachable | next, its own release |
+| R21 Legion Go device control, after research (`docs/research/legion-control.md`) and a permission-model ADR. In stages, each a release: read-only status; TDP and per-game profiles; fans; battery (R17 folds in here); controllers and RGB; display and other features. Anything needing root waits for Peter's approval of the permission ADR | after R20 |
+| R16 step 2 Take the newest save | after R21 |
+| R18 Library badges and artwork for streaming tiles | last |
 
 ## Section 10 amendments: where each is delivered
 
