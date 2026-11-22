@@ -330,6 +330,33 @@ class Plugin:
     async def device_controllers(self) -> dict[str, Any]:
         return await self.app.device_controllers()
 
+    async def reconnect_status(self) -> dict[str, Any]:
+        return await self.app.reconnect_status()
+
+    async def reconnect_set_help(self, adapter: str, mac: str, on: bool, label: str = "") -> dict[str, Any]:
+        return await self.app.reconnect_set_help(adapter, mac, on, label)
+
+    async def reconnect_set_option(self, adapter: str, mac: str, option: str, on: bool) -> dict[str, Any]:
+        return await self.app.reconnect_set_option(adapter, mac, option, on)
+
+    async def reconnect_set_dry_run(self, on: bool) -> dict[str, Any]:
+        return await self.app.reconnect_set_dry_run(on)
+
+    async def reconnect_dismiss(self, adapter: str, mac: str) -> dict[str, Any]:
+        return await self.app.reconnect_dismiss(adapter, mac)
+
+    async def reconnect_assist(self, adapter: str, mac: str) -> dict[str, Any]:
+        return await self.app.reconnect_assist(adapter, mac)
+
+    async def reconnect_read_usb(self, adapter: str, mac: str) -> dict[str, Any]:
+        return await self.app.reconnect_read_usb(adapter, mac)
+
+    async def reconnect_diagnose(self, adapter: str, mac: str) -> dict[str, Any]:
+        return await self.app.reconnect_diagnose(adapter, mac)
+
+    async def reconnect_export(self, adapter: str, mac: str, redact_adapter: bool = True) -> dict[str, Any]:
+        return await self.app.reconnect_export(adapter, mac, redact_adapter)
+
     async def device_battery(self) -> dict[str, Any]:
         return await self.app.device_battery()
 
