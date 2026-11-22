@@ -256,6 +256,12 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - A multi-disc game should show once.
     - Run the Device check "Emulator setup": it should show counts only.
 
+49. **Sending an emulator game (v0.49.0).** On the handheld with the game, open Games and devices, Emulators, and select Send to on a small game.
+    - Accept it on the other handheld.
+    - It should appear in its ROM folder and in Steam, and play.
+    - Send it again: it should say the other handheld already has it.
+    - Send a Switch game with Also send firmware and keys ticked: the keys should arrive, readable only by your user.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

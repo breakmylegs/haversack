@@ -649,6 +649,9 @@ class KeepsakeApp:
                     "pull-state": self._replication_pull_news,
                     **directsync.handlers(self._direct_store, on_changed=self._direct_peer_changed),
                     "speed": devicechecks.serve_speed,  # the other side of the link speed check (ADR-0062)
+                    # R26 stage 2 (ADR-0087 addendum): emulator games between paired devices
+                    "emu-summary": self._serve_emu_summary,
+                    "emu-offer": self.incoming.handle_emu_offer,
                 }
             )
             if restored:
@@ -1099,6 +1102,84 @@ class KeepsakeApp:
         from .replication import emulators
 
         return await asyncio.to_thread(emulators.scan, discovery.real_home(self.home))
+
+    async def _serve_emu_summary(self, _session: Any, _message: dict[str, Any]) -> dict[str, Any]:
+        """The ``emu-summary`` request from a paired device: systems, emulators and settings present, and
+        this device's emulator games by system and name. No paths and nothing about key files."""
+        from .replication import emuplan
+
+        found = await asyncio.to_thread(emuplan.summary, discovery.real_home(self.home))
+        return {"type": "emu-summary", **found}
+
+    async def emulator_peer(self, peer_id: str) -> dict[str, Any]:
+        """The paired device's emulator summary, for the copy plan."""
+        name = self._peer_name(peer_id)
+        try:
+            connection = await self._replication_connect_for(str(peer_id))()
+            try:
+                reply = await connection.request({"type": "emu-summary"})
+            finally:
+                await connection.close()
+        except (replication_link.LinkError, OSError) as exc:
+            raise ValueError(f"{capital(name)} could not be reached: {exc}") from exc
+        if reply.get("type") != "emu-summary":
+            raise ValueError(f"{capital(name)} needs Keepsake 0.49 or later to take emulator games")
+        return {k: reply.get(k) or [] for k in ("systems", "emulators", "configs", "games")}
+
+    async def emulator_send(self, peer_id: str, system: str, unit: str, with_keys: bool = False) -> dict[str, Any]:
+        """Send one emulator game to a paired device (R26 stage 2). Keys only with ``with_keys``, which the
+        page asks for separately."""
+        from .replication import emulators, emuplan
+
+        home = discovery.real_home(self.home)
+        setup = emulators.emudeck(home) or emulators.retrodeck(home)
+        if setup is None:
+            raise ValueError("this device has no EmuDeck or RetroDECK setup")
+        roms = setup["romsPath"]
+        game = next(
+            (g for g in await asyncio.to_thread(emulators.games, roms) if g.system == system and g.name == unit), None
+        )
+        if game is None:
+            raise ValueError("that game was not found on this device")
+        emulator = next((e for e in emulators.emulators(home) if e["system"] == system), None)
+        target = await self.emulator_peer(peer_id)
+        if [system, unit] in target["games"]:
+            raise ValueError(f"{capital(self._peer_name(peer_id))} already has {unit}")
+        try:
+            plan = await asyncio.to_thread(emuplan.plan, home, roms, game, emulator, target, bool(with_keys))
+        except emuplan.EmuPlanError as exc:
+            raise ValueError(str(exc)) from exc
+        extra = {"from": {"name": self.settings.get("deviceName") or ""}}
+
+        async def send() -> None:
+            try:
+                wire = await asyncio.to_thread(self._outgoing().prepare_emulator, plan, str(peer_id), extra)
+                connection = await self._replication_connect_for(str(peer_id))()
+                try:
+                    reply = await connection.request({"type": "emu-offer", "offer": wire})
+                finally:
+                    await connection.close()
+                if reply.get("type") == "error":
+                    raise ValueError(str(reply.get("message") or "the other device refused it"))
+                await self.emit("keepsake_toast", f"{unit} is on its way to {self._peer_name(peer_id)}.")
+            except Exception as exc:  # noqa: BLE001 - reported to the user, never left hanging
+                log_event(
+                    logging.WARNING,
+                    "replication.emu_offer_failed",
+                    "Emulator game not offered",
+                    error=type(exc).__name__,
+                )
+                await self.emit("keepsake_toast", f"{unit} was not offered: {exc}")
+
+        self._background.append(asyncio.create_task(send()))
+        log_event(
+            logging.INFO,
+            "replication.emu_offer",
+            "Emulator game offered",
+            parts=sorted(plan.roots),
+            keys=bool(with_keys),
+        )
+        return {"ok": True, "parts": sorted(plan.roots)}
 
     async def _emulator_probe(self) -> dict[str, Any]:
         found = await self.emulator_setup()

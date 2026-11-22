@@ -116,4 +116,11 @@ Keepsake never changes your firewall. **Diagnostics**, **Health** says what to a
 - every emulator game, with multi-disc games grouped as one;
 - how many firmware, BIOS and key files there are.
 
-Keepsake only counts the firmware, BIOS and key files and never reads them. When copying arrives in the next release, they will travel only straight to your own paired device, never to the cloud.
+Keepsake only counts the firmware, BIOS and key files and never reads them.
+
+**Send to** your other handheld (one button per game) copies:
+- the game's files, with multi-disc games kept together;
+- the emulator and its settings, but only if the other handheld lacks them;
+- firmware and keys, only when you tick **Also send firmware and keys**. They go only straight to your own paired handheld, over the encrypted link, and are stored there for your user only. Never to the cloud. Copy only what you own.
+
+Accept it on the other handheld, as with any game. Nothing already there is replaced. The game gets a Steam shortcut made from that handheld's Steam ROM Manager setup; if it has none, add the shortcut with Steam ROM Manager. Flatpak emulators are not copied: install them on the other handheld first.
