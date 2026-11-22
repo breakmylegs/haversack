@@ -139,6 +139,17 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Run the Device check **Device readings** and photograph it: it lists what each device exposes, including fan speed, the firmware modes and the charge limit.
     - On the Legion Go and the Legion Go 2, open Legion Space's mode (Legion L plus Y) or Steam's performance overlay and change the mode. Status should follow it.
 
+23. **Performance profiles (v0.34.0).**
+    - Run the Device check **Performance control** and photograph it.
+    - Start a game. In the quick access menu, set the mode to Performance and the TDP to 15 W.
+    - Quit. Steam's performance overlay should show the previous values again.
+    - Start the game again: the mode and TDP should come back by themselves.
+    - Sleep and wake the device during the game: the profile should still be applied.
+
+24. **Never fight (v0.34.0).**
+    - In Steam's own performance settings, turn on a per-game TDP limit for that game, then start it. Within a few seconds Keepsake should say another app changed it, and leave Steam's value.
+    - If SimpleDeckyTDP or another tool is installed, Device, Power should name it and show the settings read-only.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

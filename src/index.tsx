@@ -19,6 +19,7 @@ import { startSteamOps } from "./steamops";
 import { startRemoteCopies } from "./remotecopies";
 import { AdvisorQam } from "./pages/AdvisorQam";
 import { GameTransfersCompact } from "./pages/GameTransfers";
+import { PowerPanel } from "./pages/PowerPanel";
 import { openCheckpointModal } from "./pages/CheckpointModal";
 import { openWhatsNew } from "./pages/WhatsNewModal";
 import { KeepsakeRoute } from "./pages/KeepsakeRoute";
@@ -117,6 +118,7 @@ function Content() {
               Save checkpoint
             </ButtonItem>
           </PanelSectionRow>
+          <PowerPanel compact />
           <AdvisorQam onOpen={() => openSection("play", "advisor")} />
         </PanelSection>
       )}

@@ -16,6 +16,7 @@ import type {
   DeviceCheckDesk,
   DeviceCheckResultDesk,
   DeviceReadingsDesk,
+  PerformanceDesk,
   DeviceStatusDesk,
   FoundDevice,
   GameTransfer,
@@ -1404,6 +1405,7 @@ const PAGES: Page[] = [
   { id: "import", title: "Import", group: "Saves", render: importPage },
   { id: "devices", title: "Moving games and devices", group: "Games and devices", render: (main) => devices(main) },
   { id: "device", title: "Status", group: "Device", render: deviceStatusPage },
+  { id: "power", title: "Power", group: "Device", render: powerPage },
   { id: "settings", title: "General and sync", group: "Settings", render: settingsPage },
   { id: "cloud", title: "Cloud", group: "Settings", render: cloud },
   { id: "modules", title: "Modules", group: "Settings", render: modules },
@@ -1536,6 +1538,62 @@ async function deviceStatusPage(main: HTMLElement): Promise<void> {
   setTimeout(() => {
     if (document.getElementById("nav-device")?.getAttribute("aria-current") === "true") void deviceStatusPage(main).catch(() => undefined);
   }, 2000);
+}
+
+// Device: Power (R21 stage 2, ADR-0076): mode, TDP and CPU boost through steamos-manager
+const MODE_TEXT: Record<string, string> = { "low-power": "Quiet", balanced: "Balanced", "balanced-performance": "Balanced plus", performance: "Performance", custom: "Custom" };
+
+async function powerPage(main: HTMLElement): Promise<void> {
+  const s = await call<PerformanceDesk>("device_performance");
+  if (s.off || !s.available || !s.current) {
+    replace(main, h("h1", {}, "Power"), h("p", {}, s.problem ?? "Not available on this device."));
+    return;
+  }
+  const c = s.current;
+  const locked = s.tools.length > 0;
+  const apply = async (values: Record<string, unknown>) => {
+    await call("device_apply", values, s.game);
+    await powerPage(main);
+  };
+  const mode = h("select", { "aria-label": "Mode", disabled: locked }) as HTMLSelectElement;
+  for (const m of c.profile?.available ?? []) {
+    const option = h("option", { value: m }, MODE_TEXT[m] ?? m) as HTMLOptionElement;
+    option.selected = m === c.profile?.current;
+    mode.append(option);
+  }
+  mode.addEventListener("change", () => void apply({ mode: mode.value }).catch(fail));
+  const low = Math.max(c.tdp?.min ?? 0, s.limits.min ?? 0);
+  const high = Math.min(c.tdp?.max ?? 0, s.limits.max ?? 999);
+  const tdp = h("input", { type: "range", min: String(low), max: String(high), step: "1", value: String(c.tdp?.value ?? low), "aria-label": "TDP", disabled: locked || !c.tdp }) as HTMLInputElement;
+  const tdpText = h("span", {}, `${c.tdp?.value ?? ""} W`);
+  tdp.addEventListener("input", () => (tdpText.textContent = `${tdp.value} W`));
+  tdp.addEventListener("change", () => void apply({ tdp: Number(tdp.value) }).catch(fail));
+  const boost = h("input", { type: "checkbox", checked: Boolean(c.boost), disabled: locked || c.boost === null, "aria-label": "CPU boost" }) as HTMLInputElement;
+  boost.addEventListener("change", () => void apply({ boost: boost.checked }).catch(fail));
+  replace(
+    main,
+    h("h1", {}, "Power"),
+    h(
+      "p",
+      { class: locked ? "warn" : "" },
+      locked
+        ? `${s.tools.join(", ")} manages performance on this device, so Keepsake only shows it.`
+        : s.game
+          ? "Changes are kept for the game you are playing and applied each time it starts."
+          : "Start a game to keep settings for it.",
+    ),
+    s.stopped ? h("p", { class: "warn" }, s.stopped) : null,
+    h(
+      "table",
+      {},
+      h("tbody", {},
+        c.profile ? h("tr", {}, h("th", {}, "Mode"), h("td", {}, mode)) : null,
+        c.tdp ? h("tr", {}, h("th", {}, "TDP"), h("td", {}, tdp, " ", tdpText)) : null,
+        c.boost !== null ? h("tr", {}, h("th", {}, "CPU boost"), h("td", {}, h("label", { class: "switch" }, boost, " On"))) : null,
+      ),
+    ),
+    s.game && s.profile ? h("div", { class: "actions" }, button("Forget this game's profile", async () => (await call("device_forget", s.game), await powerPage(main)))) : null,
+  );
 }
 
 // Diagnostics: Device checks, as in Gaming Mode (Run all, Export results)

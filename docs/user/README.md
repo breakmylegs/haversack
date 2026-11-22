@@ -32,6 +32,7 @@ Set Keepsake up on one device, then on the next. Games whose saves already match
 - [Conflicts, history and restoring](conflicts-and-history.md): choosing between two saves, and going back to an older one.
 - [Importing from Ludusavi](import-ludusavi.md): bring your existing backups with you.
 - [Storage](storage.md): disk use per game, clearing a shader cache, and resetting a broken prefix without losing your saves.
+- [Your device](device.md): live readings, and performance modes, TDP and CPU boost for each game.
 - [Installing games](installer.md): from an ISO, a folder or a network share, on a handheld.
 - [Advisor](advisor.md): recommended settings for your device. It never changes anything.
 - [Replication](replication.md): sending a whole game from one device to another (in development).

@@ -352,6 +352,33 @@ export interface DeviceReadings {
   cpu: { boost: boolean | null; smt: string | null; online: number | null };
 }
 export const deviceReadings = callable<[], DeviceReadings>("device_readings");
+
+// Performance profiles (R21 stage 2, ADR-0076): through steamos-manager only, per game.
+export interface PerformanceValues {
+  mode?: string;
+  tdp?: number;
+  boost?: boolean;
+}
+export interface PerformanceStatus {
+  available: boolean;
+  off?: boolean;
+  problem: string | null;
+  current: {
+    tdp: { value: number; min: number; max: number } | null;
+    profile: { current: string; available: string[]; suggested: string } | null;
+    boost: boolean | null;
+    chargeLimit: { value: number; minimum: number } | null;
+  } | null;
+  tools: string[];
+  game: number | null;
+  profile: PerformanceValues | null;
+  applied: PerformanceValues;
+  stopped: string | null;
+  limits: { min?: number; max?: number };
+}
+export const devicePerformance = callable<[], PerformanceStatus>("device_performance");
+export const deviceApply = callable<[values: PerformanceValues, saveFor: number | null], PerformanceStatus>("device_apply");
+export const deviceForget = callable<[appid: number], PerformanceStatus>("device_forget");
 export const replicationStopGame = callable<[entryId: string], GameTransfer[]>("replication_stop_game");
 export const replicationClearGame = callable<[entryId: string], GameTransfer[]>("replication_clear_game");
 export const replicationPeerGames = callable<[peerId: string], { id: string; title: string }[]>("replication_peer_games");
