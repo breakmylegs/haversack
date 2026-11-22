@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.41.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Added
 
 - **The Keepsake Helper**, a small separate plugin that runs as root, so that Keepsake itself never does. Install it from Device, Reconnect help: Keepsake checks its signature and Decky asks you to confirm. It is locked to Keepsake's version and does only a short list of jobs, for Keepsake alone.

@@ -1,11 +1,11 @@
-# Device run for v0.40.0
+# Device run for v0.41.0
 
 No SSH, terminal or laptop is needed. Do the first two parts on each handheld, then the rest with both. "Go" is the Legion Go and "Go 2" the Legion Go 2.
 
-## 1. Install v0.40.0 (each handheld)
+## 1. Install v0.41.0 (each handheld)
 
 1. Open the Quick Access Menu, then Decky, then Keepsake, then the full Keepsake page.
-2. Open **Updates**, press **Check for updates**, then **Update now**. Confirm Decky's prompt to install v0.40.0, and Decky reloads Keepsake.
+2. Open **Updates**, press **Check for updates**, then **Update now**. Confirm Decky's prompt to install v0.41.0, and Decky reloads Keepsake.
 3. In **Settings**, then **Modules**, switch on **Replication**. On **Devices**, switch on **Let other devices reach this one**.
 
 ## 2. Device checks (each handheld)
