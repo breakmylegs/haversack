@@ -1,6 +1,6 @@
 import { DialogButton, Field, Focusable, Navigation, TextField, ToggleField } from "@decky/ui";
 import { addEventListener, removeEventListener, toaster } from "@decky/api";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   directSyncNow,
   Backend,
@@ -58,9 +58,8 @@ const GRANT: Partial<Record<Backend, string>> = {
   gdrive: "Google asks you to allow Keepsake access to its own app data only.",
 };
 
-// Steam's browser re-mounts this page on return and leaves gamepad focus on an invisible
-// panel, so the sign-in button is focused again when the page comes back (ADR-0044).
-let refocusAfterBrowser = false;
+// v0.41.1: no page takes focus by itself, so after the browser sign-in focus stays where Steam
+// puts it, and right or A goes back into the page (this replaces ADR-0044's refocus).
 
 const WHY_PHONE: Record<"onedrive" | "gdrive", string> = {
   onedrive: "Keepsake shows a code to enter on your phone.",
@@ -88,20 +87,12 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
   const [code, setCode] = useState<SignInCode | null>(null);
   const [browserFailed, setBrowserFailed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const buttons = useRef<HTMLDivElement>(null);
 
   const [locations, setLocations] = useState<LocationsStatus | null>(null);
   const refresh = async () => {
     setStatus(await cloudStatus());
     setLocations(await locationsStatus().catch(() => null));
   };
-
-  useEffect(() => {
-    if (refocusAfterBrowser) {
-      refocusAfterBrowser = false;
-      setTimeout(() => buttons.current?.querySelector("button")?.focus(), 100);
-    }
-  }, []);
 
   useEffect(() => {
     void refresh();
@@ -190,7 +181,6 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
       const shown = await startSignin(provider, how);
       setCode(shown);
       if (shown.method === "browser") {
-        refocusAfterBrowser = true;
         Navigation.NavigateToExternalWeb(shown.authUrl);
       }
       return null;
@@ -380,7 +370,7 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
         </Field>
       )}
 
-      <Focusable ref={buttons} style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "8px 0" }}>
+      <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "8px 0" }}>
         {oauth && !signedIn && !code && (
           <DialogButton style={{ width: "auto" }} disabled={locked || !canSignIn} onClick={() => void signIn(method)}>
             Sign in with {view === "gdrive" ? "Google" : "OneDrive"}

@@ -30,7 +30,7 @@ function Badge({ appid }: { appid: number }) {
   useEffect(() => {
     libraryBadge(appid)
       .then(setBadge)
-      .catch(() => setBadge(null));
+      .catch(() => undefined); // no badge
   }, [appid]);
   if (!badge) return null;
   return (

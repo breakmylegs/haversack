@@ -74,8 +74,8 @@ One long "Status" section, then the Advisor's section:
 
 ### Principles
 
-- **Seven sections in the full page**, grouped by what the player is doing. They are the same seven, in the same order, on the desktop. A module's section or tab shows only while the module runs, as today.
-- **Sub-pages are tabs** (`@decky/ui` `Tabs`, switched with L1 and R1), never a second sidebar. A tab is remembered while Keepsake is open, and a link can open a section at a given tab.
+- **Seven sections in the full page**, grouped by what the player is doing. They are the same seven, in the same order, on the desktop.
+- **v0.41.1: every sub-page is its own sidebar entry**, grouped by section with a line between sections, as in Steam's own settings. The list is fixed: a module that is off keeps its entries, which say so inside. (Until v0.41.1 sub-pages were a row of tabs inside each page; see the ADR-0073 addendum for why that changed.)
 - **A module's settings live with the module**, in its own tab. Settings holds only what is everyone's: this device, cloud, modules, updates.
 - **The same patterns everywhere:**
   - one confirmation pattern: a modal in Gaming Mode, a dialog on the desktop;

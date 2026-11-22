@@ -1,87 +1,74 @@
-// v0.39.1: the full page's sidebar (src/sidebar.ts), compiled and loaded from KEEPSAKE_FRONTEND_OUT.
+// The full page's sidebar (src/sidebar.ts, src/routeData.ts), compiled and loaded from KEEPSAKE_FRONTEND_OUT.
+// v0.41.1: the sidebar is static. It takes no input, so no module status, however late, can change it.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 
 const out = process.env.KEEPSAKE_FRONTEND_OUT;
-const { sidebarEntries, sidebarKey, legacyRoutes } = require(path.join(out, "sidebar.js"));
-const { LEGACY, sectionPath } = require(path.join(out, "routeData.js"));
-
-const SECTIONS = [
-  { id: "play", tabs: [{ id: "now", module: "core" }, { id: "advisor", module: "advisor" }] },
-  { id: "saves", tabs: [{ id: "games", module: "saves" }, { id: "conflicts", module: "saves" }] },
-  { id: "games-devices", tabs: [{ id: "moving", module: "replication" }, { id: "disk", module: "core" }] },
-  { id: "device", tabs: [{ id: "status", module: "core" }, { id: "power", module: "device" }] },
-  { id: "install", tabs: [{ id: "install", module: "installer" }] },
-  { id: "settings", tabs: [{ id: "general", module: "core" }] },
-  { id: "diagnostics", tabs: [{ id: "health", module: "core" }] },
-];
+const { sidebarEntries, legacyRoutes } = require(path.join(out, "sidebar.js"));
+const { LAYOUT, LEGACY, SECTION_IDS, pagePath, sectionPath, firstTab } = require(path.join(out, "routeData.js"));
 
 const pages = (entries) => entries.filter((e) => e.kind === "page");
 
-test("every entry maps to its own section, before and after the module state changes", () => {
-  const before = sidebarEntries(SECTIONS, new Set(["saves"]));
-  const after = sidebarEntries(SECTIONS, new Set(["saves", "advisor", "replication", "installer", "device"]));
-  for (const entries of [before, after]) {
-    for (const e of pages(entries)) {
-      assert.equal(e.route, sectionPath(e.section)); // the route names the section: no position involved
-    }
-  }
-  assert.deepEqual(pages(before).map((e) => e.section), ["play", "saves", "games-devices", "device", "settings", "diagnostics"]);
-  assert.deepEqual(pages(after).map((e) => e.section), ["play", "saves", "games-devices", "device", "install", "settings", "diagnostics"]);
-  assert.notEqual(sidebarKey(before), sidebarKey(after)); // a change rebuilds the sidebar, never reuses an index
-  assert.equal(sidebarKey(after), sidebarKey(sidebarEntries(SECTIONS, new Set(["saves", "advisor", "replication", "installer", "device"]))));
+test("the sidebar takes no input and is the same every time", () => {
+  assert.equal(sidebarEntries.length, 0);
+  const first = sidebarEntries();
+  for (let i = 0; i < 5; i++) assert.deepEqual(sidebarEntries(), first);
 });
 
-test("tabs follow the modules", () => {
-  const entries = pages(sidebarEntries(SECTIONS, new Set(["saves"])));
-  assert.deepEqual(entries.find((e) => e.section === "play").tabs, ["now"]);
-  assert.deepEqual(entries.find((e) => e.section === "games-devices").tabs, ["disk"]);
-});
-
-test("no hidden or legacy pages are in the sidebar", () => {
-  const entries = sidebarEntries(SECTIONS, new Set(["saves", "advisor", "replication", "installer", "device"]));
-  const legacy = new Set(legacyRoutes().map((r) => r.path));
-  for (const e of pages(entries)) {
-    assert.ok(!legacy.has(e.route), `${e.route} is an old route`);
-    assert.equal(Object.keys(e).includes("visible"), false);
-  }
-  assert.equal(pages(entries).length, SECTIONS.length);
-});
-
-test("separators are never first, last or doubled", () => {
-  for (const running of [new Set(), new Set(["saves"]), new Set(["saves", "installer"])]) {
-    const entries = sidebarEntries(SECTIONS, running);
-    assert.notEqual(entries[0].kind, "separator");
-    assert.notEqual(entries[entries.length - 1].kind, "separator");
-    entries.forEach((e, i) => assert.ok(!(e.kind === "separator" && entries[i + 1]?.kind === "separator")));
+test("every section and every tab is there, in order, whatever module it belongs to", () => {
+  const entries = pages(sidebarEntries());
+  const expected = LAYOUT.flatMap((s) => s.tabs.map((t) => `${s.id}/${t.id}`));
+  assert.deepEqual(entries.map((e) => `${e.section}/${e.tab}`), expected);
+  assert.deepEqual([...new Set(entries.map((e) => e.section))], SECTION_IDS);
+  for (const module of ["advisor", "replication", "installer", "device", "saves"]) {
+    assert.ok(entries.some((e) => e.module === module), `${module} entries stay in the list`);
   }
 });
 
-test("each old route lands on the right section and tab", () => {
+test("titles and routes are unique, and each route names its section and tab", () => {
+  const entries = pages(sidebarEntries());
+  assert.equal(new Set(entries.map((e) => e.title)).size, entries.length);
+  assert.equal(new Set(entries.map((e) => e.route)).size, entries.length);
+  for (const e of entries) assert.equal(e.route, `/keepsake/${e.section}/${e.tab}`);
+  for (const e of entries) assert.equal(Object.keys(e).includes("visible"), false);
+});
+
+test("one line between sections, never first, last or doubled", () => {
+  const entries = sidebarEntries();
+  assert.notEqual(entries[0].kind, "separator");
+  assert.notEqual(entries[entries.length - 1].kind, "separator");
+  entries.forEach((e, i) => assert.ok(!(e.kind === "separator" && entries[i + 1]?.kind === "separator")));
+  assert.equal(entries.filter((e) => e.kind === "separator").length, LAYOUT.length - 1);
+  entries.forEach((e, i) => {
+    const next = entries[i + 1];
+    if (e.kind === "page" && next?.kind === "page") assert.equal(e.section, next.section, "sections are separated by a line");
+  });
+});
+
+test("pagePath falls back to the first tab", () => {
+  assert.equal(pagePath("saves"), "/keepsake/saves/games");
+  assert.equal(pagePath("saves", "nope"), "/keepsake/saves/games");
+  assert.equal(pagePath("device", "reconnect"), "/keepsake/device/reconnect");
+  assert.equal(firstTab("diagnostics"), "health");
+});
+
+test("old addresses redirect to a page, never to themselves or to another redirect", () => {
   const routes = legacyRoutes();
-  // install, settings and diagnostics are section routes today: no redirect, or it would loop
-  assert.deepEqual(routes.map((r) => r.path.split("/").pop()).sort(), Object.keys(LEGACY).filter((k) => !["install", "settings", "diagnostics"].includes(k)).sort());
-  const sections = new Set(SECTIONS.map((s) => sectionPath(s.id)));
-  for (const r of routes) assert.ok(!sections.has(r.path), `${r.path} would redirect a live section`);
-  const by = Object.fromEntries(routes.map((r) => [r.path.split("/").pop(), [r.section, r.tab]]));
-  assert.deepEqual(by.games, ["saves", "games"]);
-  assert.deepEqual(by.devices, ["games-devices", "moving"]);
-  assert.deepEqual(by.updates, ["settings", "updates"]);
-  assert.deepEqual(by.storage, ["games-devices", "disk"]);
-  assert.deepEqual(by.logs, ["diagnostics", "logs"]);
-  for (const r of routes) assert.ok(r.path.startsWith("/keepsake/"));
-});
-
-test("a separator after the last section is dropped", () => {
-  const short = [SECTIONS[0], SECTIONS[2]]; // ends with a section that has a separator after it
-  const entries = sidebarEntries(short, new Set());
-  assert.equal(entries[entries.length - 1].kind, "page");
-});
-
-test("a module that only adds tabs still rebuilds the sidebar", () => {
-  const without = sidebarEntries(SECTIONS, new Set(["saves"]));
-  const withAdvisor = sidebarEntries(SECTIONS, new Set(["saves", "advisor"]));
-  assert.deepEqual(pages(without).map((e) => e.section), pages(withAdvisor).map((e) => e.section));
-  assert.notEqual(sidebarKey(without), sidebarKey(withAdvisor));
+  const sidebar = new Set(pages(sidebarEntries()).map((e) => e.route));
+  const olds = new Set(routes.map((r) => r.path));
+  assert.equal(olds.size, routes.length);
+  for (const r of routes) {
+    const target = pagePath(r.section, r.tab);
+    assert.ok(sidebar.has(target), `${r.path} goes to a sidebar page`);
+    assert.ok(!olds.has(target), `${r.path} goes to another redirect`);
+    assert.ok(!sidebar.has(r.path), `${r.path} is a sidebar page`);
+  }
+  for (const s of SECTION_IDS) assert.ok(olds.has(sectionPath(s)), `${s} (a page before v0.41.1) redirects`);
+  const by = Object.fromEntries(routes.map((r) => [r.path, pagePath(r.section, r.tab)]));
+  assert.equal(by["/keepsake/games"], "/keepsake/saves/games");
+  assert.equal(by["/keepsake/devices"], "/keepsake/games-devices/moving");
+  assert.equal(by["/keepsake/updates"], "/keepsake/settings/updates");
+  assert.equal(by["/keepsake/settings"], "/keepsake/settings/general");
+  for (const old of Object.keys(LEGACY)) assert.ok(olds.has(`/keepsake/${old}`), `${old} still opens`);
 });

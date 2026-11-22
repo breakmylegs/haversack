@@ -52,7 +52,7 @@ export function SnapshotsPanel({ gameKey, gameName }: { gameKey: string; gameNam
       .catch(() => setLocations({}));
     void newestChoice(gameKey)
       .then(setNewest)
-      .catch(() => setNewest(null));
+      .catch(() => undefined); // keep what is shown
     try {
       setListing(await listSnapshots(gameKey));
     } catch (err) {

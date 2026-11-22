@@ -4,6 +4,18 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Fixed
+
+- **The full page's sidebar still jumped around, and the settings were hard to reach** (v0.39.1 did not fix it all). Five causes were found and fixed:
+  - **The sidebar was rebuilt after it appeared.** If Keepsake's backend took more than 3 seconds to answer, the sidebar first showed a short list, then rebuilt itself with the full one, losing your place. The sidebar is now the same fixed list from the start: every section and every page, always. A page whose module is off says so inside, with a button to Settings, Modules, instead of disappearing.
+  - **A row of tabs inside each page.** Every tab is now its own entry in the sidebar, with lines between the sections, as in Steam's own settings. There is no inner row for the D-pad to cross.
+  - **A page took focus by itself:** the Cloud page moved focus to its buttons after a browser sign-in. No page takes focus by itself any more; press right or A to go into a page.
+  - **A page could vanish under the focus.** Several panels blanked themselves when a background refresh failed. They now keep what they show.
+  - **Old links** (for example from the quick menu) now go straight to the right page. A redirect only runs when that old address is opened, never while you move through the sidebar.
+- **A navigation recorder, to prove it on the device:** Diagnostics, Tools, "Record navigation for 60 seconds".
+  - It notes page openings, focus moves and focus calls. It records no names.
+  - It saves them to a file and adds them to the Device checks export.
+
 ## [0.41.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

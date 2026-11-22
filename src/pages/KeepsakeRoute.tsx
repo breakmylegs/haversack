@@ -1,16 +1,21 @@
-import { Field, SidebarNavigation, SidebarNavigationPage } from "@decky/ui";
-import { ReactElement, useEffect, useState } from "react";
+import { DialogButton, Field, SidebarNavigation, SidebarNavigationPage } from "@decky/ui";
+import { ReactElement, ReactNode, useEffect, useRef, useState } from "react";
 import { FaCog, FaCompactDisc, FaExchangeAlt, FaMicrochip, FaPlay, FaSave, FaStethoscope } from "react-icons/fa";
-import { modulesStatus } from "../backend";
+import { ModuleStatus, modulesStatus } from "../backend";
+import { navlog, setNavRoot } from "../navlog";
+import { ModuleName } from "../routeData";
 import { openSection, ROUTE_PATH, SectionId } from "../routes";
-import { sidebarEntries, sidebarKey } from "../sidebar";
+import { sidebarEntries } from "../sidebar";
 import { ActivityPage } from "./ActivityPage";
 import { AdvisorPage } from "./AdvisorPage";
+import { BatteryPanel } from "./BatteryPanel";
 import { ConflictsPage } from "./ConflictsPage";
+import { ControllersPanel } from "./ControllersPanel";
 import { DeviceChecks } from "./DeviceChecks";
 import { DeviceStatusPage } from "./DeviceStatusPage";
 import { DiagnosticsPage } from "./DiagnosticsPage";
 import { ExportSection } from "./ExportSection";
+import { ExtrasPanel } from "./ExtrasPanel";
 import { GamesPage } from "./GamesPage";
 import { HealthSection } from "./HealthSection";
 import { HistoryPage } from "./HistoryPage";
@@ -18,162 +23,139 @@ import { ImportPage } from "./ImportPage";
 import { InstallerPage } from "./InstallerPage";
 import { LogsPage } from "./LogsPage";
 import { NowPlaying } from "./NowPlaying";
-import { BatteryPanel } from "./BatteryPanel";
-import { ControllersPanel } from "./ControllersPanel";
-import { ReconnectPanel } from "./ReconnectPanel";
-import { ExtrasPanel } from "./ExtrasPanel";
 import { PowerPanel } from "./PowerPanel";
+import { ReconnectPanel } from "./ReconnectPanel";
 import { ReplicationPage } from "./ReplicationPage";
-import { SectionPage, SectionTab } from "./Section";
 import { SettingsPage } from "./SettingsPage";
 import { StoragePage } from "./StoragePage";
 
 export { ROUTE_PATH };
 
-// Layout v3 (ADR-0073, docs/design/layout-v3.md): seven sections grouped by what the player is
-// doing, each with tabs. A module's tabs, and a section with none left, appear only while it runs
-// (v2 spec 7.3: a disabled module has no UI).
+// Layout v3 (ADR-0073, docs/design/layout-v3.md), v0.41.1: a static sidebar. Every tab is its own
+// entry, sections are separated by lines, and the list is built once and never changes while the
+// page is open. A module that is off keeps its entries; they say so inside instead of vanishing.
 
-type Module = "saves" | "core" | "installer" | "advisor" | "replication" | "device";
+const ICONS: Record<SectionId, ReactElement> = {
+  play: <FaPlay />,
+  saves: <FaSave />,
+  "games-devices": <FaExchangeAlt />,
+  device: <FaMicrochip />,
+  install: <FaCompactDisc />,
+  settings: <FaCog />,
+  diagnostics: <FaStethoscope />,
+};
 
-interface Tab extends SectionTab {
-  module: Module;
-}
+const CONTENT: Record<string, () => ReactElement> = {
+  "play/now": () => <NowPlaying />,
+  "play/advisor": () => <AdvisorPage />,
+  "saves/games": () => <GamesPage />,
+  "saves/conflicts": () => <ConflictsPage />,
+  "saves/history": () => <HistoryPage />,
+  "saves/activity": () => <ActivityPage />,
+  "saves/import": () => (
+    <div>
+      <ImportPage />
+      <ExportSection />
+    </div>
+  ),
+  "games-devices/moving": () => <ReplicationPage part="moving" />,
+  "games-devices/devices": () => <ReplicationPage part="devices" />,
+  "games-devices/disk": () => <StoragePage />,
+  "device/status": () => <DeviceStatusPage />,
+  "device/power": () => <PowerPanel />,
+  "device/battery": () => <BatteryPanel />,
+  "device/controllers": () => <ControllersPanel />,
+  "device/reconnect": () => <ReconnectPanel />,
+  "device/other": () => <ExtrasPanel />,
+  "install/install": () => <InstallerPage />,
+  "settings/general": () => <SettingsPage part="general" />,
+  "settings/cloud": () => <SettingsPage part="cloud" />,
+  "settings/sync": () => <SettingsPage part="sync" />,
+  "settings/modules": () => <SettingsPage part="modules" />,
+  "settings/updates": () => <SettingsPage part="updates" />,
+  "diagnostics/health": () => <HealthSection />,
+  "diagnostics/checks": () => <DeviceChecks />,
+  "diagnostics/tools": () => <DiagnosticsPage />,
+  "diagnostics/logs": () => <LogsPage />,
+};
 
-interface Section {
-  id: SectionId;
-  title: string;
-  icon: ReactElement;
-  tabs: Tab[];
-}
-
-const SECTIONS: Section[] = [
-  {
-    id: "play",
-    title: "Play",
-    icon: <FaPlay />,
-    tabs: [
-      { module: "core", id: "now", title: "Now playing", content: <NowPlaying /> },
-      { module: "advisor", id: "advisor", title: "Advisor", content: <AdvisorPage /> },
-    ],
-  },
-  {
-    id: "saves",
-    title: "Saves",
-    icon: <FaSave />,
-    tabs: [
-      { module: "saves", id: "games", title: "Games", content: <GamesPage /> },
-      { module: "saves", id: "conflicts", title: "Conflicts", content: <ConflictsPage /> },
-      { module: "saves", id: "history", title: "History", content: <HistoryPage /> },
-      { module: "saves", id: "activity", title: "Activity", content: <ActivityPage /> },
-      {
-        module: "saves",
-        id: "import",
-        title: "Import and export",
-        content: (
-          <div>
-            <ImportPage />
-            <ExportSection />
-          </div>
-        ),
-      },
-    ],
-  },
-  {
-    id: "games-devices",
-    title: "Games and devices",
-    icon: <FaExchangeAlt />,
-    tabs: [
-      { module: "replication", id: "moving", title: "Moving games", content: <ReplicationPage part="moving" /> },
-      { module: "replication", id: "devices", title: "Other devices", content: <ReplicationPage part="devices" /> },
-      { module: "core", id: "disk", title: "Disk use", content: <StoragePage /> },
-    ],
-  },
-  {
-    id: "device",
-    title: "Device",
-    icon: <FaMicrochip />,
-    tabs: [
-      { module: "core", id: "status", title: "Status", content: <DeviceStatusPage /> },
-      { module: "device", id: "power", title: "Power", content: <PowerPanel /> },
-      { module: "device", id: "battery", title: "Battery", content: <BatteryPanel /> },
-      { module: "core", id: "controllers", title: "Controllers", content: <ControllersPanel /> },
-      { module: "device", id: "reconnect", title: "Reconnect help", content: <ReconnectPanel /> },
-      { module: "device", id: "other", title: "Other", content: <ExtrasPanel /> },
-    ],
-  },
-  {
-    id: "install",
-    title: "Install",
-    icon: <FaCompactDisc />,
-    tabs: [{ module: "installer", id: "install", title: "Install", content: <InstallerPage /> }],
-  },
-  {
-    id: "settings",
-    title: "Settings",
-    icon: <FaCog />,
-    tabs: [
-      { module: "core", id: "general", title: "General", content: <SettingsPage part="general" /> },
-      { module: "core", id: "cloud", title: "Cloud", content: <SettingsPage part="cloud" /> },
-      { module: "saves", id: "sync", title: "Sync and safety", content: <SettingsPage part="sync" /> },
-      { module: "core", id: "modules", title: "Modules", content: <SettingsPage part="modules" /> },
-      { module: "core", id: "updates", title: "Updates", content: <SettingsPage part="updates" /> },
-    ],
-  },
-  {
-    id: "diagnostics",
-    title: "Diagnostics",
-    icon: <FaStethoscope />,
-    tabs: [
-      { module: "core", id: "health", title: "Health", content: <HealthSection /> },
-      { module: "core", id: "checks", title: "Device checks", content: <DeviceChecks /> },
-      { module: "core", id: "tools", title: "Tools", content: <DiagnosticsPage /> },
-      { module: "core", id: "logs", title: "Logs", content: <LogsPage /> },
-    ],
-  },
-];
-
-// v0.39.1: the sidebar is built once from the loaded module state (sidebar.ts), with no hidden
-// entries; a change of modules rebuilds it under a new key, so the selection follows the route.
-export function KeepsakeRoute() {
-  const [running, setRunning] = useState<Set<string> | null>(null);
+/** A module's state for a page that needs it, read when that page opens. Never affects the sidebar. */
+function useModule(name: ModuleName): ModuleStatus | null | "unknown" {
+  const [found, setFound] = useState<ModuleStatus | null | "unknown">(name === "core" ? null : "unknown");
   useEffect(() => {
+    if (name === "core") return;
     let live = true;
-    const fallback = setTimeout(() => live && setRunning((r) => r ?? new Set(["saves"])), MODULES_WAIT_MS);
     modulesStatus()
-      .then((s) => live && setRunning(new Set(s.modules.filter((m) => m.running).map((m) => m.name))))
-      .catch(() => live && setRunning(new Set(["saves"])));
+      .then((s) => live && setFound(s.modules.find((m) => m.name === name) ?? null))
+      .catch(() => live && setFound(null));
     return () => {
       live = false;
-      clearTimeout(fallback);
     };
+  }, [name]);
+  return found;
+}
+
+/** One sidebar page: marks itself for the navigation recorder, and stands in when its module is off. */
+function PageShell({ section, tab, module, children }: { section: SectionId; tab: string; module: ModuleName; children: ReactNode }) {
+  const id = `${section}/${tab}`;
+  const state = useModule(module);
+  useEffect(() => {
+    navlog("page-mount", { page: id });
+    return () => navlog("page-unmount", { page: id });
   }, []);
-  if (running === null) {
-    return (
-      <div style={{ marginTop: 40, padding: 24 }}>
-        <Field label="Keepsake" description="Loading" />
-      </div>
+  let body: ReactNode = children;
+  if (state === "unknown") body = <Field label="Loading" />;
+  else if (state && !state.running) {
+    body = (
+      <Field
+        label="This is off"
+        description={
+          state.available
+            ? `${state.title} is off. Turn it on in Settings, Modules.`
+            : `${state.title} is not available here.${state.failed ? ` ${state.failed}` : ""}`
+        }
+      >
+        {state.available && <DialogButton onClick={() => openSection("settings", "modules")}>Open Modules</DialogButton>}
+      </Field>
     );
   }
-  const entries = sidebarEntries(SECTIONS, running);
-  const pages: (SidebarNavigationPage | "separator")[] = entries.map((e) => {
-    if (e.kind === "separator") return "separator";
-    const section = SECTIONS.find((s) => s.id === e.section) as Section;
-    const tabs = section.tabs.filter((t) => e.tabs.includes(t.id));
-    return { title: section.title, icon: section.icon, content: <SectionPage section={section.id} tabs={tabs} />, route: e.route };
-  });
+  return <div data-keepsake-page={id}>{body}</div>;
+}
+
+// Built once, when the plugin loads: the same array, in the same order, on every render.
+const PAGES: (SidebarNavigationPage | "separator")[] = sidebarEntries().map((e) =>
+  e.kind === "separator"
+    ? "separator"
+    : {
+        title: e.title,
+        icon: ICONS[e.section],
+        route: e.route,
+        content: (
+          <PageShell section={e.section} tab={e.tab} module={e.module}>
+            {CONTENT[`${e.section}/${e.tab}`]?.() ?? <Field label="Missing page" />}
+          </PageShell>
+        ),
+      },
+);
+
+export function KeepsakeRoute() {
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    setNavRoot(rootRef.current);
+    return () => setNavRoot(null);
+  }, []);
   return (
-    <div style={{ marginTop: 40, height: "calc(100% - 40px)" }}>
-      <SidebarNavigation key={sidebarKey(entries)} title="Keepsake" showTitle pages={pages} />
+    <div ref={rootRef} data-keepsake-root="" style={{ marginTop: 40, height: "calc(100% - 40px)" }}>
+      <SidebarNavigation title="Keepsake" showTitle pages={PAGES} />
     </div>
   );
 }
 
-const MODULES_WAIT_MS = 3000; // if the backend is slow, show the sidebar for Saves and Core
-
-/** An old page's route (before v0.32.0): opens its new section and tab, then gets out of the way. */
+/** An old address (a section before v0.41.1, a page before v0.32.0): opens its page. It is
+ * mounted only when that exact address is opened, so it never fires during sidebar moves. */
 export function LegacyRedirect({ section, tab }: { section: SectionId; tab: string }) {
   useEffect(() => {
+    navlog("redirect", { section, tab });
     openSection(section, tab);
   }, []);
   return null;

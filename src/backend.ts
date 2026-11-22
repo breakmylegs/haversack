@@ -528,6 +528,11 @@ export const installerRetarget = callable<[jobId: number, exe: string], InstallJ
 export const installerCancel = callable<[jobId: number], InstallJob>("installer_cancel");
 
 export const modulesStatus = callable<[], ModulesStatus>("modules_status");
+// The navigation recorder (v0.41.1): one file in the settings folder, also in the Device checks export.
+export const saveNavigationRecord = callable<
+  [record: { summary: Record<string, number>; events: { t: number; kind: string; detail?: Record<string, string | number | boolean> }[] }],
+  { file: string; where: string }
+>("save_navigation_record");
 export const setModuleEnabled = callable<[name: string, enabled: boolean], ModulesStatus>("set_module_enabled");
 export const resetModule = callable<[name: string], ModulesStatus>("reset_module");
 export const steamProbe = callable<[], { id: number }>("steam_probe");

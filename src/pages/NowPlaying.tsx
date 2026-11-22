@@ -23,7 +23,7 @@ export function NowPlaying() {
     const load = () =>
       advisorView()
         .then(setView)
-        .catch(() => setView(null));
+        .catch(() => undefined); // keep what is shown: never remove the focused element
     void load();
     const listener = addEventListener(ADVISOR_EVENT, () => void load());
     return () => removeEventListener(ADVISOR_EVENT, listener);

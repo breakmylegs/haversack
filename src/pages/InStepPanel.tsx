@@ -20,7 +20,7 @@ export function InStepPanel({ appid }: { appid: number }) {
   const load = () =>
     replicationGames()
       .then((links) => setLink(links.find((l) => l.appid === appid) ?? null))
-      .catch(() => setLink(null)); // Replication is off
+      .catch(() => undefined); // Replication is off, or busy: keep what is shown
   useEffect(() => void load(), [appid]);
 
   if (!link) return null;

@@ -171,6 +171,7 @@ CALLABLES = frozenset(
         "reconnect_set_ssp_gate",
         "reconnect_ssp_confirm",
         "helper_prepare",
+        "save_navigation_record",
         "device_extras",
         "device_set_wifi_power_saving",
         "device_set_charge_limit",

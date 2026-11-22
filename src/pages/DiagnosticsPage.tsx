@@ -16,6 +16,7 @@ import {
 import { deckyMechanisms, runningAppDetails } from "../probes";
 import { plainError } from "../format";
 import { JsonBlock } from "./JsonBlock";
+import { NavigationRecorder } from "./NavigationRecorder";
 import { SigninProbe } from "./SigninProbe";
 
 type Section = "environment" | "steam" | "processes" | "frontend" | "https" | "steamops" | "export" | "integrity";
@@ -80,6 +81,7 @@ export function DiagnosticsPage() {
         label="Diagnostics"
         description="Facts about this device for troubleshooting. The export is saved in Keepsake's settings folder on this device and includes the health checks."
       />
+      <NavigationRecorder />
       <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "8px 0" }}>
         <DialogButton style={{ width: "auto" }} disabled={!!busy} onClick={() => run("environment", getEnvironment)}>
           Environment

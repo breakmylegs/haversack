@@ -12,7 +12,7 @@ export function SendPanel({ gameKey, gameName }: { gameKey: string; gameName: st
   useEffect(() => {
     replicationStatus()
       .then((s) => setPeers(s.peers))
-      .catch(() => setPeers(null)); // Replication is off: no panel
+      .catch(() => undefined); // Replication is off (no panel), or busy: keep what is shown
   }, []);
 
   if (!peers) return null;
