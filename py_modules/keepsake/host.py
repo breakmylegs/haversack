@@ -145,6 +145,8 @@ CALLABLES = frozenset(
         "device_status",
         "take_newest",
         "library_badge",
+        "qam_shortcuts",
+        "run_shortcut",
         "installer_stream_tiles",
         "installer_stream_art_search",
         "installer_stream_art_apply",

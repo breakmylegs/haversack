@@ -240,6 +240,12 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - It should install without copying the ISO first.
     - Run the Device check "Network ISO in place": it should report in place available.
 
+46. **Quick menu shortcuts (v0.46.0).** Open Settings, Quick menu.
+    - Tick Fans and move it to the top with Up: the quick access menu should show it first straight away.
+    - Untick Sync now: it should disappear from the menu.
+    - Select Use the defaults.
+    - Switch the Device module off: its shortcuts should no longer be offered.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

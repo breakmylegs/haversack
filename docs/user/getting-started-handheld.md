@@ -27,6 +27,14 @@ That is all. Before a game starts, Keepsake checks the cloud for newer saves, pa
 
 The Quick Access Menu shows the current game's sync state, any conflicts, available updates and **Sync now**. **Open Keepsake** opens the full view, with Games, Conflicts, History, Import saves, Install, Advisor, Settings, Updates, Logs and Diagnostics.
 
+## Your quick menu
+
+Keepsake's panel in the quick access menu can show what you use most. Open **Settings**, **Quick menu**:
+- tick the shortcuts you want, and move them with **Up** and **Down**;
+- they can be pages to open, actions that run straight from the menu, or status lines;
+- shortcuts for modules you have switched off are not offered;
+- **Open Keepsake** is always there, last.
+
 ## In Desktop Mode
 
 Keepsake comes with a desktop app, with nothing more to install. When you switch to Desktop Mode, its icon appears in the system tray, with no window. Click it, or choose **Open Keepsake** from its menu, to open Keepsake in your browser; it covers the same pages as in Gaming Mode. Closing the window leaves the icon in the tray. **Quit** in the icon's menu stops it until you next log in. Keepsake is also in the app menu, which brings up the one already running.

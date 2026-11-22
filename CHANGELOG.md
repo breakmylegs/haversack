@@ -4,6 +4,15 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **Quick menu shortcuts** (Settings, Quick menu, and the desktop app). Choose what Keepsake's panel in the quick access menu shows, and in what order. There are three kinds:
+  - pages to open, such as Fans, Reconnect help or Device checks;
+  - actions that run straight from the menu, such as Sync this game now, Back up this game now, Next performance mode or Run all device checks;
+  - status lines, such as games moving between devices, open conflicts and the controller Reconnect buttons.
+
+  Only shortcuts whose module is on and whose feature is available are offered. Open Keepsake is always there, last. Changes show at once. In Gaming Mode, use Up and Down to reorder; in the desktop app, drag.
+
 ## [0.45.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

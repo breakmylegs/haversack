@@ -28,6 +28,7 @@ import { PowerPanel } from "./PowerPanel";
 import { ReconnectPanel } from "./ReconnectPanel";
 import { ReplicationPage } from "./ReplicationPage";
 import { SettingsPage } from "./SettingsPage";
+import { ShortcutsEditor } from "./ShortcutsEditor";
 import { StoragePage } from "./StoragePage";
 
 export { ROUTE_PATH };
@@ -74,6 +75,7 @@ const CONTENT: Record<string, () => ReactElement> = {
   "settings/cloud": () => <SettingsPage part="cloud" />,
   "settings/sync": () => <SettingsPage part="sync" />,
   "settings/modules": () => <SettingsPage part="modules" />,
+  "settings/quick-menu": () => <ShortcutsEditor />,
   "settings/updates": () => <SettingsPage part="updates" />,
   "diagnostics/health": () => <HealthSection />,
   "diagnostics/checks": () => <DeviceChecks />,

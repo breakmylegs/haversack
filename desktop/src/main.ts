@@ -21,6 +21,7 @@ import type {
   ControllersDesk,
   ReconnectDesk,
   FansDesk,
+  QamShortcutsDesk,
   ReconnectDeviceDesk,
   ExtrasDesk,
   DeviceStatusDesk,
@@ -1430,6 +1431,7 @@ const PAGES: Page[] = [
   { id: "settings", title: "General and sync", group: "Settings", render: settingsPage },
   { id: "cloud", title: "Cloud", group: "Settings", render: cloud },
   { id: "modules", title: "Modules", group: "Settings", render: modules },
+  { id: "quick-menu", title: "Quick menu", group: "Settings", render: quickMenuPage },
   { id: "updates", title: "Updates", group: "Settings", render: (main) => updates(main) },
   { id: "health", title: "Health", group: "Diagnostics", render: health },
   { id: "checks", title: "Device checks", group: "Diagnostics", render: deviceChecksPage },
@@ -1656,6 +1658,68 @@ async function batteryPage(main: HTMLElement): Promise<void> {
       : h("p", { class: "warn" }, `Charge limit: ${state}. This device's steamos-manager does not let Keepsake change it. ${s.where ?? ""}`),
     s.firmware.chargeTypes ? h("p", { class: "small" }, `Firmware charge types: ${s.firmware.chargeTypes}`) : null,
   );
+}
+
+// Settings: Quick menu (ADR-0073 addendum). Drag the chosen shortcuts into order, or use the arrows;
+// tick to add or remove. Saved at once; the Gaming Mode panel follows straight away.
+const KIND_TEXT = { page: "Opens a page", action: "Runs here", status: "Status line" } as const;
+
+async function quickMenuPage(main: HTMLElement): Promise<void> {
+  const data = await call<QamShortcutsDesk>("qam_shortcuts");
+  const offered = new Map(data.available.map((s) => [s.id, s]));
+  const chosen = data.chosen.filter((id) => offered.has(id));
+  const hidden = data.chosen.filter((id) => !offered.has(id)); // kept for another module or version
+  const save = async (next: string[]) => {
+    await call("set_setting", "qamShortcuts", [...next, ...hidden]);
+    await quickMenuPage(main);
+  };
+  let dragged: number | null = null;
+  const list = h("ol", { class: "shortcut-list" });
+  chosen.forEach((id, index) => {
+    const s = offered.get(id);
+    if (!s) return;
+    const item = h(
+      "li",
+      { draggable: "true", class: "shortcut" },
+      h("span", { class: "drag-handle", "aria-hidden": "true" }, "⋮⋮ "),
+      h("strong", {}, s.label),
+      h("span", { class: "small" }, ` ${KIND_TEXT[s.kind]} `),
+      button("Up", async () => {
+        if (index > 0) await save(move(chosen, index, index - 1));
+      }, "small"),
+      button("Down", async () => {
+        if (index < chosen.length - 1) await save(move(chosen, index, index + 1));
+      }, "small"),
+      button("Remove", async () => save(chosen.filter((c) => c !== id)), "small"),
+    );
+    item.addEventListener("dragstart", () => (dragged = index));
+    item.addEventListener("dragover", (event) => event.preventDefault());
+    item.addEventListener("drop", (event) => {
+      event.preventDefault();
+      if (dragged !== null && dragged !== index) void save(move(chosen, dragged, index)).catch(fail);
+      dragged = null;
+    });
+    list.append(item);
+  });
+  const others = data.available.filter((s) => !chosen.includes(s.id));
+  replace(
+    main,
+    h("h1", {}, "Quick menu"),
+    h("p", {}, "What Keepsake's panel in the quick access menu shows, in order. Open Keepsake is always there, last."),
+    chosen.length ? list : h("p", { class: "small" }, "No shortcuts chosen."),
+    others.length ? h("h2", {}, "Add") : null,
+    others.length
+      ? h("ul", {}, ...others.map((s) => h("li", {}, button(`Add ${s.label}`, async () => save([...chosen, s.id]), "small"), h("span", { class: "small" }, ` ${KIND_TEXT[s.kind]}`))))
+      : null,
+    h("div", { class: "actions" }, button("Use the defaults", async () => save(data.defaults))),
+  );
+}
+
+function move(list: string[], from: number, to: number): string[] {
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
 }
 
 // Device: Fans (R24, ADR-0085). The curve is an SVG whose points can be dragged with the mouse, or
