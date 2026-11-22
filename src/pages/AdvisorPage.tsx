@@ -17,7 +17,7 @@ import {
   saveAiKey,
   savePcgwLogin,
 } from "../backend";
-import { plainError } from "../format";
+import { plainError, STATUS } from "../format";
 
 // Advisor is read-only (P16, ADR-0019): this page shows advice and copies text. It never changes a setting.
 
@@ -28,7 +28,7 @@ const WORKLOAD_LABELS: Record<(typeof WORKLOADS)[number], string> = {
   medium: "Medium (45 fps)",
   heavy: "Heavy (30 fps)",
 };
-const CONFIDENCE_COLOURS = { high: "#59bf40", medium: "#e5b33a", low: "#9aa0a6" };
+const CONFIDENCE_COLOURS = { high: STATUS.ok, medium: STATUS.warn, low: STATUS.neutral };
 const MAPPING_TEXT = {
   steam: "Steam game",
   manifest: "Shortcut, matched to its Steam app through the save manifest",
@@ -80,7 +80,7 @@ function Recommendation({ rec }: { rec: AdvisorRecommendation }) {
           </div>
         ))}
         {rec.flags.map((flag) => (
-          <div key={flag} style={{ color: "#e5b33a" }}>
+          <div key={flag} style={{ color: STATUS.warn }}>
             {flag}
           </div>
         ))}
@@ -97,7 +97,7 @@ function Recommendation({ rec }: { rec: AdvisorRecommendation }) {
               </div>
             )}
             {rec.launch.flags.map((flag) => (
-              <div key={flag} style={{ color: "#e5b33a" }}>
+              <div key={flag} style={{ color: STATUS.warn }}>
                 {flag}
               </div>
             ))}

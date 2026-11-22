@@ -2,6 +2,7 @@ import { afterPatch, appDetailsClasses, ErrorBoundary, findInReactTree } from "@
 import { routerHook } from "@decky/api";
 import { useEffect, useState } from "react";
 import { libraryBadge } from "./backend";
+import { STATUS } from "./format";
 
 // Keepsake's badge on a game's page in Steam's library (R18, ADR-0081): its saves' state, or the
 // device a streaming tile streams from. Steam's page is not ours, so the patch is defensive:
@@ -15,14 +16,14 @@ const ROUTE = "/library/app/:appid";
 type SteamTree = any;
 
 const COLOURS: Record<string, string> = {
-  synced: "#3fae5b",
-  newer: "#1a9fff",
-  conflict: "#d9534f",
-  quarantined: "#e0a030",
-  pending: "#e0a030",
-  streaming: "#8a8fa3",
-  off: "#8a8fa3",
-  "not-synced": "#8a8fa3",
+  synced: STATUS.ok,
+  newer: STATUS.info,
+  conflict: STATUS.fail,
+  quarantined: STATUS.warn,
+  pending: STATUS.warn,
+  streaming: STATUS.neutral,
+  off: STATUS.neutral,
+  "not-synced": STATUS.neutral,
 };
 
 function Badge({ appid }: { appid: number }) {
@@ -44,7 +45,7 @@ function Badge({ appid }: { appid: number }) {
         borderRadius: 12,
         fontSize: 13,
         background: "rgba(14, 20, 27, 0.8)",
-        borderLeft: `4px solid ${COLOURS[badge.state] ?? "#8a8fa3"}`,
+        borderLeft: `4px solid ${COLOURS[badge.state] ?? STATUS.neutral}`,
         color: "#fff",
         pointerEvents: "none",
       }}

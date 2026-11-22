@@ -10,7 +10,7 @@ import {
   replicationStopGame,
   TransferStage,
 } from "../backend";
-import { plainError } from "../format";
+import { plainError, STATUS } from "../format";
 
 // Games moving between devices, as one bar each, on both devices (v0.31.0, ADR-0072).
 // The bars live in the backend, so they carry on while a page is closed and reopened.
@@ -86,7 +86,7 @@ export function Bar({ percent, failed, height = 8 }: { percent: number; failed?:
         style={{
           width: `${Math.max(0, Math.min(100, percent))}%`,
           height: "100%",
-          background: failed ? "#d9534f" : "#1a9fff",
+          background: failed ? STATUS.fail : "#1a9fff",
           transition: "width 0.8s linear",
         }}
       />

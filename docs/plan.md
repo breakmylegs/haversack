@@ -61,7 +61,7 @@ Peter's decisions and priorities of 22 November 2026 (ADR-0075 tier 1 approved; 
 | R24 The desktop app's reconnect help page (in 0.42.0); separate SPL, SPPT and FPPT (in 0.43.0, ADR-0084); fan control (in 0.44.0, ADR-0085); in-place network ISOs (in 0.45.0, `fusermount3` approved); controller settings and stick lights (in 0.47.0, ADR-0086; the power LED is not built, see the ADR); remaining from the original list: fan control (every feature of the fan plugins Peter uses), separate SPL, SPPT and FPPT, RGB, controller settings, the power LED; in-place network ISOs (`fusermount3`) | queued |
 | R25 Quick menu shortcuts (ADR-0073 addendum) | in 0.46.0 |
 | R26 Emulator games between devices (ADR-0087): detection in 0.48.0; copying in 0.49.0 | in 0.49.0 |
-| R27 The rename (name search and ADR), with a new full-colour logo and icons | queued |
+| R27 The rename (name search and ADR), with a new full-colour logo and icons; colour-blind-safe status colours in 0.50.0 (ADR-0088) | in progress |
 | R28 README and in-app Help rewrite, kept in step with each release from then on | queued |
 | R29 Research every Decky plugin (`docs/research/decky-plugins.md`), then the plugin feature stages: looks (themes, sounds, animations), library extras, performance and display, utilities, launchers and stores | queued |
 
