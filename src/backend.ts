@@ -25,6 +25,7 @@ export interface Settings {
   tidyAutomatically: boolean;
   suspendSnapshots: boolean;
   conflictPolicy?: "ask" | "newest";
+  libraryBadges?: boolean;
   libraryRoot: string;
   /** ADR-0044: how each provider signs in from Gaming Mode. */
   gamingModeSignin: Record<"onedrive" | "gdrive", SigninMethod>;
@@ -334,6 +335,12 @@ export interface NewestChoice {
   margin: number | null;
   at: number;
 }
+// R18 (ADR-0081): the badge in Steam's library, and artwork for streaming tiles.
+export const libraryBadge = callable<[appid: number], { state: string; label: string } | null>("library_badge");
+export const installerStreamTiles = callable<[], { appid: number; name: string; devices: string[] }[]>("installer_stream_tiles");
+export const installerStreamArtSearch = callable<[title: string], { id: number; name: string; verified: boolean }[]>("installer_stream_art_search");
+export const installerStreamArtApply = callable<[appid: number, gameId: number], { queued: number }>("installer_stream_art_apply");
+
 export const takeNewest = callable<[key: string], Record<string, unknown>>("take_newest");
 export const newestChoice = callable<[key: string], NewestChoice | null>("newest_choice");
 export const undoNewest = callable<[key: string], Record<string, unknown>>("undo_newest");

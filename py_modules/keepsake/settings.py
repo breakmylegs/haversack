@@ -51,6 +51,7 @@ DEFAULTS: dict[str, Any] = {
     "suspendSnapshots": False,
     # "When saves differ": ask (default), or take the newest version, guarded (ADR-0080).
     "conflictPolicy": "ask",
+    "libraryBadges": True,  # Keepsake's badge on game pages in Steam's library (ADR-0081)
     # v2 module flags (slice 13); missing names use modules.DEFAULT_FLAGS.
     "moduleFlags": {},
     # Installer (slice 21): where games are installed; empty means ~/Games.
@@ -95,6 +96,7 @@ USER_KEYS = frozenset(
         "steamAutoSync",
         "suspendSnapshots",
         "conflictPolicy",
+        "libraryBadges",
         "moduleFlags",
         "libraryRoot",
         "gamingModeSignin",
@@ -230,6 +232,7 @@ def _validate(key: str, value: Any) -> Any:
         "otherLaunchers",
         "replicationListener",
         "tidyAutomatically",
+        "libraryBadges",
     ):
         if not isinstance(value, bool):
             raise SettingsError("must be true or false")

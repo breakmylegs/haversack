@@ -282,6 +282,18 @@ class Plugin:
     async def replication_remove_game(self, offer_id: str) -> dict[str, Any]:
         return await self.app.replication_remove_game(offer_id)
 
+    async def library_badge(self, appid: int) -> dict[str, Any] | None:
+        return await self.app.library_badge(appid)
+
+    async def installer_stream_tiles(self) -> list[dict[str, Any]]:
+        return await self.app.installer_stream_tiles()
+
+    async def installer_stream_art_search(self, title: str) -> list[dict[str, Any]]:
+        return await self.app.installer_stream_art_search(title)
+
+    async def installer_stream_art_apply(self, appid: int, game_id: int) -> dict[str, Any]:
+        return await self.app.installer_stream_art_apply(appid, game_id)
+
     async def take_newest(self, key: str) -> dict[str, Any]:
         return await self.app.take_newest(key)
 

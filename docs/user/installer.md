@@ -44,3 +44,7 @@ An ISO on a share that is already mounted is opened where it is, with nothing co
 ## Artwork
 
 With your own [SteamGridDB](https://www.steamgriddb.com) API key in Settings, Keepsake can find artwork for the new shortcut. Your key is never sent anywhere except SteamGridDB.
+
+## Artwork for streaming tiles
+
+Steam lists non-Steam games installed on your other devices as streaming tiles, with no artwork. At the bottom of **Install**, **Artwork for streaming tiles** lists them. Press **Find artwork**, pick the game on SteamGridDB (your SteamGridDB key, set up as for installed games), and Keepsake sets the tile's artwork through Steam.

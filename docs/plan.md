@@ -48,7 +48,7 @@ Peter's new direction of 21 November 2026 sets the order from here:
 | R20 Layout review: `docs/design/layout-v3.md`, an ADR, and the new structure for the quick access menu, the full page and the desktop app, every feature still reachable (ADR-0073) | this release, 0.32.0 |
 | R21 Legion Go device control (stage 1, read-only readings, ADR-0074, in 0.33.0; research `docs/research/legion-control.md` and the permission ADR-0075, with tier 1 waiting for Peter; stage 2, performance profiles, ADR-0076, in 0.34.0; stage 3, fans, waits for the tier 1 decision; stage 4, battery charge limit (R17), ADR-0077, in 0.35.0; stage 5, controllers read-only, ADR-0078, in 0.36.0; stage 6, Wi-Fi power saving and the BIOS check, ADR-0079, in 0.37.0. Fans and the root parts wait for Peter's decision on ADR-0075 tier 1), after research (`docs/research/legion-control.md`) and a permission-model ADR. In stages, each a release: read-only status; TDP and per-game profiles; fans; battery (R17 folds in here); controllers and RGB; display and other features. Anything needing root waits for Peter's approval of the permission ADR | next |
 | R16 step 2 Take the newest save (ADR-0080) | in 0.38.0 |
-| R18 Library badges and artwork for streaming tiles | last |
+| R18 Library badges and artwork for streaming tiles (ADR-0081) | in 0.39.0 |
 
 ## Section 10 amendments: where each is delivered
 

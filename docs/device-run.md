@@ -171,6 +171,11 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Turn the Go 2's Wi-Fi back on and start the game there. Keepsake should keep the Go's newer save, say so in a toast, and show **Undo** in the game's History.
     - Press **Undo**: the Go 2's version should come back.
 
+29. **Badges and streaming artwork (v0.39.0).**
+    - Open a synced game's page in Steam's library. A "Keepsake · Saves: in step" label should show near the top right, and the page should otherwise work as before.
+    - Open a game that streams from the other device: it should say where it streams from.
+    - On Install, under **Artwork for streaming tiles**, press **Find artwork** for one, pick the game, and check the tile gets its artwork.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.
