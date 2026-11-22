@@ -124,4 +124,4 @@ R23 adds the BlueZ steps as root:
 - **The quick menu.** It shows a Reconnect button per helped, disconnected device, and a note when a device may need help. When the quick menu shortcuts (R25) land, these become registered shortcuts.
 - **Threat model:** T147 to T149.
 - **Device run:** steps 31 to 34. The checks run inside the plugin (the diagnosis and Device checks), not over SSH.
-- **Known gap.** The desktop app does not show reconnect help yet. It is Gaming Mode first (P7), and the desktop page follows with R23.
+- **The desktop app** has its own Reconnect help page from v0.42.0, with the same calls. Installing the helper needs Decky's installer, so that stays in Gaming Mode.
