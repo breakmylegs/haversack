@@ -4,7 +4,7 @@ Keepsake's **Device** section shows your handheld, and lets you choose its perfo
 
 ## Status
 
-**Device**, **Status** shows:
+**Device**, **Device status** shows:
 
 - the model Keepsake recognised;
 - its power range and screen;
@@ -79,7 +79,7 @@ The lasting fixes need root, so they run in a small separate plugin, the **Keeps
 
 ## Other
 
-**Device**, **Other** has:
+**Device**, **More device settings** has:
 - **Wi-Fi power saving**, through steamos-manager. Turn it off if streaming or online games stutter.
 - **A BIOS check**, with what is known about your Legion Go's BIOS version.
 

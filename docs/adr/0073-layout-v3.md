@@ -91,6 +91,31 @@ Three faults made the sidebar unpredictable on the device:
 
 The sidebar is now built once, from the loaded module state (`src/sidebar.ts`, tested with Node). It is keyed so that a module change rebuilds it, and it has no hidden entries. Games and devices lives at `/keepsake/games-devices`. Old links are exact redirect routes, added before the page's route. An old address that is also a live section's address (install, settings, diagnostics) gets no redirect, because one would loop.
 
+## Addendum (v0.41.1): a static sidebar, one entry per tab
+
+**What was still wrong.** After v0.39.1 the sidebar still jumped on the device. Five causes were confirmed in the code:
+1. **A late rebuild.** `KeepsakeRoute` fell back to "Saves only" after 3 seconds. When `modulesStatus()` answered later, the sidebar key changed, and `SidebarNavigation` remounted, losing the selection and focus. On a busy handheld the backend often takes longer than 3 seconds.
+2. **A tab row inside each page.** Each sidebar page held its own row of tabs (`Focusable flow-children="horizontal"`), a pattern that neither Steam's settings nor Decky's own settings use: both give every page its own sidebar entry.
+3. **A page that took focus.** `CloudSection` called `focus()` on a timer after a browser sign-in (ADR-0044). `SidebarNavigation` in route mode opens each page as the focus moves down the list, so a page taking focus pulls the player out of the sidebar. The other focus uses, `autoFocus` in the uninstall dialog and `preferredFocus` in the conflict dialog, are inside modals and stay.
+4. **Panels that blanked on a failed reload.** `NowPlaying`, `InStepPanel`, `SendPanel`, `TidyCopies` and `SnapshotsPanel` set their data back to null when a background reload failed, which unmounted the element that had focus.
+5. **Redirects.** These were checked and found sound: a redirect route is exact, and mounts only when that address is opened. With pages now under `/keepsake/<section>/<tab>`, each section's old address joins the redirects, and each goes to a different address, so none can loop.
+
+**The fix:**
+- **A static sidebar.** `src/routeData.ts` `LAYOUT` lists every section and tab. `src/sidebar.ts` `sidebarEntries()` takes no input and builds one entry per tab, with a line between sections. `KeepsakeRoute` builds `PAGES` once, when the plugin loads, and renders `SidebarNavigation` with no key, no state and no timer.
+- **Modules that are off.** A page whose module is off keeps its entry and shows "This is off. Turn it on in Settings, Modules" (or "not available here"). The v2 rule that a disabled module has no UI still holds for its content; only its place in the list stays.
+- **Focus.** No page or tab takes focus by itself. `focus()`, `autoFocus` and `preferredFocus` are allowed only in modals, and a source-level test enforces it.
+- **Reloads.** A reload that fails keeps what is shown, and a source-level test forbids `catch` resets to null.
+- **Routes.** Each sidebar page is `/keepsake/<section>/<tab>`, and `openSection(section, tab)` opens it.
+- **The navigation recorder.** `src/navlog.ts` and Diagnostics, Tools, "Record navigation for 60 seconds" log:
+  - route and page mounts;
+  - redirects and navigations;
+  - focus moves, with prompted or unprompted;
+  - focus calls.
+
+  The log holds page ids and counts only. The backend filters it (`app.navigation_record`), saves it as `navigation-<time>.json` and adds it to the Device checks export.
+
+**Not done.** Full render tests need `react-dom` as a development dependency. This urgent patch adds none. The rules are tested at source level and in the sidebar's pure logic instead.
+
 ## Consequences
 
 - **Every existing feature stays reachable.** Each old page is a tab, and the old paths still open.

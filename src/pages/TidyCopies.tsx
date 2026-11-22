@@ -77,7 +77,7 @@ export function TidyCopies({ onChange }: { onChange?: () => void }) {
       await reportRemoteCopies();
       setStatus(await remoteCopiesStatus());
     } catch {
-      setStatus(null); // Saves off or the backend not ready: nothing to show
+      // Saves off or the backend busy: keep what is shown (nothing, before the first load)
     }
   };
   useEffect(() => {

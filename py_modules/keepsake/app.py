@@ -128,6 +128,50 @@ from .sync import GameContext, SyncEngine
 from .update import Updater, startup_notice
 
 EmitFn = Callable[..., Coroutine[Any, Any, None]]
+NAV_KINDS = {
+    "start",
+    "stop",
+    "route-mount",
+    "route-unmount",
+    "page-mount",
+    "page-unmount",
+    "navigate",
+    "redirect",
+    "focus-call",
+    "focus",
+    "focus-left-sidebar-unprompted",
+    "input",
+}
+NAV_DETAIL = re.compile(r"^[A-Za-z0-9/_:@.-]{0,80}$")
+
+
+def navigation_record(record: Any) -> dict[str, Any]:
+    """Keep only known event kinds, numbers, booleans and short id-like strings: never free text."""
+    events = []
+    for item in list((record or {}).get("events") or [])[:5000]:
+        if (
+            not isinstance(item, dict)
+            or item.get("kind") not in NAV_KINDS
+            or not isinstance(item.get("t"), (int, float))
+        ):
+            continue
+        detail: dict[str, Any] = {}
+        for key, value in dict(item.get("detail") or {}).items():
+            if not NAV_DETAIL.match(str(key)):
+                continue
+            if isinstance(value, bool) or isinstance(value, (int, float)):
+                detail[str(key)] = value
+            elif isinstance(value, str) and NAV_DETAIL.match(value):
+                detail[str(key)] = value
+        events.append({"t": int(item["t"]), "kind": item["kind"], **({"detail": detail} if detail else {})})
+    summary = {
+        k: int(v)
+        for k, v in dict((record or {}).get("summary") or {}).items()
+        if NAV_DETAIL.match(str(k)) and isinstance(v, (int, float)) and not isinstance(v, bool)
+    }
+    return {"summary": summary, "events": events}
+
+
 IDENTITY_CACHE_SECONDS = 600
 HISTORY_MAX = 200
 CONFIG_STATE_FILE = "config-revisions.json"
@@ -748,6 +792,7 @@ class KeepsakeApp:
         self.performance: Performance | None = None
         self.reconnect: ReconnectService | None = None
         self._device_game: int | None = None
+        self._navigation_record: dict[str, Any] | None = None
         self._register_device()
 
     def _register_device(self) -> None:
@@ -5909,11 +5954,23 @@ class KeepsakeApp:
             "openssl": ssl.OPENSSL_VERSION,
             "results": results,
             "replication": await self._replication_redacted(),
+            "navigation": self._navigation_record,
         }
         await asyncio.to_thread(atomic_write_json, os.path.join(self.paths.settings_dir, name), payload)
         where = devicechecks.tilde(os.path.join(self.paths.settings_dir, name), discovery.real_home(self.home))
         log_event(logging.INFO, "devicecheck.export", "Device check results exported", file=name)
         return {"file": name, "where": where, "summary": text}
+
+    async def save_navigation_record(self, record: dict[str, Any]) -> dict[str, Any]:
+        """The navigation recorder's result (v0.41.1): kept to page ids, routes and counts, saved as one file."""
+        clean = navigation_record(record)
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        name = f"navigation-{stamp}.json"
+        path = os.path.join(self.paths.settings_dir, name)
+        await asyncio.to_thread(atomic_write_json, path, {"version": self.version, **clean})
+        self._navigation_record = {"file": name, **clean}
+        log_event(logging.INFO, "navigation.recorded", "Navigation recorded", **clean["summary"])
+        return {"file": name, "where": devicechecks.tilde(path, discovery.real_home(self.home))}
 
     async def _replication_redacted(self) -> dict[str, Any] | None:
         """Offer and transfer states for the Device checks' export (v0.30.2): no titles, names or paths."""

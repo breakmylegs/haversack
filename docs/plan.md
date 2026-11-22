@@ -50,6 +50,7 @@ Peter's new direction of 21 November 2026 sets the order from here:
 | R16 step 2 Take the newest save (ADR-0080) | in 0.38.0 |
 | R18 Library badges and artwork for streaming tiles (ADR-0081) | in 0.39.0 |
 | Sidebar fix (ADR-0073 addendum) | 0.39.1 |
+| Static sidebar, one entry per tab, focus and reload rules, navigation recorder (ADR-0073 addendum) | 0.41.1 |
 
 Peter's decisions and priorities of 22 November 2026 (ADR-0075 tier 1 approved; `fusermount3` approved). The order:
 

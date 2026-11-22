@@ -96,7 +96,7 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
   useEffect(() => {
     gamePlaytime(gameKey)
       .then(setPlayed)
-      .catch(() => setPlayed(null)); // offline or not synced: simply not shown
+      .catch(() => undefined); // offline or not synced: simply not shown
     load()
       .then(runPreview)
       .catch((err) => toaster.toast({ title: "Keepsake", body: plainError(err) }));

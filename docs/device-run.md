@@ -210,6 +210,12 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Switch the gate off: SSP should be on again. Turn it on again and disable Keepsake in Decky: SSP should come back on within about 2 minutes.
 38. **Capture.** Run Diagnose with the helper ready: the result should say the capture was read. Export the bundle without redaction: it should contain `hci.btsnoop`.
 
+39. **Navigation (v0.41.1).** Open Keepsake's full page.
+    1. With the D-pad, go down every sidebar entry slowly, then up again. The highlight must stay on the entry you moved to, and nothing should open or move by itself.
+    2. Enter every page with right or A, and come back with B.
+    3. Do it once straight after opening Keepsake, and once after a minute.
+    4. If anything jumps, open Diagnostics, Tools, select Record navigation, repeat the moves for 60 seconds, then export the Device checks results.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.
