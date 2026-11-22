@@ -4,6 +4,18 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Fixed
+
+- **The sidebar on Keepsake's full page was unpredictable.** Clicking **Saves** could open **Games and devices**, and the D-pad could get stuck between **Settings** and **Diagnostics**. There were three causes:
+  - the sidebar was drawn before Keepsake knew which modules were on, then grew, so every entry shifted;
+  - hidden entries for the old page links sat at the end of the list;
+  - the old Games page and the new Games and devices section shared one address.
+
+  Now:
+  - the sidebar appears once the modules are known, with no hidden entries;
+  - Games and devices has its own address;
+  - old links open the right section and tab through a redirect.
+
 ## [0.39.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

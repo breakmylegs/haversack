@@ -80,6 +80,17 @@ That document records the structure today, its problems and the proposal. In sho
     - **The device controls,** with their quick access menu rows, power-history chart and draggable fan-curve editor. These come with R21's stages.
     - **A desktop Install page.** The Installer's steps are built around Gaming Mode, so it stays there for now (backlog).
 
+## Addendum (v0.39.1): the sidebar fix
+
+Three faults made the sidebar unpredictable on the device:
+- it was drawn from a guess (Saves only) and then grew when the real module state arrived;
+- the old pages were hidden sidebar entries at the end of the list;
+- `/keepsake/games` was both the old Games page and the new Games and devices section.
+
+`SidebarNavigation` tracks selection and focus by position, so each fault moved clicks and the D-pad onto the wrong entry.
+
+The sidebar is now built once, from the loaded module state (`src/sidebar.ts`, tested with Node). It is keyed so that a module change rebuilds it, and it has no hidden entries. Games and devices lives at `/keepsake/games-devices`. Old links are exact redirect routes, added before the page's route. An old address that is also a live section's address (install, settings, diagnostics) gets no redirect, because one would loop.
+
 ## Consequences
 
 - **Every existing feature stays reachable.** Each old page is a tab, and the old paths still open.

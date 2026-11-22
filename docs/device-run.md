@@ -176,6 +176,11 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Open a game that streams from the other device: it should say where it streams from.
     - On Install, under **Artwork for streaming tiles**, press **Find artwork** for one, pick the game, and check the tile gets its artwork.
 
+30. **Sidebar (v0.39.1).** Open Keepsake's full page.
+    - Move with the D-pad from **Play** down to **Diagnostics** and back up again, through every entry.
+    - Press each one in turn: the page that opens should match the entry pressed.
+    - In a section, move right along its tabs and down into a tab, then press B: focus should go back to the sidebar.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.
