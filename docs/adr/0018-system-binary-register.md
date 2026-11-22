@@ -20,7 +20,7 @@ v1 principle 9 allowed no binaries at all. Some v2 features need tools that only
    | `openssl` | Replication | Candidate for certificate generation at pairing, subject to the slice 16 spike | slice 16 |
    | `firewall-cmd` | Replication | Detection only (`--state` and queries). Never changes rules | slice 17 |
    | `python3` | Desktop | Runs the tray process in the desktop session | slice 24 |
-   | `fusermount3` | Installer | **Proposed, awaiting Peter's approval (ADR-0067).** Mount Keepsake's own read-only one-file FUSE file system for a network ISO (`ro,nosuid,nodev,noexec,auto_unmount`) and unmount it (`-u -z`) | device run (A207) |
+   | `fusermount3` | Installer | **Approved by Peter on 22 November 2026 (ADR-0067).** Mount Keepsake's own read-only one-file FUSE file system for a network ISO (`ro,nosuid,nodev,noexec,auto_unmount`) and unmount it (`-u -z`) | device run (A207) |
 
 2. **Verify per distribution.** Each entry is verified present on SteamOS and on Bazzite in the slice that first uses it, recorded in `docs/assumptions.md` with versions.
 3. **Missing means disabled.** A missing or failing binary disables only the dependent feature, with a clear message. Nothing falls back to a bundled or downloaded copy.

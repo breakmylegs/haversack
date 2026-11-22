@@ -1,6 +1,6 @@
 # ADR-0067: Install straight from a network ISO, copying only as a fallback
 
-- Status: accepted for the design; the in-place mount for shares that are **not** mounted waits for Peter's approval of `fusermount3` in the System Binary Register (ADR-0018). Peter's request of 21 November 2026, decided under ADR-0037.
+- Status: accepted. Peter approved `fusermount3` in the System Binary Register on 22 November 2026, so the in-place mount for shares that are not mounted is on from v0.45.0 (`netfuse.FUSERMOUNT_APPROVED`). Peter's request of 21 November 2026, decided under ADR-0037.
 - Date: 21 November 2026
 - Deciders: Peter (owner)
 
