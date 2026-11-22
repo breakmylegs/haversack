@@ -1,6 +1,6 @@
 # ADR-0075: How Keepsake changes device settings without root, and what to do about the controls that need it
 
-- Status: **Tier 0 accepted** (decided under ADR-0037). **Tier 1 proposed, waiting for Peter's approval** (his instruction of 21 November 2026: "Stop and ask me to approve that ADR before shipping anything that needs root").
+- Status: **Tier 0 accepted** (decided under ADR-0037). **Tier 1 accepted, option B**: Peter approved it on 22 November 2026 as recommended, a separate signed, version-locked helper with an authenticated minimal interface and an allow-list. The helper is ADR-0083.
 - Date: 22 November 2026
 - Deciders: Peter (owner)
 
@@ -51,7 +51,7 @@ R21 makes Keepsake the main Legion Go and Legion Go 2 app, covering power, fans,
    - **Keepsake never disables, moves or edits another tool.**
 5. **No cloud and no peer messages carry device settings.** Profiles stay on the device that made them, until a later stage decides otherwise.
 
-### Tier 1: controls that need root (proposed, waiting for approval)
+### Tier 1: controls that need root (accepted 22 November 2026, option B, ADR-0083)
 
 These need root, and Peter must approve one of these options first:
 - fan curves and fan speed (kernel v7.0 and later have a fan target; no kernel curve interface exists yet);

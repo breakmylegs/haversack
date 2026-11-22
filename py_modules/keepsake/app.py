@@ -747,6 +747,7 @@ class KeepsakeApp:
         )
         self.performance: Performance | None = None
         self.reconnect: ReconnectService | None = None
+        self._device_game: int | None = None
         self._register_device()
 
     def _register_device(self) -> None:
@@ -768,7 +769,13 @@ class KeepsakeApp:
                 loop.call_soon_threadsafe(lambda: self._background.append(loop.create_task(self.emit(RECONNECT_EVENT))))
 
             self.reconnect = ReconnectService(
-                self.paths.settings_dir, self.sys_root, self.dev_root, notify=reconnect_notify
+                self.paths.settings_dir,
+                self.sys_root,
+                self.dev_root,
+                notify=reconnect_notify,
+                version=self.version,
+                # bluetoothd is never restarted under a running game (ADR-0083).
+                busy=lambda: "a game is running" if self._device_game is not None else None,
             )
             self.reconnect.start()
 
@@ -781,11 +788,13 @@ class KeepsakeApp:
                 await asyncio.to_thread(performance.restore)  # put back what Keepsake set
 
         async def device_game_started(payload: dict[str, Any]) -> None:
+            self._device_game = int(payload["appid"])
             # As a task: a profile never delays a game's launch.
             if self.performance is not None:
                 self._background.append(asyncio.create_task(self._device_apply(int(payload["appid"]))))
 
         async def device_game_exited(payload: dict[str, Any]) -> None:
+            self._device_game = None
             if self.performance is not None:
                 await asyncio.to_thread(self.performance.game_exited)
                 self._device_changed()
@@ -963,6 +972,32 @@ class KeepsakeApp:
     async def reconnect_export(self, adapter: str, mac: str, redact_adapter: bool = True) -> dict[str, Any]:
         found = await self._reconnect().export(adapter, mac, bool(redact_adapter))
         return {"file": found["file"], "where": devicechecks.tilde(found["path"], discovery.real_home(self.home))}
+
+    async def reconnect_cable_pair(self, adapter: str, mac: str, order: str = "same") -> dict[str, Any]:
+        return await self._reconnect().cable_pair(adapter, mac, str(order))
+
+    async def reconnect_cable_restore(self, adapter: str, mac: str) -> dict[str, Any]:
+        return await self._reconnect().cable_restore(adapter, mac)
+
+    async def reconnect_set_ssp_gate(self, on: bool, adapter: str = "", confirm: str = "") -> dict[str, Any]:
+        return await self._reconnect().set_ssp_gate(bool(on), adapter, str(confirm or ""))
+
+    async def reconnect_ssp_confirm(self) -> dict[str, Any]:
+        return await self._reconnect().ssp_confirm_power_cycle()
+
+    async def helper_prepare(self) -> dict[str, Any]:
+        """Verify the Keepsake Helper of this exact version for Decky's installer (ADR-0083)."""
+        installed = self.reconnect is not None and self.reconnect.helper.installed()
+        async with self._update_lock:
+            await asyncio.to_thread(self.updater.check, str(self.settings.get("updateChannel")), False)
+            result = await asyncio.to_thread(self.updater.prepare_helper, f"v{self.version}", installed)
+            if result.get("reason") == "unknown-release":
+                await asyncio.to_thread(self.updater.check, str(self.settings.get("updateChannel")), True)
+                result = await asyncio.to_thread(self.updater.prepare_helper, f"v{self.version}", installed)
+        log_event(
+            logging.INFO, "helper.prepare", "Prepared helper hand-off", ok=result.get("ok"), reason=result.get("reason")
+        )
+        return result
 
     async def _reconnect_probe(self) -> dict[str, Any]:
         if self.reconnect is None:

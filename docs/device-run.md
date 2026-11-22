@@ -197,6 +197,19 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Reboot, then update SteamOS when one is offered: help should still be on and step 32 should still pass.
     - Desktop Mode should stay responsive throughout.
 
+35. **Keepsake Helper (v0.41.0).** In Device, Reconnect help, select Install helper.
+    - Decky should ask to install "Keepsake Helper", and the card should then say Ready.
+    - Run the Device check "Controller reconnect help": the helper should be ready.
+36. **Cable pairing.** With the clone DualShock 4 on a USB cable and help on for it, select Cable pair, then Confirm.
+    - Bluetooth should restart, with the genuine pads dropping and coming back.
+    - Unplug the clone, turn it off and press PS, ten times: it should reconnect ten of ten. Both genuine pads should still reconnect ten of ten.
+    - Restore backup should put the old pairing back.
+37. **SSP gate.** Only if a diagnosis says O3: turn the SSP gate on through both warnings.
+    - Note whether it said "Restart Bluetooth" (SSP off needs the adapter off).
+    - The clone should reconnect with PS ten of ten, and pairing a new device from Steam should still work.
+    - Switch the gate off: SSP should be on again. Turn it on again and disable Keepsake in Decky: SSP should come back on within about 2 minutes.
+38. **Capture.** Run Diagnose with the helper ready: the result should say the capture was read. Export the bundle without redaction: it should contain `hci.btsnoop`.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

@@ -141,6 +141,8 @@ v1 escalation rules stay in force. Add these. Stop and ask Peter, and record eac
 | Module staging folders inside the plugin runtime directory or beside the target root | Replication, Installer | Always validated |
 | `<pfx>/dosdevices/<letter>:` symlinks | Installer | Game being installed only |
 | `~/.config/autostart/keepsake-tray.desktop` and `~/.local/share/applications/keepsake.desktop` | Desktop | Desktop module enabled, removed on disable and in `_uninstall` |
+| `/run/keepsake-helper/` (socket and token) | Keepsake Helper (root, ADR-0083) | While the helper runs |
+| `/var/lib/bluetooth/<ADAPTER>/<DEVICE>/info` and its `info.keepsake-<time>` backups | Keepsake Helper (root, ADR-0083) | A user's cable pairing or restore, for a device with a rule |
 
 Every write still passes the central path validator. `realpath` must stay inside the registered root.
 

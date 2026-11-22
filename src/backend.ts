@@ -433,6 +433,7 @@ export interface ReconnectDiagnosis {
   sixaxis: boolean;
   at: number;
   journal?: string;
+  capture?: string;
 }
 export interface ReconnectDevice {
   adapter: string;
@@ -453,6 +454,7 @@ export interface ReconnectDevice {
   last: ReconnectDiagnosis | null;
   suggest: { reason: string; at: number } | null;
   captured: boolean;
+  stored?: { record: boolean; linkKey: boolean; keyType: number | null; trusted: boolean; cache: boolean; services: boolean; backups: number } | null;
 }
 export interface ReconnectStatus {
   available: boolean;
@@ -463,6 +465,8 @@ export interface ReconnectStatus {
   dryRun?: boolean;
   watcher?: boolean;
   cableReady?: boolean;
+  helper?: { installed: boolean; ready: boolean; problem?: string; version?: string; helper?: string };
+  sspGate?: { on: boolean; adapter: string | null; state: string };
   actions?: { at: string; action: string; device: string | null; [k: string]: unknown }[];
 }
 export interface ReconnectResult {
@@ -481,6 +485,13 @@ export const reconnectReadUsb = callable<
   { read: { ok: boolean; state?: string; message?: string; family?: string; storesThisHandheld?: boolean }; diagnosis: ReconnectDiagnosis | null }
 >("reconnect_read_usb");
 export const reconnectDiagnose = callable<[adapter: string, mac: string], ReconnectDiagnosis>("reconnect_diagnose");
+export const reconnectCablePair = callable<[adapter: string, mac: string, order: "same" | "reversed"], ReconnectResult & { backup?: string; sixaxis?: boolean }>(
+  "reconnect_cable_pair",
+);
+export const reconnectCableRestore = callable<[adapter: string, mac: string], { ok: boolean; restored: string }>("reconnect_cable_restore");
+export const reconnectSetSspGate = callable<[on: boolean, adapter: string, confirm: string], ReconnectStatus>("reconnect_set_ssp_gate");
+export const reconnectSspConfirm = callable<[], ReconnectStatus>("reconnect_ssp_confirm");
+export const helperPrepare = callable<[], PreparedUpdate>("helper_prepare");
 export const reconnectExport = callable<[adapter: string, mac: string, redactAdapter: boolean], { file: string; where: string }>("reconnect_export");
 
 // Stage 6 (ADR-0079): Wi-Fi power saving and the BIOS check.

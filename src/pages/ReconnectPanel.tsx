@@ -16,6 +16,7 @@ import {
   reconnectStatus,
 } from "../backend";
 import { plainError } from "../format";
+import { CablePairing, HelperCard, SspGateCard } from "./ReconnectHelper";
 
 // Device, Reconnect help (R22, ADR-0082): for Bluetooth Classic controllers that pair but do not
 // reconnect. Every paired device is listed; help acts only on the ones the user turns it on for,
@@ -82,6 +83,10 @@ export function ReconnectPanel() {
         label="Reconnect help"
         description="For controllers that pair but will not reconnect with their normal button, often clones. Turn help on only for the controllers that need it: the others are never touched."
       />
+      <HelperCard s={s} reload={() => void load()} />
+      {s.helper?.ready && (s.sspGate?.on || (s.devices ?? []).some((d) => d.help && d.last?.outcome === "O3")) && (
+        <SspGateCard s={s} reload={() => void load()} />
+      )}
       {adapters.length > 1 && (
         <DropdownItem
           label="Bluetooth adapter"
@@ -222,10 +227,11 @@ export function ReconnectPanel() {
                   </DialogButton>
                 </Field>
               )}
-              <Field
-                label="Cable pairing and the security setting"
-                description="The lasting fixes rewrite the pairing key or change Bluetooth security, which needs the root helper. They arrive in the next release."
-              />
+              {s.helper?.ready ? (
+                <CablePairing d={d} cableReady={Boolean(s.cableReady)} reload={() => void load()} />
+              ) : (
+                <Field label="Cable pairing" description="Needs the Keepsake Helper (above)." />
+              )}
             </>
           )}
         </div>

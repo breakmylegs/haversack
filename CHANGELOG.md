@@ -4,6 +4,20 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **The Keepsake Helper**, a small separate plugin that runs as root, so that Keepsake itself never does. Install it from Device, Reconnect help: Keepsake checks its signature and Decky asks you to confirm. It is locked to Keepsake's version and does only a short list of jobs, for Keepsake alone.
+- **Cable pairing** in Reconnect help, for DualShock 4 controllers and clones that use their IDs:
+  - with the controller on a USB cable, Keepsake gives it and this handheld the same new key, then restarts Bluetooth;
+  - it checks first that the controller on the cable is the one you chose;
+  - it keeps a backup of the pairing, with **Restore backup**;
+  - an advanced key-order switch is there for a controlled experiment.
+- **The SSP gate**, off by default, for controllers that are refused while security starts:
+  - Secure Simple Pairing is on only while pairing;
+  - it comes behind a two-step warning, because it lowers Bluetooth security for the whole adapter;
+  - SSP goes back on when you switch it off, and by itself if Keepsake stops.
+- **Bluetooth capture in the diagnosis.** With the helper, the diagnosis records 40 seconds of Bluetooth traffic. It can now tell a key mismatch from the security race, and recommends cable pairing or the SSP gate.
+
 ## [0.40.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

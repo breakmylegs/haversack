@@ -64,7 +64,18 @@ The list also shows a note when a controller's address is not from a registered 
 
 If a controller connects and drops at once, Keepsake suggests a diagnosis. It does nothing to the controller unless you choose.
 
-The lasting fixes, cable pairing with a new key and Bluetooth's security setting, need a separate helper that runs as root. They come in the next release.
+### The Keepsake Helper: cable pairing and the SSP gate
+
+The lasting fixes need root, so they run in a small separate plugin, the **Keepsake Helper**. Select **Install helper** at the top of Reconnect help. Keepsake checks the helper's signature, and Decky asks you to confirm. After each Keepsake update, select **Update helper**.
+
+- **Cable pairing** (DualShock 4 and clones using its IDs):
+  1. Connect the controller with a USB data cable.
+  2. Open its Help options and select **Cable pair**, then **Confirm**. Bluetooth restarts, so every Bluetooth device drops for a few seconds. It never runs during a game.
+  3. Unplug the controller, turn it off, and press PS.
+
+  If it still fails, try once more with **Reversed key order**. **Restore backup** puts back the pairing from before.
+- **SSP gate:** offered when the diagnosis says the controller is refused while security starts. It lowers Bluetooth security for the whole adapter, so it asks twice. Secure Simple Pairing comes back on while you pair, when you switch the gate off, and by itself if Keepsake stops.
+- **Bluetooth capture:** with the helper, Diagnose also records 40 seconds of Bluetooth traffic, to tell the causes apart.
 
 ## Other
 

@@ -93,6 +93,7 @@ class Rules:
             "last": dict(data.get("last") or {}),
             "suggest": dict(data.get("suggest") or {}),
             "dryRun": bool(data.get("dryRun")),
+            "sspGate": data.get("sspGate") if isinstance(data.get("sspGate"), dict) else None,
         }
 
     def _save(self, data: dict[str, Any]) -> None:
@@ -118,6 +119,17 @@ class Rules:
 
     def dry_run(self) -> bool:
         return bool(self._load()["dryRun"])
+
+    def ssp_gate(self) -> dict[str, Any] | None:
+        """``{"adapter", "path"}`` while the SSP gate is on, else None."""
+        gate = self._load()["sspGate"]
+        return dict(gate) if gate and normal_mac(gate.get("adapter")) else None
+
+    def set_ssp_gate(self, adapter: str | None, path: str | None) -> None:
+        data = self._load()
+        data["sspGate"] = {"adapter": adapter, "path": path} if adapter and path else None
+        self._save(data)
+        self.action("ssp-gate-on" if adapter else "ssp-gate-off", adapter, None)
 
     def set_dry_run(self, on: bool) -> None:
         data = self._load()
@@ -294,9 +306,15 @@ ADVICE = {
     ),
     "O2": (
         "The controller calls, but the handshake fails",
-        "The controller reaches this handheld and is turned away within seconds. Put it in pairing "
-        "mode and use Reconnect. The lasting fixes (cable pairing and the security setting) need "
-        "the root helper, which comes in the next release.",
+        "The controller reaches this handheld and is turned away: the pairing key does not match. "
+        "Cable pairing gives both sides a new key (it needs the Keepsake Helper). Until then, put "
+        "it in pairing mode and use Reconnect.",
+    ),
+    "O3": (
+        "The controller is refused while security starts",
+        "The controller opens its connection a moment too early and BlueZ turns it away. The SSP "
+        "gate fixes this (it needs the Keepsake Helper; read its warning first). Until then, put it "
+        "in pairing mode and use Reconnect.",
     ),
     "O4": (
         "This handheld has no pairing for the controller",
@@ -335,7 +353,15 @@ ADVICE = {
     ),
 }
 
-RECOMMEND = {"O1": "commit", "O2": "assist", "O4": "pair", "O5": "assist", "OTHER-HOST": "pair", "O6": "none"}
+RECOMMEND = {
+    "O1": "commit",
+    "O2": "cable",
+    "O3": "ssp-gate",
+    "O4": "pair",
+    "O5": "assist",
+    "OTHER-HOST": "pair",
+    "O6": "none",
+}
 
 
 def classify(
@@ -345,6 +371,7 @@ def classify(
     identity: dict[str, Any] | None = None,
     adapter: str | None = None,
     watched: bool = True,
+    hci: set[str] | None = None,
 ) -> dict[str, Any]:
     """The likely outcome from what was seen, with plain advice and the module to try.
 
@@ -361,6 +388,23 @@ def classify(
     elif bond is not None and not (bond.get("Paired") or bond.get("Bonded")):
         outcome = "O4"
         evidence.append("BlueZ has no pairing for it")
+    elif hci and "link-key-negative" in hci:
+        outcome = "O4"
+        evidence.append("capture: BlueZ had no key to give")
+    elif hci and "security-block" in hci:
+        outcome = "O3"
+        evidence.append("capture: the controller's connection was refused with a security block")
+    elif hci and "auth-failure" in hci and "encrypted" not in hci:
+        outcome = "O2"
+        evidence.append("capture: authentication failed before encryption")
+    elif (
+        hci is not None
+        and watched
+        and "connect-request" not in hci
+        and not any(name == "Connected" and value for _t, name, value in events)
+    ):
+        outcome = "O1"
+        evidence.append("capture: the controller never paged this handheld")
     elif not watched:
         outcome = "STORED" if identity else "NONE"
         evidence.append("the controller stores this handheld" if identity else "nothing to compare")
