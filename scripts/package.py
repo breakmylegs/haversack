@@ -182,7 +182,9 @@ def helper_name() -> str:
 
 def collect_helper() -> list[tuple[str, str]]:
     """(source path, archive path) for the helper: its own files, a copy of the licence, no tests."""
-    entries = [(os.path.join(HELPER, n), n) for n in ("main.py", "plugin.json", "dist/index.js")]
+    entries = [(os.path.join(HELPER, n), n) for n in ("main.py", "plugin.json")]
+    # Hand-written against Decky's globals, so it is kept in the repository (dist/ is ignored).
+    entries.append((os.path.join(HELPER, "frontend", "index.js"), "dist/index.js"))
     entries.append((os.path.join(ROOT, "LICENSE"), "LICENSE"))
     base = os.path.join(HELPER, "py_modules")
     for folder, dirs, files in os.walk(base):

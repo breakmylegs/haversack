@@ -765,6 +765,7 @@ def test_helper_zip_is_version_locked_and_root_flagged(tmp_path: Any) -> None:
     assert version == package.version() == meta["version"]
     assert plugin["flags"] == ["root"] and plugin["name"] == "Keepsake Helper"
     assert "keepsake-helper/py_modules/keepsake_helper/server.py" in names
+    assert "keepsake-helper/dist/index.js" in names
     assert not any("test" in n or n.endswith(".pyc") for n in names)
     with open(os.path.join(ROOT, "plugin.json"), encoding="utf-8") as handle:
         assert "root" not in json.load(handle)["flags"]  # Keepsake itself never runs as root (P8)
