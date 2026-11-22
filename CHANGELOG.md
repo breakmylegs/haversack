@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.36.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Added
 
 - **Device, Controllers** (the controller stage of the Legion Go controls), in Gaming Mode and the desktop app. It shows:
