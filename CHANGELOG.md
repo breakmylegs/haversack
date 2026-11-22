@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.40.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Added
 
 - **Reconnect help for Bluetooth controllers** (Device, Reconnect help). It is for Bluetooth Classic controllers, often clones, that pair once and then will not reconnect with their normal button. Every paired device is listed, and you turn help on only for the ones that need it: the others are never touched.
