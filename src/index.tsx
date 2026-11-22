@@ -20,6 +20,7 @@ import { startRemoteCopies } from "./remotecopies";
 import { startLibraryBadges } from "./libraryBadges";
 import { AdvisorQam } from "./pages/AdvisorQam";
 import { GameTransfersCompact } from "./pages/GameTransfers";
+import { ReconnectQam } from "./pages/ReconnectQam";
 import { BatteryPanel } from "./pages/BatteryPanel";
 import { PowerPanel } from "./pages/PowerPanel";
 import { openCheckpointModal } from "./pages/CheckpointModal";
@@ -128,6 +129,7 @@ function Content() {
       <PanelSection title="Keepsake">
         <BatteryPanel compact />
         <GameTransfersCompact onOpen={() => openSection("games-devices", "moving")} />
+        <ReconnectQam onOpen={() => openSection("device", "reconnect")} />
         {attention.slice(0, 3).map((a) => (
           <PanelSectionRow key={a.key}>
             <ButtonItem layout="below" onClick={a.open}>

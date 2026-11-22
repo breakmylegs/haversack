@@ -865,6 +865,31 @@ async def serve_speed(_session: Any, message: dict[str, Any]) -> Any:
     return {"size": size}, _SPEED_BLOCK * whole + _SPEED_BLOCK[:rest]
 
 
+async def check_reconnect_help(ctx: Context) -> dict[str, Any]:
+    """Controller reconnect help (R22, ADR-0082): BlueZ reachable as the user, the journal readable,
+    and each helped device's last outcome. Counts and masked addresses only."""
+    probe = ctx.probes.get("reconnect-help")
+    if probe is None:
+        return result("skip", "This build has no controller reconnect help.")
+    found = await probe()
+    if not found.get("available"):
+        return result("fail", f"Bluetooth could not be read: {found.get('problem') or 'unknown'}.", **found)
+    helped = found.get("helped") or []
+    parts = [
+        f"{found.get('paired', 0)} paired device{'s' if found.get('paired') != 1 else ''}"
+        f" ({found.get('classic', 0)} Bluetooth Classic) on {found.get('adapters', 0)} adapter"
+        f"{'s' if found.get('adapters') != 1 else ''}",
+        f"help on for {len(helped)}",
+        "watcher running" if found.get("watcher") else "watcher not running",
+        "journal readable" if found.get("journal") == "read" else f"journal not readable ({found.get('journal')})",
+    ]
+    outcomes = [h.get("outcome") for h in helped if h.get("outcome")]
+    if outcomes:
+        parts.append("last outcomes " + ", ".join(outcomes))
+    status = "pass" if found.get("watcher") and found.get("journal") == "read" else "warn"
+    return result(status, "; ".join(parts) + ".", **found)
+
+
 CHECKS = [
     Check("link", "Encrypted link", "one", "A188, test_on_device.py", check_tls),
     Check("addresses", "Listening addresses", "one", "A190", check_addresses),
@@ -899,6 +924,7 @@ CHECKS = [
     Check("performance-control", "Performance control", "one", "ADR-0076", check_performance_control),
     Check("charge-limit", "Battery charge limit", "one", "ADR-0077", check_charge_limit),
     Check("controllers", "Controllers", "one", "ADR-0078", check_controllers),
+    Check("reconnect-help", "Controller reconnect help", "one", "ADR-0082, A225 to A228", check_reconnect_help),
     Check("bios", "BIOS check", "one", "ADR-0079", check_bios),
 ]
 BY_ID = {c.id: c for c in CHECKS}

@@ -46,6 +46,26 @@ Keepsake changes it through Valve's steamos-manager. Where steamos-manager does 
 
 **Device**, **Controllers** shows each controller's battery, the settings the controllers report, and the stick lights. Remap buttons, set dead zones and use the gyro in Steam's controller settings. Changing the controllers' own settings and the lights needs root, which waits for a separate decision.
 
+## Reconnect help
+
+**Device**, **Reconnect help** is for Bluetooth controllers, often clones, that pair once and then will not reconnect when you press their normal button.
+
+1. Pair the controller in Steam's Bluetooth settings.
+2. Find it in the list and turn on help for it. Help acts only on the controllers you turn it on for.
+3. Select **Help options**:
+   - **Pair and commit** (on by default): the next time you pair this controller, Keepsake connects to it at once, so that it saves the pairing. Forget it and pair it again after turning help on.
+   - **Reconnect**: put the controller in pairing mode (on a DualShock 4, hold Share and PS until the light flashes quickly), then select Reconnect. This is also in the quick menu.
+   - **Diagnose**: turn the controller off, wait 10 seconds, select **Start** and press the controller's normal button once. Keepsake says what went wrong and what to try.
+   - **Read stored host over USB** (DualShock 4 on a USB data cable): whether the controller will call this handheld.
+   - **Export report bundle**: the last diagnosis and the Bluetooth journal lines in a zip, to share on an issue. This handheld's address is replaced.
+   - **Full report mode** (DualShock 4 only): for clones that send reduced reports, such as a missing touchpad or motion.
+
+The list also shows a note when a controller's address is not from a registered manufacturer. That is only information: Keepsake never acts on it.
+
+If a controller connects and drops at once, Keepsake suggests a diagnosis. It does nothing to the controller unless you choose.
+
+The lasting fixes, cable pairing with a new key and Bluetooth's security setting, need a separate helper that runs as root. They come in the next release.
+
 ## Other
 
 **Device**, **Other** has:

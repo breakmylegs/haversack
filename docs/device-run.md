@@ -181,6 +181,22 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Press each one in turn: the page that opens should match the entry pressed.
     - In a section, move right along its tabs and down into a tab, then press B: focus should go back to the sidebar.
 
+31. **Reconnect help: the list (v0.40.0).** Open Device, Reconnect help.
+    - Every paired Bluetooth device should be listed, with its class, modalias and adapter, and the clone should show the "not from a registered manufacturer" note.
+    - Run the Device check "Controller reconnect help": it should pass, with the journal readable.
+32. **Reconnect help: pair and commit.** Turn help on for the clone DualShock 4 only.
+    - Forget it in Steam's Bluetooth settings and pair it again.
+    - Then turn it off and on with PS alone, ten times: it should reconnect ten of ten.
+    - Both genuine DualShock 4 pads, and any other controller, should still reconnect ten of ten, and Bluetooth audio should keep playing.
+33. **Reconnect help: diagnose, USB and export.**
+    - Run Diagnose on the clone: power off, wait 10 seconds, Start, press PS once. Note the outcome.
+    - Connect the clone by USB and select Read stored host over USB. Note the answer.
+    - Export the report bundle: this handheld's address should not appear in it.
+34. **Reconnect help: Reconnect, and lasting state.**
+    - With the clone off, open the quick menu, hold Share and PS, and select Reconnect: it should connect within 15 seconds.
+    - Reboot, then update SteamOS when one is offered: help should still be on and step 32 should still pass.
+    - Desktop Mode should stay responsive throughout.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

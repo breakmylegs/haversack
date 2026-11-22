@@ -155,6 +155,7 @@ Each entry must be verified present on SteamOS and Bazzite during the slice that
 | `openssl` | Replication | Candidate for certificate generation at pairing, subject to the slice 16 spike |
 | `firewall-cmd` | Replication | Detection only (`--state`, query). Never used to change rules |
 | `python3` | Desktop | Run the tray process in the desktop session |
+| `journalctl` | Device | Read-only: bluetoothd's and the kernel's lines for a reconnect diagnosis, with `--since`, `-n` and a timeout (ADR-0082) |
 
 ---
 

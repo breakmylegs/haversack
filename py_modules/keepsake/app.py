@@ -70,7 +70,9 @@ from .desktop import entries as desktop_entries
 from .device import battery as device_battery
 from .device import bios as device_bios
 from .device import controllers as device_controllers
+from .device.bluez import BlueZError
 from .device.performance import Performance, ProfileError, ProfileStore, clean_profile, other_tools
+from .device.reconnect_service import ReconnectService
 from .device.steamos import ManagerError, SteamOSManager
 from .engine import SnapshotEngine
 from .freeze import Freezer
@@ -150,6 +152,7 @@ ADVISOR_EVENT = "keepsake_advisor"
 IMPORT_PROGRESS_EVENT = "keepsake_import_progress"
 REPLICATION_EVENT = "keepsake_replication"
 DEVICE_EVENT = "keepsake_device"
+RECONNECT_EVENT = "keepsake_reconnect"
 DEVICE_WATCH_SECONDS = 5.0  # after applying a profile, look once more for another app setting its own value
 PAIR_REQUEST_EVENT = "keepsake_pair_request"  # a device asks to pair (ADR-0070)
 MANIFEST_PROGRESS_SECONDS = 0.5
@@ -518,6 +521,7 @@ class KeepsakeApp:
         self._progress_task: asyncio.Task[None] | None = None
         self._progress_told: dict[str, tuple[Any, ...]] = {}
         self.sys_root = "/sys"
+        self.dev_root = "/dev"
         self.power_root = "/"  # where /sys/class/power_supply is read (tests point it elsewhere)
         self._games_running: set[int] = set()
         self._direct_last: dict[str, Any] | None = None
@@ -742,6 +746,7 @@ class KeepsakeApp:
             )
         )
         self.performance: Performance | None = None
+        self.reconnect: ReconnectService | None = None
         self._register_device()
 
     def _register_device(self) -> None:
@@ -756,8 +761,21 @@ class KeepsakeApp:
                 lambda: other_tools(home, self.proc_root),
                 self._device_limits,
             )
+            loop = asyncio.get_running_loop()
+
+            def reconnect_notify() -> None:
+                # From the watcher's thread: the event is sent on the loop.
+                loop.call_soon_threadsafe(lambda: self._background.append(loop.create_task(self.emit(RECONNECT_EVENT))))
+
+            self.reconnect = ReconnectService(
+                self.paths.settings_dir, self.sys_root, self.dev_root, notify=reconnect_notify
+            )
+            self.reconnect.start()
 
         async def device_stop() -> None:
+            reconnect, self.reconnect = self.reconnect, None
+            if reconnect is not None:
+                await asyncio.to_thread(reconnect.stop)
             performance, self.performance = self.performance, None
             if performance is not None:
                 await asyncio.to_thread(performance.restore)  # put back what Keepsake set
@@ -895,6 +913,61 @@ class KeepsakeApp:
     async def device_controllers(self) -> dict[str, Any]:
         """The controllers as the kernel shows them (R21 stage 5, ADR-0078). Read-only."""
         return await asyncio.to_thread(device_controllers.status, self.sys_root, self.proc_root)
+
+    # Controller reconnect help (R22, ADR-0082): every action is gated on the user's rule for that device.
+
+    def _reconnect(self) -> ReconnectService:
+        if self.reconnect is None:
+            raise ValueError("Device controls are off; switch them on in Settings, Modules")
+        return self.reconnect
+
+    async def reconnect_status(self) -> dict[str, Any]:
+        if self.reconnect is None:
+            return {
+                "available": False,
+                "problem": "Device controls are off; switch them on in Settings, Modules",
+                "off": True,
+            }
+        return await self.reconnect.status()
+
+    async def reconnect_set_help(self, adapter: str, mac: str, on: bool, label: str = "") -> dict[str, Any]:
+        return await self._reconnect().set_help(adapter, mac, bool(on), str(label or ""))
+
+    async def reconnect_set_option(self, adapter: str, mac: str, option: str, on: bool) -> dict[str, Any]:
+        return await self._reconnect().set_option(adapter, mac, str(option), bool(on))
+
+    async def reconnect_set_dry_run(self, on: bool) -> dict[str, Any]:
+        return await self._reconnect().set_dry_run(bool(on))
+
+    async def reconnect_dismiss(self, adapter: str, mac: str) -> dict[str, Any]:
+        return await self._reconnect().dismiss(adapter, mac)
+
+    async def reconnect_assist(self, adapter: str, mac: str) -> dict[str, Any]:
+        try:
+            return await self._reconnect().assist(adapter, mac)
+        except BlueZError as exc:
+            raise ValueError(str(exc)) from exc
+
+    async def reconnect_read_usb(self, adapter: str, mac: str) -> dict[str, Any]:
+        try:
+            return await self._reconnect().read_usb(adapter, mac)
+        except BlueZError as exc:
+            raise ValueError(str(exc)) from exc
+
+    async def reconnect_diagnose(self, adapter: str, mac: str) -> dict[str, Any]:
+        try:
+            return await self._reconnect().diagnose(adapter, mac)
+        except BlueZError as exc:
+            raise ValueError(str(exc)) from exc
+
+    async def reconnect_export(self, adapter: str, mac: str, redact_adapter: bool = True) -> dict[str, Any]:
+        found = await self._reconnect().export(adapter, mac, bool(redact_adapter))
+        return {"file": found["file"], "where": devicechecks.tilde(found["path"], discovery.real_home(self.home))}
+
+    async def _reconnect_probe(self) -> dict[str, Any]:
+        if self.reconnect is None:
+            return {"available": False, "problem": "Device controls are off"}
+        return await self.reconnect.probe()
 
     async def device_extras(self) -> dict[str, Any]:
         """Stage 6 (ADR-0079): Wi-Fi power saving where steamos-manager offers it, and the BIOS check."""
@@ -5722,6 +5795,7 @@ class KeepsakeApp:
                 "performance-control": self._performance_probe,
                 "charge-limit": self._charge_probe,
                 "controllers": self.device_controllers,
+                "reconnect-help": self._reconnect_probe,
                 "bios": self._bios_probe,
                 **({"desktop-app": self._desktop_probe} if self.registry.enabled("desktop") else {}),
             },

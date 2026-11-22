@@ -422,6 +422,67 @@ export interface ControllersStatus {
 }
 export const deviceControllers = callable<[], ControllersStatus>("device_controllers");
 
+// Controller reconnect help (R22, ADR-0082): every paired device, help per device by adapter and address.
+export const RECONNECT_EVENT = "keepsake_reconnect";
+export interface ReconnectDiagnosis {
+  outcome: string;
+  title: string;
+  advice: string;
+  recommend: string | null;
+  evidence: string[];
+  sixaxis: boolean;
+  at: number;
+  journal?: string;
+}
+export interface ReconnectDevice {
+  adapter: string;
+  adapterName: string;
+  mac: string;
+  name: string;
+  class: string | null;
+  modalias: string | null;
+  icon: string | null;
+  transport: "bredr" | "le" | "unknown";
+  paired: boolean;
+  connected: boolean;
+  services: number;
+  unregisteredPrefix: boolean;
+  help: boolean;
+  commit: boolean;
+  fullMode: boolean;
+  last: ReconnectDiagnosis | null;
+  suggest: { reason: string; at: number } | null;
+  captured: boolean;
+}
+export interface ReconnectStatus {
+  available: boolean;
+  problem: string | null;
+  off?: boolean;
+  adapters?: { address: string; name: string; alias: string; powered: boolean }[];
+  devices?: ReconnectDevice[];
+  dryRun?: boolean;
+  watcher?: boolean;
+  cableReady?: boolean;
+  actions?: { at: string; action: string; device: string | null; [k: string]: unknown }[];
+}
+export interface ReconnectResult {
+  ok: boolean;
+  state: string;
+  message: string;
+}
+export const reconnectStatus = callable<[], ReconnectStatus>("reconnect_status");
+export const reconnectSetHelp = callable<[adapter: string, mac: string, on: boolean, label: string], ReconnectStatus>("reconnect_set_help");
+export const reconnectSetOption = callable<[adapter: string, mac: string, option: "commit" | "fullMode", on: boolean], ReconnectStatus>("reconnect_set_option");
+export const reconnectSetDryRun = callable<[on: boolean], ReconnectStatus>("reconnect_set_dry_run");
+export const reconnectDismiss = callable<[adapter: string, mac: string], ReconnectStatus>("reconnect_dismiss");
+export const reconnectAssist = callable<[adapter: string, mac: string], ReconnectResult>("reconnect_assist");
+export const reconnectReadUsb = callable<
+  [adapter: string, mac: string],
+  { read: { ok: boolean; state?: string; message?: string; family?: string; storesThisHandheld?: boolean }; diagnosis: ReconnectDiagnosis | null }
+>("reconnect_read_usb");
+export const reconnectDiagnose = callable<[adapter: string, mac: string], ReconnectDiagnosis>("reconnect_diagnose");
+export const reconnectExport = callable<[adapter: string, mac: string, redactAdapter: boolean], { file: string; where: string }>("reconnect_export");
+
 // Stage 6 (ADR-0079): Wi-Fi power saving and the BIOS check.
 export interface DeviceExtras {
   wifiPowerSaving: boolean | null;
