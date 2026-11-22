@@ -18,6 +18,7 @@ import { InstallerPage } from "./InstallerPage";
 import { LogsPage } from "./LogsPage";
 import { NowPlaying } from "./NowPlaying";
 import { BatteryPanel } from "./BatteryPanel";
+import { ControllersPanel } from "./ControllersPanel";
 import { PowerPanel } from "./PowerPanel";
 import { ReplicationPage } from "./ReplicationPage";
 import { SectionPage, SectionTab } from "./Section";
@@ -93,6 +94,7 @@ const SECTIONS: Section[] = [
       { module: "core", id: "status", title: "Status", content: <DeviceStatusPage /> },
       { module: "device", id: "power", title: "Power", content: <PowerPanel /> },
       { module: "device", id: "battery", title: "Battery", content: <BatteryPanel /> },
+      { module: "core", id: "controllers", title: "Controllers", content: <ControllersPanel /> },
     ],
   },
   {

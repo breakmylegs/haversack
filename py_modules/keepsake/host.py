@@ -148,6 +148,7 @@ CALLABLES = frozenset(
         "device_apply",
         "device_forget",
         "device_battery",
+        "device_controllers",
         "device_set_charge_limit",
         "replication_stop_game",
         "replication_clear_game",

@@ -390,6 +390,15 @@ export interface ChargeLimitStatus {
   where?: string;
 }
 export const deviceBattery = callable<[], ChargeLimitStatus>("device_battery");
+
+// The controllers, read-only (R21 stage 5, ADR-0078).
+export interface ControllersStatus {
+  batteries: { name: string; percent: number | null; level: string | null; status: string | null }[];
+  controllers: { id: string; settings: Record<string, string>; left: Record<string, string>; right: Record<string, string>; touchpad: Record<string, string> }[];
+  rings: Record<string, string> | null;
+  tools: string[];
+}
+export const deviceControllers = callable<[], ControllersStatus>("device_controllers");
 export const deviceSetChargeLimit = callable<[on: boolean], ChargeLimitStatus>("device_set_charge_limit");
 export const replicationStopGame = callable<[entryId: string], GameTransfer[]>("replication_stop_game");
 export const replicationClearGame = callable<[entryId: string], GameTransfer[]>("replication_clear_game");

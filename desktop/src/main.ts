@@ -18,6 +18,7 @@ import type {
   DeviceReadingsDesk,
   PerformanceDesk,
   ChargeLimitDesk,
+  ControllersDesk,
   DeviceStatusDesk,
   FoundDevice,
   GameTransfer,
@@ -1408,6 +1409,7 @@ const PAGES: Page[] = [
   { id: "device", title: "Status", group: "Device", render: deviceStatusPage },
   { id: "power", title: "Power", group: "Device", render: powerPage },
   { id: "battery", title: "Battery", group: "Device", render: batteryPage },
+  { id: "controllers", title: "Controllers", group: "Device", render: controllersPage },
   { id: "settings", title: "General and sync", group: "Settings", render: settingsPage },
   { id: "cloud", title: "Cloud", group: "Settings", render: cloud },
   { id: "modules", title: "Modules", group: "Settings", render: modules },
@@ -1612,6 +1614,27 @@ async function batteryPage(main: HTMLElement): Promise<void> {
       ? h("label", { class: "switch" }, box, " Stop charging at 80%")
       : h("p", { class: "warn" }, `Charge limit: ${state}. This device's steamos-manager does not let Keepsake change it. ${s.where ?? ""}`),
     s.firmware.chargeTypes ? h("p", { class: "small" }, `Firmware charge types: ${s.firmware.chargeTypes}`) : null,
+  );
+}
+
+// Device: Controllers (R21 stage 5, ADR-0078): read-only
+async function controllersPage(main: HTMLElement): Promise<void> {
+  const s = await call<ControllersDesk>("device_controllers");
+  const rows = (values: Record<string, string>, where: string) => Object.entries(values).map(([k, v]) => h("tr", {}, h("td", {}, where), h("td", {}, k), h("td", {}, v)));
+  const settingRows = s.controllers.flatMap((c) => [...rows(c.settings, "controller"), ...rows(c.left, "left"), ...rows(c.right, "right"), ...rows(c.touchpad, "touchpad")]);
+  replace(
+    main,
+    h("h1", {}, "Controllers"),
+    h("h2", {}, "Batteries"),
+    s.batteries.length
+      ? h("table", {}, h("tbody", {}, ...s.batteries.map((b) => h("tr", {}, h("th", {}, b.name), h("td", {}, b.percent != null ? `${b.percent}%` : (b.level ?? "unknown")), h("td", {}, b.status ?? "")))))
+      : h("p", { class: "small" }, "This system does not show them yet (the Legion controller driver arrives in kernel 7.1)."),
+    settingRows.length ? h("h2", {}, "Settings the controllers report") : null,
+    settingRows.length ? h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Part"), h("th", {}, "Setting"), h("th", {}, "Value"))), h("tbody", {}, ...settingRows)) : null,
+    s.rings ? h("h2", {}, "Stick lights") : null,
+    s.rings ? h("table", {}, h("tbody", {}, ...Object.entries(s.rings).map(([k, v]) => h("tr", {}, h("th", {}, k), h("td", {}, v))))) : null,
+    s.tools.length ? h("p", {}, `Managed by ${s.tools.join(", ")}.`) : null,
+    h("p", { class: "small" }, "Remap buttons, dead zones and gyro in Steam's controller settings. Changing the controllers' own settings and the lights needs a separate root helper, which is waiting for a decision."),
   );
 }
 

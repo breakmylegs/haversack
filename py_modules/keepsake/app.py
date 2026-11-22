@@ -67,6 +67,7 @@ from .bus import EventBus
 from .desktop import dbus as desktop_dbus
 from .desktop import entries as desktop_entries
 from .device import battery as device_battery
+from .device import controllers as device_controllers
 from .device.performance import Performance, ProfileError, ProfileStore, clean_profile, other_tools
 from .device.steamos import ManagerError, SteamOSManager
 from .engine import SnapshotEngine
@@ -886,6 +887,10 @@ class KeepsakeApp:
         log_event(logging.INFO, "device.charge_limit", "Charge limit changed", on=bool(on))
         self._device_changed()
         return result
+
+    async def device_controllers(self) -> dict[str, Any]:
+        """The controllers as the kernel shows them (R21 stage 5, ADR-0078). Read-only."""
+        return await asyncio.to_thread(device_controllers.status, self.sys_root, self.proc_root)
 
     async def _charge_probe(self) -> dict[str, Any]:
         return await self.device_battery()
@@ -5524,6 +5529,7 @@ class KeepsakeApp:
                 "device-readings": self._readings_probe,
                 "performance-control": self._performance_probe,
                 "charge-limit": self._charge_probe,
+                "controllers": self.device_controllers,
                 **({"desktop-app": self._desktop_probe} if self.registry.enabled("desktop") else {}),
             },
         )
