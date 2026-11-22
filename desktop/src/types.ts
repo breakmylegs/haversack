@@ -346,3 +346,9 @@ export interface ChargeLimitDesk {
   firmware: { chargeTypes: string | null };
   where?: string;
 }
+export interface ControllersDesk {
+  batteries: { name: string; percent: number | null; level: string | null; status: string | null }[];
+  controllers: { id: string; settings: Record<string, string>; left: Record<string, string>; right: Record<string, string>; touchpad: Record<string, string> }[];
+  rings: Record<string, string> | null;
+  tools: string[];
+}

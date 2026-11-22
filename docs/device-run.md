@@ -155,6 +155,11 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Open Device, Battery. Either turn on **Stop charging at 80%**, or note where it tells you to change it.
     - If you changed it in Steam's settings, Battery should show the new state.
 
+26. **Controllers (v0.36.0).**
+    - Run the Device check **Controllers** and photograph it.
+    - Open Device, Controllers. It should show both controllers' batteries, and their settings and lights if the kernel shows them.
+    - Detach one controller. Its battery should go, and come back when you attach it.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

@@ -762,6 +762,38 @@ async def check_charge_limit(ctx: Context) -> dict[str, Any]:
     return result("fail", "Neither steamos-manager nor the kernel shows a charge limit on this device.", **details)
 
 
+async def check_controllers(ctx: Context) -> dict[str, Any]:
+    """Controllers (R21 stage 5): what the kernel shows of the Legion controllers, to plan their controls."""
+    probe = ctx.probes.get("controllers")
+    if probe is None:
+        return result("skip", "This build cannot read the controllers.")
+    found = await probe()
+    pads = found.get("controllers") or []
+    cells = found.get("batteries") or []
+    rings = found.get("rings")
+    details = {
+        "controllers": [p.get("id") for p in pads],
+        "settings": sorted({k for p in pads for k in (p.get("settings") or {})}),
+        "batteries": len(cells),
+        "rings": sorted(rings) if rings else None,
+        "tools": found.get("tools"),
+    }
+    parts = [
+        f"{len(pads)} controller{'s' if len(pads) != 1 else ''} on the hid-lenovo-go driver",
+        f"{len(cells)} controller batter{'ies' if len(cells) != 1 else 'y'}",
+        "RGB rings shown" if rings else "no RGB rings shown",
+    ]
+    if found.get("tools"):
+        parts.append(f"managed by {', '.join(found['tools'])}")
+    if not pads and not cells and not rings:
+        return result(
+            "warn",
+            "; ".join(parts) + ". This kernel shows nothing of the controllers (hid-lenovo-go needs 7.1).",
+            **details,
+        )
+    return result("pass", "; ".join(parts) + ".", **details)
+
+
 TRAY_LIMIT_MS = 200.0
 
 
@@ -840,6 +872,7 @@ CHECKS = [
     Check("device-readings", "Device readings", "one", "ADR-0074", check_device_readings),
     Check("performance-control", "Performance control", "one", "ADR-0076", check_performance_control),
     Check("charge-limit", "Battery charge limit", "one", "ADR-0077", check_charge_limit),
+    Check("controllers", "Controllers", "one", "ADR-0078", check_controllers),
 ]
 BY_ID = {c.id: c for c in CHECKS}
 

@@ -42,6 +42,10 @@ Keepsake changes these settings through Valve's steamos-manager, and never needs
 
 Keepsake changes it through Valve's steamos-manager. Where steamos-manager does not offer it yet, Battery shows whether the limit is on and tells you where to change it: Steam's settings, Power.
 
+## Controllers
+
+**Device**, **Controllers** shows each controller's battery, the settings the controllers report, and the stick lights. Remap buttons, set dead zones and use the gyro in Steam's controller settings. Changing the controllers' own settings and the lights needs root, which waits for a separate decision.
+
 ## Coming next
 
 Fan curves, controller and RGB settings, and display settings arrive in later releases. The ones that need root wait for a separate decision.

@@ -4,6 +4,16 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **Device, Controllers** (the controller stage of the Legion Go controls), in Gaming Mode and the desktop app. It shows:
+  - each controller's battery;
+  - the settings the controllers report (mode, rumble, gyro, auto-sleep, touchpad);
+  - the stick lights.
+
+  It points to Steam's controller settings for remapping, dead zones and gyro, which Steam already does well. Changing the controllers' own settings and the lights needs root, and waits for the owner's decision. Keepsake only reads these.
+- **A new Device check, "Controllers",** records what each device shows of its controllers.
+
 ## [0.35.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
