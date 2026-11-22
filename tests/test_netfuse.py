@@ -247,6 +247,8 @@ def test_smb_ranges_reconnect_once():
 
 
 def test_in_place_waits_for_the_register_approval(monkeypatch):
+    assert netfuse.FUSERMOUNT_APPROVED is True  # approved on 22 November 2026
+    monkeypatch.setattr(netfuse, "FUSERMOUNT_APPROVED", False)
     assert "fusermount3 to be approved" in netfuse.available()
     monkeypatch.setattr(netfuse, "FUSERMOUNT_APPROVED", True)
     if os.name != "posix":

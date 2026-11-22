@@ -159,6 +159,7 @@ Each entry must be verified present on SteamOS and Bazzite during the slice that
 | `openssl` | Replication | Candidate for certificate generation at pairing, subject to the slice 16 spike |
 | `firewall-cmd` | Replication | Detection only (`--state`, query). Never used to change rules |
 | `python3` | Desktop | Run the tray process in the desktop session |
+| `fusermount3` | Installer | Mount Keepsake's own read-only one-file FUSE file system for a network ISO and unmount it (approved 22 November 2026, ADR-0067) |
 | `journalctl` | Device | Read-only: bluetoothd's and the kernel's lines for a reconnect diagnosis, with `--since`, `-n` and a timeout (ADR-0082) |
 
 ---

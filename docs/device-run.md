@@ -236,6 +236,10 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - reboot: control should resume on its own.
 44. **Full fan speed on the Legion Go.** Switch on Full fan speed: the fan should run flat out. Disable Keepsake in Decky: it should stop within about 10 seconds.
 
+45. **Network ISO in place (v0.45.0).** In Install, pick an ISO on a Windows share that is not mounted.
+    - It should install without copying the ISO first.
+    - Run the Device check "Network ISO in place": it should report in place available.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

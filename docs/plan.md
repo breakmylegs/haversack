@@ -58,7 +58,7 @@ Peter's decisions and priorities of 22 November 2026 (ADR-0075 tier 1 approved; 
 |---|---|
 | R22 Controller reconnect help, without root (ADR-0082; generic for Bluetooth Classic controllers, the DualShock 4 as the first cable provider): device list, passive detection, Reconnect assist (also in the quick menu), pair and commit, diagnosis from D-Bus and the journal, the USB stored-host read, report bundle | in 0.40.0 |
 | R23 The root helper (ADR-0075 tier 1, ADR-0083), first jobs for reconnect help: HCI capture, cable pairing through providers with a confirmed bluetoothd restart and Restore backup, the opt-in SSP gate | in 0.41.0 |
-| R24 The desktop app's reconnect help page (in 0.42.0); separate SPL, SPPT and FPPT (in 0.43.0, ADR-0084); fan control (in 0.44.0, ADR-0085); next, the helper's other jobs: fan control (every feature of the fan plugins Peter uses), separate SPL, SPPT and FPPT, RGB, controller settings, the power LED; in-place network ISOs (`fusermount3`) | queued |
+| R24 The desktop app's reconnect help page (in 0.42.0); separate SPL, SPPT and FPPT (in 0.43.0, ADR-0084); fan control (in 0.44.0, ADR-0085); in-place network ISOs (in 0.45.0, `fusermount3` approved); next, the helper's other jobs: fan control (every feature of the fan plugins Peter uses), separate SPL, SPPT and FPPT, RGB, controller settings, the power LED; in-place network ISOs (`fusermount3`) | queued |
 | R25 Quick menu shortcuts (ADR-0073 addendum; work in progress on its branch) | queued |
 | R26 Emulator games between devices, with emulators, EmuDeck, firmware, BIOS and keys | queued |
 | R27 The rename (name search and ADR), with a new full-colour logo and icons | queued |

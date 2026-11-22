@@ -34,7 +34,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Protocol
 
 # ADR-0018: fusermount3 is proposed, not approved. Peter's approval flips this, in its own change.
-FUSERMOUNT_APPROVED = False
+FUSERMOUNT_APPROVED = True  # Peter approved the register entry on 22 November 2026 (ADR-0018, ADR-0067)
 FUSERMOUNT = "fusermount3"
 
 ROOT_ID = 1
