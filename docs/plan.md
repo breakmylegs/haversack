@@ -49,6 +49,20 @@ Peter's new direction of 21 November 2026 sets the order from here:
 | R21 Legion Go device control (stage 1, read-only readings, ADR-0074, in 0.33.0; research `docs/research/legion-control.md` and the permission ADR-0075, with tier 1 waiting for Peter; stage 2, performance profiles, ADR-0076, in 0.34.0; stage 3, fans, waits for the tier 1 decision; stage 4, battery charge limit (R17), ADR-0077, in 0.35.0; stage 5, controllers read-only, ADR-0078, in 0.36.0; stage 6, Wi-Fi power saving and the BIOS check, ADR-0079, in 0.37.0. Fans and the root parts wait for Peter's decision on ADR-0075 tier 1), after research (`docs/research/legion-control.md`) and a permission-model ADR. In stages, each a release: read-only status; TDP and per-game profiles; fans; battery (R17 folds in here); controllers and RGB; display and other features. Anything needing root waits for Peter's approval of the permission ADR | next |
 | R16 step 2 Take the newest save (ADR-0080) | in 0.38.0 |
 | R18 Library badges and artwork for streaming tiles (ADR-0081) | in 0.39.0 |
+| Sidebar fix (ADR-0073 addendum) | 0.39.1 |
+
+Peter's decisions and priorities of 22 November 2026 (ADR-0075 tier 1 approved; `fusermount3` approved). The order:
+
+| Item | State |
+|---|---|
+| R22 Clone DualShock 4 reconnect fix, without root: diagnosis, Share+PS assist (also a quick menu shortcut), pair-and-commit watcher, report 0x12 over USB, allow-list | next |
+| R23 The root helper (ADR-0075 tier 1), first jobs for the DS4 fix: cable pairing key install with a confirmed bluetoothd restart, the opt-in SSP gate, HCI capture | queued |
+| R24 The helper's other jobs: fan control (every feature of the fan plugins Peter uses), separate SPL, SPPT and FPPT, RGB, controller settings, the power LED; in-place network ISOs (`fusermount3`) | queued |
+| R25 Quick menu shortcuts (ADR-0073 addendum; work in progress on its branch) | queued |
+| R26 Emulator games between devices, with emulators, EmuDeck, firmware, BIOS and keys | queued |
+| R27 The rename (name search and ADR), with a new full-colour logo and icons | queued |
+| R28 README and in-app Help rewrite, kept in step with each release from then on | queued |
+| R29 Research every Decky plugin (`docs/research/decky-plugins.md`), then the plugin feature stages: looks (themes, sounds, animations), library extras, performance and display, utilities, launchers and stores | queued |
 
 ## Section 10 amendments: where each is delivered
 

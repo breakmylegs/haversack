@@ -1,8 +1,9 @@
-import { SidebarNavigation, SidebarNavigationPage } from "@decky/ui";
+import { Field, SidebarNavigation, SidebarNavigationPage } from "@decky/ui";
 import { ReactElement, useEffect, useState } from "react";
 import { FaCog, FaCompactDisc, FaExchangeAlt, FaMicrochip, FaPlay, FaSave, FaStethoscope } from "react-icons/fa";
 import { modulesStatus } from "../backend";
-import { LEGACY, ROUTE_PATH, SectionId, sectionPath } from "../routes";
+import { openSection, ROUTE_PATH, SectionId } from "../routes";
+import { sidebarEntries, sidebarKey } from "../sidebar";
 import { ActivityPage } from "./ActivityPage";
 import { AdvisorPage } from "./AdvisorPage";
 import { ConflictsPage } from "./ConflictsPage";
@@ -78,7 +79,7 @@ const SECTIONS: Section[] = [
     ],
   },
   {
-    id: "games",
+    id: "games-devices",
     title: "Games and devices",
     icon: <FaExchangeAlt />,
     tabs: [
@@ -130,35 +131,48 @@ const SECTIONS: Section[] = [
   },
 ];
 
-// Where the sidebar draws a line: after Play, after Games and devices, and after Install.
-const SEPARATE_AFTER: SectionId[] = ["play", "games", "install"];
-
+// v0.39.1: the sidebar is built once from the loaded module state (sidebar.ts), with no hidden
+// entries; a change of modules rebuilds it under a new key, so the selection follows the route.
 export function KeepsakeRoute() {
-  const [running, setRunning] = useState<Set<string>>(new Set(["saves"]));
+  const [running, setRunning] = useState<Set<string> | null>(null);
   useEffect(() => {
+    let live = true;
+    const fallback = setTimeout(() => live && setRunning((r) => r ?? new Set(["saves"])), MODULES_WAIT_MS);
     modulesStatus()
-      .then((s) => setRunning(new Set(s.modules.filter((m) => m.running).map((m) => m.name))))
-      .catch(() => undefined);
+      .then((s) => live && setRunning(new Set(s.modules.filter((m) => m.running).map((m) => m.name))))
+      .catch(() => live && setRunning(new Set(["saves"])));
+    return () => {
+      live = false;
+      clearTimeout(fallback);
+    };
   }, []);
-  const shown = SECTIONS.map((s) => ({ ...s, tabs: s.tabs.filter((t) => t.module === "core" || running.has(t.module)) })).filter(
-    (s) => s.tabs.length,
-  );
-  const pages: (SidebarNavigationPage | "separator")[] = [];
-  for (const s of shown) {
-    pages.push({ title: s.title, icon: s.icon, content: <SectionPage section={s.id} tabs={s.tabs} />, route: sectionPath(s.id) });
-    if (SEPARATE_AFTER.includes(s.id)) pages.push("separator");
+  if (running === null) {
+    return (
+      <div style={{ marginTop: 40, padding: 24 }}>
+        <Field label="Keepsake" description="Loading" />
+      </div>
+    );
   }
-  // The pages before v0.32.0 still open, at their new tab, for links and habits from older versions.
-  for (const [old, [section, tab]] of Object.entries(LEGACY)) {
-    const target = shown.find((s) => s.id === section);
-    if (!target) continue;
-    const content = <SectionPage section={section} tabs={target.tabs} initial={tab} />;
-    pages.push({ title: target.title, content, route: `${ROUTE_PATH}/${old}`, visible: false });
-  }
-  if (pages[pages.length - 1] === "separator") pages.pop();
+  const entries = sidebarEntries(SECTIONS, running);
+  const pages: (SidebarNavigationPage | "separator")[] = entries.map((e) => {
+    if (e.kind === "separator") return "separator";
+    const section = SECTIONS.find((s) => s.id === e.section) as Section;
+    const tabs = section.tabs.filter((t) => e.tabs.includes(t.id));
+    return { title: section.title, icon: section.icon, content: <SectionPage section={section.id} tabs={tabs} />, route: e.route };
+  });
   return (
     <div style={{ marginTop: 40, height: "calc(100% - 40px)" }}>
-      <SidebarNavigation title="Keepsake" showTitle pages={pages} />
+      <SidebarNavigation key={sidebarKey(entries)} title="Keepsake" showTitle pages={pages} />
     </div>
   );
+}
+
+const MODULES_WAIT_MS = 3000; // if the backend is slow, show the sidebar for Saves and Core
+
+/** An old page's route (before v0.32.0): opens its new section and tab, then gets out of the way. */
+export function LegacyRedirect({ section, tab }: { section: SectionId; tab: string }) {
+  useEffect(() => {
+    openSection(section, tab);
+  }, []);
+  return null;
 }

@@ -1,18 +1,15 @@
 // Route paths for Keepsake's pages.
 import { Navigation } from "@decky/ui";
+import { SectionId, sectionPath } from "./routeData";
 
-export const ROUTE_PATH = "/keepsake";
-export const SETUP_PATH = "/keepsake-setup";
+export { LEGACY, ROUTE_PATH, SETUP_PATH, sectionPath } from "./routeData";
+export type { SectionId } from "./routeData";
 
-// Layout v3 (ADR-0073): seven sections, each with tabs.
-export type SectionId = "play" | "saves" | "games" | "device" | "install" | "settings" | "diagnostics";
+
 
 // The tab a link asked for, taken by the section when it opens.
 const requested: Partial<Record<SectionId, string>> = {};
 
-export function sectionPath(section: SectionId): string {
-  return `${ROUTE_PATH}/${section}`;
-}
 
 /** Ask for ``tab`` the next time ``section`` opens (or now, if it is open). */
 export function requestTab(section: SectionId, tab?: string): void {
@@ -32,19 +29,3 @@ export function takeRequestedTab(section: SectionId): string | undefined {
   return tab;
 }
 
-// The pages before v0.32.0, so old links keep working: page to [section, tab].
-export const LEGACY: Record<string, [SectionId, string]> = {
-  games: ["saves", "games"],
-  conflicts: ["saves", "conflicts"],
-  history: ["saves", "history"],
-  activity: ["saves", "activity"],
-  import: ["saves", "import"],
-  advisor: ["play", "advisor"],
-  devices: ["games", "moving"],
-  storage: ["games", "disk"],
-  install: ["install", "install"],
-  settings: ["settings", "general"],
-  updates: ["settings", "updates"],
-  logs: ["diagnostics", "logs"],
-  diagnostics: ["diagnostics", "health"],
-};

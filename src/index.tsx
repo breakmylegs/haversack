@@ -24,7 +24,8 @@ import { BatteryPanel } from "./pages/BatteryPanel";
 import { PowerPanel } from "./pages/PowerPanel";
 import { openCheckpointModal } from "./pages/CheckpointModal";
 import { openWhatsNew } from "./pages/WhatsNewModal";
-import { KeepsakeRoute } from "./pages/KeepsakeRoute";
+import { KeepsakeRoute, LegacyRedirect } from "./pages/KeepsakeRoute";
+import { legacyRoutes } from "./sidebar";
 import { SetupWizard } from "./pages/SetupWizard";
 import { openSection, ROUTE_PATH, SETUP_PATH } from "./routes";
 
@@ -126,7 +127,7 @@ function Content() {
       )}
       <PanelSection title="Keepsake">
         <BatteryPanel compact />
-        <GameTransfersCompact onOpen={() => openSection("games", "moving")} />
+        <GameTransfersCompact onOpen={() => openSection("games-devices", "moving")} />
         {attention.slice(0, 3).map((a) => (
           <PanelSectionRow key={a.key}>
             <ButtonItem layout="below" onClick={a.open}>
@@ -182,6 +183,12 @@ async function announce() {
 }
 
 export default definePlugin(() => {
+  // Old page routes (before v0.32.0) redirect to their section and tab. Registered first and exact,
+  // so they win over the page's own route; never as hidden sidebar pages (v0.39.1).
+  const legacy = legacyRoutes();
+  for (const old of legacy) {
+    routerHook.addRoute(old.path, () => <LegacyRedirect section={old.section} tab={old.tab} />, { exact: true });
+  }
   routerHook.addRoute(ROUTE_PATH, KeepsakeRoute);
   routerHook.addRoute(SETUP_PATH, SetupWizard);
   const stopProbes = startProbes();
@@ -225,6 +232,7 @@ export default definePlugin(() => {
       stopLibraryBadges();
       removeEventListener("keepsake_toast", toastListener);
       removeEventListener("keepsake_pair_request", pairListener);
+      for (const old of legacy) routerHook.removeRoute(old.path);
       routerHook.removeRoute(ROUTE_PATH);
       routerHook.removeRoute(SETUP_PATH);
     },

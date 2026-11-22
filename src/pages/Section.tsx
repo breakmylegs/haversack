@@ -36,7 +36,9 @@ export function SectionPage({ section, tabs, initial }: { section: SectionId; ta
   return (
     <div>
       {tabs.length > 1 && (
-        <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+        // A horizontal row the D-pad moves along; Down goes into the tab, and B is left to the
+        // sidebar (no onCancel here), so focus always gets back to it (v0.39.1).
+        <Focusable flow-children="horizontal" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
           {tabs.map((t) => (
             <DialogButton
               key={t.id}
