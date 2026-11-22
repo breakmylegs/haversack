@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.43.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Added
 
 - **Separate power limits** (Device, Power, and the desktop app's Power page):
