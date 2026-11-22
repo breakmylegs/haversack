@@ -340,6 +340,11 @@ export interface PerformanceDesk {
   profile: Record<string, unknown> | null;
   stopped: string | null;
   limits: { min?: number; max?: number };
+  powerLimits?: {
+    available: boolean;
+    ready: boolean;
+    ranges: Record<"spl" | "sppt" | "fppt", { current: number; min: number; max: number; step: number }> | null;
+  };
 }
 export interface ChargeLimitDesk {
   control: string | null;

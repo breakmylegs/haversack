@@ -71,7 +71,9 @@ from .device import battery as device_battery
 from .device import bios as device_bios
 from .device import controllers as device_controllers
 from .device.bluez import BlueZError
+from .device.helper import HelperClient
 from .device.performance import Performance, ProfileError, ProfileStore, clean_profile, other_tools
+from .device.powerlimits import PowerLimits
 from .device.reconnect_service import ReconnectService
 from .device.steamos import ManagerError, SteamOSManager
 from .engine import SnapshotEngine
@@ -806,6 +808,7 @@ class KeepsakeApp:
                 self._steamos(),
                 lambda: other_tools(home, self.proc_root),
                 self._device_limits,
+                PowerLimits(HelperClient(self.version), self.sys_root),
             )
             loop = asyncio.get_running_loop()
 

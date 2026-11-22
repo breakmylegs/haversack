@@ -376,10 +376,16 @@ export interface DeviceReadings {
 export const deviceReadings = callable<[], DeviceReadings>("device_readings");
 
 // Performance profiles (R21 stage 2, ADR-0076): through steamos-manager only, per game.
+export interface PowerLimitValues {
+  spl: number;
+  sppt: number;
+  fppt: number;
+}
 export interface PerformanceValues {
   mode?: string;
   tdp?: number;
   boost?: boolean;
+  limits?: PowerLimitValues;
 }
 export interface PerformanceStatus {
   available: boolean;
@@ -397,6 +403,12 @@ export interface PerformanceStatus {
   applied: PerformanceValues;
   stopped: string | null;
   limits: { min?: number; max?: number };
+  // Separate SPL, SPPT and FPPT (ADR-0084): ranges from the firmware; setting needs the helper.
+  powerLimits?: {
+    available: boolean;
+    ready: boolean;
+    ranges: Record<keyof PowerLimitValues, { current: number; min: number; max: number; step: number }> | null;
+  };
 }
 export const devicePerformance = callable<[], PerformanceStatus>("device_performance");
 export const deviceApply = callable<[values: PerformanceValues, saveFor: number | null], PerformanceStatus>("device_apply");

@@ -221,6 +221,11 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Run Diagnose on the clone from there.
     - The app should stay responsive throughout.
 
+41. **Separate power limits (v0.43.0).** With the helper installed, open Device, Power.
+    - Set SPL 20, SPPT 25, FPPT 30 W and select Apply: the mode should switch to Custom, and the values should stay after reopening the page.
+    - Start a game, set different limits, quit: the earlier values should come back.
+    - Press Legion L plus Y during a game: Keepsake should say it paused the profile, and not set the limits again.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

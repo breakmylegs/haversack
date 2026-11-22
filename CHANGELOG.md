@@ -4,6 +4,17 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **Separate power limits** (Device, Power, and the desktop app's Power page):
+  - set SPL (sustained), SPPT (slow boost) and FPPT (fast boost) on their own, each within the firmware's range;
+  - kept per game like the other performance settings, put back when the game exits, and applied again after sleep;
+  - this needs the Keepsake Helper. Without it the current values are shown.
+
+### Fixed
+
+- The Power page's settings no longer redraw themselves on every update, which could move the focus.
+
 ## [0.42.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

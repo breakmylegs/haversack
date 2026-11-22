@@ -18,6 +18,8 @@ from collections.abc import Callable
 from typing import Any
 
 from ..fsutil import atomic_write_json, read_json
+from .powerlimits import LimitsError, PowerLimits
+from .powerlimits import clean as clean_limits
 from .steamos import ManagerError, SteamOSManager
 
 MAX_GAMES = 500
@@ -58,6 +60,12 @@ def clean_profile(value: Any) -> dict[str, Any]:
         if not isinstance(boost, bool):
             raise ProfileError("CPU boost is on or off")
         out["boost"] = boost
+    limits = value.get("limits")
+    if limits is not None:
+        try:
+            out["limits"] = clean_limits(limits)
+        except LimitsError as exc:
+            raise ProfileError(str(exc)) from exc
     return out
 
 
@@ -126,7 +134,9 @@ class Performance:
         manager: SteamOSManager,
         tools: Callable[[], list[str]],
         limits: Callable[[], dict[str, int]],
+        power: PowerLimits | None = None,
     ) -> None:
+        self.power = power  # separate SPL, SPPT and FPPT through the Keepsake Helper (ADR-0084)
         self.store = store
         self.manager = manager
         self.tools = tools
@@ -153,6 +163,15 @@ class Performance:
             "applied": dict(self.applied),
             "stopped": self.stopped,
             "limits": self.limits(),
+            "powerLimits": self._power_status(),
+        }
+
+    def _power_status(self) -> dict[str, Any]:
+        ranges = self.power.read() if self.power else None
+        return {
+            "available": ranges is not None,
+            "ready": bool(ranges is not None and self.power and self.power.helper.status().get("ready")),
+            "ranges": ranges,
         }
 
     def _clamp(self, tdp: int, current: dict[str, Any]) -> int:
@@ -176,7 +195,8 @@ class Performance:
         profile = clean_profile(profile)
         current = self.manager.read()
         mode = profile.get("mode")
-        if profile.get("tdp") is not None and current.get("profile") and "custom" in current["profile"]["available"]:
+        wants_custom = profile.get("tdp") is not None or profile.get("limits") is not None
+        if wants_custom and current.get("profile") and "custom" in current["profile"]["available"]:
             mode = "custom"
         if mode is not None:
             if not current.get("profile") or mode not in current["profile"]["available"]:
@@ -193,6 +213,15 @@ class Performance:
                 raise ProfileError("this device does not offer CPU boost control")
             self.before.setdefault("boost", current["boost"])
             self.applied["boost"] = self.manager.set_boost(profile["boost"])
+        if profile.get("limits") is not None:
+            # After the TDP: steamos-manager's TDP writes one value to all three.
+            if self.power is None or self.power.read() is None:
+                raise ProfileError("this device does not offer separate power limits")
+            self.before.setdefault("limits", self.power.current())
+            try:
+                self.applied["limits"] = self.power.set(profile["limits"])
+            except LimitsError as exc:
+                raise ProfileError(str(exc)) from exc
         return dict(self.applied)
 
     def game_started(self, appid: int) -> dict[str, Any] | None:
@@ -202,7 +231,7 @@ class Performance:
             return None
         try:
             return self.apply(profile)
-        except (ProfileError, ManagerError) as exc:
+        except (ProfileError, ManagerError, LimitsError) as exc:
             self.stopped = str(exc)
             return None
 
@@ -218,6 +247,7 @@ class Performance:
             "mode": (current.get("profile") or {}).get("current"),
             "tdp": (current.get("tdp") or {}).get("value"),
             "boost": current.get("boost"),
+            "limits": self.power.current() if self.power and "limits" in self.applied else None,
         }
         changed = [k for k, v in self.applied.items() if now.get(k) != v]
         if changed:
@@ -241,18 +271,20 @@ class Performance:
             "mode": (current.get("profile") or {}).get("current"),
             "tdp": (current.get("tdp") or {}).get("value"),
             "boost": current.get("boost"),
+            "limits": self.power.current() if self.power and "limits" in self.applied else None,
         }
         setters: dict[str, Callable[[Any], Any]] = {
+            "limits": lambda v: self.power.set(v) if self.power else None,
             "tdp": self.manager.set_tdp,
             "boost": self.manager.set_boost,
             "mode": self.manager.set_profile,
         }
-        for key in ("tdp", "boost", "mode"):  # the mode last: putting it back resets the firmware's limits
+        for key in ("limits", "tdp", "boost", "mode"):  # the mode last: putting it back resets the firmware's limits
             if key in self.applied and key in self.before and now.get(key) == self.applied[key]:
                 try:
                     setters[key](self.before[key])
                     restored.append(key)
-                except ManagerError:
+                except (ManagerError, LimitsError):
                     continue
         self.applied, self.before = {}, {}
         return restored

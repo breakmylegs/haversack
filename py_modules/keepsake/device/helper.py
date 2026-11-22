@@ -146,6 +146,9 @@ class HelperClient:
     def ssp_release(self) -> dict[str, Any]:
         return self.call("ssp.release")
 
+    def power_set(self, values: dict[str, int]) -> dict[str, Any]:
+        return self.call("power.set", values=values)
+
     def capture(self, seconds: float) -> bytes:
         found = self.call("hci.capture", timeout=CAPTURE_TIMEOUT, seconds=seconds)
         return base64.b64decode(str(found.get("btsnoop", "")))

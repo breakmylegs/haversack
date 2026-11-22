@@ -36,6 +36,15 @@ Keepsake never fights another tool:
 
 Keepsake changes these settings through Valve's steamos-manager, and never needs root.
 
+### Separate power limits
+
+With the Keepsake Helper installed, **Device**, **Power** also has **Separate power limits**:
+- **SPL** is the sustained power;
+- **SPPT** is the slow boost;
+- **FPPT** is the fast boost.
+
+Move the sliders, then select **Apply**. Keepsake switches to Custom mode first, because the firmware ignores the limits in any other mode. With a game running, the limits are kept for that game, like the TDP.
+
 ## Battery
 
 **Device**, **Battery** has **Stop charging at 80%**, Lenovo's charge limit. It keeps the battery healthier if the device is plugged in for long spells. The same toggle is in the quick access menu.

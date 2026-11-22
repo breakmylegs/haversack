@@ -1612,6 +1612,30 @@ async function powerPage(main: HTMLElement): Promise<void> {
       ),
     ),
     s.game && s.profile ? h("div", { class: "actions" }, button("Forget this game's profile", async () => (await call("device_forget", s.game), await powerPage(main)))) : null,
+    limitsSection(s, locked, apply),
+  );
+}
+
+// Separate SPL, SPPT and FPPT (ADR-0084), through the Keepsake Helper.
+function limitsSection(s: PerformanceDesk, locked: boolean, apply: (values: Record<string, unknown>) => Promise<void>): HTMLElement | null {
+  const p = s.powerLimits;
+  if (!p?.available || !p.ranges) return null;
+  const r = p.ranges;
+  if (!p.ready) {
+    return h("p", { class: "small" }, `Power limits now: SPL ${r.spl.current} W, SPPT ${r.sppt.current} W, FPPT ${r.fppt.current} W. Changing them separately needs the Keepsake Helper (install it from Gaming Mode: Device, Reconnect help).`);
+  }
+  const words = { spl: "SPL, sustained", sppt: "SPPT, slow boost", fppt: "FPPT, fast boost" } as const;
+  const inputs = (Object.keys(words) as (keyof typeof words)[]).map((key) => {
+    const input = h("input", { type: "number", min: String(r[key].min), max: String(r[key].max), step: String(r[key].step), value: String(r[key].current), "aria-label": words[key], disabled: locked }) as HTMLInputElement;
+    return [key, input] as const;
+  });
+  return h(
+    "section",
+    {},
+    h("h2", {}, "Separate power limits"),
+    h("p", { class: "small" }, "Each within the firmware's own range, rising from SPL to FPPT. Applying sets Custom mode; with a game running they are kept for that game."),
+    h("table", {}, h("tbody", {}, ...inputs.map(([key, input]) => h("tr", {}, h("th", {}, words[key]), h("td", {}, input, " W"))))),
+    h("div", { class: "actions" }, button("Apply the limits", async () => apply({ limits: Object.fromEntries(inputs.map(([key, input]) => [key, Number(input.value)])) }))),
   );
 }
 
