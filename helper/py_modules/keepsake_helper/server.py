@@ -28,7 +28,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from . import bluetooth, hid, mgmt
+from . import bluetooth, hid, mgmt, power
 
 RUN_DIR = "/run/keepsake-helper"
 MAX_REQUEST = 64 * 1024
@@ -44,6 +44,8 @@ JOBS = (
     "ssp.renew",
     "ssp.release",
     "hci.capture",
+    "power.read",
+    "power.set",
 )
 log = logging.getLogger("keepsake-helper")
 
@@ -80,7 +82,11 @@ class Helper:
         sys_root: str = "/sys",
         ioctl: hid.Ioctl | None = None,
         clock: Callable[[], float] = time.monotonic,
+        power_root: str = power.ROOT,
+        profile_glob: str = power.PROFILE_GLOB,
     ) -> None:
+        self.power_root = power_root
+        self.profile_glob = profile_glob
         self.version = version
         self.uid = uid
         self.token = secrets.token_hex(32)
@@ -143,7 +149,15 @@ class Helper:
             raise Refused("unknown job")
         try:
             return {"ok": True, **self._run(str(job), args)}
-        except (bluetooth.BluetoothError, hid.HidError, mgmt.MgmtError, Refused, ValueError, OSError) as exc:
+        except (
+            bluetooth.BluetoothError,
+            hid.HidError,
+            mgmt.MgmtError,
+            power.PowerError,
+            Refused,
+            ValueError,
+            OSError,
+        ) as exc:
             return {"ok": False, "error": str(exc)[:200]}
 
     def _run(self, job: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -192,6 +206,10 @@ class Helper:
         if job == "ssp.release":
             self.restore_ssp("released by Keepsake")
             return {}
+        if job == "power.read":
+            return {"limits": power.read(self.power_root), "profile": power.profile(self.profile_glob)}
+        if job == "power.set":
+            return {"limits": power.apply(args.get("values"), self.power_root, self.profile_glob)}
         if job == "hci.capture":
             data = mgmt.capture(float(args.get("seconds") or 40), self.opener)
             return {"btsnoop": base64.b64encode(data).decode("ascii")}
