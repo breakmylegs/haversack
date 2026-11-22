@@ -285,6 +285,9 @@ class Plugin:
     async def device_status(self) -> dict[str, Any]:
         return await self.app.device_status()
 
+    async def device_readings(self) -> dict[str, Any]:
+        return await self.app.device_readings()
+
     async def replication_activity(self) -> list[dict[str, Any]]:
         return await self.app.replication_activity()
 

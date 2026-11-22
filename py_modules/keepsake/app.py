@@ -35,6 +35,7 @@ from . import (
     diagnostics,
     directsync,
     discovery,
+    hardware,
     health,
     hosts,
     identity,
@@ -5335,6 +5336,7 @@ class KeepsakeApp:
                 "network-iso": self._network_iso_probe,
                 "session-sources": self._session_sources_probe,
                 "tray-responsive": self._tray_probe,
+                "device-readings": self._readings_probe,
                 **({"desktop-app": self._desktop_probe} if self.registry.enabled("desktop") else {}),
             },
         )
@@ -5385,6 +5387,13 @@ class KeepsakeApp:
             }
 
         return await asyncio.to_thread(read)
+
+    async def device_readings(self) -> dict[str, Any]:
+        """Live readings for Device, Status (R21 stage 1, ADR-0074): every world-readable sensor. Read-only."""
+        return await asyncio.to_thread(hardware.read_status, self.sys_root)
+
+    async def _readings_probe(self) -> dict[str, Any]:
+        return await self.device_readings()
 
     async def device_checks_export(self) -> dict[str, Any]:
         """Save the results as one redacted file, and give a short summary for the screen and a QR code."""

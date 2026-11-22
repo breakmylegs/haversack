@@ -314,3 +314,14 @@ export interface AdvisorDesk {
   recommendations?: { lines: { power: string[]; display: string[]; scaling: string[] } }[];
   sessions?: { recent: AdvisorSessionDesk[]; advice: { text: string }[] };
 }
+export interface SensorDesk {
+  label: string;
+  value: number;
+}
+export interface DeviceReadingsDesk {
+  chips: { name: string; temps: SensorDesk[]; fans: SensorDesk[]; power: SensorDesk[] }[];
+  battery: { watts?: number | null };
+  bios: { version: string | null; date: string | null };
+  profile: { current: string; choices: string[]; words: string } | null;
+  cpu: { boost: boolean | null; smt: string | null; online: number | null };
+}

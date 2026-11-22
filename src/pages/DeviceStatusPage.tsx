@@ -1,6 +1,7 @@
 import { Field } from "@decky/ui";
 import { useEffect, useState } from "react";
 import { deviceStatus, DeviceStatus } from "../backend";
+import { DeviceReadings } from "./DeviceReadings";
 
 // Device, Status (layout v3, ADR-0073): this handheld as Keepsake sees it. Read-only. The device
 // controls (R21) add Power, Fans, Battery, Controllers and Display beside it, stage by stage.
@@ -43,6 +44,7 @@ export function DeviceStatusPage() {
         />
       )}
       <Field label="Battery" description={batteryText} />
+      <DeviceReadings />
       <Field
         label="Device controls"
         description="Power, fan, battery, controller and display controls arrive here in the next releases, one area at a time."

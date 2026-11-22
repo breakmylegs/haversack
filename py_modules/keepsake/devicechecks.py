@@ -650,6 +650,49 @@ async def check_see_other(ctx: Context) -> dict[str, Any]:
     )
 
 
+async def check_device_readings(ctx: Context) -> dict[str, Any]:
+    """Device readings (R21 stage 1): which sensors, fans, modes and BIOS details this device exposes."""
+    probe = ctx.probes.get("device-readings")
+    if probe is None:
+        return result("skip", "This build cannot read the device's sensors.")
+    found = await probe()
+    chips = found.get("chips") or []
+    temps = sum(len(c.get("temps", [])) for c in chips)
+    fans = [f for c in chips for f in c.get("fans", [])]
+    profile = found.get("profile") or {}
+    bios = found.get("bios") or {}
+    names = [str(c.get("name")) for c in chips]
+    details = {
+        "chips": names,
+        "temps": temps,
+        "fans": len(fans),
+        "profile": profile.get("current"),
+        "choices": profile.get("choices"),
+        "bios": bios.get("version"),
+        "chargeLimit": (found.get("battery") or {}).get("chargeLimit"),
+        "cpu": found.get("cpu"),
+    }
+    parts = [f"{temps} temperature sensors on {', '.join(names) or 'no chip'}"]
+    parts.append(
+        f"{len(fans)} fan reading{'s' if len(fans) != 1 else ''}" + (f" ({fans[0]['value']:.0f} RPM)" if fans else "")
+    )
+    parts.append(
+        f"mode {profile['current']} of {', '.join(profile.get('choices') or [])}"
+        if profile
+        else "no firmware mode exposed"
+    )
+    parts.append(f"BIOS {bios['version']}" if bios.get("version") else "no BIOS version")
+    if not temps:
+        return result("fail", "No temperature sensor could be read: " + "; ".join(parts) + ".", **details)
+    if not fans or not profile:
+        return result(
+            "warn",
+            "; ".join(parts) + ". Fan or mode control needs these; see docs/research/legion-control.md.",
+            **details,
+        )
+    return result("pass", "; ".join(parts) + ".", **details)
+
+
 TRAY_LIMIT_MS = 200.0
 
 
@@ -725,6 +768,7 @@ CHECKS = [
     Check("desktop-app", "Desktop app ready", "one", "A208, A209", check_desktop_app),
     Check("session-sources", "Session stats sources", "one", "A211, A212", check_session_sources),
     Check("tray-responsive", "Desktop tray responsive", "one", "v0.30.1", check_tray_responsive),
+    Check("device-readings", "Device readings", "one", "ADR-0074", check_device_readings),
 ]
 BY_ID = {c.id: c for c in CHECKS}
 
