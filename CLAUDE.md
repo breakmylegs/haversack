@@ -35,7 +35,7 @@ Outcomes:
 1. **Never silently overwrite.** Whenever local and cloud have both changed, the user resolves a conflict.
 2. **Snapshots are immutable.** Cloud objects are written once and never modified. Only retention deletes, within the protection rules in build prompt section 9.
 3. **Every restore is reversible.** A local pre-restore snapshot is taken and verified before any local save file is replaced or removed.
-4. **Hashes decide, timestamps inform.** Decisions about save data use content hashes and parent links. Timestamps are displayed but never pick a winner.
+4. **Hashes decide, timestamps inform.** Decisions about save data use content hashes and parent links. Timestamps are displayed but never pick a winner, except under the opt-in "Take the newest" setting and its clock guard (ADR-0080).
 5. **Fail closed.** If discovery, resolution, hashing, auth or network is uncertain, do nothing destructive, tell the user and keep the game playable.
 6. **Never write saves under a running game.** Restores happen only before launch, while the game is frozen, or after exit.
 7. **Gaming Mode first** (amended in v2, ADR-0014). Every feature is fully operable from Gaming Mode with the controller alone. Desktop Mode surfaces are additional and never required. No feature may need a terminal or a separately installed app.

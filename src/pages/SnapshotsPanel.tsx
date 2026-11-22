@@ -3,6 +3,10 @@ import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import {
   listSnapshots,
+  NewestChoice,
+  newestChoice,
+  snapshotLocations,
+  undoNewest,
   pinSnapshot,
   releaseQuarantine,
   repairSnapshot,
@@ -39,7 +43,16 @@ export function SnapshotsPanel({ gameKey, gameName }: { gameKey: string; gameNam
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const pathOf = (c: RestoreChange) => `${c.root}/${c.rel}`;
 
+  // Which save locations hold each snapshot, and the version Keepsake took by itself (ADR-0080).
+  const [locations, setLocations] = useState<Record<string, string[]>>({});
+  const [newest, setNewest] = useState<NewestChoice | null>(null);
   const refresh = async () => {
+    void snapshotLocations(gameKey)
+      .then(setLocations)
+      .catch(() => setLocations({}));
+    void newestChoice(gameKey)
+      .then(setNewest)
+      .catch(() => setNewest(null));
     try {
       setListing(await listSnapshots(gameKey));
     } catch (err) {
@@ -88,6 +101,27 @@ export function SnapshotsPanel({ gameKey, gameName }: { gameKey: string; gameNam
         label="History"
         description="Snapshots of this game's saves, newest first. Every restore first saves the current files so it can be undone."
       />
+      {newest?.replaced && (
+        <Field
+          label="Keepsake took the newer save"
+          description={`It kept ${newest.choice === "use-cloud" ? `the version from ${newest.device ?? "your other device"}` : "this device's version"}, which was newer. The other version is pinned below. Undo brings it back (your current files are saved first).`}
+          childrenLayout="below"
+        >
+          <DialogButton
+            style={{ width: "auto" }}
+            disabled={busy}
+            onClick={() =>
+              void act(async () => {
+                await undoNewest(gameKey);
+                await refresh();
+                return "The other version is back.";
+              })
+            }
+          >
+            Undo
+          </DialogButton>
+        </Field>
+      )}
       {(listing?.damaged ?? []).length > 0 && (
         <Field
           label={`${listing?.damaged?.length} snapshots are damaged in the cloud`}
@@ -201,7 +235,12 @@ export function SnapshotsPanel({ gameKey, gameName }: { gameKey: string; gameNam
       )}
 
       {(listing?.snapshots ?? []).map((s) => (
-        <Field key={s.snapId} label={s.label ? `Checkpoint: ${s.label}` : s.snapId} description={describe(s)} childrenLayout="below">
+        <Field
+          key={s.snapId}
+          label={s.label ? `Checkpoint: ${s.label}` : s.snapId}
+          description={`${describe(s)}${locations[s.snapId] ? `. In: ${locations[s.snapId].join(", ")}` : ""}`}
+          childrenLayout="below"
+        >
           <Focusable style={{ display: "flex", gap: 8 }}>
             <DialogButton
               style={{ width: "auto" }}

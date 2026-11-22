@@ -43,6 +43,7 @@ from . import (
     lifecycle,
     manifest,
     net,
+    newest,
     ordering,
     pcwatch,
     playtime,
@@ -87,6 +88,7 @@ from .locks import GameLocks
 from .log import log_event, setup_logging, tail
 from .loopback_auth import BrowserProbe, LoopbackFlow
 from .modules import Module, ModuleRegistry
+from .newest import NewestChoices
 from .paths import PluginPaths
 from .procs import find_game_processes
 from .replication import activity as replication_activity
@@ -507,6 +509,7 @@ class KeepsakeApp:
         self.outgoing: Outgoing | None = None
         self.game_links: GameLinks | None = None
         self._sending: dict[str, dict[str, Any]] = {}  # games being prepared to send, by game key
+        self._newest_running: set[str] = set()  # games being settled by "Take the newest" (ADR-0080)
         self._send_tasks: dict[str, asyncio.Task[None]] = {}
         self._pulling: dict[str, dict[str, Any]] = {}  # games asked for from another device, by pull token
         self._pull_tokens: dict[str, dict[str, Any]] = {}  # this device's games listed to a peer, by token
@@ -2394,7 +2397,7 @@ class KeepsakeApp:
                 "Its unsaved progress is in History as a suspend snapshot.",
             )
         if result.get("action") == "conflict":
-            await self.emit("keepsake_toast", f"Save conflict for {game['name']}. Open Keepsake to choose.")
+            await self._conflict_raised(game)
         elif result.get("reason") == "cloud-newer-game-running":
             await self.emit("keepsake_toast", lifecycle.TOAST_CLOUD_NEWER)
 
@@ -2430,7 +2433,7 @@ class KeepsakeApp:
         if status == "published" and self.settings.get("toastOnSync"):
             await self.emit("keepsake_toast", f"Saved {game['name']} to the cloud.")
         elif status == "published-fork":
-            await self.emit("keepsake_toast", f"Save conflict for {game['name']}. Open Keepsake to choose.")
+            await self._conflict_raised(game)
         elif status == "quarantined":
             await self.emit(
                 "keepsake_toast", f"{game['name']}: a suspicious save was kept on this device, not uploaded."
@@ -2479,6 +2482,8 @@ class KeepsakeApp:
             action=result.get("action"),
             reason=result.get("reason"),
         )
+        if result.get("action") == "conflict" and self.settings.get("conflictPolicy") == "newest":
+            await self._conflict_raised(await self._game(key))
         return result
 
     async def bring_newer(self, key: str) -> dict[str, Any]:
@@ -2505,7 +2510,109 @@ class KeepsakeApp:
             gameKey=ctx.game_key,
             status=result.get("status"),
         )
+        if result.get("status") in ("conflict", "published-fork") and self.settings.get("conflictPolicy") == "newest":
+            await self._conflict_raised(await self._game(key))
         return result
+
+    async def _conflict_raised(self, game: dict[str, Any]) -> None:
+        """A conflict appeared. With "When saves differ" set to "Take the newest", settle it by time
+        (ADR-0080); otherwise ask, as always."""
+        if self.settings.get("conflictPolicy") != "newest":
+            await self.emit("keepsake_toast", f"Save conflict for {game['name']}. Open Keepsake to choose.")
+            return
+        key = str(game["key"])
+        if key in self._newest_running:
+            return
+        self._newest_running.add(key)
+
+        async def settle() -> None:
+            try:
+                await self.take_newest(key)
+            finally:
+                self._newest_running.discard(key)
+
+        self._background.append(asyncio.create_task(settle()))
+
+    async def take_newest(self, key: str) -> dict[str, Any]:
+        """Settle an open conflict by taking the newer version, if time can be trusted (ADR-0080).
+
+        Through the same resolution as the user's choice: this device's files are kept pinned, a
+        pre-restore snapshot comes first, and the other version stays pinned in History. Undo
+        brings the replaced version back.
+        """
+        game = await self._game(key)
+        details = await self.conflict_details(key)
+        if not details.get("conflict"):
+            return {"status": "no-conflict"}
+        decision = newest.decide(details.get("sides") or [], time.time())
+        if decision["choice"] is None:
+            await self.emit("keepsake_toast", f"Save conflict for {game['name']}: {decision['reason']}. Open Keepsake.")
+            return {"status": "asked", **decision}
+        try:
+            result = await self.resolve_conflict(key, decision["choice"], decision["head"])
+        except (SnapshotError, StoreError, ValueError) as exc:
+            # The game is running, say: the conflict stays, and the next exit or idle pass tries again.
+            log_event(logging.INFO, "sync.newest_waits", "Newest save not taken yet", key=key, error=str(exc))
+            return {"status": "waiting", "error": str(exc)}
+        loser = result.get("keptLocal") if decision["choice"] == "use-cloud" else self._other_head(details, result)
+        record = {
+            "choice": decision["choice"],
+            "used": result.get("used") or result.get("merge"),
+            "replaced": loser,
+            "device": decision.get("device"),
+            "margin": decision.get("margin"),
+            "at": time.time(),
+        }
+        await asyncio.to_thread(self._newest_store().record, key, record)
+        newer = "the other device's" if decision["choice"] == "use-cloud" else "this device's"
+        who = f" from {decision['device']}" if decision["choice"] == "use-cloud" and decision.get("device") else ""
+        await self.emit(
+            "keepsake_toast",
+            f"{game['name']}: kept {newer} newer save{who} ({newest.margin_text(decision.get('margin'))}). "
+            "The other one is in History; Undo brings it back.",
+        )
+        log_event(logging.WARNING, "sync.newest", "Took the newest save", key=key, choice=decision["choice"])
+        return {"status": "taken", **record}
+
+    @staticmethod
+    def _other_head(details: dict[str, Any], result: dict[str, Any]) -> str | None:
+        heads = [s.get("snapId") for s in details.get("sides") or [] if s.get("side") == "cloud"]
+        return heads[0] if heads else None
+
+    def _newest_store(self) -> NewestChoices:
+        return NewestChoices(os.path.join(self.paths.runtime_dir, "newest-choices.json"))
+
+    async def newest_choice(self, key: str) -> dict[str, Any] | None:
+        """The last version Keepsake took by itself for this game, for the Undo card (ADR-0080)."""
+        return await asyncio.to_thread(self._newest_store().get, str(key))
+
+    async def undo_newest(self, key: str) -> dict[str, Any]:
+        """Bring back the version Keepsake replaced: an ordinary restore from History (reversible too)."""
+        record = await asyncio.to_thread(self._newest_store().get, str(key))
+        if not record or not record.get("replaced"):
+            raise ValueError("there is nothing to undo for this game")
+        result = await self.restore_snapshot(key, str(record["replaced"]))
+        await asyncio.to_thread(self._newest_store().clear, str(key))
+        log_event(logging.WARNING, "sync.newest_undone", "Newest save undone", key=key)
+        return result
+
+    async def snapshot_locations(self, key: str) -> dict[str, list[str]]:
+        """For History: which save locations hold each snapshot, when there are several (ADR-0080)."""
+        store = self._store()
+        if not isinstance(store, MultiStore):
+            return {}
+        ctx = await self._snapshot_context(key)
+        prefix = f"games/{ctx['gameKey']}/snapshots/"
+        try:
+            listing = await asyncio.to_thread(store.listing, prefix)
+        except StoreError:
+            return {}
+        found: dict[str, list[str]] = {}
+        for name, objects in listing.items():
+            for object_key in objects:
+                snap = object_key.rsplit("/", 1)[-1].removesuffix(".json")
+                found.setdefault(snap, []).append(name)
+        return found
 
     async def resolve_conflict(self, key: str, choice: str, head: str | None = None) -> dict[str, Any]:
         ctx = await self._sync_context(key)
@@ -2614,7 +2721,7 @@ class KeepsakeApp:
                         )
                     outcome = {**outcome, "playedWithoutKeepsake": True}
                 if outcome.get("status") == "conflict" or outcome.get("push") == "published-fork":
-                    await self.emit("keepsake_toast", f"Save conflict for {game['name']}. Open Keepsake to choose.")
+                    await self._conflict_raised(game)
                 elif outcome.get("push") == "quarantined":
                     await self.emit(
                         "keepsake_toast", f"{game['name']}: a suspicious save was kept on this device, not uploaded."

@@ -164,6 +164,13 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Run the Device check **BIOS check** and photograph it.
     - Open Device, Other. Turn Wi-Fi power saving off and on: it should follow, or say it is not offered.
 
+28. **Take the newest (v0.38.0).**
+    - On the Go 2, set Settings, Sync and safety, **When saves differ** to **Take the newest**.
+    - Turn the Wi-Fi off on the Go 2, play a synced game for a minute and quit.
+    - Wait at least 2 minutes. Play the same game on the Go and quit.
+    - Turn the Go 2's Wi-Fi back on and start the game there. Keepsake should keep the Go's newer save, say so in a toast, and show **Undo** in the game's History.
+    - Press **Undo**: the Go 2's version should come back.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

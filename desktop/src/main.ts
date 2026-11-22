@@ -597,6 +597,14 @@ async function settingsPage(main: HTMLElement): Promise<void> {
   const toasts = h("input", { type: "checkbox", checked: s.toastOnSync, "aria-label": "Notify after each sync" }) as HTMLInputElement;
   toasts.addEventListener("change", () => void save("toastOnSync", toasts.checked, "Saved.").catch(fail));
   channel.addEventListener("change", () => void save("updateChannel", channel.value, "Saved.").catch(fail));
+  // "When saves differ" (ADR-0080): ask, or take the newest when it can be sure.
+  const differ = h(
+    "select",
+    { "aria-label": "When saves differ" },
+    h("option", { value: "ask", selected: (s.conflictPolicy ?? "ask") === "ask" }, "Ask me"),
+    h("option", { value: "newest", selected: s.conflictPolicy === "newest" }, "Take the newest"),
+  ) as HTMLSelectElement;
+  differ.addEventListener("change", () => void save("conflictPolicy", differ.value, "Saved.").catch(fail));
   replace(
     main,
     h("h1", {}, "Settings"),
@@ -625,6 +633,8 @@ async function settingsPage(main: HTMLElement): Promise<void> {
         button("Save", async () => save("idleSyncMinutes", Number(idle.value), "Saved.")),
       ),
       h("label", { class: "switch" }, toasts, " Notify after each sync"),
+      h("label", {}, "When saves differ ", differ),
+      h("p", { class: "small" }, "Take the newest: when exactly two versions differ, their times are far enough apart and no clock looks wrong, Keepsake keeps the newer one and pins the other in History, with Undo."),
     ),
     h(
       "div",
