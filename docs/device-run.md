@@ -226,6 +226,16 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Start a game, set different limits, quit: the earlier values should come back.
     - Press Legion L plus Y during a game: Keepsake should say it paused the profile, and not set the limits again.
 
+42. **Fans on the Legion Go 2 (v0.44.0).** With the helper installed, open Device, Fans. Run the Device check "Fan control" first and note the model, BIOS, EC and fan speed.
+    - If the BIOS and EC are not RRCN16WW with EC 1.16, run the fan test: it should pass, with the fan audibly changing speed.
+    - Switch on Keepsake controls the fan with the Cool profile: the speed should follow the temperature.
+    - Select Hand back: the fan should return to its normal behaviour.
+43. **Fan lease, sleep and reboot.** With fan control on:
+    - disable Keepsake in Decky: within about 10 seconds the fan should return to the firmware;
+    - re-enable Keepsake, sleep the device for a minute, then wake it: control should resume;
+    - reboot: control should resume on its own.
+44. **Full fan speed on the Legion Go.** Switch on Full fan speed: the fan should run flat out. Disable Keepsake in Decky: it should stop within about 10 seconds.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

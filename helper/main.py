@@ -38,6 +38,8 @@ class Plugin:
         state = os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "state.json")
         self.helper = server.Helper(_version(), uid, state, systemd)
         self.helper.restore_ssp("helper started")  # reconcile: nothing is left off from before
+        self.helper.fans.controlling = True  # a fan left overridden by an earlier run is handed back
+        self.helper.release_fans("helper started")
         self.listener = server.publish(self.helper)
         threading.Thread(target=self._serve, name="keepsake-helper", daemon=True).start()
         decky.logger.info("Keepsake Helper %s ready", self.helper.version)
@@ -66,6 +68,7 @@ class Plugin:
             self.listener.close()
         if self.helper is not None:
             await asyncio.to_thread(self.helper.restore_ssp, "helper unloaded")
+            await asyncio.to_thread(self.helper.release_fans, "helper unloaded")
 
     async def _uninstall(self) -> None:
         if self.helper is not None:

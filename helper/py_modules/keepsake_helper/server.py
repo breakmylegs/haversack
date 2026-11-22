@@ -28,7 +28,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from . import bluetooth, hid, mgmt, power
+from . import bluetooth, fan, hid, mgmt, power
 
 RUN_DIR = "/run/keepsake-helper"
 MAX_REQUEST = 64 * 1024
@@ -46,6 +46,12 @@ JOBS = (
     "hci.capture",
     "power.read",
     "power.set",
+    "fan.status",
+    "fan.set",
+    "fan.renew",
+    "fan.release",
+    "fan.full",
+    "fan.selftest",
 )
 log = logging.getLogger("keepsake-helper")
 
@@ -84,7 +90,9 @@ class Helper:
         clock: Callable[[], float] = time.monotonic,
         power_root: str = power.ROOT,
         profile_glob: str = power.PROFILE_GLOB,
+        fans: fan.Fans | None = None,
     ) -> None:
+        self.fans = fans or fan.Fans(passed=self._fan_passed, record_pass=self._record_fan_pass)
         self.power_root = power_root
         self.profile_glob = profile_glob
         self.version = version
@@ -113,7 +121,7 @@ class Helper:
         os.makedirs(os.path.dirname(self.state_path) or ".", exist_ok=True)
         temp = f"{self.state_path}.tmp"
         with open(temp, "w", encoding="utf-8") as handle:
-            json.dump({"sspOff": sorted(set(indexes))}, handle)
+            json.dump({**self._state(), "sspOff": sorted(set(indexes))}, handle)
         os.replace(temp, self.state_path)
 
     def restore_ssp(self, reason: str) -> None:
@@ -133,9 +141,45 @@ class Helper:
             log.info("SSP restored (%s)", reason)
 
     def tick(self) -> None:
-        """Called every few seconds: an expired lease puts SSP back on."""
+        """Called every few seconds: an expired lease puts SSP back on, and the fan back to the firmware;
+        101 °C or more sets the fan's ceiling."""
         if self._off() and self.clock() > self.lease_until:
             self.restore_ssp("lease expired")
+        try:
+            done = self.fans.tick()
+        except (fan.FanError, OSError) as exc:
+            log.warning("fan tick failed (%s)", exc)
+            done = None
+        if done:
+            log.info("fan: %s", done)
+
+    def _state(self) -> dict[str, Any]:
+        try:
+            with open(self.state_path, encoding="utf-8") as handle:
+                found = json.load(handle)
+            return found if isinstance(found, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    def _fan_passed(self) -> set[tuple[str, str]]:
+        return {(str(b), str(e)) for b, e in self._state().get("fanPassed", []) if isinstance(b, str)}
+
+    def _record_fan_pass(self, pair: tuple[str, str]) -> None:
+        state = self._state()
+        state["fanPassed"] = sorted({*map(tuple, state.get("fanPassed", [])), pair})
+        os.makedirs(os.path.dirname(self.state_path) or ".", exist_ok=True)
+        temp = f"{self.state_path}.tmp"
+        with open(temp, "w", encoding="utf-8") as handle:
+            json.dump(state, handle)
+        os.replace(temp, self.state_path)
+
+    def release_fans(self, reason: str) -> None:
+        if self.fans.controlling:
+            try:
+                self.fans.release()
+                log.info("fan handed back (%s)", reason)
+            except (fan.FanError, OSError) as exc:
+                log.warning("fan hand-back failed (%s)", exc)
 
     # Requests
 
@@ -151,6 +195,7 @@ class Helper:
             return {"ok": True, **self._run(str(job), args)}
         except (
             bluetooth.BluetoothError,
+            fan.FanError,
             hid.HidError,
             mgmt.MgmtError,
             power.PowerError,
@@ -210,6 +255,19 @@ class Helper:
             return {"limits": power.read(self.power_root), "profile": power.profile(self.profile_glob)}
         if job == "power.set":
             return {"limits": power.apply(args.get("values"), self.power_root, self.profile_glob)}
+        if job == "fan.status":
+            return self.fans.status()
+        if job == "fan.set":
+            return self.fans.set_rpm(args.get("rpm"), float(args.get("lease") or 0))  # type: ignore[arg-type]
+        if job == "fan.renew":
+            self.fans.renew(float(args.get("lease") or 0))
+            return {}
+        if job == "fan.release":
+            return self.fans.release()
+        if job == "fan.full":
+            return self.fans.full_speed(bool(args.get("on")), float(args.get("lease") or 0))
+        if job == "fan.selftest":
+            return self.fans.selftest()
         if job == "hci.capture":
             data = mgmt.capture(float(args.get("seconds") or 40), self.opener)
             return {"btsnoop": base64.b64encode(data).decode("ascii")}

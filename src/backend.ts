@@ -540,6 +540,53 @@ export const installerRetarget = callable<[jobId: number, exe: string], InstallJ
 export const installerCancel = callable<[jobId: number], InstallJob>("installer_cancel");
 
 export const modulesStatus = callable<[], ModulesStatus>("modules_status");
+// Fan control (R24, ADR-0085): curves for the Legion Go 2, full speed for the Legion Go, through the helper.
+export type FanPoint = [number, number];
+export interface FansStatus {
+  off?: boolean;
+  problem: string | null;
+  helper: { installed?: boolean; ready?: boolean; problem?: string };
+  temperature: number | null;
+  mode: string | null;
+  game?: number | null;
+  device: {
+    model?: "go2" | "go2-beta" | "go1" | null;
+    rpm?: number | null;
+    override?: number | null;
+    firmware?: { bios: string; ec: string } | null;
+    validated?: boolean;
+    conflicts?: string[];
+    acpiCall?: boolean;
+    fullSpeedAttribute?: boolean;
+    controlling?: boolean;
+    problem?: string;
+  };
+  tools: string[];
+  settings: {
+    enabled: boolean;
+    fullSpeed: boolean;
+    unlocked: boolean;
+    smooth: boolean;
+    profiles: Record<string, FanPoint[]>;
+    default: string;
+    modes: Record<string, string>;
+    games: Record<string, string>;
+  };
+  active: string | null;
+  target: number | null;
+  limits: { min: number; max: number; failsafe: number };
+}
+export const fansStatus = callable<[], FansStatus>("fans_status");
+export const fansSetOptions = callable<
+  [options: { enabled?: boolean; fullSpeed?: boolean; smooth?: boolean; unlocked?: boolean; confirm?: string }],
+  FansStatus
+>("fans_set_options");
+export const fansSaveProfile = callable<[name: string, points: FanPoint[], makeDefault: boolean], FansStatus>("fans_save_profile");
+export const fansDeleteProfile = callable<[name: string], FansStatus>("fans_delete_profile");
+export const fansAssign = callable<[kind: "default" | "mode" | "game", key: string, name: string | null], FansStatus>("fans_assign");
+export const fansHandBack = callable<[], FansStatus>("fans_hand_back");
+export const fansSelftest = callable<[], { passed: boolean; status: FansStatus }>("fans_selftest");
+
 // The navigation recorder (v0.41.1): one file in the settings folder, also in the Device checks export.
 export const saveNavigationRecord = callable<
   [record: { summary: Record<string, number>; events: { t: number; kind: string; detail?: Record<string, string | number | boolean> }[] }],

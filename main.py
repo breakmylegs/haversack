@@ -372,6 +372,27 @@ class Plugin:
     async def helper_prepare(self) -> dict[str, Any]:
         return await self.app.helper_prepare()
 
+    async def fans_status(self) -> dict[str, Any]:
+        return await self.app.fans_status()
+
+    async def fans_set_options(self, options: dict[str, Any]) -> dict[str, Any]:
+        return await self.app.fans_set_options(options)
+
+    async def fans_save_profile(self, name: str, points: list[Any], make_default: bool = False) -> dict[str, Any]:
+        return await self.app.fans_save_profile(name, points, make_default)
+
+    async def fans_delete_profile(self, name: str) -> dict[str, Any]:
+        return await self.app.fans_delete_profile(name)
+
+    async def fans_assign(self, kind: str, key: str, name: str | None) -> dict[str, Any]:
+        return await self.app.fans_assign(kind, key, name)
+
+    async def fans_hand_back(self) -> dict[str, Any]:
+        return await self.app.fans_hand_back()
+
+    async def fans_selftest(self) -> dict[str, Any]:
+        return await self.app.fans_selftest()
+
     async def save_navigation_record(self, record: dict[str, Any]) -> dict[str, Any]:
         return await self.app.save_navigation_record(record)
 

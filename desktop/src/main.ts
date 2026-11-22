@@ -20,6 +20,7 @@ import type {
   ChargeLimitDesk,
   ControllersDesk,
   ReconnectDesk,
+  FansDesk,
   ReconnectDeviceDesk,
   ExtrasDesk,
   DeviceStatusDesk,
@@ -1422,6 +1423,7 @@ const PAGES: Page[] = [
   { id: "device", title: "Status", group: "Device", render: deviceStatusPage },
   { id: "power", title: "Power", group: "Device", render: powerPage },
   { id: "battery", title: "Battery", group: "Device", render: batteryPage },
+  { id: "fans", title: "Fans", group: "Device", render: fansPage },
   { id: "controllers", title: "Controllers", group: "Device", render: controllersPage },
   { id: "reconnect", title: "Reconnect help", group: "Device", render: reconnectPage },
   { id: "other", title: "Other", group: "Device", render: extrasPage },
@@ -1654,6 +1656,151 @@ async function batteryPage(main: HTMLElement): Promise<void> {
       : h("p", { class: "warn" }, `Charge limit: ${state}. This device's steamos-manager does not let Keepsake change it. ${s.where ?? ""}`),
     s.firmware.chargeTypes ? h("p", { class: "small" }, `Firmware charge types: ${s.firmware.chargeTypes}`) : null,
   );
+}
+
+// Device: Fans (R24, ADR-0085). The curve is an SVG whose points can be dragged with the mouse, or
+// set in the table under it; Save sends it through the same checks as Gaming Mode.
+const SVG = "http://www.w3.org/2000/svg";
+
+function svg(tag: string, attrs: Record<string, string | number>): SVGElement {
+  const element = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) element.setAttribute(k, String(v));
+  return element;
+}
+
+async function fansPage(main: HTMLElement): Promise<void> {
+  const s = await call<FansDesk>("fans_status");
+  const again = () => fansPage(main);
+  if (s.off) {
+    replace(main, h("h1", {}, "Fans"), h("p", {}, s.problem ?? "Device controls are off."));
+    return;
+  }
+  const d = s.device ?? {};
+  const go2 = d.model === "go2" || d.model === "go2-beta";
+  const others = [...(d.conflicts ?? []), ...(s.tools ?? [])];
+  const now = h(
+    "p",
+    {},
+    [
+      s.temperature != null ? `${s.temperature.toFixed(0)} °C` : "no temperature",
+      d.rpm != null ? `fan ${d.rpm} RPM` : "fan speed unknown",
+      s.active ? `profile ${s.active}${s.target ? `, asking ${s.target} RPM` : ""}` : "firmware in control",
+    ].join(", "),
+  );
+  const parts: (HTMLElement | null)[] = [h("h1", {}, "Fans"), now];
+  if (!s.helper.ready) parts.push(h("p", { class: "small" }, "Changing the fan needs the Keepsake Helper (install it from Gaming Mode: Device, Reconnect help)."));
+  if (others.length) parts.push(h("p", { class: "warn" }, `${others.join(", ")} controls the fan here; Keepsake only shows the readings.`));
+  if (s.problem) parts.push(h("p", { class: "warn" }, s.problem));
+  if (s.helper.ready && go2 && !d.validated) {
+    parts.push(
+      h("p", {}, `BIOS ${d.firmware?.bios ?? "?"} with EC ${d.firmware?.ec ?? "?"} is not on the checked list. The fan test asks for one speed for up to 15 seconds, checks the fan gets there and gives it back.`),
+      h("div", { class: "actions" }, button("Run the fan test", async () => {
+        const r = await call<{ passed: boolean }>("fans_selftest");
+        toast(r.passed ? "The fan test passed." : "The fan test did not pass: Keepsake will not control this fan.");
+        await again();
+      })),
+    );
+  }
+  if (s.helper.ready && go2 && d.validated && !others.length) {
+    const enabled = h("input", { type: "checkbox", checked: s.settings.enabled, "aria-label": "Keepsake controls the fan" }) as HTMLInputElement;
+    enabled.addEventListener("change", () => void call("fans_set_options", { enabled: enabled.checked }).then(again, fail));
+    const smooth = h("input", { type: "checkbox", checked: s.settings.smooth, "aria-label": "Smooth curve" }) as HTMLInputElement;
+    smooth.addEventListener("change", () => void call("fans_set_options", { smooth: smooth.checked }).then(again, fail));
+    const select = h("select", { "aria-label": "Profile" }) as HTMLSelectElement;
+    for (const name of Object.keys(s.settings.profiles)) {
+      const option = h("option", { value: name }, name === s.settings.default ? `${name} (default)` : name) as HTMLOptionElement;
+      option.selected = name === s.settings.default;
+      select.append(option);
+    }
+    let points = (s.settings.profiles[select.value] ?? []).map((p) => [...p] as [number, number]);
+    const width = 480, height = 240, pad = 30;
+    const x = (t: number) => pad + ((t - 20) / 80) * (width - 2 * pad);
+    const y = (r: number) => height - pad - ((r - s.limits.min) / (s.limits.max - s.limits.min)) * (height - 2 * pad);
+    const chart = svg("svg", { viewBox: `0 0 ${width} ${height}`, width, height, class: "fan-curve", role: "img", "aria-label": "Fan curve" }) as SVGSVGElement;
+    const table = h("tbody", {});
+    const draw = () => {
+      chart.replaceChildren(
+        svg("rect", { x: pad, y: pad, width: width - 2 * pad, height: height - 2 * pad, fill: "none", stroke: "currentColor", "stroke-opacity": 0.3 }),
+        svg("polyline", { points: points.map(([t, r]) => `${x(t)},${y(r)}`).join(" "), fill: "none", stroke: "currentColor", "stroke-width": 2 }),
+        ...points.map(([t, r], i) => {
+          const dot = svg("circle", { cx: x(t), cy: y(r), r: 7, fill: "currentColor", tabindex: 0, "aria-label": `Point ${i + 1}: ${t} °C, ${r} RPM` });
+          dot.addEventListener("pointerdown", (event) => {
+            const box = chart.getBoundingClientRect();
+            const move = (e: PointerEvent) => {
+              const t2 = Math.round(20 + ((e.clientX - box.left) * (width / box.width) - pad) / (width - 2 * pad) * 80);
+              const r2 = Math.round((s.limits.min + ((height - pad - (e.clientY - box.top) * (height / box.height)) / (height - 2 * pad)) * (s.limits.max - s.limits.min)) / 100) * 100;
+              const low = i > 0 ? points[i - 1] : [20, s.limits.min];
+              const high = i < points.length - 1 ? points[i + 1] : [100, s.limits.max];
+              points[i] = [Math.max(low[0] + (i > 0 ? 1 : 0), Math.min(high[0] - (i < points.length - 1 ? 1 : 0), t2)), Math.max(low[1], Math.min(high[1], r2))];
+              draw();
+            };
+            const up = () => {
+              chart.removeEventListener("pointermove", move);
+              chart.removeEventListener("pointerup", up);
+            };
+            chart.setPointerCapture((event as PointerEvent).pointerId);
+            chart.addEventListener("pointermove", move);
+            chart.addEventListener("pointerup", up);
+          });
+          return dot;
+        }),
+      );
+      table.replaceChildren(
+        ...points.map(([t, r], i) => {
+          const temp = h("input", { type: "number", min: "20", max: "100", value: String(t), "aria-label": `Point ${i + 1} temperature` }) as HTMLInputElement;
+          const rpm = h("input", { type: "number", min: String(s.limits.min), max: String(s.limits.max), step: "100", value: String(r), "aria-label": `Point ${i + 1} speed` }) as HTMLInputElement;
+          const update = () => {
+            points[i] = [Number(temp.value), Number(rpm.value)];
+            draw();
+          };
+          temp.addEventListener("change", update);
+          rpm.addEventListener("change", update);
+          return h("tr", {}, h("td", {}, `Point ${i + 1}`), h("td", {}, temp, " °C"), h("td", {}, rpm, " RPM"));
+        }),
+      );
+    };
+    select.addEventListener("change", () => {
+      points = (s.settings.profiles[select.value] ?? []).map((p) => [...p] as [number, number]);
+      draw();
+    });
+    draw();
+    parts.push(
+      h("label", { class: "switch" }, enabled, " Keepsake controls the fan (back to the firmware within seconds if Keepsake stops; full speed at 101 °C)"),
+      h("label", { class: "switch" }, smooth, " Smooth curve (off: stepped)"),
+      h("h2", {}, "Curve"),
+      h("div", { class: "actions" }, h("label", {}, "Profile ", select)),
+      chart as unknown as HTMLElement,
+      h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Point"), h("th", {}, "Temperature"), h("th", {}, "Speed"))), table),
+      h(
+        "div",
+        { class: "actions" },
+        button("Save", async () => (await call("fans_save_profile", select.value, points, false), toast(`${select.value} saved.`), await again())),
+        button("Make it the default", async () => (await call("fans_assign", "default", "", select.value), await again())),
+        s.mode ? button(`Use in ${s.mode} mode`, async () => (await call("fans_assign", "mode", s.mode, select.value), await again())) : null,
+        s.game != null ? button("Use for this game", async () => (await call("fans_assign", "game", String(s.game), select.value), await again())) : null,
+      ),
+    );
+    const confirmBox = h("input", { type: "text", placeholder: "Type: I understand", "aria-label": "Confirm wider limits" }) as HTMLInputElement;
+    parts.push(
+      h("h2", {}, "Wider limits"),
+      h("p", { class: "small" }, `Lets curves reach 5200 RPM, beyond Lenovo's own maximum: louder and more wear. The ${s.limits.min} RPM floor and the 101 °C failsafe always stay.`),
+      s.settings.unlocked
+        ? h("div", { class: "actions" }, button("Lock the limits again", async () => (await call("fans_set_options", { unlocked: false }), await again())))
+        : h("div", { class: "actions" }, confirmBox, button("Unlock", async () => (await call("fans_set_options", { unlocked: true, confirm: confirmBox.value.trim() }), await again()))),
+    );
+  }
+  if (s.helper.ready && d.model === "go1" && !others.length) {
+    const full = h("input", { type: "checkbox", checked: s.settings.fullSpeed, disabled: !d.fullSpeedAttribute, "aria-label": "Full fan speed" }) as HTMLInputElement;
+    full.addEventListener("change", () => void call("fans_set_options", { fullSpeed: full.checked }).then(again, fail));
+    parts.push(
+      h("label", { class: "switch" }, full, d.fullSpeedAttribute ? " Full fan speed (switches off by itself if Keepsake stops)" : " Full fan speed (needs kernel 7.2)"),
+      h("p", { class: "small" }, "The Legion Go's own fan table can only be changed through acpi_call, a kernel module SteamOS does not include and Keepsake will not install."),
+    );
+  }
+  if (s.helper.ready && (d.controlling || s.settings.enabled || s.settings.fullSpeed)) {
+    parts.push(h("div", { class: "actions" }, button("Give the fan back to the firmware", async () => (await call("fans_hand_back"), await again()))));
+  }
+  replace(main, ...parts);
 }
 
 // Device: Controllers (R21 stage 5, ADR-0078): read-only

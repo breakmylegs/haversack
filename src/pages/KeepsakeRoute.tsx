@@ -16,6 +16,7 @@ import { DeviceStatusPage } from "./DeviceStatusPage";
 import { DiagnosticsPage } from "./DiagnosticsPage";
 import { ExportSection } from "./ExportSection";
 import { ExtrasPanel } from "./ExtrasPanel";
+import { FansPanel } from "./FansPanel";
 import { GamesPage } from "./GamesPage";
 import { HealthSection } from "./HealthSection";
 import { HistoryPage } from "./HistoryPage";
@@ -64,6 +65,7 @@ const CONTENT: Record<string, () => ReactElement> = {
   "device/status": () => <DeviceStatusPage />,
   "device/power": () => <PowerPanel />,
   "device/battery": () => <BatteryPanel />,
+  "device/fans": () => <FansPanel />,
   "device/controllers": () => <ControllersPanel />,
   "device/reconnect": () => <ReconnectPanel />,
   "device/other": () => <ExtrasPanel />,
