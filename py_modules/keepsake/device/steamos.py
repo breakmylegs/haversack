@@ -22,6 +22,7 @@ TDP = f"{BUS}.TdpLimit1"
 PROFILE = f"{BUS}.PerformanceProfile1"
 BOOST = f"{BUS}.CpuBoost1"
 CHARGE = f"{BUS}.BatteryChargeLimit1"
+WIFI = f"{BUS}.WifiPowerManagement1"
 TIMEOUT = 3.0
 
 
@@ -74,7 +75,8 @@ class SteamOSManager:
             profile = self._all(conn, PROFILE)
             boost = self._all(conn, BOOST)
             charge = self._all(conn, CHARGE)
-            if tdp is None and profile is None and boost is None and charge is None:
+            wifi = self._all(conn, WIFI)
+            if tdp is None and profile is None and boost is None and charge is None and wifi is None:
                 raise ManagerError("steamos-manager is not running on this system")
             return {
                 "tdp": None
@@ -92,6 +94,7 @@ class SteamOSManager:
                     "suggested": str(profile.get("SuggestedDefaultPerformanceProfile", "")),
                 },
                 "boost": None if boost is None else bool(int(boost.get("CpuBoostState", 0))),
+                "wifiPowerSaving": None if wifi is None else bool(int(wifi.get("WifiPowerManagementState", 0))),
                 "chargeLimit": None
                 if charge is None
                 else {
@@ -128,6 +131,13 @@ class SteamOSManager:
         back = int(self._set(CHARGE, "MaxChargeLevel", "i", int(level)))
         if back != int(level):
             raise ManagerError(f"the charge limit reads back as {back}, not {level}")
+        return back
+
+    def set_wifi_power_saving(self, on: bool) -> bool:
+        """Wi-Fi power saving (R21 stage 6): 1 on, 0 off."""
+        back = bool(int(self._set(WIFI, "WifiPowerManagementState", "u", 1 if on else 0)))
+        if back != on:
+            raise ManagerError("Wi-Fi power saving did not change")
         return back
 
     def set_boost(self, on: bool) -> bool:

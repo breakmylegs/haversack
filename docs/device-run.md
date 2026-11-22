@@ -160,6 +160,10 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Open Device, Controllers. It should show both controllers' batteries, and their settings and lights if the kernel shows them.
     - Detach one controller. Its battery should go, and come back when you attach it.
 
+27. **Other (v0.37.0).**
+    - Run the Device check **BIOS check** and photograph it.
+    - Open Device, Other. Turn Wi-Fi power saving off and on: it should follow, or say it is not offered.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

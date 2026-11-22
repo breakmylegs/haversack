@@ -4,6 +4,14 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **Device, Other** (the last stage of the Legion Go controls that needs no root), in Gaming Mode and the desktop app:
+  - **Wi-Fi power saving** on or off, through Valve's steamos-manager;
+  - **a BIOS check** that warns about known Legion Go BIOS problems, such as the withdrawn N3CN42WW, and features missing before v28 and v29;
+  - **where the display settings are:** refresh rate, frame limit and brightness stay in Steam's own settings.
+- **A new Device check, "BIOS check".**
+
 ## [0.36.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

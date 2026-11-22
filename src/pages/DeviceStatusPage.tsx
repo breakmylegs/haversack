@@ -47,7 +47,7 @@ export function DeviceStatusPage() {
       <DeviceReadings />
       <Field
         label="Device controls"
-        description="Performance modes, TDP and CPU boost are on the Power tab, and the charge limit on the Battery tab, and the controllers on the Controllers tab. Fan and display controls arrive in later releases."
+        description="Performance modes, TDP and CPU boost are on the Power tab, and the charge limit on the Battery tab, the controllers on the Controllers tab, and Wi-Fi power saving and the BIOS check on the Other tab. Fan controls need root and wait for a decision."
       />
     </div>
   );

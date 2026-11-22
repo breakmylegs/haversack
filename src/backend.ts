@@ -399,6 +399,14 @@ export interface ControllersStatus {
   tools: string[];
 }
 export const deviceControllers = callable<[], ControllersStatus>("device_controllers");
+
+// Stage 6 (ADR-0079): Wi-Fi power saving and the BIOS check.
+export interface DeviceExtras {
+  wifiPowerSaving: boolean | null;
+  bios: { version: string | null; date: string | null; known?: boolean; model?: string; notes: string[]; level: "ok" | "warn" | "fail" };
+}
+export const deviceExtras = callable<[], DeviceExtras>("device_extras");
+export const deviceSetWifiPowerSaving = callable<[on: boolean], DeviceExtras>("device_set_wifi_power_saving");
 export const deviceSetChargeLimit = callable<[on: boolean], ChargeLimitStatus>("device_set_charge_limit");
 export const replicationStopGame = callable<[entryId: string], GameTransfer[]>("replication_stop_game");
 export const replicationClearGame = callable<[entryId: string], GameTransfer[]>("replication_clear_game");

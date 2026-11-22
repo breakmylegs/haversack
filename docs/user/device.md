@@ -46,6 +46,14 @@ Keepsake changes it through Valve's steamos-manager. Where steamos-manager does 
 
 **Device**, **Controllers** shows each controller's battery, the settings the controllers report, and the stick lights. Remap buttons, set dead zones and use the gyro in Steam's controller settings. Changing the controllers' own settings and the lights needs root, which waits for a separate decision.
 
+## Other
+
+**Device**, **Other** has:
+- **Wi-Fi power saving**, through steamos-manager. Turn it off if streaming or online games stutter.
+- **A BIOS check**, with what is known about your Legion Go's BIOS version.
+
+Refresh rate, frame limit and brightness stay in Steam's own quick access menu.
+
 ## Coming next
 
-Fan curves, controller and RGB settings, and display settings arrive in later releases. The ones that need root wait for a separate decision.
+Fan curves, and changing the controllers' settings and lights, need root. They wait for a separate decision.
