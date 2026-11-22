@@ -134,6 +134,11 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Advisor should show charts of your last sessions.
     - Diagnostics, Device checks, Run all should work, and **Desktop tray responsive** (step 9) can be run here.
 
+22. **Device readings (v0.33.0).**
+    - Open Device, Status. The temperatures, fan speed, power, performance mode and BIOS lines should fill in and change every couple of seconds.
+    - Run the Device check **Device readings** and photograph it: it lists what each device exposes, including fan speed, the firmware modes and the charge limit.
+    - On the Legion Go and the Legion Go 2, open Legion Space's mode (Legion L plus Y) or Steam's performance overlay and change the mode. Status should follow it.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

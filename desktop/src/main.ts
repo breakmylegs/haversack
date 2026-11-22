@@ -15,6 +15,7 @@ import type {
   AdvisorSessionDesk,
   DeviceCheckDesk,
   DeviceCheckResultDesk,
+  DeviceReadingsDesk,
   DeviceStatusDesk,
   FoundDevice,
   GameTransfer,
@@ -1498,6 +1499,12 @@ async function advisorPage(main: HTMLElement): Promise<void> {
 // Device: Status (layout v3; the controls arrive with R21)
 async function deviceStatusPage(main: HTMLElement): Promise<void> {
   const s = await call<DeviceStatusDesk>("device_status");
+  const r = await call<DeviceReadingsDesk>("device_readings");
+  const sensorRows = r.chips.flatMap((c) => [
+    ...c.temps.map((t) => h("tr", {}, h("td", {}, c.name), h("td", {}, t.label), h("td", {}, `${t.value.toFixed(1)} °C`))),
+    ...c.fans.map((f) => h("tr", {}, h("td", {}, c.name), h("td", {}, f.label), h("td", {}, `${f.value.toFixed(0)} RPM`))),
+    ...c.power.map((p) => h("tr", {}, h("td", {}, c.name), h("td", {}, p.label), h("td", {}, `${p.value.toFixed(1)} W`))),
+  ]);
   const battery = !s.battery.present ? "No battery: mains power." : `${s.battery.percent ?? "Unknown"}%${s.battery.mains ? ", on mains power" : ", on battery"}`;
   replace(
     main,
@@ -1512,8 +1519,23 @@ async function deviceStatusPage(main: HTMLElement): Promise<void> {
         h("tr", {}, h("th", {}, "Battery"), h("td", {}, battery)),
       ),
     ),
+    h("h2", {}, "Readings"),
+    h(
+      "table",
+      {},
+      h("tbody", {},
+        h("tr", {}, h("th", {}, "Performance mode"), h("td", {}, r.profile ? `${r.profile.words} (${r.profile.current}); available: ${r.profile.choices.join(", ")}` : "Not exposed")),
+        h("tr", {}, h("th", {}, "BIOS"), h("td", {}, r.bios.version ? `${r.bios.version}${r.bios.date ? `, ${r.bios.date}` : ""}` : "Unknown")),
+        h("tr", {}, h("th", {}, "Processor"), h("td", {}, [r.cpu.online ? `${r.cpu.online} threads` : "", r.cpu.smt ? `SMT ${r.cpu.smt}` : "", r.cpu.boost == null ? "" : `boost ${r.cpu.boost ? "on" : "off"}`].filter(Boolean).join(", "))),
+        h("tr", {}, h("th", {}, "Battery power"), h("td", {}, r.battery.watts != null ? `${r.battery.watts} W` : "Unknown")),
+      ),
+    ),
+    sensorRows.length ? h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Chip"), h("th", {}, "Sensor"), h("th", {}, "Value"))), h("tbody", {}, ...sensorRows)) : h("p", { class: "small" }, "No sensors readable."),
     h("p", { class: "small" }, "Power, fan, battery, controller and display controls arrive here in the next releases."),
   );
+  setTimeout(() => {
+    if (document.getElementById("nav-device")?.getAttribute("aria-current") === "true") void deviceStatusPage(main).catch(() => undefined);
+  }, 2000);
 }
 
 // Diagnostics: Device checks, as in Gaming Mode (Run all, Export results)

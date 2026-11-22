@@ -4,6 +4,18 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **Live readings on Device, Status** (the first stage of the Legion Go controls). Every 2 seconds, in Gaming Mode and in the desktop app, it shows:
+  - temperatures (CPU, GPU and the rest), fan speed, and battery and GPU power;
+  - Lenovo's performance mode (Quiet, Balanced, Performance or Custom);
+  - the BIOS version and date;
+  - CPU boost, SMT and the cores online;
+  - the battery charge limit, if the system exposes one.
+
+  Keepsake only reads these; it changes nothing.
+- **A new Device check, "Device readings",** says which sensors, fan readings and modes this device exposes, so the next stages know what they can control.
+
 ## [0.32.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

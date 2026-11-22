@@ -337,6 +337,21 @@ export interface DeviceStatus {
   battery: { percent: number | null; mains: boolean | null; present: boolean };
 }
 export const deviceStatus = callable<[], DeviceStatus>("device_status");
+
+// Live readings (R21 stage 1, ADR-0074): every world-readable sensor, read-only.
+export interface Sensor {
+  label: string;
+  value: number;
+}
+export interface DeviceReadings {
+  chips: { name: string; temps: Sensor[]; fans: Sensor[]; power: Sensor[] }[];
+  battery: { percent?: number | null; status?: string | null; watts?: number | null; mains?: boolean; chargeLimit?: number };
+  gpuWatts: number | null;
+  bios: { version: string | null; date: string | null };
+  profile: { current: string; choices: string[]; words: string } | null;
+  cpu: { boost: boolean | null; smt: string | null; online: number | null };
+}
+export const deviceReadings = callable<[], DeviceReadings>("device_readings");
 export const replicationStopGame = callable<[entryId: string], GameTransfer[]>("replication_stop_game");
 export const replicationClearGame = callable<[entryId: string], GameTransfer[]>("replication_clear_game");
 export const replicationPeerGames = callable<[peerId: string], { id: string; title: string }[]>("replication_peer_games");

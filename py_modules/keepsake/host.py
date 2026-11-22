@@ -143,6 +143,7 @@ CALLABLES = frozenset(
         "replication_remove_game",
         "replication_activity",
         "device_status",
+        "device_readings",
         "replication_stop_game",
         "replication_clear_game",
         "replication_peer_games",
