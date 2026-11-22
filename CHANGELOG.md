@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.41.1]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Fixed
 
 - **The full page's sidebar still jumped around, and the settings were hard to reach** (v0.39.1 did not fix it all). Five causes were found and fixed:
