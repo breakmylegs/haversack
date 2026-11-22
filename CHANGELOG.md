@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.49.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Added
 
 - **Send emulator games to your other handheld** (Games and devices, Emulators, in Gaming Mode and the desktop app). One button per game sends:
