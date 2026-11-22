@@ -735,6 +735,33 @@ async def check_performance_control(ctx: Context) -> dict[str, Any]:
     return result("pass", "; ".join(parts) + f". Written and read back: {found.get('writeBack')}.", **details)
 
 
+async def check_charge_limit(ctx: Context) -> dict[str, Any]:
+    """Battery charge limit (R21 stage 4): who controls the 80 percent limit here, and its state."""
+    probe = ctx.probes.get("charge-limit")
+    if probe is None:
+        return result("skip", "Switch on Device in Settings, Modules.")
+    found = await probe()
+    firmware = found.get("firmware") or {}
+    details = {
+        "control": found.get("control"),
+        "limited": found.get("limited"),
+        "level": found.get("level"),
+        "chargeTypes": firmware.get("chargeTypes"),
+        "threshold": firmware.get("threshold"),
+    }
+    state = {True: "on", False: "off", None: "unknown"}[found.get("limited")]
+    if found.get("control") == "steamos-manager":
+        return result("pass", f"Keepsake can set it through steamos-manager; the limit is {state}.", **details)
+    if firmware.get("chargeTypes") or firmware.get("threshold") is not None:
+        return result(
+            "warn",
+            f"The kernel shows the limit ({state}), but steamos-manager does not offer it here, "
+            "so Keepsake only shows it. " + str(found.get("where") or ""),
+            **details,
+        )
+    return result("fail", "Neither steamos-manager nor the kernel shows a charge limit on this device.", **details)
+
+
 TRAY_LIMIT_MS = 200.0
 
 
@@ -812,6 +839,7 @@ CHECKS = [
     Check("tray-responsive", "Desktop tray responsive", "one", "v0.30.1", check_tray_responsive),
     Check("device-readings", "Device readings", "one", "ADR-0074", check_device_readings),
     Check("performance-control", "Performance control", "one", "ADR-0076", check_performance_control),
+    Check("charge-limit", "Battery charge limit", "one", "ADR-0077", check_charge_limit),
 ]
 BY_ID = {c.id: c for c in CHECKS}
 

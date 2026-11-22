@@ -379,6 +379,18 @@ export interface PerformanceStatus {
 export const devicePerformance = callable<[], PerformanceStatus>("device_performance");
 export const deviceApply = callable<[values: PerformanceValues, saveFor: number | null], PerformanceStatus>("device_apply");
 export const deviceForget = callable<[appid: number], PerformanceStatus>("device_forget");
+
+// The 80 percent charge limit (R21 stage 4, ADR-0077).
+export interface ChargeLimitStatus {
+  control: "steamos-manager" | null;
+  limited: boolean | null;
+  level: number | null;
+  firmware: { battery: string | null; chargeTypes: string | null; threshold: number | null; limited: boolean | null };
+  problem?: string | null;
+  where?: string;
+}
+export const deviceBattery = callable<[], ChargeLimitStatus>("device_battery");
+export const deviceSetChargeLimit = callable<[on: boolean], ChargeLimitStatus>("device_set_charge_limit");
 export const replicationStopGame = callable<[entryId: string], GameTransfer[]>("replication_stop_game");
 export const replicationClearGame = callable<[entryId: string], GameTransfer[]>("replication_clear_game");
 export const replicationPeerGames = callable<[peerId: string], { id: string; title: string }[]>("replication_peer_games");

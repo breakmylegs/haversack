@@ -66,6 +66,7 @@ from .backends import BackendConfigError, CredentialStore
 from .bus import EventBus
 from .desktop import dbus as desktop_dbus
 from .desktop import entries as desktop_entries
+from .device import battery as device_battery
 from .device.performance import Performance, ProfileError, ProfileStore, clean_profile, other_tools
 from .device.steamos import ManagerError, SteamOSManager
 from .engine import SnapshotEngine
@@ -869,6 +870,25 @@ class KeepsakeApp:
         await asyncio.to_thread(performance.store.set, int(appid), None)
         self._device_changed()
         return await asyncio.to_thread(performance.status)
+
+    async def device_battery(self) -> dict[str, Any]:
+        """The 80 percent charge limit (R21 stage 4, ADR-0077): who controls it here, and its state."""
+        return await asyncio.to_thread(device_battery.status, self._steamos(), self.sys_root)
+
+    async def device_set_charge_limit(self, on: bool) -> dict[str, Any]:
+        """Turn the 80 percent limit on or off (a user action), through steamos-manager only."""
+        if self.performance is None:
+            raise ValueError("Device controls are off; switch them on in Settings, Modules")
+        try:
+            result = await asyncio.to_thread(device_battery.set_limit, self._steamos(), bool(on), self.sys_root)
+        except ManagerError as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(logging.INFO, "device.charge_limit", "Charge limit changed", on=bool(on))
+        self._device_changed()
+        return result
+
+    async def _charge_probe(self) -> dict[str, Any]:
+        return await self.device_battery()
 
     async def _performance_probe(self) -> dict[str, Any]:
         """The Device check: what steamos-manager offers here, and a write that changes nothing, read back."""
@@ -5503,6 +5523,7 @@ class KeepsakeApp:
                 "tray-responsive": self._tray_probe,
                 "device-readings": self._readings_probe,
                 "performance-control": self._performance_probe,
+                "charge-limit": self._charge_probe,
                 **({"desktop-app": self._desktop_probe} if self.registry.enabled("desktop") else {}),
             },
         )

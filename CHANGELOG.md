@@ -4,6 +4,13 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **Battery care** (the battery stage of the Legion Go controls). On Device, Battery, in the quick access menu and in the desktop app, choose **Stop charging at 80%**, Lenovo's charge limit on the Legion Go and Go 2.
+  - Keepsake changes it only through Valve's steamos-manager, with no root.
+  - Where steamos-manager does not offer it yet, Keepsake shows whether the limit is on and says where to change it: Steam's settings, Power.
+- **A new Device check, "Battery charge limit",** says who controls the limit on each device.
+
 ## [0.34.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

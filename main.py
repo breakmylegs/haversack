@@ -297,6 +297,12 @@ class Plugin:
     async def device_forget(self, appid: int) -> dict[str, Any]:
         return await self.app.device_forget(appid)
 
+    async def device_battery(self) -> dict[str, Any]:
+        return await self.app.device_battery()
+
+    async def device_set_charge_limit(self, on: bool) -> dict[str, Any]:
+        return await self.app.device_set_charge_limit(on)
+
     async def replication_activity(self) -> list[dict[str, Any]]:
         return await self.app.replication_activity()
 
