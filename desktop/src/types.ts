@@ -325,3 +325,18 @@ export interface DeviceReadingsDesk {
   profile: { current: string; choices: string[]; words: string } | null;
   cpu: { boost: boolean | null; smt: string | null; online: number | null };
 }
+export interface PerformanceDesk {
+  available: boolean;
+  off?: boolean;
+  problem: string | null;
+  current: {
+    tdp: { value: number; min: number; max: number } | null;
+    profile: { current: string; available: string[] } | null;
+    boost: boolean | null;
+  } | null;
+  tools: string[];
+  game: number | null;
+  profile: Record<string, unknown> | null;
+  stopped: string | null;
+  limits: { min?: number; max?: number };
+}

@@ -4,6 +4,21 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **Performance profiles per game** (the second stage of the Legion Go controls).
+  - On Device, Power, in the quick access menu while a game runs, and in the desktop app, choose the performance mode (Quiet, Balanced, Performance or Custom), the TDP and CPU boost.
+  - While a game runs, your choice is kept for that game and applied each time it starts. When the game exits, Keepsake puts back what was there before.
+  - Keepsake changes these only through Valve's steamos-manager, with no root.
+- **Keepsake never fights another tool.**
+  - If SimpleDeckyTDP, PowerControl, LegionGo2Companion, Legion Go Toolbox, Legion Center or Handheld Daemon manages performance, Keepsake only shows the settings and names the tool.
+  - If Steam's own performance settings change a value Keepsake set, Keepsake leaves it alone until the next launch and says so.
+- **A new Device check, "Performance control",** says what each device offers and proves a write works.
+- **Research.**
+  - `docs/research/legion-control.md` lists every existing Legion Go tool, kernel interface and firmware rule, with sources.
+  - ADR-0075 sets out how Keepsake changes device settings without root.
+  - Fans, RGB and the controller's hardware settings need root, and wait for the owner's decision on that ADR.
+
 ## [0.33.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

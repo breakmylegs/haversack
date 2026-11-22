@@ -17,6 +17,7 @@ import { ImportPage } from "./ImportPage";
 import { InstallerPage } from "./InstallerPage";
 import { LogsPage } from "./LogsPage";
 import { NowPlaying } from "./NowPlaying";
+import { PowerPanel } from "./PowerPanel";
 import { ReplicationPage } from "./ReplicationPage";
 import { SectionPage, SectionTab } from "./Section";
 import { SettingsPage } from "./SettingsPage";
@@ -28,7 +29,7 @@ export { ROUTE_PATH };
 // doing, each with tabs. A module's tabs, and a section with none left, appear only while it runs
 // (v2 spec 7.3: a disabled module has no UI).
 
-type Module = "saves" | "core" | "installer" | "advisor" | "replication";
+type Module = "saves" | "core" | "installer" | "advisor" | "replication" | "device";
 
 interface Tab extends SectionTab {
   module: Module;
@@ -87,7 +88,10 @@ const SECTIONS: Section[] = [
     id: "device",
     title: "Device",
     icon: <FaMicrochip />,
-    tabs: [{ module: "core", id: "status", title: "Status", content: <DeviceStatusPage /> }],
+    tabs: [
+      { module: "core", id: "status", title: "Status", content: <DeviceStatusPage /> },
+      { module: "device", id: "power", title: "Power", content: <PowerPanel /> },
+    ],
   },
   {
     id: "install",

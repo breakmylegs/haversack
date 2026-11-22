@@ -46,7 +46,7 @@ Peter's new direction of 21 November 2026 sets the order from here:
 |---|---|
 | R19 Replication both ways: two-way pairing, space check, no Accept, pull, progress bars on every surface, Stop and remove on either side, toasts (ADR-0072) | in 0.31.0; Send's wording fixed in 0.31.1 |
 | R20 Layout review: `docs/design/layout-v3.md`, an ADR, and the new structure for the quick access menu, the full page and the desktop app, every feature still reachable (ADR-0073) | this release, 0.32.0 |
-| R21 Legion Go device control (stage 1, read-only readings, ADR-0074, in 0.33.0), after research (`docs/research/legion-control.md`) and a permission-model ADR. In stages, each a release: read-only status; TDP and per-game profiles; fans; battery (R17 folds in here); controllers and RGB; display and other features. Anything needing root waits for Peter's approval of the permission ADR | next |
+| R21 Legion Go device control (stage 1, read-only readings, ADR-0074, in 0.33.0; research `docs/research/legion-control.md` and the permission ADR-0075, with tier 1 waiting for Peter; stage 2, performance profiles, ADR-0076, in 0.34.0), after research (`docs/research/legion-control.md`) and a permission-model ADR. In stages, each a release: read-only status; TDP and per-game profiles; fans; battery (R17 folds in here); controllers and RGB; display and other features. Anything needing root waits for Peter's approval of the permission ADR | next |
 | R16 step 2 Take the newest save | after R21 |
 | R18 Library badges and artwork for streaming tiles | last |
 

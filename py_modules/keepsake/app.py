@@ -66,6 +66,8 @@ from .backends import BackendConfigError, CredentialStore
 from .bus import EventBus
 from .desktop import dbus as desktop_dbus
 from .desktop import entries as desktop_entries
+from .device.performance import Performance, ProfileError, ProfileStore, clean_profile, other_tools
+from .device.steamos import ManagerError, SteamOSManager
 from .engine import SnapshotEngine
 from .freeze import Freezer
 from .fsutil import atomic_write_json, read_json
@@ -142,6 +144,8 @@ MANIFEST_PROGRESS_EVENT = "keepsake_manifest_progress"
 ADVISOR_EVENT = "keepsake_advisor"
 IMPORT_PROGRESS_EVENT = "keepsake_import_progress"
 REPLICATION_EVENT = "keepsake_replication"
+DEVICE_EVENT = "keepsake_device"
+DEVICE_WATCH_SECONDS = 5.0  # after applying a profile, look once more for another app setting its own value
 PAIR_REQUEST_EVENT = "keepsake_pair_request"  # a device asks to pair (ADR-0070)
 MANIFEST_PROGRESS_SECONDS = 0.5
 RETARGET_KINDS = ("set-shortcut-name", "set-shortcut-exe", "set-shortcut-start-dir", "set-launch-options")
@@ -731,6 +735,164 @@ class KeepsakeApp:
                 else "The Installer needs Decky: it creates the game's Steam shortcut through Steam itself.",
             )
         )
+        self.performance: Performance | None = None
+        self._register_device()
+
+    def _register_device(self) -> None:
+        """The device controls (R21, ADR-0075 and ADR-0076): performance profiles through steamos-manager."""
+
+        async def device_start() -> None:
+            store = ProfileStore(os.path.join(self.paths.settings_dir, "device-profiles.json"))
+            home = discovery.real_home(self.home)
+            self.performance = Performance(
+                store,
+                self._steamos(),
+                lambda: other_tools(home, self.proc_root),
+                self._device_limits,
+            )
+
+        async def device_stop() -> None:
+            performance, self.performance = self.performance, None
+            if performance is not None:
+                await asyncio.to_thread(performance.restore)  # put back what Keepsake set
+
+        async def device_game_started(payload: dict[str, Any]) -> None:
+            # As a task: a profile never delays a game's launch.
+            if self.performance is not None:
+                self._background.append(asyncio.create_task(self._device_apply(int(payload["appid"]))))
+
+        async def device_game_exited(payload: dict[str, Any]) -> None:
+            if self.performance is not None:
+                await asyncio.to_thread(self.performance.game_exited)
+                self._device_changed()
+
+        async def device_health() -> list[dict[str, Any]]:
+            if self.performance is None:
+                return []
+            status = await asyncio.to_thread(self.performance.status)
+            if status["tools"]:
+                state, detail = (
+                    "warn",
+                    f"{', '.join(status['tools'])} manages performance here; Keepsake only shows it.",
+                )
+            elif not status["available"]:
+                state, detail = "warn", f"Performance controls are not available: {status['problem']}"
+            else:
+                state, detail = "ok", "Performance modes and TDP are available through steamos-manager."
+            return [
+                {
+                    "id": "device-performance",
+                    "label": "Performance controls",
+                    "status": state,
+                    "detail": detail,
+                    "items": [],
+                }
+            ]
+
+        self.registry.register(
+            Module(
+                "device",
+                "Device",
+                "This handheld's performance modes, TDP and CPU boost, per game, through Valve's steamos-manager.",
+                "Nothing on disk but its own profiles file. Device settings change only through steamos-manager, "
+                "and what Keepsake changed is put back when the game exits.",
+                start=device_start,
+                stop=device_stop,
+                health=device_health,
+                listeners={"game_started": device_game_started, "game_exited": device_game_exited},
+                available=self.host != "windows",
+                unavailable_reason=None if self.host != "windows" else "Device controls are for Linux handhelds.",
+            )
+        )
+
+    def _steamos(self) -> SteamOSManager:
+        return SteamOSManager()
+
+    def _device_limits(self) -> dict[str, int]:
+        facts = devices.read_facts(self.power_root)
+        profile, _how = devices.resolve(devices.load_profiles(), facts)
+        tdp = profile.get("tdp_w") or {}
+        return {k: int(v) for k, v in tdp.items() if k in ("min", "max") and isinstance(v, (int, float))}
+
+    def _device_changed(self) -> None:
+        try:
+            asyncio.get_running_loop().create_task(self.emit(DEVICE_EVENT))
+        except RuntimeError:
+            pass
+
+    def _performance(self) -> Performance:
+        if self.performance is None:
+            raise ValueError("Device controls are off; switch them on in Settings, Modules")
+        return self.performance
+
+    async def _device_apply(self, appid: int) -> None:
+        performance = self.performance
+        if performance is None:
+            return
+        applied = await asyncio.to_thread(performance.game_started, appid)
+        self._device_changed()
+        if applied:
+            # Something else may set its own value at launch (Steam's per-game settings): look once more.
+            await asyncio.sleep(DEVICE_WATCH_SECONDS)
+            stopped = await asyncio.to_thread(performance.watch)
+            if stopped:
+                await self.emit("keepsake_toast", f"Performance profile: {stopped}.")
+            self._device_changed()
+
+    async def device_performance(self) -> dict[str, Any]:
+        """The performance controls' state: what the device offers, current values, the running game's profile."""
+        if self.performance is None:
+            return {
+                "available": False,
+                "problem": "Device controls are off; switch them on in Settings, Modules",
+                "off": True,
+            }
+        return await asyncio.to_thread(self.performance.status)
+
+    async def device_apply(self, values: dict[str, Any], save_for: int | None = None) -> dict[str, Any]:
+        """Change the mode, TDP or boost now (a user action); with ``save_for``, also keep it for that game."""
+        performance = self._performance()
+        try:
+            await asyncio.to_thread(performance.apply, values if isinstance(values, dict) else {})
+            if save_for:
+                saved = {**(performance.store.get(int(save_for)) or {}), **clean_profile(values)}
+                await asyncio.to_thread(performance.store.set, int(save_for), saved)
+        except (ProfileError, ManagerError) as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(logging.INFO, "device.applied", "Performance settings changed", saved=bool(save_for))
+        self._device_changed()
+        return await asyncio.to_thread(performance.status)
+
+    async def device_forget(self, appid: int) -> dict[str, Any]:
+        """Forget a game's profile. What is set now stays until the game exits."""
+        performance = self._performance()
+        await asyncio.to_thread(performance.store.set, int(appid), None)
+        self._device_changed()
+        return await asyncio.to_thread(performance.status)
+
+    async def _performance_probe(self) -> dict[str, Any]:
+        """The Device check: what steamos-manager offers here, and a write that changes nothing, read back."""
+        manager = self._steamos()
+
+        def probe() -> dict[str, Any]:
+            try:
+                current = manager.read()
+            except ManagerError as exc:
+                return {"reachable": False, "error": str(exc)}
+            out: dict[str, Any] = {"reachable": True, "current": current, "writeBack": None}
+            try:
+                if current.get("tdp"):
+                    manager.set_tdp(current["tdp"]["value"])  # the same value: nothing changes
+                    out["writeBack"] = "tdp"
+                elif current.get("profile"):
+                    manager.set_profile(current["profile"]["current"])
+                    out["writeBack"] = "mode"
+            except ManagerError as exc:
+                out["writeError"] = str(exc)
+            out["tools"] = other_tools(discovery.real_home(self.home), self.proc_root)
+            return out
+
+        return await asyncio.to_thread(probe)
 
     def _library_root(self) -> str:
         configured = str(self.settings.get("libraryRoot") or "").strip()
@@ -1152,8 +1314,11 @@ class KeepsakeApp:
         return found
 
     async def on_resume(self) -> dict[str, Any]:
-        """The device woke: session sampling carries on (ADR-0069)."""
+        """The device woke: session sampling carries on (ADR-0069); the game's profile is applied again (ADR-0076)."""
         self.session_recorder.paused.clear()
+        if self.performance is not None:
+            await asyncio.to_thread(self.performance.resumed)
+            self._device_changed()
         return {"ok": True}
 
     async def on_suspend(self) -> dict[str, Any]:
@@ -5337,6 +5502,7 @@ class KeepsakeApp:
                 "session-sources": self._session_sources_probe,
                 "tray-responsive": self._tray_probe,
                 "device-readings": self._readings_probe,
+                "performance-control": self._performance_probe,
                 **({"desktop-app": self._desktop_probe} if self.registry.enabled("desktop") else {}),
             },
         )

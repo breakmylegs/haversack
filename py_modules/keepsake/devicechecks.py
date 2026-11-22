@@ -693,6 +693,48 @@ async def check_device_readings(ctx: Context) -> dict[str, Any]:
     return result("pass", "; ".join(parts) + ".", **details)
 
 
+async def check_performance_control(ctx: Context) -> dict[str, Any]:
+    """Performance control (R21 stage 2): steamos-manager reachable, what it offers, and a write read back."""
+    probe = ctx.probes.get("performance-control")
+    if probe is None:
+        return result("skip", "Switch on Device in Settings, Modules.")
+    found = await probe()
+    if not found.get("reachable"):
+        return result("fail", f"steamos-manager could not be reached: {found.get('error')}", reachable=False)
+    current = found.get("current") or {}
+    tdp, profile = current.get("tdp"), current.get("profile")
+    details = {
+        "tdp": tdp,
+        "profile": profile,
+        "boost": current.get("boost"),
+        "chargeLimit": current.get("chargeLimit"),
+        "writeBack": found.get("writeBack"),
+        "tools": found.get("tools"),
+    }
+    parts = []
+    if tdp:
+        parts.append(f"TDP {tdp['value']} W ({tdp['min']} to {tdp['max']} W)")
+    if profile:
+        parts.append(f"mode {profile['current']} of {', '.join(profile['available'])}")
+    if current.get("boost") is not None:
+        parts.append(f"CPU boost {'on' if current['boost'] else 'off'}")
+    if current.get("chargeLimit"):
+        parts.append(f"charge limit {current['chargeLimit']['value']}")
+    if found.get("writeError"):
+        return result(
+            "fail", "; ".join(parts) + f". A write that changes nothing failed: {found['writeError']}", **details
+        )
+    if not tdp and not profile:
+        return result("warn", "steamos-manager runs but offers no TDP or mode here.", **details)
+    if found.get("tools"):
+        return result(
+            "warn",
+            "; ".join(parts) + f". {', '.join(found['tools'])} manages performance, so Keepsake only shows it.",
+            **details,
+        )
+    return result("pass", "; ".join(parts) + f". Written and read back: {found.get('writeBack')}.", **details)
+
+
 TRAY_LIMIT_MS = 200.0
 
 
@@ -769,6 +811,7 @@ CHECKS = [
     Check("session-sources", "Session stats sources", "one", "A211, A212", check_session_sources),
     Check("tray-responsive", "Desktop tray responsive", "one", "v0.30.1", check_tray_responsive),
     Check("device-readings", "Device readings", "one", "ADR-0074", check_device_readings),
+    Check("performance-control", "Performance control", "one", "ADR-0076", check_performance_control),
 ]
 BY_ID = {c.id: c for c in CHECKS}
 
