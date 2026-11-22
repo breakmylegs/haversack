@@ -282,6 +282,18 @@ class Plugin:
     async def replication_remove_game(self, offer_id: str) -> dict[str, Any]:
         return await self.app.replication_remove_game(offer_id)
 
+    async def take_newest(self, key: str) -> dict[str, Any]:
+        return await self.app.take_newest(key)
+
+    async def newest_choice(self, key: str) -> dict[str, Any] | None:
+        return await self.app.newest_choice(key)
+
+    async def undo_newest(self, key: str) -> dict[str, Any]:
+        return await self.app.undo_newest(key)
+
+    async def snapshot_locations(self, key: str) -> dict[str, list[str]]:
+        return await self.app.snapshot_locations(key)
+
     async def device_status(self) -> dict[str, Any]:
         return await self.app.device_status()
 

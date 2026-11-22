@@ -145,6 +145,7 @@ export interface NewerSave {
 }
 
 export interface Settings {
+  conflictPolicy?: "ask" | "newest";
   deviceName: string;
   updateChannel: "stable" | "prerelease";
   idleSyncMinutes: number;

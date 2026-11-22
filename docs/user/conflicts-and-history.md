@@ -7,10 +7,19 @@ A conflict means a game's saves changed on two devices since they last agreed. F
 ![The Conflicts page on a PC](images/desktop-conflicts.png)
 
 1. Open **Conflicts** and choose **Compare and choose**.
-2. Keepsake shows each side: the device, when its save last changed, how many files and the size. It also lists each file that is new, gone or changed on that side since the two devices last agreed. Keepsake never picks for you by date.
+2. Keepsake shows each side: the device, when its save last changed, how many files and the size. It also lists each file that is new, gone or changed on that side since the two devices last agreed. Keepsake never picks for you by date, unless you turn on Take the newest (below).
 3. Choose **Keep this device's save** or **Use the save from ...**, then press again to confirm. Or choose **Decide later**.
 
 The save you do not choose is kept in History and pinned, so you can always go back to it. Until you choose, Keepsake does not sync that game, and the game stays playable with the save it has.
+
+### Take the newest instead
+
+If you would rather not be asked, set **Settings**, **Sync and safety**, **When saves differ** to **Take the newest**. Keepsake then keeps the newer version by itself, but only when it can be sure:
+- exactly two versions differ;
+- they are at least 2 minutes apart;
+- no device's clock looks wrong.
+
+If it cannot be sure, it asks you as before and says why. The version it did not keep stays pinned in the game's History, where **Undo** brings it back.
 
 ## History
 

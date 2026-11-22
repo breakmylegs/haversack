@@ -24,6 +24,7 @@ export interface Settings {
   steamAutoSync: boolean;
   tidyAutomatically: boolean;
   suspendSnapshots: boolean;
+  conflictPolicy?: "ask" | "newest";
   libraryRoot: string;
   /** ADR-0044: how each provider signs in from Gaming Mode. */
   gamingModeSignin: Record<"onedrive" | "gdrive", SigninMethod>;
@@ -323,6 +324,20 @@ export type GameTransfer = {
   canClear: boolean;
 };
 export const replicationActivity = callable<[], GameTransfer[]>("replication_activity");
+
+// "When saves differ: take the newest" (R16 step 2, ADR-0080).
+export interface NewestChoice {
+  choice: "use-cloud" | "use-local";
+  used: string | null;
+  replaced: string | null;
+  device: string | null;
+  margin: number | null;
+  at: number;
+}
+export const takeNewest = callable<[key: string], Record<string, unknown>>("take_newest");
+export const newestChoice = callable<[key: string], NewestChoice | null>("newest_choice");
+export const undoNewest = callable<[key: string], Record<string, unknown>>("undo_newest");
+export const snapshotLocations = callable<[key: string], Record<string, string[]>>("snapshot_locations");
 
 // This handheld, for Device's Status tab (layout v3, ADR-0073).
 export interface DeviceStatus {

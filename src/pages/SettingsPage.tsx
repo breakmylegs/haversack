@@ -1,4 +1,4 @@
-import { DialogButton, Field, Focusable, Navigation, SliderField, TextField, ToggleField } from "@decky/ui";
+import { DialogButton, DropdownItem, Field, Focusable, Navigation, SliderField, TextField, ToggleField } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { getSettings, setSetting, Settings } from "../backend";
@@ -144,6 +144,17 @@ export function SettingsPage({ part = "general" }: { part?: SettingsPart }) {
         checked={settings?.steamAutoSync ?? true}
         disabled={locked || !(settings?.steamCloudDetection ?? true)}
         onChange={(on) => void save("steamAutoSync", on, on ? "Steam games without Steam Cloud sync automatically." : "Steam games only sync when you turn them on.")}
+      />
+      <DropdownItem
+        label="When saves differ"
+        description="Ask me: you choose every time (the default). Take the newest: Keepsake keeps the newer version by itself when exactly two versions differ, their times are far enough apart and no clock looks wrong; the other version stays in History with Undo."
+        rgOptions={[
+          { data: "ask", label: "Ask me" },
+          { data: "newest", label: "Take the newest" },
+        ]}
+        selectedOption={settings?.conflictPolicy ?? "ask"}
+        disabled={locked}
+        onChange={(o) => void save("conflictPolicy", o.data, o.data === "newest" ? "Keepsake now takes the newest save when it can be sure." : "Keepsake asks you whenever saves differ.")}
       />
       <TidyCopies />
       <ToggleField

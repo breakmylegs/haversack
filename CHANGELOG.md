@@ -4,6 +4,14 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **"When saves differ"**, in Settings, Sync and safety, and in the desktop app.
+  - **"Ask me"** stays the default.
+  - **"Take the newest"** keeps the newer version by itself, but only when exactly two versions differ, their times are at least 2 minutes apart, and no device's clock looks wrong.
+  - The other version stays pinned in History, and **Undo** brings it back. Otherwise Keepsake asks you as before, and says why.
+- **History shows where each snapshot is stored** when you use several save locations, for example "In: onedrive, direct".
+
 ## [0.37.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

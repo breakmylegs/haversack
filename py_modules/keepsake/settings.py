@@ -49,6 +49,8 @@ DEFAULTS: dict[str, Any] = {
     # Played Steam games without Steam Cloud saves start syncing on their own (ADR-0063).
     "steamAutoSync": True,
     "suspendSnapshots": False,
+    # "When saves differ": ask (default), or take the newest version, guarded (ADR-0080).
+    "conflictPolicy": "ask",
     # v2 module flags (slice 13); missing names use modules.DEFAULT_FLAGS.
     "moduleFlags": {},
     # Installer (slice 21): where games are installed; empty means ~/Games.
@@ -92,6 +94,7 @@ USER_KEYS = frozenset(
         "steamCloudDetection",
         "steamAutoSync",
         "suspendSnapshots",
+        "conflictPolicy",
         "moduleFlags",
         "libraryRoot",
         "gamingModeSignin",
@@ -189,6 +192,10 @@ def _validate(key: str, value: Any) -> Any:
         ):
             raise SettingsError("choose browser or phone for OneDrive and Google Drive")
         return {"onedrive": value["onedrive"], "gdrive": value["gdrive"]}
+    if key == "conflictPolicy":
+        if value not in ("ask", "newest"):
+            raise SettingsError("when saves differ, choose ask or newest")
+        return value
     if key == "launchPullTimeout":
         if not isinstance(value, int) or isinstance(value, bool) or not 5 <= value <= 60:
             raise SettingsError("the launch check timeout is 5 to 60 seconds")
