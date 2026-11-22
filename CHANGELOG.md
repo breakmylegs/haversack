@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.39.1]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Fixed
 
 - **The sidebar on Keepsake's full page was unpredictable.** Clicking **Saves** could open **Games and devices**, and the D-pad could get stuck between **Settings** and **Diagnostics**. There were three causes:
