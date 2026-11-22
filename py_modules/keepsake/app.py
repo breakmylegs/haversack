@@ -1090,6 +1090,27 @@ class KeepsakeApp:
         )
         return result
 
+    # Emulator games (R26 stage 1, ADR-0087): read-only
+
+    async def emulator_setup(self) -> dict[str, Any]:
+        """This device's emulator setup and games. Game names are shown on this device only."""
+        if not self.registry.enabled("replication"):
+            return {"off": True, "problem": "Replication is off; switch it on in Settings, Modules"}
+        from .replication import emulators
+
+        return await asyncio.to_thread(emulators.scan, discovery.real_home(self.home))
+
+    async def _emulator_probe(self) -> dict[str, Any]:
+        found = await self.emulator_setup()
+        if found.get("off"):
+            return {"off": True}
+        return {
+            "setups": found["setups"],
+            "emulators": [{"name": e["name"], "type": e["type"]} for e in found["emulators"]],
+            "perSystem": found["perSystem"],
+            "secrets": found["secrets"],
+        }
+
     # The controllers' own settings and stick lights (R24, ADR-0086)
 
     async def controller_settings_status(self) -> dict[str, Any]:
@@ -6143,6 +6164,7 @@ class KeepsakeApp:
                 "controllers": self.device_controllers,
                 "reconnect-help": self._reconnect_probe,
                 "fan-control": self._fans_probe,
+                "emulator-setup": self._emulator_probe,
                 "bios": self._bios_probe,
                 **({"desktop-app": self._desktop_probe} if self.registry.enabled("desktop") else {}),
             },

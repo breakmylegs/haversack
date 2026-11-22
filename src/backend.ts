@@ -555,6 +555,18 @@ export const installerRetarget = callable<[jobId: number, exe: string], InstallJ
 export const installerCancel = callable<[jobId: number], InstallJob>("installer_cancel");
 
 export const modulesStatus = callable<[], ModulesStatus>("modules_status");
+// Emulator games (R26 stage 1, ADR-0087): this device's setup, read-only.
+export interface EmulatorSetup {
+  off?: boolean;
+  problem?: string;
+  setups: string[];
+  emulators: { name: string; system: string; type: "appimage" | "binary" | "flatpak" }[];
+  games: { system: string; name: string; files: number; size: number }[];
+  perSystem: Record<string, number>;
+  secrets: Record<string, number>;
+}
+export const emulatorSetup = callable<[], EmulatorSetup>("emulator_setup");
+
 // Quick menu shortcuts (layout v3 addendum, ADR-0073): pages, actions and status lines, chosen and ordered.
 export const SHORTCUTS_EVENT = "keepsake_shortcuts";
 export interface Shortcut {

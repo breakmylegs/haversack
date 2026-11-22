@@ -13,6 +13,7 @@ import { ConflictsPage } from "./ConflictsPage";
 import { ControllersPanel } from "./ControllersPanel";
 import { DeviceChecks } from "./DeviceChecks";
 import { DeviceStatusPage } from "./DeviceStatusPage";
+import { EmulatorsPanel } from "./EmulatorsPanel";
 import { DiagnosticsPage } from "./DiagnosticsPage";
 import { ExportSection } from "./ExportSection";
 import { ExtrasPanel } from "./ExtrasPanel";
@@ -62,6 +63,7 @@ const CONTENT: Record<string, () => ReactElement> = {
   ),
   "games-devices/moving": () => <ReplicationPage part="moving" />,
   "games-devices/devices": () => <ReplicationPage part="devices" />,
+  "games-devices/emulators": () => <EmulatorsPanel />,
   "games-devices/disk": () => <StoragePage />,
   "device/status": () => <DeviceStatusPage />,
   "device/power": () => <PowerPanel />,

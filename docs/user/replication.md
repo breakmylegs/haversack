@@ -108,3 +108,12 @@ Keepsake never changes your firewall. **Diagnostics**, **Health** says what to a
 - **Room to spare.** Keepsake checks there is enough free space before anything is read or copied, and keeps the device awake while it copies.
 - **Honest speed.** Both devices show the speed, time left and progress, and say plainly when a link looks slow.
 - **Saves stay with Saves.** Replication never touches save files. Keepsake's save sync looks after them.
+
+## Emulators
+
+**Games and devices**, **Emulators** shows what this device has:
+- EmuDeck or RetroDECK, and the standalone emulators;
+- every emulator game, with multi-disc games grouped as one;
+- how many firmware, BIOS and key files there are.
+
+Keepsake only counts the firmware, BIOS and key files and never reads them. When copying arrives in the next release, they will travel only straight to your own paired device, never to the cloud.

@@ -4,6 +4,15 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **Emulators** (Games and devices, Emulators, in Gaming Mode and the desktop app). See what this device has:
+  - EmuDeck or RetroDECK, and standalone emulators;
+  - every emulator game, with multi-disc games grouped as one;
+  - how many firmware, BIOS and key files there are, per system. Keepsake counts them and never reads them.
+
+  A Device check, "Emulator setup", records the counts. Copying games, emulators, settings, firmware and keys to your other handheld comes in the next release.
+
 ## [0.47.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

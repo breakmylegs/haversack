@@ -890,6 +890,26 @@ async def check_reconnect_help(ctx: Context) -> dict[str, Any]:
     return result(status, "; ".join(parts) + ".", **found)
 
 
+async def check_emulator_setup(ctx: Context) -> dict[str, Any]:
+    """Emulator setup (R26 stage 1, ADR-0087): which tools, games per system, and how many key and firmware
+    files there are. Counts and names of systems only: no game names, no contents."""
+    probe = ctx.probes.get("emulator-setup")
+    if probe is None:
+        return result("skip", "This build has no emulator support.")
+    found = await probe()
+    if found.get("off"):
+        return result("skip", "Replication is off.")
+    games = sum(found["perSystem"].values())
+    parts = [
+        f"setups: {', '.join(found['setups']) or 'none'}",
+        f"{len(found['emulators'])} emulators ({', '.join(sorted({e['type'] for e in found['emulators']})) or 'none'})",
+        f"{games} games across {len(found['perSystem'])} systems",
+        f"key and firmware files: {sum(found['secrets'].values())}",
+    ]
+    status = "pass" if found["setups"] or found["emulators"] else "warn"
+    return result(status, "; ".join(parts) + ".", **found)
+
+
 async def check_fan_control(ctx: Context) -> dict[str, Any]:
     """Fan control (R24, ADR-0085): the model, firmware, readings, the routes there are, and other fan tools."""
     probe = ctx.probes.get("fan-control")
@@ -957,6 +977,7 @@ CHECKS = [
     Check("controllers", "Controllers", "one", "ADR-0078", check_controllers),
     Check("reconnect-help", "Controller reconnect help", "one", "ADR-0082, A225 to A228", check_reconnect_help),
     Check("fan-control", "Fan control", "one", "ADR-0085, A236 to A238", check_fan_control),
+    Check("emulator-setup", "Emulator setup", "both", "ADR-0087", check_emulator_setup),
     Check("bios", "BIOS check", "one", "ADR-0079", check_bios),
 ]
 BY_ID = {c.id: c for c in CHECKS}

@@ -53,6 +53,7 @@ export const LAYOUT: SectionSpec[] = [
     tabs: [
       { id: "moving", title: "Moving games", module: "replication" },
       { id: "devices", title: "Other devices", module: "replication" },
+      { id: "emulators", title: "Emulators", module: "replication" },
       { id: "disk", title: "Disk use", module: "core" },
     ],
   },
