@@ -78,6 +78,13 @@ export function SettingsPage({ part = "general" }: { part?: SettingsPart }) {
             Run setup again
           </DialogButton>
         </Field>
+        <ToggleField
+          label="Badges in Steam's library"
+          description="On each game's page in Steam's library, a small badge shows its saves' state, or which device a streaming tile streams from."
+          checked={settings?.libraryBadges ?? true}
+          disabled={locked}
+          onChange={(on) => void save("libraryBadges", on, on ? "Library badges on." : "Library badges off.")}
+        />
         {settings && <Field label="Device ID" description={settings.deviceId} />}
       </div>
     );

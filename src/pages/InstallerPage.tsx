@@ -21,6 +21,7 @@ import {
   updateGameConfig,
 } from "../backend";
 import { openSection } from "../routes";
+import { StreamArtSection } from "./StreamArtSection";
 import { NetworkSource } from "./NetworkSource";
 import { plainError } from "../format";
 
@@ -312,6 +313,7 @@ export function InstallerPage() {
           )}
         </Field>
       ))}
+      <StreamArtSection />
     </div>
   );
 }

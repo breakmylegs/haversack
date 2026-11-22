@@ -609,6 +609,41 @@ class Installer:
         self._save(job_id, job["state"], data)
         return self.get(job_id)
 
+    def queue_stream_art(self, appid: int, game_id: int) -> int:
+        """User action (R18, ADR-0081): SteamGridDB's top images for a streaming tile, queued for Steam.
+
+        Same route as an installed game's artwork: staged here, set by Steam's own artwork call
+        (P15), only after the user chose the game on SteamGridDB. Returns how many were queued.
+        """
+        if self.art is None:
+            raise InstallerError("SteamGridDB artwork is not available")
+        if not 2**31 <= int(appid) < 2**32:
+            raise InstallerError("only a non-Steam game's streaming tile needs artwork")
+        queued = 0
+        try:
+            for item in self.art.choose(int(game_id)):
+                name = f"stream{int(appid)}-{item['label']}"
+                path = os.path.join(self._staging(), name)
+                kind = self.art.download(item["url"], path)
+                staged = f"{name}.{kind}"
+                os.replace(path, os.path.join(self._staging(), staged))
+                payload = {"appid": int(appid), "assetType": item["assetType"], "imageType": kind, "file": staged}
+                self.ops.enqueue("installer", "set-artwork", payload)
+                queued += 1
+        except ArtworkError as exc:
+            raise InstallerError(str(exc)) from exc
+        if not queued:
+            raise InstallerError("SteamGridDB has no artwork for that game")
+        return queued
+
+    def search_titles(self, title: str) -> list[dict[str, Any]]:
+        if self.art is None:
+            raise InstallerError("SteamGridDB artwork is not available")
+        try:
+            return self.art.search(title)
+        except ArtworkError as exc:
+            raise InstallerError(str(exc)) from exc
+
     def _finish(self, job_id: int, data: dict[str, Any], state: str) -> None:
         drive = data.get("cdDrive")
         if drive and drive.get("links"):

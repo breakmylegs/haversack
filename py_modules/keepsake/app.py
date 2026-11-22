@@ -5193,6 +5193,62 @@ class KeepsakeApp:
         await self.emit("keepsake_steam_ops")
         return job
 
+    async def installer_stream_tiles(self) -> list[dict[str, Any]]:
+        """Streaming tiles for non-Steam games on another device (R18, ADR-0081), from Steam's own report."""
+        report = await asyncio.to_thread(self.remote_copies.report)
+        return [
+            {"appid": e["appid"], "name": e["name"], "devices": e.get("clients", [])}
+            for e in report.get("entries", [])
+            if e.get("steam") == discovery.REMOTE and int(e["appid"]) >= 2**31
+        ]
+
+    async def installer_stream_art_search(self, title: str) -> list[dict[str, Any]]:
+        try:
+            return await asyncio.to_thread(self._installer().search_titles, str(title)[:80])
+        except InstallerError as exc:
+            raise ValueError(str(exc)) from exc
+
+    async def installer_stream_art_apply(self, appid: int, game_id: int) -> dict[str, Any]:
+        """User action: add SteamGridDB's artwork to one streaming tile, through Steam (P15)."""
+        tiles = {t["appid"] for t in await self.installer_stream_tiles()}
+        if int(appid) not in tiles:
+            raise ValueError("that is not a streaming tile for a non-Steam game")
+        try:
+            queued = await asyncio.to_thread(self._installer().queue_stream_art, int(appid), int(game_id))
+        except InstallerError as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(logging.INFO, "installer.stream_art", "Artwork queued for a streaming tile", images=queued)
+        await self.emit("keepsake_steam_ops")
+        return {"queued": queued}
+
+    async def library_badge(self, appid: int) -> dict[str, Any] | None:
+        """The badge on a game's page in Steam's library (R18, ADR-0081): its saves, or where it streams from."""
+        if not self.settings.get("libraryBadges"):
+            return None
+        appid = int(appid)
+        verdict = (await asyncio.to_thread(self.remote_copies.steam_verdicts)).get(appid)
+        if verdict and verdict.get("steam") == discovery.REMOTE:
+            devices = verdict.get("clients") or []
+            return {
+                "state": "streaming",
+                "label": f"Streams from {devices[0]}" if devices else "Streams from another device",
+            }
+        if not self.registry.enabled("saves"):
+            return None
+        states = self._sync().state.games()
+        for game, config, gk in await self._matched():
+            if int(game.get("appid") or 0) != appid:
+                continue
+            if not config.get("enabled") or not gk:
+                return {"state": "off", "label": "Saves: not synced by Keepsake"}
+            state = states.get(gk) or {}
+            found = newer_save(state)
+            if found:
+                return {"state": "newer", "label": f"Saves: newer on {found.get('device') or 'another device'}"}
+            word = status_word(state)
+            return {"state": word, "label": BADGE_LABELS.get(word, "Saves: synced")}
+        return None
+
     async def installer_handoff(self, job_id: int) -> dict[str, Any]:
         """The Games list key for a finished install, so the user can switch on save sync for it."""
         job = await self._installer_call("get", int(job_id))
@@ -5799,6 +5855,15 @@ class KeepsakeApp:
             finally:
                 resumed = await asyncio.to_thread(self.freezer.resume_all, "normal")
             return {"ok": bool(stopped), "stopped": len(stopped), "resumed": len(resumed), "seconds": seconds}
+
+
+BADGE_LABELS = {
+    "synced": "Saves: in step",
+    "pending": "Saves: waiting to upload",
+    "conflict": "Saves: conflict, open Keepsake",
+    "quarantined": "Saves: a suspicious save was kept here",
+    "not-synced": "Saves: not synced yet",
+}
 
 
 def status_word(state: dict[str, Any]) -> str:

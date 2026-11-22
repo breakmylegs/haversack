@@ -17,6 +17,7 @@ import { startLifecycle } from "./lifecycle";
 import { startProbes } from "./probes";
 import { startSteamOps } from "./steamops";
 import { startRemoteCopies } from "./remotecopies";
+import { startLibraryBadges } from "./libraryBadges";
 import { AdvisorQam } from "./pages/AdvisorQam";
 import { GameTransfersCompact } from "./pages/GameTransfers";
 import { BatteryPanel } from "./pages/BatteryPanel";
@@ -187,6 +188,7 @@ export default definePlugin(() => {
   const stopLifecycle = startLifecycle();
   const stopSteamOps = startSteamOps();
   const stopRemoteCopies = startRemoteCopies();
+  const stopLibraryBadges = startLibraryBadges();
   // Messages from the backend, such as "Recovered missed exit backup for <game>".
   const toastListener = addEventListener<[string]>("keepsake_toast", (body) =>
     toaster.toast({ title: "Keepsake", body }),
@@ -220,6 +222,7 @@ export default definePlugin(() => {
       stopLifecycle();
       stopSteamOps();
       stopRemoteCopies();
+      stopLibraryBadges();
       removeEventListener("keepsake_toast", toastListener);
       removeEventListener("keepsake_pair_request", pairListener);
       routerHook.removeRoute(ROUTE_PATH);
