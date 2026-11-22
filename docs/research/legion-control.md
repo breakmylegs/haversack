@@ -407,7 +407,7 @@ The agent's report lists them: docs.kernel.org (lenovo-wmi-gamezone, lenovo-wmi-
   - https://github.com/torvalds/linux/blob/v7.3/drivers/hid/hid-lenovo-go.c
   - https://github.com/torvalds/linux/blob/v7.3/Documentation/ABI/testing/sysfs-driver-hid-lenovo-go
 - Patches:
-  - https://patchew.org/linux/20250609185027.7378-1-derekjohn.clark@gmail.com
+  - https://lwn.net/Articles/1003992 (the Lenovo WMI driver series)
   - https://lkml.iu.edu/2605.2/07283.html
   - https://lkml.indiana.edu/hypermail/linux/kernel/2507.3/07953.html
   - https://lkml.iu.edu/2511.3/06159.html
