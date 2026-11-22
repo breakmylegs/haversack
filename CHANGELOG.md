@@ -4,6 +4,15 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **Reconnect help in the desktop app** (Device, Reconnect help). It offers what Gaming Mode does:
+  - every paired device, with help per device;
+  - Pair and commit, Reconnect, Diagnose, Read stored host over USB and the report bundle;
+  - with the Keepsake Helper: cable pairing, Restore backup and the SSP gate. Each restart asks twice, and the gate asks you to type "I understand".
+
+  Installing the helper still needs Gaming Mode, because Decky's installer runs there.
+
 ## [0.41.1]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

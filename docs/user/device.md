@@ -60,6 +60,8 @@ Keepsake changes it through Valve's steamos-manager. Where steamos-manager does 
    - **Export report bundle**: the last diagnosis and the Bluetooth journal lines in a zip, to share on an issue. This handheld's address is replaced.
    - **Full report mode** (DualShock 4 only): for clones that send reduced reports, such as a missing touchpad or motion.
 
+The desktop app has the same page under Device, Reconnect help. Install the Keepsake Helper from Gaming Mode.
+
 The list also shows a note when a controller's address is not from a registered manufacturer. That is only information: Keepsake never acts on it.
 
 If a controller connects and drops at once, Keepsake suggests a diagnosis. It does nothing to the controller unless you choose.

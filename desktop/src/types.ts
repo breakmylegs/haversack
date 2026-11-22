@@ -353,6 +353,42 @@ export interface ControllersDesk {
   rings: Record<string, string> | null;
   tools: string[];
 }
+// Controller reconnect help (ADR-0082, ADR-0083).
+export interface ReconnectDiagnosisDesk {
+  outcome: string;
+  title: string;
+  advice: string;
+  evidence: string[];
+}
+export interface ReconnectDeviceDesk {
+  adapter: string;
+  adapterName: string;
+  mac: string;
+  name: string;
+  class: string | null;
+  modalias: string | null;
+  transport: "bredr" | "le" | "unknown";
+  connected: boolean;
+  unregisteredPrefix: boolean;
+  help: boolean;
+  commit: boolean;
+  last: ReconnectDiagnosisDesk | null;
+  suggest: { reason: string } | null;
+  captured: boolean;
+  stored?: { linkKey: boolean; keyType: number | null; trusted: boolean; services: boolean; backups: number } | null;
+}
+export interface ReconnectDesk {
+  available: boolean;
+  problem: string | null;
+  off?: boolean;
+  helper?: { installed: boolean; ready: boolean; problem?: string; version?: string };
+  sspGate?: { on: boolean; adapter: string | null; state: string };
+  adapters?: { address: string; name: string }[];
+  devices?: ReconnectDeviceDesk[];
+  dryRun?: boolean;
+  cableReady?: boolean;
+  actions?: { at: string; action: string; device: string | null }[];
+}
 export interface ExtrasDesk {
   wifiPowerSaving: boolean | null;
   bios: { version: string | null; known?: boolean; notes: string[]; level: string };

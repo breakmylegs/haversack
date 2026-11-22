@@ -216,6 +216,11 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     3. Do it once straight after opening Keepsake, and once after a minute.
     4. If anything jumps, open Diagnostics, Tools, select Record navigation, repeat the moves for 60 seconds, then export the Device checks results.
 
+40. **Reconnect help in the desktop app (v0.42.0).** In Desktop Mode, open Keepsake's desktop app, Device, Reconnect help.
+    - The paired devices and their help switches should match Gaming Mode.
+    - Run Diagnose on the clone from there.
+    - The app should stay responsive throughout.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

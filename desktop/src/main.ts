@@ -19,6 +19,8 @@ import type {
   PerformanceDesk,
   ChargeLimitDesk,
   ControllersDesk,
+  ReconnectDesk,
+  ReconnectDeviceDesk,
   ExtrasDesk,
   DeviceStatusDesk,
   FoundDevice,
@@ -1421,6 +1423,7 @@ const PAGES: Page[] = [
   { id: "power", title: "Power", group: "Device", render: powerPage },
   { id: "battery", title: "Battery", group: "Device", render: batteryPage },
   { id: "controllers", title: "Controllers", group: "Device", render: controllersPage },
+  { id: "reconnect", title: "Reconnect help", group: "Device", render: reconnectPage },
   { id: "other", title: "Other", group: "Device", render: extrasPage },
   { id: "settings", title: "General and sync", group: "Settings", render: settingsPage },
   { id: "cloud", title: "Cloud", group: "Settings", render: cloud },
@@ -1646,7 +1649,147 @@ async function controllersPage(main: HTMLElement): Promise<void> {
     s.rings ? h("h2", {}, "Stick lights") : null,
     s.rings ? h("table", {}, h("tbody", {}, ...Object.entries(s.rings).map(([k, v]) => h("tr", {}, h("th", {}, k), h("td", {}, v))))) : null,
     s.tools.length ? h("p", {}, `Managed by ${s.tools.join(", ")}.`) : null,
-    h("p", { class: "small" }, "Remap buttons, dead zones and gyro in Steam's controller settings. Changing the controllers' own settings and the lights needs a separate root helper, which is waiting for a decision."),
+    h("p", { class: "small" }, "Remap buttons, dead zones and gyro in Steam's controller settings. Changing the controllers' own settings and the lights will use the Keepsake Helper, in a later release."),
+  );
+}
+
+// Device: Reconnect help (ADR-0082, ADR-0083). The same calls as Gaming Mode; installing the
+// helper needs Decky's installer, so it stays in Gaming Mode.
+async function reconnectPage(main: HTMLElement): Promise<void> {
+  const s = await call<ReconnectDesk>("reconnect_status");
+  const again = () => reconnectPage(main);
+  if (!s.available) {
+    replace(main, h("h1", {}, "Reconnect help"), h("p", {}, s.problem ?? "Bluetooth could not be read."));
+    return;
+  }
+  const ready = Boolean(s.helper?.ready);
+  const twice = (label: string, confirmLabel: string, work: () => Promise<unknown>) => {
+    let armed = false;
+    return button(label, async (self) => {
+      if (!armed) {
+        armed = true;
+        self.textContent = confirmLabel;
+        return;
+      }
+      await work();
+      await again();
+    });
+  };
+  const deviceRow = (d: ReconnectDeviceDesk) => {
+    const help = h("input", { type: "checkbox", checked: d.help, disabled: d.transport === "le", "aria-label": `Reconnect help for ${d.name}` }) as HTMLInputElement;
+    help.addEventListener("change", () => void call("reconnect_set_help", d.adapter, d.mac, help.checked, d.name).then(again, fail));
+    const notes = [
+      d.transport === "le" ? "Bluetooth LE (not supported yet)" : "",
+      d.unregisteredPrefix ? "address not from a registered manufacturer (information only)" : "",
+      d.suggest && !d.help ? `may need help: ${d.suggest.reason}` : "",
+      d.last ? `last diagnosis: ${d.last.title}` : "",
+    ].filter(Boolean);
+    return h(
+      "tr",
+      {},
+      h("td", {}, h("label", { class: "switch" }, help, ` ${d.name}`)),
+      h("td", {}, [d.class, d.modalias].filter(Boolean).join(", ")),
+      h("td", {}, d.adapterName),
+      h("td", {}, d.connected ? "connected" : "not connected"),
+      h("td", { class: "small" }, notes.join("; ")),
+    );
+  };
+  const actions = (d: ReconnectDeviceDesk) => {
+    const commit = h("input", { type: "checkbox", checked: d.commit, "aria-label": "Pair and commit" }) as HTMLInputElement;
+    commit.addEventListener("change", () => void call("reconnect_set_option", d.adapter, d.mac, "commit", commit.checked).then(again, fail));
+    let reversed = false;
+    const order = h("input", { type: "checkbox", "aria-label": "Reversed key order" }) as HTMLInputElement;
+    order.addEventListener("change", () => (reversed = order.checked));
+    return h(
+      "section",
+      {},
+      h("h2", {}, d.name),
+      h("label", { class: "switch" }, commit, " Pair and commit (connect at once after pairing, so the controller saves it)"),
+      h("p", { class: "small" }, "Reconnect: put the controller in pairing mode first (on a DualShock 4, hold Share and PS until the light flashes quickly). Diagnose: turn it off, wait 10 seconds, select Diagnose, then press its button once."),
+      h(
+        "div",
+        { class: "actions" },
+        button("Reconnect", async () => {
+          const r = await call<{ message: string }>("reconnect_assist", d.adapter, d.mac);
+          toast(r.message);
+          await again();
+        }),
+        button("Diagnose", async () => {
+          const r = await call<{ title: string; advice: string }>("reconnect_diagnose", d.adapter, d.mac);
+          toast(`${r.title}. ${r.advice}`);
+          await again();
+        }),
+        s.cableReady ? button("Read stored host over USB", async () => {
+          const r = await call<{ read: { ok: boolean; message?: string; storesThisHandheld?: boolean } }>("reconnect_read_usb", d.adapter, d.mac);
+          toast(r.read.ok ? (r.read.storesThisHandheld ? "The controller stores this handheld." : "The controller stores a different host.") : (r.read.message ?? "Not read."));
+          await again();
+        }) : null,
+        d.captured ? button("Export report bundle", async () => {
+          const r = await call<{ where: string }>("reconnect_export", d.adapter, d.mac, true);
+          toast(`Saved: ${r.where}`);
+        }) : null,
+      ),
+      d.last ? h("p", {}, `${d.last.title}. ${d.last.advice} Seen: ${d.last.evidence.join("; ") || "nothing"}.`) : null,
+      ready
+        ? h(
+            "div",
+            {},
+            d.stored ? h("p", { class: "small" }, `This handheld: ${d.stored.linkKey ? `a key is stored (type ${d.stored.keyType ?? "unknown"})` : "no key"}, ${d.stored.trusted ? "trusted" : "not trusted"}, ${d.stored.services ? "services known" : "services not known yet"}${d.stored.backups ? `, ${d.stored.backups} backup(s)` : ""}.`) : null,
+            h("label", { class: "switch" }, order, " Reversed key order (advanced, one controlled experiment)"),
+            h(
+              "div",
+              { class: "actions" },
+              s.cableReady
+                ? twice("Cable pair", "Confirm: restart Bluetooth", async () => {
+                    const r = await call<{ message: string }>("reconnect_cable_pair", d.adapter, d.mac, reversed ? "reversed" : "same");
+                    toast(r.message);
+                  })
+                : h("span", { class: "small" }, "Connect the controller with a USB data cable for cable pairing."),
+              d.stored?.backups ? twice("Restore backup", "Confirm: restart Bluetooth", () => call("reconnect_cable_restore", d.adapter, d.mac)) : null,
+            ),
+          )
+        : null,
+    );
+  };
+  const dry = h("input", { type: "checkbox", checked: Boolean(s.dryRun), "aria-label": "Dry run" }) as HTMLInputElement;
+  dry.addEventListener("change", () => void call("reconnect_set_dry_run", dry.checked).then(again, fail));
+  const devices = s.devices ?? [];
+  const gate = s.sspGate;
+  const showGate = ready && (gate?.on || devices.some((d) => d.help && d.last?.outcome === "O3"));
+  const confirmBox = h("input", { type: "text", placeholder: "Type: I understand", "aria-label": "Confirm the SSP gate warning" }) as HTMLInputElement;
+  replace(
+    main,
+    h("h1", {}, "Reconnect help"),
+    h("p", {}, "For Bluetooth controllers, often clones, that pair once and then will not reconnect with their normal button. Turn help on only for the ones that need it: the others are never touched."),
+    h(
+      "p",
+      { class: ready ? "" : "small" },
+      ready
+        ? `Keepsake Helper ready (version ${s.helper?.version}): cable pairing, the SSP gate and the Bluetooth capture are available.`
+        : s.helper?.problem === "version"
+          ? "The Keepsake Helper does not match this Keepsake. Update it from Gaming Mode: Device, Reconnect help."
+          : "Cable pairing, the SSP gate and the Bluetooth capture need the Keepsake Helper. Install it from Gaming Mode: Device, Reconnect help.",
+    ),
+    devices.length
+      ? h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Device"), h("th", {}, "Class and modalias"), h("th", {}, "Adapter"), h("th", {}, "State"), h("th", {}, "Notes"))), h("tbody", {}, ...devices.map(deviceRow)))
+      : h("p", {}, "No paired devices. Pair a controller in Steam's Bluetooth settings first."),
+    ...devices.filter((d) => d.help).map(actions),
+    showGate
+      ? h(
+          "section",
+          {},
+          h("h2", {}, "SSP gate"),
+          h("p", { class: "warn" }, "The SSP gate lowers Bluetooth security for the whole adapter, for every device. While it is on, new pairings use the older PIN method and Secure Connections protection is lost. SSP goes back on while pairing, when you switch the gate off, and if Keepsake stops."),
+          h("p", {}, gate?.on ? `On (now: ${gate.state}).` : "Off."),
+          gate?.on
+            ? h("div", { class: "actions" }, button("Switch the SSP gate off", async () => (await call("reconnect_set_ssp_gate", false, "", ""), await again())), gate.state === "needs-confirm" ? button("Restart Bluetooth to turn SSP off", async () => (await call("reconnect_ssp_confirm"), await again())) : null)
+            : h("div", { class: "actions" }, confirmBox, button("Turn the SSP gate on", async () => (await call("reconnect_set_ssp_gate", true, s.adapters?.[0]?.address ?? "", confirmBox.value.trim()), await again()))),
+        )
+      : null,
+    h("label", { class: "switch" }, dry, " Dry run (log what would be done, without scanning or connecting)"),
+    (s.actions ?? []).length
+      ? h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "When"), h("th", {}, "Action"), h("th", {}, "Device"))), h("tbody", {}, ...(s.actions ?? []).slice(-10).reverse().map((a) => h("tr", {}, h("td", {}, a.at.replace("T", " ").replace("Z", "")), h("td", {}, a.action), h("td", {}, a.device ?? "")))))
+      : null,
   );
 }
 
