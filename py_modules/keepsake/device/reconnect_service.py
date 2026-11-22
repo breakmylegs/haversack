@@ -11,16 +11,21 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import secrets
 import threading
 import time
 import zipfile
 from collections.abc import Callable
 from typing import Any
 
-from . import bluez, cable
+from . import bluez, cable, hcilog
+from .helper import HelperClient, HelperError
 from .reconnect import Rules, classify, journal_signs, masked, normal_mac, read_journal, redact, rule_key
+from .sspgate import SspGate
 
 FULL_REPORT_TRIES = 6
+CAPTURE_SECONDS = 40.0
+CONFIRM = "I understand"
 
 
 class ReconnectService:
@@ -33,8 +38,14 @@ class ReconnectService:
         journal: Callable[[float], list[str]] = read_journal,
         get: cable.Get = cable.get_feature,
         notify: Callable[[], None] = lambda: None,
+        version: str = "dev",
+        helper: HelperClient | None = None,
+        busy: Callable[[], str | None] = lambda: None,
     ) -> None:
         self.rules = Rules(os.path.join(settings_dir, "reconnect-help.json"))
+        self.helper = helper or HelperClient(version)
+        self.busy = busy
+        self.gate: SspGate | None = None
         self.export_dir = settings_dir
         self.sys_root = sys_root
         self.dev_root = dev_root
@@ -55,9 +66,23 @@ class ReconnectService:
 
     def start(self) -> None:
         self.watcher.start()
+        gate = self.rules.ssp_gate()
+        if gate:
+            self._start_gate(str(gate["path"]))
 
     def stop(self) -> None:
         self.watcher.stop()
+        self._stop_gate()
+
+    def _start_gate(self, path: str) -> None:
+        self._stop_gate()
+        self.gate = SspGate(self.helper, path, self.connect)
+        self.gate.start()
+
+    def _stop_gate(self) -> None:
+        gate, self.gate = self.gate, None
+        if gate is not None:
+            gate.stop()  # SSP back on
 
     # Watcher callbacks (on the watcher's thread)
 
@@ -105,9 +130,24 @@ class ReconnectService:
                     "captured": key in self.captures,
                 }
             )
+        helper = self.helper.status()
+        if helper.get("ready"):
+            for device in out:
+                if device["help"]:
+                    try:
+                        device["stored"] = self.helper.bt_state(device["adapter"], device["mac"])
+                    except HelperError:
+                        device["stored"] = None
+        gate = self.rules.ssp_gate()
         return {
             "available": problem is None,
             "problem": problem,
+            "helper": helper,
+            "sspGate": {
+                "on": bool(gate),
+                "adapter": (gate or {}).get("adapter"),
+                "state": self.gate.state if self.gate else "on",
+            },
             "adapters": found["adapters"],
             "devices": out,
             "dryRun": state["dryRun"],
@@ -155,6 +195,8 @@ class ReconnectService:
         a, m = self._gate(adapter, mac)
         nodes = await asyncio.to_thread(cable.hid_nodes, self.sys_root, self.dev_root)
         read = await asyncio.to_thread(cable.read_stored_host, m, nodes, self.get)
+        if read["state"] == "permission" and self.helper.installed():
+            read = await asyncio.to_thread(cable.read_stored_host, m, nodes, self.helper.get_feature)
         self.rules.action("read-usb", a, m, state=read["state"])
         if not read["ok"]:
             return {"read": read, "diagnosis": None}
@@ -174,15 +216,27 @@ class ReconnectService:
         """The time-boxed watch while the user presses the button, the journal, then the outcome."""
         a, m = self._gate(adapter, mac)
         since = time.time() - 2
+        capture_task = None
+        if self.helper.status().get("ready"):
+            capture_task = asyncio.create_task(asyncio.to_thread(self.helper.capture, CAPTURE_SECONDS))
         watched = await asyncio.to_thread(bluez.watch_reconnect, a, m, self.rules.enabled, self.connect)
+        btsnoop: bytes | None = None
+        capture_problem = None
+        if capture_task is not None:
+            try:
+                btsnoop = await capture_task
+            except HelperError as exc:
+                capture_problem = str(exc)[:120]
         try:
             lines = await asyncio.to_thread(self.journal, since)
             journal_problem = None
         except Exception as exc:  # noqa: BLE001 - the journal is evidence, not a requirement
             lines, journal_problem = [], str(exc)[:120]
         signs = journal_signs(lines, m)
-        diagnosis = classify(watched["bond"], watched["events"], signs)
+        hci = hcilog.signs(btsnoop) if btsnoop else None
+        diagnosis = classify(watched["bond"], watched["events"], signs, hci=hci)
         diagnosis["journal"] = "unavailable" if journal_problem else "read"
+        diagnosis["capture"] = "read" if btsnoop else (capture_problem or "needs the Keepsake Helper")
         await asyncio.to_thread(self.rules.record, a, m, diagnosis)
         key = rule_key(a, m)
         self.captures[key] = {
@@ -192,6 +246,7 @@ class ReconnectService:
             "journal": lines,
             "journalProblem": journal_problem,
             "diagnosis": diagnosis,
+            "btsnoop": btsnoop,
         }
         self.rules.action("diagnose", a, m, outcome=diagnosis["outcome"])
         return diagnosis
@@ -220,7 +275,7 @@ class ReconnectService:
             "usb": capture.get("usb"),
             "diagnosis": capture.get("diagnosis"),
             "journalProblem": capture.get("journalProblem"),
-            "hciCapture": "needs the root helper (next release)",
+            "hciCapture": "hci.btsnoop" if capture.get("btsnoop") else "none (needs the Keepsake Helper)",
         }
         lines = redact(capture.get("journal", []), a if redact_adapter else None)
         if redact_adapter and isinstance(report["usb"], dict) and report["usb"].get("host") == a:
@@ -232,10 +287,137 @@ class ReconnectService:
             with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as bundle:
                 bundle.writestr("report.json", json.dumps(report, indent=1))
                 bundle.writestr("journal.txt", "\n".join(lines) + ("\n" if lines else ""))
+                if capture.get("btsnoop"):
+                    # Raw packets: the adapter address is in them, so they are left out when redacting.
+                    if not redact_adapter:
+                        bundle.writestr("hci.btsnoop", capture["btsnoop"])
 
         await asyncio.to_thread(write)
         self.rules.action("export", a, m, redacted=bool(redact_adapter))
         return {"file": name, "path": path}
+
+    # Root jobs through the Keepsake Helper (R23, ADR-0083)
+
+    def _ready(self) -> None:
+        status = self.helper.status()
+        if not status.get("ready"):
+            raise ValueError(
+                "update the Keepsake Helper to match Keepsake"
+                if status.get("problem") == "version"
+                else "install the Keepsake Helper first"
+            )
+
+    def _cable_pair(self, a: str, m: str, order: str) -> dict[str, Any]:
+        self._ready()
+        busy = self.busy()
+        if busy:
+            raise ValueError(f"not now: {busy}")
+        stored = self.helper.bt_state(a, m)
+        if not stored.get("record") or not stored.get("services"):
+            raise ValueError(
+                "BlueZ does not know this controller's services yet. "
+                "Put it in pairing mode and use Reconnect once first."
+            )
+        nodes = cable.hid_nodes(self.sys_root, self.dev_root)
+        usb = [(n, cable.provider_for(n)) for n in nodes if n.bus == "usb"]
+        matched = None
+        for node, provider in usb:
+            if provider is None:
+                continue
+            identity = provider.read_identity(node, self.helper.get_feature)
+            if identity["controller"] == m:
+                matched = (node, provider)
+                break
+        if matched is None:
+            raise ValueError(
+                "connect this controller with a USB data cable first"
+                if not any(p for _n, p in usb)
+                else "the controller on the cable is a different one, or cable pairing is not supported for it"
+            )
+        node, provider = matched
+        if self.rules.dry_run():
+            self.rules.action("cable-pair", a, m, dryRun=True)
+            return {"ok": True, "state": "dry-run", "message": "Dry run: nothing was written."}
+        key = secrets.token_bytes(16)
+        provider.write_pairing(node, a, key, self.helper.set_feature)
+        provider.commit(node, self.helper.set_feature)
+        if not provider.verify(node, a, self.helper.get_feature):
+            self.rules.action("cable-pair", a, m, state="not-taken")
+            raise ValueError("the controller did not take the new pairing; nothing was changed on this handheld")
+        since = time.time() - 1
+        file_key = key if order == "same" else bytes(reversed(key))
+        done = self.helper.bt_install(a, m, file_key, provider.key_type)
+        time.sleep(3.0)
+        try:
+            sixaxis = "sixaxis" in journal_signs(self.journal(since))
+        except Exception:  # noqa: BLE001 - the journal only adds a warning
+            sixaxis = False
+        self.rules.action("cable-pair", a, m, order=order, sixaxis=sixaxis)
+        return {
+            "ok": True,
+            "state": "paired",
+            "backup": done.get("backup"),
+            "sixaxis": sixaxis,
+            "message": (
+                "BlueZ's sixaxis plugin acted on the controller while it was plugged in, so it may have "
+                "replaced the key. Unplug it and run cable pairing again."
+                if sixaxis
+                else "Paired. Unplug the controller, turn it off, then press its button."
+            ),
+        }
+
+    async def cable_pair(self, adapter: Any, mac: Any, order: str = "same") -> dict[str, Any]:
+        """Cable pairing through the device's provider and the helper. bluetoothd restarts."""
+        a, m = self._gate(adapter, mac)
+        if order not in ("same", "reversed"):
+            raise ValueError("the key order is same or reversed")
+        try:
+            return await asyncio.to_thread(self._cable_pair, a, m, order)
+        except (HelperError, cable.CableError, OSError) as exc:
+            raise ValueError(str(exc)) from exc
+
+    async def cable_restore(self, adapter: Any, mac: Any) -> dict[str, Any]:
+        a, m = self._gate(adapter, mac)
+        await asyncio.to_thread(self._ready)
+        busy = self.busy()
+        if busy:
+            raise ValueError(f"not now: {busy}")
+        try:
+            done = await asyncio.to_thread(self.helper.bt_restore, a, m)
+        except HelperError as exc:
+            raise ValueError(str(exc)) from exc
+        self.rules.action("restore-backup", a, m)
+        return {"ok": True, "restored": done.get("restored")}
+
+    async def set_ssp_gate(self, on: bool, adapter: Any = None, confirm: str = "") -> dict[str, Any]:
+        """The SSP gate: on only with the exact confirmation text, after the screen's two steps."""
+        if not on:
+            await asyncio.to_thread(self._stop_gate)
+            await asyncio.to_thread(self.rules.set_ssp_gate, None, None)
+            return await self.status()
+        if confirm != CONFIRM:
+            raise ValueError("confirm the warning first")
+        await asyncio.to_thread(self._ready)
+        a = normal_mac(adapter)
+        found = await asyncio.to_thread(bluez.list_devices, self.connect)
+        path = next((f"/org/bluez/{x['name']}" for x in found["adapters"] if x["address"] == a), None)
+        if a is None or path is None:
+            raise ValueError("choose a Bluetooth adapter")
+        await asyncio.to_thread(self.rules.set_ssp_gate, a, path)
+        await asyncio.to_thread(self._start_gate, path)
+        return await self.status()
+
+    async def ssp_confirm_power_cycle(self) -> dict[str, Any]:
+        """The kernel needs the adapter off to turn SSP off, and devices are connected: the user said yes."""
+        gate = self.gate
+        if gate is None:
+            raise ValueError("the SSP gate is off")
+        await asyncio.to_thread(gate.apply, 1, True)
+        return await self.status()
+
+    def arm_pairing(self, seconds: float = 60.0) -> None:
+        if self.gate is not None:
+            self.gate.arm(seconds)
 
     async def probe(self) -> dict[str, Any]:
         """For the Device check: counts and outcome codes only, addresses masked."""
@@ -266,4 +448,6 @@ class ReconnectService:
             "dryRun": status["dryRun"],
             "cableReady": status["cableReady"],
             "journal": journal,
+            "helper": {k: status["helper"].get(k) for k in ("installed", "ready", "problem")},
+            "sspGate": status["sspGate"]["state"] if status["sspGate"]["on"] else "off",
         }

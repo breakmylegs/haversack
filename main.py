@@ -357,6 +357,21 @@ class Plugin:
     async def reconnect_export(self, adapter: str, mac: str, redact_adapter: bool = True) -> dict[str, Any]:
         return await self.app.reconnect_export(adapter, mac, redact_adapter)
 
+    async def reconnect_cable_pair(self, adapter: str, mac: str, order: str = "same") -> dict[str, Any]:
+        return await self.app.reconnect_cable_pair(adapter, mac, order)
+
+    async def reconnect_cable_restore(self, adapter: str, mac: str) -> dict[str, Any]:
+        return await self.app.reconnect_cable_restore(adapter, mac)
+
+    async def reconnect_set_ssp_gate(self, on: bool, adapter: str = "", confirm: str = "") -> dict[str, Any]:
+        return await self.app.reconnect_set_ssp_gate(on, adapter, confirm)
+
+    async def reconnect_ssp_confirm(self) -> dict[str, Any]:
+        return await self.app.reconnect_ssp_confirm()
+
+    async def helper_prepare(self) -> dict[str, Any]:
+        return await self.app.helper_prepare()
+
     async def device_battery(self) -> dict[str, Any]:
         return await self.app.device_battery()
 

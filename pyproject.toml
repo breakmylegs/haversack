@@ -12,7 +12,7 @@ markers = [
 [tool.ruff]
 line-length = 120
 target-version = "py311"
-src = ["py_modules", "tests", "scripts"]
+src = ["py_modules", "tests", "scripts", "helper/py_modules"]
 # decky.pyi is copied verbatim from the plugin template.
 # The Codehouse-pinned regression file is locked (change only with the owner) and is not valid
 # Python as generated; the same counterexample is pinned in tests/test_restore.py. See the slice 5 report.
@@ -41,8 +41,8 @@ ignore = [
 
 [tool.mypy]
 python_version = "3.11"
-mypy_path = ["py_modules", "."]
-files = ["py_modules/keepsake", "main.py"]
+mypy_path = ["py_modules", ".", "helper/py_modules"]
+files = ["py_modules/keepsake", "main.py", "helper/py_modules/keepsake_helper"]
 strict = true
 warn_unused_ignores = true
 exclude = ["py_modules/keepsake/_vendor/"]

@@ -1,0 +1,11 @@
+{
+  "name": "Keepsake Helper",
+  "author": "breakmylegs",
+  "flags": ["root"],
+  "api_version": 1,
+  "publish": {
+    "tags": ["keepsake", "root"],
+    "description": "Keepsake's small root helper: Bluetooth pairing keys, the SSP setting and HCI capture, only for Keepsake.",
+    "image": "https://opengraph.githubassets.com/1/breakmylegs/keepsake"
+  }
+}

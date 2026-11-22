@@ -133,6 +133,10 @@ def build_assets(out_dir: str, version: str, notes: str) -> list[str]:
     desktop_path = package.build_desktop(out_dir)
     with open(desktop_path, "rb") as handle:
         desktop_digest = hashlib.sha256(handle.read()).hexdigest()
+    # The root helper (ADR-0083), version-locked, under the same signature.
+    helper_path = package.build_helper(out_dir)
+    with open(helper_path, "rb") as handle:
+        helper_digest = hashlib.sha256(handle.read()).hexdigest()
     # The software bill of materials (ADR-0050), under the same signature.
     sbom_path = sbom.write(os.path.join(out_dir, sbom.asset_name(package.plugin_name(), version)), ROOT)
     with open(sbom_path, "rb") as handle:
@@ -141,11 +145,11 @@ def build_assets(out_dir: str, version: str, notes: str) -> list[str]:
     with open(sums_path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(
             f"{digest}  {expected}\n{digest}  {stable_zip_name()}\n{desktop_digest}  {os.path.basename(desktop_path)}\n"
-            f"{sbom_digest}  {os.path.basename(sbom_path)}\n"
+            f"{helper_digest}  {os.path.basename(helper_path)}\n{sbom_digest}  {os.path.basename(sbom_path)}\n"
         )
     with open(os.path.join(out_dir, "notes.md"), "w", encoding="utf-8", newline="\n") as handle:
         handle.write(notes)
-    return [zip_path, stable_path, desktop_path, sbom_path, sums_path]
+    return [zip_path, stable_path, desktop_path, helper_path, sbom_path, sums_path]
 
 
 def pinned_key() -> str:

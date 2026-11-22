@@ -171,9 +171,54 @@ def build_desktop(out_dir: str) -> str:
     return target
 
 
+# The root helper (ADR-0083): a separate plugin, version-locked to Keepsake, under the same signature.
+HELPER = os.path.join(ROOT, "helper")
+HELPER_FOLDER = "keepsake-helper"
+
+
+def helper_name() -> str:
+    return f"{plugin_name()}-helper-v{version()}.zip"
+
+
+def collect_helper() -> list[tuple[str, str]]:
+    """(source path, archive path) for the helper: its own files, a copy of the licence, no tests."""
+    entries = [(os.path.join(HELPER, n), n) for n in ("main.py", "plugin.json")]
+    # Hand-written against Decky's globals, so it is kept in the repository (dist/ is ignored).
+    entries.append((os.path.join(HELPER, "frontend", "index.js"), "dist/index.js"))
+    entries.append((os.path.join(ROOT, "LICENSE"), "LICENSE"))
+    base = os.path.join(HELPER, "py_modules")
+    for folder, dirs, files in os.walk(base):
+        dirs[:] = sorted(d for d in dirs if d not in SKIP_PARTS)
+        for name in files:
+            if name.endswith(".py"):
+                src = os.path.join(folder, name)
+                entries.append((src, os.path.relpath(src, HELPER).replace(os.sep, "/")))
+    return sorted(entries, key=lambda e: e[1])
+
+
+def build_helper(out_dir: str) -> str:
+    """Build ``Keepsake-helper-v<version>.zip``, deterministic, with its version stamped in."""
+    os.makedirs(out_dir, exist_ok=True)
+    target = os.path.join(out_dir, helper_name())
+    with open(os.path.join(HELPER, "package.json"), encoding="utf-8") as handle:
+        meta = json.load(handle)
+    meta["version"] = version()
+    extra = {"VERSION": version() + "\n", "package.json": json.dumps(meta, indent=2) + "\n"}
+    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        items = [(rel, open(src, "rb").read()) for src, rel in collect_helper()]
+        items += [(rel, text.encode("utf-8")) for rel, text in extra.items()]
+        for rel, data in sorted(items):
+            info = zipfile.ZipInfo(f"{HELPER_FOLDER}/{rel}", date_time=FIXED_TIME)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = (0o100000 | 0o644) << 16
+            archive.writestr(info, data)
+    return target
+
+
 def main() -> None:
     out_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "out")
-    for target in (build(out_dir), build_desktop(out_dir)):
+    for target in (build(out_dir), build_desktop(out_dir), build_helper(out_dir)):
         with open(target, "rb") as handle:
             digest = hashlib.sha256(handle.read()).hexdigest()
         print(f"{digest}  {os.path.basename(target)}")
