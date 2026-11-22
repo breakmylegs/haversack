@@ -4,6 +4,15 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **Send emulator games to your other handheld** (Games and devices, Emulators, in Gaming Mode and the desktop app). One button per game sends:
+  - the game's files, with multi-disc games kept together;
+  - the emulator and its settings, but only if the other handheld lacks them;
+  - firmware and keys, only if you tick **Also send firmware and keys**. They go straight to your own paired handheld over the encrypted link and are stored there for your user only. They never go to the cloud, logs or exports.
+
+  Nothing already on the other handheld is replaced. The game gets a Steam shortcut built from that handheld's own Steam ROM Manager setup. Without one, it is copied and you add the shortcut with Steam ROM Manager. Flatpak emulators are not copied: install them on the other handheld.
+
 ## [0.48.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

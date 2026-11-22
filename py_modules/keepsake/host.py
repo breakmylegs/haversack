@@ -177,6 +177,8 @@ CALLABLES = frozenset(
         "fans_status",
         "controller_settings_status",
         "emulator_setup",
+        "emulator_peer",
+        "emulator_send",
         "controller_settings_set",
         "controller_settings_forget",
         "fans_set_options",

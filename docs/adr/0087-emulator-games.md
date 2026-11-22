@@ -59,3 +59,34 @@
 
 - **Stage 1 changes nothing on either device.**
 - **Threat model:** T160. **Device run:** step 48.
+
+## Addendum (v0.49.0): the peer protocol for emulator games
+
+This changes the peer protocol after slice 18. It adds two request types and one offer kind; nothing existing changes, and a device without them answers with the usual unknown-request error, which the sender reports as "needs Keepsake 0.49 or later".
+
+**`emu-summary`** (request, no fields). The reply is `{"type": "emu-summary", "systems", "emulators", "configs", "games"}`:
+- `systems`: the ROM folder names that exist (`switch`, `psx`, ...);
+- `emulators`: the emulators found, by name;
+- `configs`: the emulators that already have settings;
+- `games`: `[system, name]` pairs of this device's emulator games.
+
+It never holds paths, user names or SD card labels (P10), and nothing about key or firmware files.
+
+**`emu-offer`** (request, `{"offer": ...}`). The offer is `{"kind": "emulator", "id", "system", "unit", "emulator", "shares", "from"}`:
+- `shares` holds the parts `rom` (always), `app`, `config` and `keys`. Each part is `{share, root, bytes}`, the same as a game share.
+- The receiver checks it with `emuplan.validate`:
+  - the system name, the game name and the emulator name come from a fixed list;
+  - every share field is checked;
+  - unknown fields are dropped;
+  - `config` and `keys` are accepted only for emulators with a known place for them.
+- The reply is `{"type": "offer-received", "id"}`.
+
+**On the receiver, the offer takes the existing flow** (offered, accepted, transferring, registering, done), with its own branch at each step:
+- **Targets:** `emureceive.targets` puts each part in a staging folder beside where it belongs. Settings go straight to their folder, and only where there are none.
+- **Finishing:** `emureceive.finish` moves each name into place only where nothing of that name exists, sets the executable bit on the emulator, and makes keys owner-only.
+- **The shortcut:** it comes from the receiver's own Steam ROM Manager parser (`emureceive.launch`), through `add-shortcut` and the field operations (P15). When there is no parser, or a template Keepsake does not know, no shortcut is made and the page says to add it with Steam ROM Manager.
+
+**On the sender:**
+- `emulator_send` asks for the summary first, refuses a game the other device already has, and plans only the missing parts.
+- Keys are included only when the user ticked the separate confirmation.
+- The game's share is the system's ROM folder with everything but that game's files excluded, so other games never travel.

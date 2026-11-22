@@ -566,6 +566,9 @@ export interface EmulatorSetup {
   secrets: Record<string, number>;
 }
 export const emulatorSetup = callable<[], EmulatorSetup>("emulator_setup");
+export const emulatorSend = callable<[peerId: string, system: string, unit: string, withKeys: boolean], { ok: boolean; parts: string[] }>(
+  "emulator_send",
+);
 
 // Quick menu shortcuts (layout v3 addendum, ADR-0073): pages, actions and status lines, chosen and ordered.
 export const SHORTCUTS_EVENT = "keepsake_shortcuts";

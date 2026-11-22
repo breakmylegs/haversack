@@ -1895,6 +1895,10 @@ async function controllersPage(main: HTMLElement): Promise<void> {
 // Games and devices: Emulators (R26 stage 1, ADR-0087), read-only. Key and firmware files are counted only.
 async function emulatorsPage(main: HTMLElement): Promise<void> {
   const s = await call<EmulatorSetupDesk>("emulator_setup");
+  const peers = (await call<{ peers: { id: string; name: string }[] }>("replication_status").catch(() => ({ peers: [] }))).peers;
+  const peerSelect = h("select", { "aria-label": "Send to" }) as HTMLSelectElement;
+  for (const p of peers) peerSelect.append(h("option", { value: p.id }, p.name));
+  const keys = h("input", { type: "checkbox", "aria-label": "Also send firmware and keys" }) as HTMLInputElement;
   if (s.off) {
     replace(main, h("h1", {}, "Emulators"), h("p", {}, s.problem ?? "Replication is off."));
     return;
@@ -1907,12 +1911,17 @@ async function emulatorsPage(main: HTMLElement): Promise<void> {
       ? h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Emulator"), h("th", {}, "Type"), h("th", {}, "System"))), h("tbody", {}, ...s.emulators.map((e) => h("tr", {}, h("td", {}, e.name), h("td", {}, e.type), h("td", {}, e.system)))))
       : h("p", { class: "small" }, "No standalone emulators found."),
     s.games.length
-      ? h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "System"), h("th", {}, "Game"), h("th", {}, "Files"), h("th", {}, "Size"))), h("tbody", {}, ...s.games.slice(0, 500).map((g) => h("tr", {}, h("td", {}, g.system), h("td", {}, g.name), h("td", {}, String(g.files)), h("td", {}, size(g.size))))))
+      ? h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "System"), h("th", {}, "Game"), h("th", {}, "Files"), h("th", {}, "Size"), h("th", {}, ""))), h("tbody", {}, ...s.games.slice(0, 500).map((g) => h("tr", {}, h("td", {}, g.system), h("td", {}, g.name), h("td", {}, String(g.files)), h("td", {}, size(g.size)), h("td", {}, peers.length ? button("Send", async () => {
+          const r = await call<{ parts: string[] }>("emulator_send", peerSelect.value, g.system, g.name, keys.checked);
+          toast(`Getting ${g.name} ready to send (${r.parts.join(", ")}).`);
+        }, "small") : "")))))
       : h("p", { class: "small" }, "No games found."),
     Object.keys(s.secrets).length
       ? h("p", {}, `Firmware, BIOS and keys: ${Object.entries(s.secrets).map(([k, n]) => `${n} for ${k}`).join(", ")}. Counted only; never read.`)
       : null,
-    h("p", { class: "small" }, "Copying games, emulators, settings, firmware and keys to your other handheld comes in the next release."),
+    peers.length
+      ? h("div", { class: "actions" }, h("label", {}, "Send to ", peerSelect), h("label", { class: "switch" }, keys, " Also send firmware and keys (only straight to your own paired device, stored there for your user only; never to the cloud)"))
+      : h("p", { class: "small" }, "Pair your other handheld to send games to it."),
   );
 }
 

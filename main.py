@@ -381,6 +381,12 @@ class Plugin:
     async def emulator_setup(self) -> dict[str, Any]:
         return await self.app.emulator_setup()
 
+    async def emulator_peer(self, peer_id: str) -> dict[str, Any]:
+        return await self.app.emulator_peer(peer_id)
+
+    async def emulator_send(self, peer_id: str, system: str, unit: str, with_keys: bool = False) -> dict[str, Any]:
+        return await self.app.emulator_send(peer_id, system, unit, with_keys)
+
     async def controller_settings_status(self) -> dict[str, Any]:
         return await self.app.controller_settings_status()
 

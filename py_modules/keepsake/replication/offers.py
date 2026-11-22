@@ -26,7 +26,8 @@ from collections.abc import Callable
 from typing import Any
 
 from ..fsutil import atomic_write_json, read_json
-from . import activity, ongoing, policy, sendgame, transfer
+from . import activity, emuplan, emureceive, ongoing, policy, sendgame, transfer
+from . import emulators as emu
 from . import manifest as mf
 from .jobs import Transfers
 from .link import ServeError, Session
@@ -58,6 +59,18 @@ def wire_reason(reason: str | None) -> str | None:
 
 class OfferError(Exception):
     pass
+
+
+def only(members: list[str]) -> Any:
+    """An exclude function keeping just ``members`` (paths relative to the root), what is inside them,
+    and the folders on the way to them."""
+    keep = {m.strip("/") for m in members}
+    ancestors = {"/".join(m.split("/")[:i]) for m in keep for i in range(1, m.count("/") + 1)}
+
+    def exclude(rel: str) -> bool:
+        return not (rel in keep or rel in ancestors or any(rel.startswith(f"{m}/") for m in keep))
+
+    return exclude
 
 
 # The wire format
@@ -252,6 +265,41 @@ class Outgoing:
             **extra,
         }
         offers[offer_id] = {"peer": peer_id, "title": plan.title, "shares": record_shares, "created": time.time()}
+        self._save(offers)
+        return wire
+
+    def prepare_emulator(self, plan: emuplan.EmuPlan, peer_id: str, extra: dict[str, Any]) -> dict[str, Any]:
+        """Hash an emulator game's parts and offer them to ``peer_id`` (R26 stage 2). Slow: run in a thread."""
+        offers = self._load()
+        if len(offers) >= MAX_OFFERS:
+            raise OfferError(f"at most {MAX_OFFERS} games can be on offer; withdraw one first")
+        offer_id = sendgame.new_offer_id()
+        folder = os.path.join(self.work_dir, offer_id)
+        os.makedirs(folder, exist_ok=True)
+        record_shares, wire_shares = {}, {}
+        for part, path in plan.roots.items():
+            if part == "rom":
+                root, exclude = path, only(plan.rom_files)
+            elif os.path.isfile(path):
+                root, exclude = os.path.dirname(path), only([os.path.basename(path)])
+            else:
+                root, exclude = path, (lambda _rel: False)
+            manifest = mf.build(root, exclude)
+            manifest_file = os.path.join(folder, f"{part}.json")
+            atomic_write_json(manifest_file, manifest)
+            share = self.shares.add(root, manifest, {peer_id})
+            record_shares[part] = {"share": share.id, "root": root, "manifestFile": manifest_file}
+            wire_shares[part] = {"share": share.id, "root": manifest["root"], "bytes": mf.total_bytes(manifest)}
+        wire = {
+            "kind": "emulator",
+            "id": offer_id,
+            "system": plan.system,
+            "unit": plan.unit,
+            "emulator": plan.emulator,
+            "shares": wire_shares,
+            **extra,
+        }
+        offers[offer_id] = {"peer": peer_id, "title": plan.unit, "shares": record_shares, "created": time.time()}
         self._save(offers)
         return wire
 
@@ -463,6 +511,51 @@ class Incoming:
             self.on_offer(offer)
         return {"type": "offer-received", "id": offer["id"]}
 
+    async def handle_emu_offer(self, session: Session, message: dict[str, Any]) -> dict[str, Any]:
+        """The ``emu-offer`` request (R26 stage 2): an emulator game, checked by its own validator."""
+        raw = message.get("offer")
+        try:
+            clean = emuplan.validate(raw)
+        except emuplan.EmuPlanError as exc:
+            raise ServeError(str(exc)) from exc
+        if not OFFER_ID.match(clean["id"]):
+            raise ServeError("the offer is not valid")
+        sender = (
+            (raw.get("from") or {}).get("name") if isinstance(raw, dict) and isinstance(raw.get("from"), dict) else None
+        )
+        offer = {
+            **clean,
+            "title": clean["unit"],
+            "from": clean_name(sender),
+            "compatTool": None,
+            "art": [],
+            "update": None,
+            "launchOptions": "",
+            "droppedOptions": [],
+            "gameKey": None,
+            "savesEnabled": False,
+            "pull": None,
+        }
+        offers = self._load()
+        if offer["id"] not in offers and sum(1 for r in offers.values() if r["state"] == "offered") >= MAX_OFFERS:
+            raise ServeError("that device already has too many offers waiting")
+        new = offer["id"] not in offers
+        offers.setdefault(
+            offer["id"], {"offer": offer, "peer": session.peer_id, "state": "offered", "received": time.time()}
+        )
+        self._save(offers)
+        self._changed()
+        if new and self.on_offer:
+            self.on_offer(offer)
+        return {"type": "offer-received", "id": offer["id"]}
+
+    def _emu_places(self) -> tuple[str, str]:
+        home = self.places().get("home", "")
+        setup = emu.emudeck(home) or emu.retrodeck(home)
+        if not home or setup is None:
+            raise OfferError("this device has no emulator setup (EmuDeck or RetroDECK)")
+        return home, setup["romsPath"]
+
     # The user's choices
 
     def list(self) -> list[dict[str, Any]]:
@@ -585,6 +678,18 @@ class Incoming:
             raise OfferError("that offer has gone")
         offer, places = record["offer"], self.places()
         targets: dict[str, str] = {}
+        if offer.get("kind") == "emulator":
+            home, roms = self._emu_places()
+            try:
+                targets = emureceive.targets(offer, offer_id, home, roms)
+            except (emureceive.EmuReceiveError, emuplan.EmuPlanError) as exc:
+                raise OfferError(str(exc)) from exc
+            for scope, target in targets.items():
+                parent = os.path.dirname(target)
+                needed = policy.space_needed(offer["shares"][scope]["bytes"])
+                if shutil.disk_usage(parent).free < needed:
+                    raise OfferError(f"not enough space in {parent}")
+            return {"targets": targets, "toolMissing": False}
         if "install" in offer["shares"]:
             if not places.get("library") or not os.path.isdir(places["library"]):
                 raise OfferError("choose where games are installed first (Settings, Install)")
@@ -736,12 +841,48 @@ class Incoming:
             done = set(record.get("doneScopes", [])) | {next(s for s, j in record["jobs"].items() if j == job.id)}
             record = self._update(offer_id, doneScopes=sorted(done))
             if done >= set(record["jobs"]):
-                if record["offer"].get("update"):
+                if record["offer"].get("kind") == "emulator":
+                    self._emu_finish(offer_id)
+                elif record["offer"].get("update"):
                     record = self._update(offer_id, state="done")  # files only: the shortcut stays as it is
                     if self.on_done:
                         self.on_done(record)
                 else:
                     self._register(offer_id)
+
+    def _emu_finish(self, offer_id: str) -> None:
+        record = self._load()[offer_id]
+        offer = record["offer"]
+        try:
+            home, roms = self._emu_places()
+            done = emureceive.finish(offer, record["targets"], home, roms)
+        except (OSError, OfferError, emuplan.EmuPlanError) as exc:
+            self._update(offer_id, state="failed", reason=f"the copy could not be put in place: {exc}")
+            return
+        placed = done["placed"].get("rom", [])
+        record = self._update(offer_id, placed=done["placed"], skipped=done["skipped"])
+        # The shortcut points at the playlist if there is one, else the game's first file or folder.
+        main = next((p for p in placed if p.lower().endswith(".m3u")), placed[0] if placed else None)
+        launch = emureceive.launch(home, offer["system"], os.path.join(roms, offer["system"], main)) if main else None
+        if launch is None:
+            reason = (
+                "Copied. No shortcut was made: add it with Steam ROM Manager on this device."
+                if placed
+                else "Nothing new: this device already has the game."
+            )
+            record = self._update(offer_id, state="done", reason=reason)
+            if self.on_done:
+                self.on_done(record)
+            return
+        self._update(offer_id, launch=launch)
+        payload = {
+            "name": offer["title"],
+            "exe": launch["exe"],
+            "startDir": launch["startDir"],
+            "launchOptions": launch["args"],
+        }
+        op_id = self.enqueue_op("add-shortcut", payload)
+        self._update(offer_id, state="registering", ops={str(op_id): "add"})
 
     def _resolve(self, record: dict[str, Any], ref: dict[str, str], prefix_final: str | None = None) -> str:
         targets = record["targets"]
@@ -803,11 +944,19 @@ class Incoming:
             record = self._update(offer_id, prefixFinal=final)
             os.replace(targets["prefix"], final)
         ops: dict[str, str] = {k: v for k, v in record["ops"].items()}
-        fields = (
-            ("set-shortcut-exe", self._resolve(record, offer["exe"], final)),
-            ("set-shortcut-start-dir", self._resolve(record, offer["startDir"], final)),
-            ("set-launch-options", sendgame.local_options(offer["launchOptions"], self._roots(record, final))),
-        )
+        if offer.get("kind") == "emulator":
+            launch = record["launch"]
+            fields = (
+                ("set-shortcut-exe", launch["exe"]),
+                ("set-shortcut-start-dir", launch["startDir"]),
+                ("set-launch-options", launch["args"]),
+            )
+        else:
+            fields = (
+                ("set-shortcut-exe", self._resolve(record, offer["exe"], final)),
+                ("set-shortcut-start-dir", self._resolve(record, offer["startDir"], final)),
+                ("set-launch-options", sendgame.local_options(offer["launchOptions"], self._roots(record, final))),
+            )
         for kind, value in fields:
             ops[str(self.enqueue_op(kind, {"appid": appid, "value": value}))] = kind
         if offer["compatTool"]:
