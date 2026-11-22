@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.45.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Changed
 
 - **Network ISOs install in place, without copying,** also from shares that are not mounted. Keepsake reads the ISO over the network through its own read-only file system, mounted with `fusermount3` (approved for the System Binary Register). If anything about it fails, the ISO is copied as before.
