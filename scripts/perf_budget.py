@@ -206,6 +206,11 @@ def run() -> dict[str, float]:
 
 def main() -> int:
     results = run()
+    if any(seconds > BUDGETS[name] for name, seconds in results.items()):
+        # A busy laptop (a release build, the antivirus) can stall one measurement: measure again and keep the
+        # better of the two, so only a slowdown seen twice fails (v0.48.0: two releases stopped on one-off spikes).
+        again = run()
+        results = {name: min(seconds, again[name]) for name, seconds in results.items()}
     failed = []
     for name, seconds in results.items():
         limit = BUDGETS[name]
