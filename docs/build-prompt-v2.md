@@ -145,6 +145,7 @@ v1 escalation rules stay in force. Add these. Stop and ask Peter, and record eac
 | `/var/lib/bluetooth/<ADAPTER>/<DEVICE>/info` and its `info.keepsake-<time>` backups | Keepsake Helper (root, ADR-0083) | A user's cable pairing or restore, for a device with a rule |
 | `/sys/class/firmware-attributes/lenovo-wmi-other-*/attributes/ppt_pl{1_spl,2_sppt,3_fppt}/current_value` | Keepsake Helper (root, ADR-0084) | A user's Apply or a saved game profile, in Custom mode only |
 | Go 2 EC 0xC6C8/9 through `/dev/port`; Go 1 `fan_full_speed/current_value` | Keepsake Helper (root, ADR-0085) | Fan control switched on by the user, under a lease |
+| The allow-listed `hid-lenovo-go` attributes of 17EF:61EB to 61EE and `/sys/class/leds/go:rgb:joystick_rings/` | Keepsake Helper (root, ADR-0086) | A user's change, or kept settings re-applied when the controller comes back |
 
 Every write still passes the central path validator. `realpath` must stay inside the registered root.
 

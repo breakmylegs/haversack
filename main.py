@@ -378,6 +378,15 @@ class Plugin:
     async def helper_prepare(self) -> dict[str, Any]:
         return await self.app.helper_prepare()
 
+    async def controller_settings_status(self) -> dict[str, Any]:
+        return await self.app.controller_settings_status()
+
+    async def controller_settings_set(self, values: dict[str, Any], keep: bool = False) -> dict[str, Any]:
+        return await self.app.controller_settings_set(values, keep)
+
+    async def controller_settings_forget(self) -> dict[str, Any]:
+        return await self.app.controller_settings_forget()
+
     async def fans_status(self) -> dict[str, Any]:
         return await self.app.fans_status()
 

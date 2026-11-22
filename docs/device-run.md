@@ -246,6 +246,11 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Select Use the defaults.
     - Switch the Device module off: its shortcuts should no longer be offered.
 
+47. **Controller settings and lights (v0.47.0).** With the helper installed, open Device, Controllers.
+    - Set rumble to High and the stick lights to Breathe in blue: both should change on the controllers.
+    - Note whether each controller sleeps after the minutes chosen.
+    - Detach and reattach a controller: with Keep my changes on, the settings should come back within about 10 seconds.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

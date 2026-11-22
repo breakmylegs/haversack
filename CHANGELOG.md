@@ -4,6 +4,16 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **Change the Legion controllers' own settings and the stick lights** (Device, Controllers, in Gaming Mode and the desktop app), through the Keepsake Helper.
+  - **Controller settings:** mode, button chords, rumble and its style, FPS mouse DPI, controller sleep, the left gyro, the touchpad and its haptics.
+  - **Stick lights:** on or off, effect, brightness, speed and colour.
+  - **Keep my changes** applies them again whenever the controllers reconnect or the device wakes.
+  - Keepsake leaves alone what Handheld Daemon or InputPlumber manage.
+
+  This needs kernel 7.1 or later, and on the Legion Go the 2025 controller firmware. The power LED is not offered: every known way to switch it needs a kernel module or memory access that Keepsake will not use.
+
 ## [0.46.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

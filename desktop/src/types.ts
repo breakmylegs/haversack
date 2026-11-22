@@ -420,6 +420,16 @@ export interface ReconnectDesk {
   cableReady?: boolean;
   actions?: { at: string; action: string; device: string | null }[];
 }
+export interface ControllerSettingsDesk {
+  off?: boolean;
+  problem: string | null;
+  present?: boolean;
+  current?: Record<string, string> | null;
+  kept: Record<string, unknown>;
+  allowed: string[];
+  tools: { hhd?: boolean; inputplumber?: boolean };
+  helper: { ready?: boolean };
+}
 export interface ExtrasDesk {
   wifiPowerSaving: boolean | null;
   bios: { version: string | null; known?: boolean; notes: string[]; level: string };
