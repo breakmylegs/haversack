@@ -4,6 +4,21 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Added
+
+- **Fan control** (Device, Fans, in Gaming Mode and the desktop app), through the Keepsake Helper.
+  - **Legion Go 2: your own fan curve.**
+    - Stepped or smooth, with live temperature and fan speed.
+    - Named profiles, a default, one per performance mode and one per game.
+    - The fan rises at once and comes down gently.
+    - Full speed at 101 °C, whatever the curve.
+    - The fan goes back to the firmware within seconds if Keepsake stops; **Hand back** does it straight away.
+    - Firmware checks: BIOS RRCN16WW with EC 1.16 is checked already; any other BIOS runs a short fan test first.
+    - Wider limits, up to 5200 RPM, are off by default and behind a warning.
+  - **Legion Go: full fan speed** (kernel 7.2 and later). Its own fan table needs a kernel module that SteamOS does not include, so it is not offered; the page says why.
+  - **Never fights another fan tool:** with one installed, Keepsake only shows the readings.
+  - **A Device check, "Fan control".**
+
 ## [0.43.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

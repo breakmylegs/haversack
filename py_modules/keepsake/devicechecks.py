@@ -890,6 +890,37 @@ async def check_reconnect_help(ctx: Context) -> dict[str, Any]:
     return result(status, "; ".join(parts) + ".", **found)
 
 
+async def check_fan_control(ctx: Context) -> dict[str, Any]:
+    """Fan control (R24, ADR-0085): the model, firmware, readings, the routes there are, and other fan tools."""
+    probe = ctx.probes.get("fan-control")
+    if probe is None:
+        return result("skip", "This build has no fan control.")
+    found = await probe()
+    if found.get("off"):
+        return result("skip", "Device controls are off.")
+    parts = [
+        f"model {found.get('model') or 'not a Legion Go'}",
+        f"temperature {found.get('temperature')} °C" if found.get("temperature") is not None else "no temperature",
+        f"fan {found.get('rpm')} RPM" if found.get("rpm") is not None else "fan speed not read",
+    ]
+    firmware = found.get("firmware") or {}
+    if firmware:
+        checked = "validated" if found.get("validated") else "not validated"
+        parts.append(f"BIOS {firmware.get('bios')} EC {firmware.get('ec')} ({checked})")
+    if found.get("model") == "go1":
+        parts.append(
+            "full fan speed " + ("offered" if found.get("fullSpeedAttribute") else "not offered by this kernel")
+        )
+    parts.append("acpi_call " + ("present" if found.get("acpiCall") else "absent"))
+    others = [*(found.get("conflicts") or []), *(found.get("tools") or [])]
+    if others:
+        parts.append("other fan control: " + ", ".join(others))
+    if not (found.get("helper") or {}).get("ready"):
+        return result("warn", "; ".join(parts) + ". The Keepsake Helper is not ready.", **found)
+    status = "pass" if found.get("model") and not others and found.get("rpm") is not None else "warn"
+    return result(status, "; ".join(parts) + ".", **found)
+
+
 CHECKS = [
     Check("link", "Encrypted link", "one", "A188, test_on_device.py", check_tls),
     Check("addresses", "Listening addresses", "one", "A190", check_addresses),
@@ -925,6 +956,7 @@ CHECKS = [
     Check("charge-limit", "Battery charge limit", "one", "ADR-0077", check_charge_limit),
     Check("controllers", "Controllers", "one", "ADR-0078", check_controllers),
     Check("reconnect-help", "Controller reconnect help", "one", "ADR-0082, A225 to A228", check_reconnect_help),
+    Check("fan-control", "Fan control", "one", "ADR-0085, A236 to A238", check_fan_control),
     Check("bios", "BIOS check", "one", "ADR-0079", check_bios),
 ]
 BY_ID = {c.id: c for c in CHECKS}

@@ -71,7 +71,8 @@ from .device import battery as device_battery
 from .device import bios as device_bios
 from .device import controllers as device_controllers
 from .device.bluez import BlueZError
-from .device.helper import HelperClient
+from .device.fans import Fans, FanSettingsError, FanStore, fan_tools
+from .device.helper import HelperClient, HelperError
 from .device.performance import Performance, ProfileError, ProfileStore, clean_profile, other_tools
 from .device.powerlimits import PowerLimits
 from .device.reconnect_service import ReconnectService
@@ -793,6 +794,7 @@ class KeepsakeApp:
         )
         self.performance: Performance | None = None
         self.reconnect: ReconnectService | None = None
+        self.fans: Fans | None = None
         self._device_game: int | None = None
         self._navigation_record: dict[str, Any] | None = None
         self._register_device()
@@ -826,8 +828,19 @@ class KeepsakeApp:
                 busy=lambda: "a game is running" if self._device_game is not None else None,
             )
             self.reconnect.start()
+            # Fan control (ADR-0085): the loop runs only while a profile or full speed is switched on.
+            self.fans = Fans(
+                FanStore(os.path.join(self.paths.settings_dir, "fan-profiles.json")),
+                HelperClient(self.version),
+                lambda: fan_tools(home, self.proc_root),
+                self.sys_root,
+            )
+            self.fans.start()
 
         async def device_stop() -> None:
+            fans, self.fans = self.fans, None
+            if fans is not None:
+                await asyncio.to_thread(fans.stop)  # the fan goes back to the firmware
             reconnect, self.reconnect = self.reconnect, None
             if reconnect is not None:
                 await asyncio.to_thread(reconnect.stop)
@@ -837,12 +850,16 @@ class KeepsakeApp:
 
         async def device_game_started(payload: dict[str, Any]) -> None:
             self._device_game = int(payload["appid"])
+            if self.fans is not None:
+                self.fans.game = self._device_game
             # As a task: a profile never delays a game's launch.
             if self.performance is not None:
                 self._background.append(asyncio.create_task(self._device_apply(int(payload["appid"]))))
 
         async def device_game_exited(payload: dict[str, Any]) -> None:
             self._device_game = None
+            if self.fans is not None:
+                self.fans.game = None
             if self.performance is not None:
                 await asyncio.to_thread(self.performance.game_exited)
                 self._device_changed()
@@ -1046,6 +1063,102 @@ class KeepsakeApp:
             logging.INFO, "helper.prepare", "Prepared helper hand-off", ok=result.get("ok"), reason=result.get("reason")
         )
         return result
+
+    # Fan control (R24, ADR-0085)
+
+    def _fans(self) -> Fans:
+        if self.fans is None:
+            raise ValueError("Device controls are off; switch them on in Settings, Modules")
+        return self.fans
+
+    async def fans_status(self) -> dict[str, Any]:
+        if self.fans is None:
+            return {"off": True, "problem": "Device controls are off; switch them on in Settings, Modules"}
+        found = await asyncio.to_thread(self.fans.status)
+        return {**found, "game": self._device_game}
+
+    async def _fans_call(self, work: Any) -> dict[str, Any]:
+        try:
+            await asyncio.to_thread(work)
+        except FanSettingsError as exc:
+            raise ValueError(str(exc)) from exc
+        self._device_changed()
+        return await self.fans_status()
+
+    async def fans_set_options(self, options: dict[str, Any]) -> dict[str, Any]:
+        fans = self._fans()
+        opts = options if isinstance(options, dict) else {}
+        if opts.get("unlocked") is True and opts.get("confirm") != "I understand":
+            raise ValueError("confirm the warning first")
+        log_event(
+            logging.INFO,
+            "fans.options",
+            "Fan options changed",
+            **{k: bool(v) for k, v in opts.items() if k != "confirm"},
+        )
+        return await self._fans_call(
+            lambda: fans.set_options(
+                smooth=opts.get("smooth"),
+                unlocked=opts.get("unlocked"),
+                enabled=opts.get("enabled"),
+                full_speed=opts.get("fullSpeed"),
+            )
+        )
+
+    async def fans_save_profile(self, name: str, points: list[Any], make_default: bool = False) -> dict[str, Any]:
+        fans = self._fans()
+        return await self._fans_call(lambda: fans.save_profile(name, points, bool(make_default)))
+
+    async def fans_delete_profile(self, name: str) -> dict[str, Any]:
+        fans = self._fans()
+        return await self._fans_call(lambda: fans.delete_profile(str(name)))
+
+    async def fans_assign(self, kind: str, key: str, name: str | None) -> dict[str, Any]:
+        fans = self._fans()
+        return await self._fans_call(lambda: fans.assign(str(kind), str(key), name))
+
+    async def fans_hand_back(self) -> dict[str, Any]:
+        """Switch fan control off and give the fan back to the firmware now."""
+        fans = self._fans()
+
+        def work() -> None:
+            fans.set_options(enabled=False, full_speed=False)
+            fans.release()
+
+        log_event(logging.INFO, "fans.hand_back", "Fan handed back to the firmware")
+        return await self._fans_call(work)
+
+    async def fans_selftest(self) -> dict[str, Any]:
+        """The Go 2 fan test for a BIOS and EC pair that is not on the validated list (about 15 seconds)."""
+        fans = self._fans()
+        if self._device_game is not None:
+            raise ValueError("not while a game is running")
+        try:
+            result = await asyncio.to_thread(lambda: fans.helper.call("fan.selftest", timeout=40.0))
+        except HelperError as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(logging.INFO, "fans.selftest", "Fan test run", passed=bool(result.get("passed")))
+        return {**result, "status": await self.fans_status()}
+
+    async def _fans_probe(self) -> dict[str, Any]:
+        if self.fans is None:
+            return {"off": True}
+        found = await asyncio.to_thread(self.fans.status)
+        device = found.get("device") or {}
+        return {
+            "helper": found["helper"],
+            "model": device.get("model"),
+            "firmware": device.get("firmware"),
+            "validated": device.get("validated"),
+            "rpm": device.get("rpm"),
+            "temperature": found.get("temperature"),
+            "conflicts": device.get("conflicts"),
+            "tools": found.get("tools"),
+            "acpiCall": device.get("acpiCall"),
+            "fullSpeedAttribute": device.get("fullSpeedAttribute"),
+            "enabled": found["settings"]["enabled"],
+            "problem": found.get("problem") or device.get("problem"),
+        }
 
     async def _reconnect_probe(self) -> dict[str, Any]:
         if self.reconnect is None:
@@ -5879,6 +5992,7 @@ class KeepsakeApp:
                 "charge-limit": self._charge_probe,
                 "controllers": self.device_controllers,
                 "reconnect-help": self._reconnect_probe,
+                "fan-control": self._fans_probe,
                 "bios": self._bios_probe,
                 **({"desktop-app": self._desktop_probe} if self.registry.enabled("desktop") else {}),
             },

@@ -346,6 +346,21 @@ export interface PerformanceDesk {
     ranges: Record<"spl" | "sppt" | "fppt", { current: number; min: number; max: number; step: number }> | null;
   };
 }
+// Fan control (ADR-0085).
+export interface FansDesk {
+  off?: boolean;
+  problem: string | null;
+  helper: { ready?: boolean };
+  temperature: number | null;
+  mode: string | null;
+  game?: number | null;
+  device: { model?: string | null; rpm?: number | null; firmware?: { bios: string; ec: string } | null; validated?: boolean; conflicts?: string[]; fullSpeedAttribute?: boolean; controlling?: boolean };
+  tools: string[];
+  settings: { enabled: boolean; fullSpeed: boolean; unlocked: boolean; smooth: boolean; profiles: Record<string, [number, number][]>; default: string };
+  active: string | null;
+  target: number | null;
+  limits: { min: number; max: number; failsafe: number };
+}
 export interface ChargeLimitDesk {
   control: string | null;
   limited: boolean | null;

@@ -63,6 +63,7 @@ export const LAYOUT: SectionSpec[] = [
       { id: "status", title: "Device status", module: "core" },
       { id: "power", title: "Power", module: "device" },
       { id: "battery", title: "Battery", module: "device" },
+      { id: "fans", title: "Fans", module: "device" },
       { id: "controllers", title: "Controllers", module: "core" },
       { id: "reconnect", title: "Reconnect help", module: "device" },
       { id: "other", title: "More device settings", module: "device" },

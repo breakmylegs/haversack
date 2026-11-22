@@ -45,6 +45,24 @@ With the Keepsake Helper installed, **Device**, **Power** also has **Separate po
 
 Move the sliders, then select **Apply**. Keepsake switches to Custom mode first, because the firmware ignores the limits in any other mode. With a game running, the limits are kept for that game, like the TDP.
 
+## Fans
+
+**Device**, **Fans** shows the temperature and fan speed. With the Keepsake Helper installed:
+
+- **Legion Go 2:**
+  - Switch on **Keepsake controls the fan**, then edit a curve: each point is a temperature and a fan speed.
+  - Save it, make it the default, or use it in the current performance mode or for the game you are playing.
+  - **Smooth curve** blends between points; off, each point's speed holds until the next.
+  - The fan speeds up at once and slows down gently. At 101 °C it runs at full speed whatever the curve says.
+  - If Keepsake stops, the fan goes back to the firmware within seconds. **Hand back** does it straight away.
+  - On a BIOS other than RRCN16WW with EC 1.16, run **the fan test** first. It takes about 15 seconds.
+  - **Unlock wider limits** lets curves reach 5200 RPM. It is off by default, because it is louder and wears the fan more.
+- **Legion Go:**
+  - **Full fan speed** (kernel 7.2 and later).
+  - The Legion Go's own fan table needs a kernel module SteamOS does not include, so curves are not offered yet.
+
+If another fan tool is installed (or Handheld Daemon is running), Keepsake only shows the readings.
+
 ## Battery
 
 **Device**, **Battery** has **Stop charging at 80%**, Lenovo's charge limit. It keeps the battery healthier if the device is plugged in for long spells. The same toggle is in the quick access menu.
