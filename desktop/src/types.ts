@@ -430,6 +430,15 @@ export interface ControllerSettingsDesk {
   tools: { hhd?: boolean; inputplumber?: boolean };
   helper: { ready?: boolean };
 }
+export interface EmulatorSetupDesk {
+  off?: boolean;
+  problem?: string;
+  setups: string[];
+  emulators: { name: string; system: string; type: string }[];
+  games: { system: string; name: string; files: number; size: number }[];
+  perSystem: Record<string, number>;
+  secrets: Record<string, number>;
+}
 export interface ExtrasDesk {
   wifiPowerSaving: boolean | null;
   bios: { version: string | null; known?: boolean; notes: string[]; level: string };

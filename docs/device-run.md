@@ -251,6 +251,11 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - Note whether each controller sleeps after the minutes chosen.
     - Detach and reattach a controller: with Keep my changes on, the settings should come back within about 10 seconds.
 
+48. **Emulators (v0.48.0).** Open Games and devices, Emulators on each handheld.
+    - The setup (EmuDeck or RetroDECK), the emulators and the games per system should match what is installed.
+    - A multi-disc game should show once.
+    - Run the Device check "Emulator setup": it should show counts only.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

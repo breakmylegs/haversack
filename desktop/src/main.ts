@@ -20,6 +20,7 @@ import type {
   ChargeLimitDesk,
   ControllersDesk,
   ControllerSettingsDesk,
+  EmulatorSetupDesk,
   ReconnectDesk,
   FansDesk,
   QamShortcutsDesk,
@@ -1422,6 +1423,7 @@ const PAGES: Page[] = [
   { id: "activity", title: "Activity", group: "Saves", render: activityPage },
   { id: "import", title: "Import", group: "Saves", render: importPage },
   { id: "devices", title: "Moving games and devices", group: "Games and devices", render: (main) => devices(main) },
+  { id: "emulators", title: "Emulators", group: "Games and devices", render: emulatorsPage },
   { id: "device", title: "Status", group: "Device", render: deviceStatusPage },
   { id: "power", title: "Power", group: "Device", render: powerPage },
   { id: "battery", title: "Battery", group: "Device", render: batteryPage },
@@ -1888,6 +1890,30 @@ async function controllersPage(main: HTMLElement): Promise<void> {
     h("p", { class: "small" }, "Remap buttons, dead zones and gyro in Steam's controller settings."),
   );
   main.append(await controllerSettingsSection(() => controllersPage(main)));
+}
+
+// Games and devices: Emulators (R26 stage 1, ADR-0087), read-only. Key and firmware files are counted only.
+async function emulatorsPage(main: HTMLElement): Promise<void> {
+  const s = await call<EmulatorSetupDesk>("emulator_setup");
+  if (s.off) {
+    replace(main, h("h1", {}, "Emulators"), h("p", {}, s.problem ?? "Replication is off."));
+    return;
+  }
+  replace(
+    main,
+    h("h1", {}, "Emulators"),
+    h("p", {}, s.setups.length ? `Set up with ${s.setups.join(" and ")}.` : "No EmuDeck or RetroDECK found."),
+    s.emulators.length
+      ? h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Emulator"), h("th", {}, "Type"), h("th", {}, "System"))), h("tbody", {}, ...s.emulators.map((e) => h("tr", {}, h("td", {}, e.name), h("td", {}, e.type), h("td", {}, e.system)))))
+      : h("p", { class: "small" }, "No standalone emulators found."),
+    s.games.length
+      ? h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "System"), h("th", {}, "Game"), h("th", {}, "Files"), h("th", {}, "Size"))), h("tbody", {}, ...s.games.slice(0, 500).map((g) => h("tr", {}, h("td", {}, g.system), h("td", {}, g.name), h("td", {}, String(g.files)), h("td", {}, size(g.size))))))
+      : h("p", { class: "small" }, "No games found."),
+    Object.keys(s.secrets).length
+      ? h("p", {}, `Firmware, BIOS and keys: ${Object.entries(s.secrets).map(([k, n]) => `${n} for ${k}`).join(", ")}. Counted only; never read.`)
+      : null,
+    h("p", { class: "small" }, "Copying games, emulators, settings, firmware and keys to your other handheld comes in the next release."),
+  );
 }
 
 // Changing the controllers and the stick lights (ADR-0086), through the Keepsake Helper.

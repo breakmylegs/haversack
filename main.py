@@ -378,6 +378,9 @@ class Plugin:
     async def helper_prepare(self) -> dict[str, Any]:
         return await self.app.helper_prepare()
 
+    async def emulator_setup(self) -> dict[str, Any]:
+        return await self.app.emulator_setup()
+
     async def controller_settings_status(self) -> dict[str, Any]:
         return await self.app.controller_settings_status()
 

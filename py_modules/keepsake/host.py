@@ -176,6 +176,7 @@ CALLABLES = frozenset(
         "save_navigation_record",
         "fans_status",
         "controller_settings_status",
+        "emulator_setup",
         "controller_settings_set",
         "controller_settings_forget",
         "fans_set_options",
