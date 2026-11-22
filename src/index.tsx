@@ -19,6 +19,7 @@ import { startSteamOps } from "./steamops";
 import { startRemoteCopies } from "./remotecopies";
 import { AdvisorQam } from "./pages/AdvisorQam";
 import { GameTransfersCompact } from "./pages/GameTransfers";
+import { BatteryPanel } from "./pages/BatteryPanel";
 import { PowerPanel } from "./pages/PowerPanel";
 import { openCheckpointModal } from "./pages/CheckpointModal";
 import { openWhatsNew } from "./pages/WhatsNewModal";
@@ -123,6 +124,7 @@ function Content() {
         </PanelSection>
       )}
       <PanelSection title="Keepsake">
+        <BatteryPanel compact />
         <GameTransfersCompact onOpen={() => openSection("games", "moving")} />
         {attention.slice(0, 3).map((a) => (
           <PanelSectionRow key={a.key}>

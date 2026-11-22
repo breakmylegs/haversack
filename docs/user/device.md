@@ -36,6 +36,12 @@ Keepsake never fights another tool:
 
 Keepsake changes these settings through Valve's steamos-manager, and never needs root.
 
+## Battery
+
+**Device**, **Battery** has **Stop charging at 80%**, Lenovo's charge limit. It keeps the battery healthier if the device is plugged in for long spells. The same toggle is in the quick access menu.
+
+Keepsake changes it through Valve's steamos-manager. Where steamos-manager does not offer it yet, Battery shows whether the limit is on and tells you where to change it: Steam's settings, Power.
+
 ## Coming next
 
-Fan curves, the battery charge limit, controller and RGB settings, and display settings arrive in later releases. The ones that need root wait for a separate decision.
+Fan curves, controller and RGB settings, and display settings arrive in later releases. The ones that need root wait for a separate decision.

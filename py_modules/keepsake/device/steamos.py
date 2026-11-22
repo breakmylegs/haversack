@@ -123,6 +123,13 @@ class SteamOSManager:
             raise ManagerError(f"the TDP reads back as {back} W, not {watts} W")
         return back
 
+    def set_charge_limit(self, level: int) -> int:
+        """``MaxChargeLevel``: a percentage, or -1 for no limit (R21 stage 4)."""
+        back = int(self._set(CHARGE, "MaxChargeLevel", "i", int(level)))
+        if back != int(level):
+            raise ManagerError(f"the charge limit reads back as {back}, not {level}")
+        return back
+
     def set_boost(self, on: bool) -> bool:
         back = bool(int(self._set(BOOST, "CpuBoostState", "u", 1 if on else 0)))
         if back != on:

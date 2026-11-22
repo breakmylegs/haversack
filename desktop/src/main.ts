@@ -17,6 +17,7 @@ import type {
   DeviceCheckResultDesk,
   DeviceReadingsDesk,
   PerformanceDesk,
+  ChargeLimitDesk,
   DeviceStatusDesk,
   FoundDevice,
   GameTransfer,
@@ -1406,6 +1407,7 @@ const PAGES: Page[] = [
   { id: "devices", title: "Moving games and devices", group: "Games and devices", render: (main) => devices(main) },
   { id: "device", title: "Status", group: "Device", render: deviceStatusPage },
   { id: "power", title: "Power", group: "Device", render: powerPage },
+  { id: "battery", title: "Battery", group: "Device", render: batteryPage },
   { id: "settings", title: "General and sync", group: "Settings", render: settingsPage },
   { id: "cloud", title: "Cloud", group: "Settings", render: cloud },
   { id: "modules", title: "Modules", group: "Settings", render: modules },
@@ -1593,6 +1595,23 @@ async function powerPage(main: HTMLElement): Promise<void> {
       ),
     ),
     s.game && s.profile ? h("div", { class: "actions" }, button("Forget this game's profile", async () => (await call("device_forget", s.game), await powerPage(main)))) : null,
+  );
+}
+
+// Device: Battery (R21 stage 4, ADR-0077): the 80 percent charge limit
+async function batteryPage(main: HTMLElement): Promise<void> {
+  const s = await call<ChargeLimitDesk>("device_battery");
+  const state = s.limited == null ? "unknown" : s.limited ? "on" : "off";
+  const box = h("input", { type: "checkbox", checked: Boolean(s.limited), "aria-label": "Stop charging at 80%" }) as HTMLInputElement;
+  box.addEventListener("change", () => void call("device_set_charge_limit", box.checked).then(() => batteryPage(main), fail));
+  replace(
+    main,
+    h("h1", {}, "Battery"),
+    h("p", {}, "Stopping at 80% keeps the battery healthier if the device is plugged in for long spells. It is Lenovo's only charge limit on the Legion Go and Go 2."),
+    s.control === "steamos-manager"
+      ? h("label", { class: "switch" }, box, " Stop charging at 80%")
+      : h("p", { class: "warn" }, `Charge limit: ${state}. This device's steamos-manager does not let Keepsake change it. ${s.where ?? ""}`),
+    s.firmware.chargeTypes ? h("p", { class: "small" }, `Firmware charge types: ${s.firmware.chargeTypes}`) : null,
   );
 }
 

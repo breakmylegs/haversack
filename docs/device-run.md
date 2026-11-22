@@ -150,6 +150,11 @@ No SSH, terminal or laptop is needed. Do the first two parts on each handheld, t
     - In Steam's own performance settings, turn on a per-game TDP limit for that game, then start it. Within a few seconds Keepsake should say another app changed it, and leave Steam's value.
     - If SimpleDeckyTDP or another tool is installed, Device, Power should name it and show the settings read-only.
 
+25. **Battery charge limit (v0.35.0).**
+    - Run the Device check **Battery charge limit** and photograph it.
+    - Open Device, Battery. Either turn on **Stop charging at 80%**, or note where it tells you to change it.
+    - If you changed it in Steam's settings, Battery should show the new state.
+
 ## 5. Send back
 
 - The photos or files from parts 2 and 3.

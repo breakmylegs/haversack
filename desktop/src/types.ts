@@ -340,3 +340,9 @@ export interface PerformanceDesk {
   stopped: string | null;
   limits: { min?: number; max?: number };
 }
+export interface ChargeLimitDesk {
+  control: string | null;
+  limited: boolean | null;
+  firmware: { chargeTypes: string | null };
+  where?: string;
+}
