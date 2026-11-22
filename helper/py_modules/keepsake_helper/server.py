@@ -28,7 +28,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from . import bluetooth, fan, hid, mgmt, power
+from . import bluetooth, controller, fan, hid, mgmt, power
 
 RUN_DIR = "/run/keepsake-helper"
 MAX_REQUEST = 64 * 1024
@@ -52,6 +52,8 @@ JOBS = (
     "fan.release",
     "fan.full",
     "fan.selftest",
+    "ctrl.read",
+    "ctrl.set",
 )
 log = logging.getLogger("keepsake-helper")
 
@@ -195,6 +197,7 @@ class Helper:
             return {"ok": True, **self._run(str(job), args)}
         except (
             bluetooth.BluetoothError,
+            controller.ControllerError,
             fan.FanError,
             hid.HidError,
             mgmt.MgmtError,
@@ -255,6 +258,10 @@ class Helper:
             return {"limits": power.read(self.power_root), "profile": power.profile(self.profile_glob)}
         if job == "power.set":
             return {"limits": power.apply(args.get("values"), self.power_root, self.profile_glob)}
+        if job == "ctrl.read":
+            return controller.read(self.sys_root)
+        if job == "ctrl.set":
+            return controller.apply(args.get("values"), self.sys_root)
         if job == "fan.status":
             return self.fans.status()
         if job == "fan.set":

@@ -71,7 +71,15 @@ Keepsake changes it through Valve's steamos-manager. Where steamos-manager does 
 
 ## Controllers
 
-**Device**, **Controllers** shows each controller's battery, the settings the controllers report, and the stick lights. Remap buttons, set dead zones and use the gyro in Steam's controller settings. Changing the controllers' own settings and the lights needs root, which waits for a separate decision.
+**Device**, **Controllers** shows each controller's battery, the settings the controllers report, and the stick lights. Remap buttons, set dead zones and use the gyro in Steam's controller settings.
+
+With the Keepsake Helper installed, you can also change:
+- **the controllers' own settings:** mode, button chords, rumble and its style, FPS mouse DPI, how soon each controller sleeps, the left gyro, the touchpad and its haptics;
+- **the stick lights:** on or off, effect, brightness, speed and colour (select **Apply colour**).
+
+Leave **Keep my changes** on, and Keepsake applies them again when the controllers reconnect or the device wakes. This needs kernel 7.1 or later; on the Legion Go it also needs Lenovo's 2025 controller firmware. If Handheld Daemon is running, Keepsake only shows the settings. If InputPlumber is installed, it keeps the button chords and touchpad haptics.
+
+The power LED cannot be changed: every known way needs a kernel module or memory access that Keepsake will not use.
 
 ## Reconnect help
 

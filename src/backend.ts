@@ -434,6 +434,21 @@ export interface ControllersStatus {
 }
 export const deviceControllers = callable<[], ControllersStatus>("device_controllers");
 
+// Changing the controllers and the stick lights (R24, ADR-0086), through the Keepsake Helper.
+export interface ControllerSettingsStatus {
+  off?: boolean;
+  problem: string | null;
+  present?: boolean;
+  current?: Record<string, string> | null;
+  kept: Record<string, unknown>;
+  allowed: string[];
+  tools: { hhd?: boolean; inputplumber?: boolean };
+  helper: { installed?: boolean; ready?: boolean; problem?: string };
+}
+export const controllerSettingsStatus = callable<[], ControllerSettingsStatus>("controller_settings_status");
+export const controllerSettingsSet = callable<[values: Record<string, unknown>, keep: boolean], ControllerSettingsStatus>("controller_settings_set");
+export const controllerSettingsForget = callable<[], ControllerSettingsStatus>("controller_settings_forget");
+
 // Controller reconnect help (R22, ADR-0082): every paired device, help per device by adapter and address.
 export const RECONNECT_EVENT = "keepsake_reconnect";
 export interface ReconnectDiagnosis {

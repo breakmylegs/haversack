@@ -1,6 +1,7 @@
 import { Field } from "@decky/ui";
 import { useEffect, useState } from "react";
 import { ControllersStatus, deviceControllers } from "../backend";
+import { ControllerSettingsPanel } from "./ControllerSettingsPanel";
 
 // Device, Controllers (R21 stage 5, ADR-0078): what the kernel shows of the Legion controllers,
 // read-only. Remapping, dead zones and gyro are Steam Input's; changing the controllers' own
@@ -63,10 +64,8 @@ export function ControllersPanel() {
       ))}
       {s.rings && <Field label="Stick lights" description={line(s.rings) || "Shown by the kernel."} />}
       {s.tools.length > 0 && <Field label="Managed by" description={s.tools.join(", ")} />}
-      <Field
-        label="Changing them"
-        description="Remap buttons, set dead zones and use the gyro in Steam's controller settings. Changing the controllers' own settings and the stick lights needs a separate helper that runs as root, which is waiting for a decision."
-      />
+      <ControllerSettingsPanel />
+      <Field label="Remapping" description="Remap buttons, set dead zones and use the gyro in Steam's controller settings." />
     </>
   );
 }

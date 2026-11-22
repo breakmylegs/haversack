@@ -19,6 +19,7 @@ import type {
   PerformanceDesk,
   ChargeLimitDesk,
   ControllersDesk,
+  ControllerSettingsDesk,
   ReconnectDesk,
   FansDesk,
   QamShortcutsDesk,
@@ -1884,8 +1885,80 @@ async function controllersPage(main: HTMLElement): Promise<void> {
     s.rings ? h("h2", {}, "Stick lights") : null,
     s.rings ? h("table", {}, h("tbody", {}, ...Object.entries(s.rings).map(([k, v]) => h("tr", {}, h("th", {}, k), h("td", {}, v))))) : null,
     s.tools.length ? h("p", {}, `Managed by ${s.tools.join(", ")}.`) : null,
-    h("p", { class: "small" }, "Remap buttons, dead zones and gyro in Steam's controller settings. Changing the controllers' own settings and the lights will use the Keepsake Helper, in a later release."),
+    h("p", { class: "small" }, "Remap buttons, dead zones and gyro in Steam's controller settings."),
   );
+  main.append(await controllerSettingsSection(() => controllersPage(main)));
+}
+
+// Changing the controllers and the stick lights (ADR-0086), through the Keepsake Helper.
+const CONTROLLER_CHOICES: Record<string, [string, string[]]> = {
+  mode: ["Controller mode", ["xinput", "dinput"]],
+  os_mode: ["Button chords for", ["linux", "windows"]],
+  rumble_intensity: ["Rumble", ["off", "low", "medium", "high"]],
+  fps_mode_dpi: ["FPS mode mouse DPI", ["500", "800", "1200", "1800"]],
+  "left_handle/rumble_mode": ["Left rumble style", ["standard", "fps", "racing", "spg", "rpg"]],
+  "right_handle/rumble_mode": ["Right rumble style", ["standard", "fps", "racing", "spg", "rpg"]],
+  "left_handle/auto_sleep_time": ["Left controller sleeps after (minutes, 0 never)", ["0", "5", "10", "15", "30", "60"]],
+  "right_handle/auto_sleep_time": ["Right controller sleeps after (minutes, 0 never)", ["0", "5", "10", "15", "30", "60"]],
+  "left_handle/imu_enabled": ["Left controller gyro", ["true", "false"]],
+  "touchpad/enabled": ["Touchpad", ["true", "false"]],
+  "touchpad/vibration_enabled": ["Touchpad haptics", ["true", "false"]],
+  "touchpad/vibration_intensity": ["Touchpad haptic strength", ["off", "low", "medium", "high"]],
+  "led/enabled": ["Stick lights", ["true", "false"]],
+  "led/effect": ["Light effect", ["monocolor", "breathe", "chroma", "rainbow"]],
+};
+
+async function controllerSettingsSection(again: () => Promise<void>): Promise<HTMLElement> {
+  const s = await call<ControllerSettingsDesk>("controller_settings_status");
+  const box = h("section", {}, h("h2", {}, "Change the controllers"));
+  if (s.off || !s.present) {
+    box.append(h("p", { class: "small" }, "Needs the Legion controllers on the kernel's hid-lenovo-go driver (kernel 7.1 and later)."));
+    return box;
+  }
+  if (!s.helper.ready) {
+    box.append(h("p", { class: "small" }, "Needs the Keepsake Helper (install it from Gaming Mode: Device, Reconnect help)."));
+    return box;
+  }
+  if (s.tools.hhd) {
+    box.append(h("p", { class: "warn" }, "Handheld Daemon manages the controllers here, so Keepsake only shows their settings."));
+    return box;
+  }
+  const keep = h("input", { type: "checkbox", checked: true, "aria-label": "Keep my changes" }) as HTMLInputElement;
+  const set = (values: Record<string, unknown>) => call("controller_settings_set", values, keep.checked).then(again, fail);
+  const current = s.current ?? {};
+  const rows = Object.entries(CONTROLLER_CHOICES)
+    .filter(([key]) => s.allowed.includes(key) && current[key] !== undefined)
+    .map(([key, [label, options]]) => {
+      const select = h("select", { "aria-label": label }) as HTMLSelectElement;
+      for (const o of options) {
+        const option = h("option", { value: o }, o) as HTMLOptionElement;
+        option.selected = o === current[key];
+        select.append(option);
+      }
+      select.addEventListener("change", () => void set(key.startsWith("led/") ? { "led/mode": "custom", [key]: select.value } : { [key]: select.value }));
+      return h("tr", {}, h("th", {}, label), h("td", {}, select));
+    });
+  const sliders = (["led/brightness", "led/speed"] as const)
+    .filter((key) => current[key] !== undefined)
+    .map((key) => {
+      const input = h("input", { type: "range", min: "0", max: "100", step: "5", value: current[key], "aria-label": key }) as HTMLInputElement;
+      input.addEventListener("change", () => void set({ [key]: Number(input.value) }));
+      return h("tr", {}, h("th", {}, key === "led/brightness" ? "Light brightness" : "Light speed"), h("td", {}, input));
+    });
+  const colour = (current["led/multi_intensity"] ?? "").split(" ").map(Number);
+  const colourInputs = ["Red", "Green", "Blue"].map(
+    (name, i) => h("input", { type: "number", min: "0", max: "100", value: String(colour[i] ?? 0), "aria-label": name }) as HTMLInputElement,
+  );
+  box.append(
+    s.tools.inputplumber ? h("p", { class: "small" }, "InputPlumber manages the button chords and touchpad haptics here, so those are left to it.") : h("span", {}),
+    h("label", { class: "switch" }, keep, " Keep my changes (applied again when the controller reconnects or the device wakes)"),
+    h("table", {}, h("tbody", {}, ...rows, ...sliders)),
+    current["led/multi_intensity"] !== undefined
+      ? h("div", { class: "actions" }, ...colourInputs, button("Apply colour", async () => set({ "led/mode": "custom", "led/multi_intensity": colourInputs.map((x) => Number(x.value)) })))
+      : h("span", {}),
+    Object.keys(s.kept).length ? h("div", { class: "actions" }, button("Forget kept settings", async () => (await call("controller_settings_forget"), await again()))) : h("span", {}),
+  );
+  return box;
 }
 
 // Device: Reconnect help (ADR-0082, ADR-0083). The same calls as Gaming Mode; installing the

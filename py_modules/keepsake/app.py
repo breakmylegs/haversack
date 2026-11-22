@@ -72,6 +72,9 @@ from .device import battery as device_battery
 from .device import bios as device_bios
 from .device import controllers as device_controllers
 from .device.bluez import BlueZError
+from .device.controller_settings import ControllerSettings
+from .device.controller_settings import SettingsError as ControllerSettingsError
+from .device.controller_settings import others as controller_tools
 from .device.fans import Fans, FanSettingsError, FanStore, fan_tools
 from .device.helper import HelperClient, HelperError
 from .device.performance import Performance, ProfileError, ProfileStore, clean_profile, other_tools
@@ -806,6 +809,7 @@ class KeepsakeApp:
         self.performance: Performance | None = None
         self.reconnect: ReconnectService | None = None
         self.fans: Fans | None = None
+        self.controller_settings: ControllerSettings | None = None
         self._device_game: int | None = None
         self._navigation_record: dict[str, Any] | None = None
         self._register_device()
@@ -847,8 +851,19 @@ class KeepsakeApp:
                 self.sys_root,
             )
             self.fans.start()
+            # The controllers' own settings and lights (ADR-0086): kept settings come back after a reconnect.
+            self.controller_settings = ControllerSettings(
+                os.path.join(self.paths.settings_dir, "controller-settings.json"),
+                HelperClient(self.version),
+                lambda: controller_tools(home, self.proc_root),
+                self.sys_root,
+            )
+            self.controller_settings.start()
 
         async def device_stop() -> None:
+            settings, self.controller_settings = self.controller_settings, None
+            if settings is not None:
+                await asyncio.to_thread(settings.stop)
             fans, self.fans = self.fans, None
             if fans is not None:
                 await asyncio.to_thread(fans.stop)  # the fan goes back to the firmware
@@ -1074,6 +1089,32 @@ class KeepsakeApp:
             logging.INFO, "helper.prepare", "Prepared helper hand-off", ok=result.get("ok"), reason=result.get("reason")
         )
         return result
+
+    # The controllers' own settings and stick lights (R24, ADR-0086)
+
+    async def controller_settings_status(self) -> dict[str, Any]:
+        if self.controller_settings is None:
+            return {"off": True, "problem": "Device controls are off; switch them on in Settings, Modules"}
+        return await asyncio.to_thread(self.controller_settings.status)
+
+    async def controller_settings_set(self, values: dict[str, Any], keep: bool = False) -> dict[str, Any]:
+        if self.controller_settings is None:
+            raise ValueError("Device controls are off; switch them on in Settings, Modules")
+        settings = self.controller_settings
+        try:
+            await asyncio.to_thread(settings.set, values, bool(keep))
+        except ControllerSettingsError as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(
+            logging.INFO, "controller.settings", "Controller settings changed", count=len(values or {}), kept=bool(keep)
+        )
+        return await self.controller_settings_status()
+
+    async def controller_settings_forget(self) -> dict[str, Any]:
+        if self.controller_settings is None:
+            raise ValueError("Device controls are off; switch them on in Settings, Modules")
+        await asyncio.to_thread(self.controller_settings.forget)
+        return await self.controller_settings_status()
 
     # Fan control (R24, ADR-0085)
 
