@@ -297,6 +297,12 @@ class Plugin:
     async def device_forget(self, appid: int) -> dict[str, Any]:
         return await self.app.device_forget(appid)
 
+    async def device_extras(self) -> dict[str, Any]:
+        return await self.app.device_extras()
+
+    async def device_set_wifi_power_saving(self, on: bool) -> dict[str, Any]:
+        return await self.app.device_set_wifi_power_saving(on)
+
     async def device_controllers(self) -> dict[str, Any]:
         return await self.app.device_controllers()
 

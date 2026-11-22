@@ -352,3 +352,7 @@ export interface ControllersDesk {
   rings: Record<string, string> | null;
   tools: string[];
 }
+export interface ExtrasDesk {
+  wifiPowerSaving: boolean | null;
+  bios: { version: string | null; known?: boolean; notes: string[]; level: string };
+}

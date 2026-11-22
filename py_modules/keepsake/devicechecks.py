@@ -794,6 +794,32 @@ async def check_controllers(ctx: Context) -> dict[str, Any]:
     return result("pass", "; ".join(parts) + ".", **details)
 
 
+async def check_bios(ctx: Context) -> dict[str, Any]:
+    """BIOS check (R21 stage 6): known Legion Go BIOS problems for this version."""
+    probe = ctx.probes.get("bios")
+    if probe is None:
+        return result("skip", "This build cannot read the BIOS version.")
+    found = await probe()
+    details = {
+        "version": found.get("version"),
+        "date": found.get("date"),
+        "known": found.get("known"),
+        "notes": found.get("notes"),
+    }
+    if not found.get("version"):
+        return result("warn", "The BIOS version could not be read.", **details)
+    if not found.get("known"):
+        return result(
+            "pass", f"BIOS {found['version']}: Keepsake knows of no problems with this model's BIOS.", **details
+        )
+    text = " ".join(found.get("notes") or []) or "No known problems."
+    return result(
+        found.get("level", "pass") if found.get("level") != "ok" else "pass",
+        f"BIOS {found['version']}. {text}",
+        **details,
+    )
+
+
 TRAY_LIMIT_MS = 200.0
 
 
@@ -873,6 +899,7 @@ CHECKS = [
     Check("performance-control", "Performance control", "one", "ADR-0076", check_performance_control),
     Check("charge-limit", "Battery charge limit", "one", "ADR-0077", check_charge_limit),
     Check("controllers", "Controllers", "one", "ADR-0078", check_controllers),
+    Check("bios", "BIOS check", "one", "ADR-0079", check_bios),
 ]
 BY_ID = {c.id: c for c in CHECKS}
 

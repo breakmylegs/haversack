@@ -19,6 +19,7 @@ import type {
   PerformanceDesk,
   ChargeLimitDesk,
   ControllersDesk,
+  ExtrasDesk,
   DeviceStatusDesk,
   FoundDevice,
   GameTransfer,
@@ -1410,6 +1411,7 @@ const PAGES: Page[] = [
   { id: "power", title: "Power", group: "Device", render: powerPage },
   { id: "battery", title: "Battery", group: "Device", render: batteryPage },
   { id: "controllers", title: "Controllers", group: "Device", render: controllersPage },
+  { id: "other", title: "Other", group: "Device", render: extrasPage },
   { id: "settings", title: "General and sync", group: "Settings", render: settingsPage },
   { id: "cloud", title: "Cloud", group: "Settings", render: cloud },
   { id: "modules", title: "Modules", group: "Settings", render: modules },
@@ -1635,6 +1637,21 @@ async function controllersPage(main: HTMLElement): Promise<void> {
     s.rings ? h("table", {}, h("tbody", {}, ...Object.entries(s.rings).map(([k, v]) => h("tr", {}, h("th", {}, k), h("td", {}, v))))) : null,
     s.tools.length ? h("p", {}, `Managed by ${s.tools.join(", ")}.`) : null,
     h("p", { class: "small" }, "Remap buttons, dead zones and gyro in Steam's controller settings. Changing the controllers' own settings and the lights needs a separate root helper, which is waiting for a decision."),
+  );
+}
+
+// Device: Other (R21 stage 6, ADR-0079): Wi-Fi power saving and the BIOS check
+async function extrasPage(main: HTMLElement): Promise<void> {
+  const s = await call<ExtrasDesk>("device_extras");
+  const wifi = h("input", { type: "checkbox", checked: Boolean(s.wifiPowerSaving), "aria-label": "Wi-Fi power saving" }) as HTMLInputElement;
+  wifi.addEventListener("change", () => void call("device_set_wifi_power_saving", wifi.checked).then(() => extrasPage(main), fail));
+  replace(
+    main,
+    h("h1", {}, "Other"),
+    s.wifiPowerSaving !== null ? h("label", { class: "switch" }, wifi, " Wi-Fi power saving (saves battery; turn off if streaming stutters)") : h("p", { class: "small" }, "Wi-Fi power saving: not offered by this device's steamos-manager."),
+    h("h2", {}, `BIOS ${s.bios.version ?? "unknown"}`),
+    s.bios.notes.length ? h("ul", { class: s.bios.level === "ok" ? "" : "warn" }, ...s.bios.notes.map((n) => h("li", {}, n))) : h("p", {}, s.bios.known ? "No known problems with this BIOS." : "No BIOS notes for this model."),
+    h("p", { class: "small" }, "Refresh rate, frame limit and brightness are in Steam's own settings; Keepsake leaves them to Steam."),
   );
 }
 

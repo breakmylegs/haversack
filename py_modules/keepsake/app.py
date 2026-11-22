@@ -67,6 +67,7 @@ from .bus import EventBus
 from .desktop import dbus as desktop_dbus
 from .desktop import entries as desktop_entries
 from .device import battery as device_battery
+from .device import bios as device_bios
 from .device import controllers as device_controllers
 from .device.performance import Performance, ProfileError, ProfileStore, clean_profile, other_tools
 from .device.steamos import ManagerError, SteamOSManager
@@ -891,6 +892,34 @@ class KeepsakeApp:
     async def device_controllers(self) -> dict[str, Any]:
         """The controllers as the kernel shows them (R21 stage 5, ADR-0078). Read-only."""
         return await asyncio.to_thread(device_controllers.status, self.sys_root, self.proc_root)
+
+    async def device_extras(self) -> dict[str, Any]:
+        """Stage 6 (ADR-0079): Wi-Fi power saving where steamos-manager offers it, and the BIOS check."""
+        manager = self._steamos()
+
+        def read() -> dict[str, Any]:
+            try:
+                wifi = manager.read().get("wifiPowerSaving")
+            except ManagerError:
+                wifi = None
+            return {"wifiPowerSaving": wifi, "bios": device_bios.check(self.sys_root)}
+
+        return await asyncio.to_thread(read)
+
+    async def device_set_wifi_power_saving(self, on: bool) -> dict[str, Any]:
+        """Turn Wi-Fi power saving on or off (a user action), through steamos-manager only."""
+        if self.performance is None:
+            raise ValueError("Device controls are off; switch them on in Settings, Modules")
+        try:
+            await asyncio.to_thread(self._steamos().set_wifi_power_saving, bool(on))
+        except ManagerError as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(logging.INFO, "device.wifi_power", "Wi-Fi power saving changed", on=bool(on))
+        self._device_changed()
+        return await self.device_extras()
+
+    async def _bios_probe(self) -> dict[str, Any]:
+        return await asyncio.to_thread(device_bios.check, self.sys_root)
 
     async def _charge_probe(self) -> dict[str, Any]:
         return await self.device_battery()
@@ -5530,6 +5559,7 @@ class KeepsakeApp:
                 "performance-control": self._performance_probe,
                 "charge-limit": self._charge_probe,
                 "controllers": self.device_controllers,
+                "bios": self._bios_probe,
                 **({"desktop-app": self._desktop_probe} if self.registry.enabled("desktop") else {}),
             },
         )
