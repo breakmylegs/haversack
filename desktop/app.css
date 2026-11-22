@@ -7,9 +7,10 @@
   --muted: #5b6573;
   --line: #d8dde4;
   --accent: #2f6fde;
-  --ok: #1f8a4c;
-  --warn: #b26a00;
-  --fail: #c0392b;
+  /* Okabe-Ito, darkened for contrast on white (v0.50.0): distinct for the common kinds of colour blindness. */
+  --ok: #00785a;
+  --warn: #a66a00;
+  --fail: #b34700;
   /* rem, so text follows the browser's own text size setting (ADR-0049) */
   font: 0.9375rem/1.5 system-ui, "Segoe UI", sans-serif;
 }
@@ -21,6 +22,9 @@
     --muted: #9aa4b2;
     --line: #333a44;
     --accent: #6b9cff;
+    --ok: #009e73;
+    --warn: #e69f00;
+    --fail: #e0702a;
   }
 }
 * { box-sizing: border-box; }
@@ -83,8 +87,9 @@ figure.chart .axis { fill: var(--muted); font-size: 11px; }
 figure.chart .line { fill: none; stroke-width: 2; }
 figure.chart .legend { display: flex; gap: 16px; margin: 4px 0 0; font-size: 0.8125rem; color: var(--muted); }
 figure.chart .key::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
-.series-1.line { stroke: #2f6fde; } .series-1.dot { fill: #2f6fde; } .key.series-1::before { background: #2f6fde; }
-.series-2.line { stroke: #e07b39; } .series-2.dot { fill: #e07b39; } .key.series-2::before { background: #e07b39; }
-.series-3.line { stroke: #1f8a4c; } .series-3.dot { fill: #1f8a4c; } .key.series-3::before { background: #1f8a4c; }
-.series-4.line { stroke: #b04fc7; } .series-4.dot { fill: #b04fc7; } .key.series-4::before { background: #b04fc7; }
+/* Chart series: Okabe-Ito blue, orange, bluish green and reddish purple. */
+.series-1.line { stroke: #0072b2; } .series-1.dot { fill: #0072b2; } .key.series-1::before { background: #0072b2; }
+.series-2.line { stroke: #e69f00; } .series-2.dot { fill: #e69f00; } .key.series-2::before { background: #e69f00; }
+.series-3.line { stroke: #009e73; } .series-3.dot { fill: #009e73; } .key.series-3::before { background: #009e73; }
+.series-4.line { stroke: #cc79a7; } .series-4.dot { fill: #cc79a7; } .key.series-4::before { background: #cc79a7; }
 .check.info strong { color: var(--accent); }

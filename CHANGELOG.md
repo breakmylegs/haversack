@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+### Changed
+
+- **Status colours that colour-blind players can tell apart.** Success, warning and failure now use the Okabe-Ito palette (bluish green, orange, vermilion) everywhere: in Gaming Mode, the library badge and the desktop app, which also gains proper colours in dark mode. Every status still has its own icon or words, so colour is never the only sign.
+
 ## [0.49.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

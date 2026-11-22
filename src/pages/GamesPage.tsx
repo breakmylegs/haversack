@@ -20,7 +20,7 @@ import {
   updateGameConfig,
   bringNewer,
 } from "../backend";
-import { newerText, plainError, SYNC_LABELS } from "../format";
+import { newerText, plainError, STATUS, SYNC_LABELS } from "../format";
 import { GameDetail } from "./GameDetail";
 import { askApproveMatch } from "../matchApproval";
 import { TidyCopies } from "./TidyCopies";
@@ -41,10 +41,10 @@ const LAUNCHER_KINDS = ["heroic", "lutris", "bottles"];
 const STATUS_ICONS: Record<SyncWord, ReactElement> = {
   off: <FaMinusCircle style={{ opacity: 0.5 }} />,
   "not-synced": <FaRegCircle />,
-  synced: <FaCheckCircle style={{ color: "#59bf40" }} />,
-  pending: <FaClock style={{ color: "#e5b33a" }} />,
-  conflict: <FaCodeBranch style={{ color: "#e04f4f" }} />,
-  quarantined: <FaExclamationTriangle style={{ color: "#e5b33a" }} />,
+  synced: <FaCheckCircle style={{ color: STATUS.ok }} />,
+  pending: <FaClock style={{ color: STATUS.warn }} />,
+  conflict: <FaCodeBranch style={{ color: STATUS.fail }} />,
+  quarantined: <FaExclamationTriangle style={{ color: STATUS.warn }} />,
 };
 
 function prefixText(game: GameEntry): string {

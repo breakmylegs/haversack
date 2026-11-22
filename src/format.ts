@@ -50,11 +50,21 @@ export const HEALTH_LABELS: Record<HealthStatus, string> = {
   fail: "Problem",
 };
 
+// Status colours from the Okabe-Ito palette, which stays distinct for the common kinds of colour
+// blindness (v0.50.0). Green and red alone are not: every status also has its own icon shape or words.
+export const STATUS = {
+  ok: "#009E73", // bluish green
+  warn: "#E69F00", // orange
+  fail: "#D55E00", // vermilion
+  info: "#56B4E9", // sky blue
+  neutral: "#8a8fa3",
+} as const;
+
 export const HEALTH_COLOURS: Record<HealthStatus, string> = {
-  ok: "#59bf40",
-  info: "#59bf40",
-  warn: "#e5b33a",
-  fail: "#e04f4f",
+  ok: STATUS.ok,
+  info: STATUS.ok,
+  warn: STATUS.warn,
+  fail: STATUS.fail,
 };
 
 export const PLAN_LABELS: Record<PlanEntry["action"], string> = {

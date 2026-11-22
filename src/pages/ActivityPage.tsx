@@ -2,7 +2,7 @@ import { DialogButton, Field, Focusable } from "@decky/ui";
 import { useEffect, useState } from "react";
 import { FaExclamationTriangle, FaInfoCircle } from "react-icons/fa";
 import { activity, ActivityEntry } from "../backend";
-import { isoText } from "../format";
+import { isoText, STATUS } from "../format";
 
 // What Keepsake did, newest first, in plain words (ADR-0048). The detailed log stays in Logs.
 export function ActivityPage() {
@@ -37,7 +37,7 @@ export function ActivityPage() {
           focusable
           label={
             <span>
-              {e.level === "warn" ? <FaExclamationTriangle style={{ color: "#e5b33a" }} /> : <FaInfoCircle />} {e.text}
+              {e.level === "warn" ? <FaExclamationTriangle style={{ color: STATUS.warn }} /> : <FaInfoCircle />} {e.text}
             </span>
           }
           description={e.time ? isoText(e.time) : undefined}
