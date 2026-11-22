@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.39.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Added
 
 - **Keepsake's badge in Steam's library.** On each game's page, a small label shows its saves, for example "Saves: in step", "Saves: newer on Legion Go 2" or "Saves: conflict". For a game streamed from another device, it shows where it streams from. Switch it off in Settings, General.
