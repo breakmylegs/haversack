@@ -4,6 +4,10 @@ All notable changes to Keepsake are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [0.35.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Added
 
 - **Battery care** (the battery stage of the Legion Go controls). On Device, Battery, in the quick access menu and in the desktop app, choose **Stop charging at 80%**, Lenovo's charge limit on the Legion Go and Go 2.
