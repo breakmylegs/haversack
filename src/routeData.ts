@@ -78,6 +78,7 @@ export const LAYOUT: SectionSpec[] = [
       { id: "cloud", title: "Cloud", module: "core" },
       { id: "sync", title: "Sync and safety", module: "saves" },
       { id: "modules", title: "Modules", module: "core" },
+      { id: "quick-menu", title: "Quick menu", module: "core" },
       { id: "updates", title: "Updates", module: "core" },
     ],
   },

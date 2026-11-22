@@ -52,6 +52,7 @@ DEFAULTS: dict[str, Any] = {
     # "When saves differ": ask (default), or take the newest version, guarded (ADR-0080).
     "conflictPolicy": "ask",
     "libraryBadges": True,  # Keepsake's badge on game pages in Steam's library (ADR-0081)
+    "qamShortcuts": None,  # the quick menu's shortcuts in order; None means the defaults (ADR-0073 addendum)
     # v2 module flags (slice 13); missing names use modules.DEFAULT_FLAGS.
     "moduleFlags": {},
     # Installer (slice 21): where games are installed; empty means ~/Games.
@@ -97,6 +98,7 @@ USER_KEYS = frozenset(
         "suspendSnapshots",
         "conflictPolicy",
         "libraryBadges",
+        "qamShortcuts",
         "moduleFlags",
         "libraryRoot",
         "gamingModeSignin",
@@ -194,6 +196,15 @@ def _validate(key: str, value: Any) -> Any:
         ):
             raise SettingsError("choose browser or phone for OneDrive and Google Drive")
         return {"onedrive": value["onedrive"], "gdrive": value["gdrive"]}
+    if key == "qamShortcuts":
+        if value is None:
+            return None
+        from .shortcuts import clean_choice
+
+        try:
+            return clean_choice(value)
+        except ValueError as exc:
+            raise SettingsError(str(exc)) from exc
     if key == "conflictPolicy":
         if value not in ("ask", "newest"):
             raise SettingsError("when saves differ, choose ask or newest")

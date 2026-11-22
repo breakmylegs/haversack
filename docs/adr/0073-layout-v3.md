@@ -116,6 +116,28 @@ The sidebar is now built once, from the loaded module state (`src/sidebar.ts`, t
 
 **Not done.** Full render tests need `react-dom` as a development dependency. This urgent patch adds none. The rules are tested at source level and in the sidebar's pure logic instead.
 
+## Addendum (v0.46.0): quick menu shortcuts
+
+Peter asked for Keepsake's quick access menu panel to be configurable.
+
+**The registry.** `keepsake/shortcuts.py` lists every shortcut: an ID, a kind (page, action or status line), a label, its module and, where needed, a feature.
+- **Every new feature registers its pages and actions there.** This release adds Reconnect help, Fans and More device settings, and the controller Reconnect status line.
+- **What is offered:** only entries whose module is on (Core always is) and whose feature this device has (updates, performance modes, the charge limit).
+
+**The setting.** `qamShortcuts` holds the user's choice in order. `None` means the defaults:
+- Sync now;
+- games moving between devices;
+- open conflicts;
+- the controller Reconnect buttons, kept because helped controllers have had them in the menu since v0.40.0.
+
+Unknown IDs are kept in the setting, so a later version's shortcuts survive a downgrade; they are only shown when they exist.
+
+**The panel.** Some parts are always shown and are not shortcuts: Now playing, the battery line, the attention items and the status line. The chosen shortcuts follow them, then Open Keepsake, always last. The panel reloads on `keepsake_shortcuts`, which Keepsake sends when the setting changes, so changes show at once.
+
+**The editors.**
+- **Gaming Mode:** Settings, Quick menu has tick boxes with Up and Down. Nothing in it is disabled while saving (the v0.41.1 focus rule).
+- **Desktop app:** Settings, Quick menu orders by dragging, with arrows as well.
+
 ## Consequences
 
 - **Every existing feature stays reachable.** Each old page is a tab, and the old paths still open.

@@ -5,8 +5,13 @@ import { FaSave } from "react-icons/fa";
 import {
   checkForUpdates,
   getStatus,
+  qamShortcuts,
+  QamShortcuts,
   qamSummary,
   QamSummary,
+  runShortcut,
+  Shortcut,
+  SHORTCUTS_EVENT,
   syncNow,
   takeStartupNotice,
   UpdateStatus,
@@ -28,7 +33,7 @@ import { openWhatsNew } from "./pages/WhatsNewModal";
 import { KeepsakeRoute, LegacyRedirect } from "./pages/KeepsakeRoute";
 import { legacyRoutes } from "./sidebar";
 import { SetupWizard } from "./pages/SetupWizard";
-import { openSection, ROUTE_PATH, SETUP_PATH } from "./routes";
+import { openSection, ROUTE_PATH, SectionId, SETUP_PATH } from "./routes";
 
 function openRoute(path: string) {
   Navigation.Navigate(path);
@@ -47,7 +52,13 @@ function Content() {
   const [safeMode, setSafeMode] = useState(false);
   const [update, setUpdate] = useState<UpdateStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [shortcuts, setShortcuts] = useState<QamShortcuts | null>(null);
+  const [running, setRunning] = useState<string | null>(null);
 
+  const loadShortcuts = () =>
+    qamShortcuts()
+      .then(setShortcuts)
+      .catch(() => undefined); // keep what is shown
   const refresh = () =>
     qamSummary()
       .then((s) => {
@@ -57,6 +68,8 @@ function Content() {
       .catch(() => setFailed(true));
 
   useEffect(() => {
+    void loadShortcuts();
+    const shortcutsListener = addEventListener(SHORTCUTS_EVENT, () => void loadShortcuts());
     void refresh();
     getStatus()
       .then((s) => {
@@ -68,6 +81,9 @@ function Content() {
     checkForUpdates(false)
       .then(setUpdate)
       .catch(() => undefined);
+    return () => {
+      removeEventListener(SHORTCUTS_EVENT, shortcutsListener);
+    };
   }, []);
 
   const runSync = async () => {
@@ -90,16 +106,66 @@ function Content() {
   // attention, then the status line and the two buttons. Nothing deeper.
   const attention: { key: string; text: string; open: () => void }[] = [];
   if (summary && !summary.setupComplete) attention.push({ key: "setup", text: "Set up Keepsake", open: () => openRoute(SETUP_PATH) });
-  if (summary && summary.conflicts > 0) {
-    const text = summary.conflicts === 1 ? "1 conflict needs your choice" : `${summary.conflicts} conflicts need your choice`;
-    attention.push({ key: "conflicts", text, open: () => openSection("saves", "conflicts") });
-  }
   if (safeMode) attention.push({ key: "safe", text: "Safe mode: settings come from a newer version. Please update.", open: () => openSection("settings", "updates") });
   for (const problem of summary?.problems ?? []) attention.push({ key: `p-${problem}`, text: `Check: ${problem}`, open: () => openSection("diagnostics", "health") });
   for (const n of summary?.newer ?? []) attention.push({ key: `n-${n.key}`, text: `${n.name}: ${newerText(n)}`, open: () => openSection("saves", "games") });
   if (update?.updateAvailable && update.latest) {
     attention.push({ key: "update", text: `Update available: v${update.latest.version}`, open: () => openSection("settings", "updates") });
   }
+
+  // The chosen shortcuts, in the user's order (layout v3 addendum, ADR-0073); Open Keepsake is always last.
+  const runAction = async (s: Shortcut) => {
+    if (s.id === "sync-now") return runSync();
+    setRunning(s.id);
+    try {
+      const r = await runShortcut(s.id);
+      toaster.toast({ title: "Keepsake", body: r.message });
+      if (r.open) openSection(r.open[0] as SectionId, r.open[1]);
+    } catch (err) {
+      toaster.toast({ title: "Keepsake", body: plainError(err) });
+    } finally {
+      setRunning(null);
+      void refresh();
+    }
+  };
+  const shortcutItem = (s: Shortcut) => {
+    if (s.kind === "page" && s.open) {
+      const [section, tab] = s.open;
+      return (
+        <PanelSectionRow key={s.id}>
+          <ButtonItem layout="below" onClick={() => openSection(section as SectionId, tab)}>
+            {s.label}
+          </ButtonItem>
+        </PanelSectionRow>
+      );
+    }
+    if (s.kind === "action") {
+      const isSync = s.id === "sync-now";
+      return (
+        <PanelSectionRow key={s.id}>
+          <ButtonItem
+            layout="below"
+            disabled={isSync ? syncing || !summary || summary.enabledGames === 0 || Boolean(summary.busy) : running !== null}
+            onClick={() => void runAction(s)}
+          >
+            {(isSync && syncing) || running === s.id ? "Working" : s.label}
+          </ButtonItem>
+        </PanelSectionRow>
+      );
+    }
+    if (s.id === "status-transfers") return <GameTransfersCompact key={s.id} onOpen={() => openSection("games-devices", "moving")} />;
+    if (s.id === "status-reconnect") return <ReconnectQam key={s.id} onOpen={() => openSection("device", "reconnect")} />;
+    if (s.id === "status-conflicts" && summary && summary.conflicts > 0) {
+      return (
+        <PanelSectionRow key={s.id}>
+          <ButtonItem layout="below" onClick={() => openSection("saves", "conflicts")}>
+            {summary.conflicts === 1 ? "1 conflict needs your choice" : `${summary.conflicts} conflicts need your choice`}
+          </ButtonItem>
+        </PanelSectionRow>
+      );
+    }
+    return null;
+  };
 
   return (
     <>
@@ -128,8 +194,6 @@ function Content() {
       )}
       <PanelSection title="Keepsake">
         <BatteryPanel compact />
-        <GameTransfersCompact onOpen={() => openSection("games-devices", "moving")} />
-        <ReconnectQam onOpen={() => openSection("device", "reconnect")} />
         {attention.slice(0, 3).map((a) => (
           <PanelSectionRow key={a.key}>
             <ButtonItem layout="below" onClick={a.open}>
@@ -151,15 +215,7 @@ function Content() {
             )}
           </div>
         </PanelSectionRow>
-        <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            disabled={syncing || !summary || summary.enabledGames === 0 || Boolean(summary.busy)}
-            onClick={() => void runSync()}
-          >
-            {syncing ? "Syncing" : "Sync now"}
-          </ButtonItem>
-        </PanelSectionRow>
+        {(shortcuts?.shown ?? []).map((s) => shortcutItem(s))}
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={() => openSection(summary?.currentGame ? "play" : "saves")}>
             Open Keepsake

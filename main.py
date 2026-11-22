@@ -282,6 +282,12 @@ class Plugin:
     async def replication_remove_game(self, offer_id: str) -> dict[str, Any]:
         return await self.app.replication_remove_game(offer_id)
 
+    async def qam_shortcuts(self) -> dict[str, Any]:
+        return await self.app.qam_shortcuts()
+
+    async def run_shortcut(self, shortcut_id: str) -> dict[str, Any]:
+        return await self.app.run_shortcut(shortcut_id)
+
     async def library_badge(self, appid: int) -> dict[str, Any] | None:
         return await self.app.library_badge(appid)
 

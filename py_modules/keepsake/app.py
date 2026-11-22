@@ -54,6 +54,7 @@ from . import (
     resolve,
     restore,
     retention,
+    shortcuts,
     steamcloud,
     storage,
     uninstall,
@@ -114,6 +115,7 @@ from .replication.service import health_checks as replication_health_checks
 from .replication.source import Shares
 from .resolve import ALL_ROOTS
 from .safepath import PathEscapeError, validate_relative
+from .settings import MODULE_NAMES as SETTINGS_MODULE_NAMES
 from .settings import SNAPSHOT_STORES, SettingsStore
 from .snapshot import SnapshotError, content_hash, scan_entries
 from .statedb import StateDB, StateError, open_db
@@ -200,6 +202,15 @@ IMPORT_PROGRESS_EVENT = "keepsake_import_progress"
 REPLICATION_EVENT = "keepsake_replication"
 DEVICE_EVENT = "keepsake_device"
 RECONNECT_EVENT = "keepsake_reconnect"
+SHORTCUTS_EVENT = "keepsake_shortcuts"
+MODE_WORDS = {"low-power": "Quiet", "balanced": "Balanced", "performance": "Performance", "custom": "Custom"}
+SYNC_RESULT = {
+    "published": "saved to the cloud",
+    "unchanged": "already up to date",
+    "conflict": "save conflict, open Keepsake",
+    "published-fork": "save conflict, open Keepsake",
+    "quarantined": "a suspicious save was kept here",
+}
 DEVICE_WATCH_SECONDS = 5.0  # after applying a profile, look once more for another app setting its own value
 PAIR_REQUEST_EVENT = "keepsake_pair_request"  # a device asks to pair (ADR-0070)
 MANIFEST_PROGRESS_SECONDS = 0.5
@@ -5916,7 +5927,105 @@ class KeepsakeApp:
     async def set_setting(self, key: str, value: Any) -> dict[str, Any]:
         result = self.settings.set(key, value)
         log_event(logging.INFO, "settings.changed", "Setting changed", key=key)
+        if key == "qamShortcuts":
+            await self.emit(SHORTCUTS_EVENT)  # the quick access menu shows the change at once
         return result
+
+    # Quick menu shortcuts (layout v3 addendum, ADR-0073)
+
+    def _shortcut_features(self) -> list[str]:
+        """Features some shortcuts need, as this device has them now."""
+        found = []
+        if self.host == "decky":
+            found.append("updates")
+        if self.performance is not None:
+            try:
+                current = self._steamos().read()
+            except ManagerError:
+                current = {}
+            if current.get("profile"):
+                found.append("performance")
+            if current.get("chargeLimit") is not None:
+                found.append("charge-limit")
+        return found
+
+    async def qam_shortcuts(self) -> dict[str, Any]:
+        """Every shortcut this device can show, the ones chosen (in order), and the defaults."""
+        modules = {name: self.registry.enabled(name) for name in SETTINGS_MODULE_NAMES}
+        features = await asyncio.to_thread(self._shortcut_features)
+        offered = shortcuts.available(modules, features)
+        chosen = self.settings.get("qamShortcuts")
+        return {
+            "available": offered,
+            "shown": shortcuts.shown(chosen, offered),
+            "chosen": list(shortcuts.DEFAULT) if chosen is None else list(chosen),
+            "defaults": list(shortcuts.DEFAULT),
+        }
+
+    async def run_shortcut(self, shortcut_id: str) -> dict[str, Any]:
+        """Run an action shortcut from the quick access menu. ``open`` asks the page to open a tab instead."""
+        offered = {e["id"]: e for e in (await self.qam_shortcuts())["available"]}
+        entry = offered.get(str(shortcut_id))
+        if entry is None or entry["kind"] != "action":
+            raise ValueError("that shortcut is not available here")
+        current = (await self.qam_summary()).get("currentGame")
+        sid = entry["id"]
+        if sid == "sync-now":
+            r = await self.sync_now()
+            return {
+                "message": f"Checked {r.get('games', 0)} games."
+                if r.get("ok")
+                else "Keepsake is busy; try again in a moment."
+            }
+        if sid == "get-game":
+            return {"message": "Choose Games on a device, then Get this game.", "open": ["games-devices", "devices"]}
+        if sid == "run-device-checks":
+            r = await self.device_checks_run_all()
+            counts: dict[str, int] = {}
+            for result in r.get("results", []):
+                counts[result["status"]] = counts.get(result["status"], 0) + 1
+            parts = [f"{counts[k]} {k}" for k in ("pass", "warn", "fail", "skip") if counts.get(k)]
+            return {"message": f"Device checks: {', '.join(parts) or 'none ran'}."}
+        if sid == "check-updates":
+            r = await self.check_for_updates(True)
+            latest = r.get("latest") or {}
+            return {
+                "message": f"Update available: v{latest.get('version')}."
+                if r.get("updateAvailable")
+                else "Keepsake is up to date."
+            }
+        if sid == "next-mode":
+            status = await self.device_performance()
+            profile = (status.get("current") or {}).get("profile") or {}
+            modes = profile.get("available") or []
+            if not modes:
+                raise ValueError("this device offers no performance modes")
+            following = (
+                modes[(modes.index(profile.get("current")) + 1) % len(modes)]
+                if profile.get("current") in modes
+                else modes[0]
+            )
+            await self.device_apply({"mode": following}, status.get("game"))
+            return {"message": f"Performance mode: {MODE_WORDS.get(following, following)}."}
+        if sid == "charge-limit":
+            battery = await self.device_battery()
+            result = await self.device_set_charge_limit(not battery.get("limited"))
+            return {"message": "Charging stops at 80%." if result.get("limited") else "Charging to 100%."}
+        if current is None:
+            return {"message": "No synced game is running."}
+        if sid == "sync-current":
+            r = await self.sync_push(current["key"])
+            return {"message": f"{current['name']}: {SYNC_RESULT.get(str(r.get('status')), str(r.get('status')))}."}
+        if sid == "backup-current":
+            await self.snapshot_game(current["key"])
+            return {"message": f"{current['name']} backed up. It is in History."}
+        if sid == "send-current":
+            peers = self._links().store.list()
+            if len(peers) != 1:
+                return {"message": "Choose the device on Other devices.", "open": ["games-devices", "devices"]}
+            await self.replication_send(current["key"], str(peers[0]["id"]))
+            return {"message": f"Sending {current['name']} to {peers[0].get('name') or 'your other device'}."}
+        raise ValueError("that shortcut is not available here")
 
     # Logs
 

@@ -61,6 +61,8 @@ tr.quarantined td { color: var(--warn); }
 input[type="text"], input[type="search"], input[type="number"], select { font: inherit; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
 input[type="number"] { width: 6em; }
 .switch { display: inline-flex; align-items: center; gap: 6px; }
+.shortcut-list li { margin: 4px 0; cursor: grab; }
+.drag-handle { opacity: 0.6; }
 .card + .card { margin-top: 12px; }
 ul.changes { margin: 4px 0 8px; padding-left: 20px; font-size: 0.875rem; max-height: 240px; overflow: auto; }
 details { margin: 8px 0; }

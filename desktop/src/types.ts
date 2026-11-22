@@ -346,6 +346,17 @@ export interface PerformanceDesk {
     ranges: Record<"spl" | "sppt" | "fppt", { current: number; min: number; max: number; step: number }> | null;
   };
 }
+// Quick menu shortcuts (ADR-0073 addendum).
+export interface ShortcutDesk {
+  id: string;
+  kind: "page" | "action" | "status";
+  label: string;
+}
+export interface QamShortcutsDesk {
+  available: ShortcutDesk[];
+  chosen: string[];
+  defaults: string[];
+}
 // Fan control (ADR-0085).
 export interface FansDesk {
   off?: boolean;

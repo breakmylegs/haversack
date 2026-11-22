@@ -540,6 +540,25 @@ export const installerRetarget = callable<[jobId: number, exe: string], InstallJ
 export const installerCancel = callable<[jobId: number], InstallJob>("installer_cancel");
 
 export const modulesStatus = callable<[], ModulesStatus>("modules_status");
+// Quick menu shortcuts (layout v3 addendum, ADR-0073): pages, actions and status lines, chosen and ordered.
+export const SHORTCUTS_EVENT = "keepsake_shortcuts";
+export interface Shortcut {
+  id: string;
+  kind: "page" | "action" | "status";
+  label: string;
+  module: string;
+  feature?: string;
+  open?: [string, string];
+}
+export interface QamShortcuts {
+  available: Shortcut[];
+  shown: Shortcut[];
+  chosen: string[];
+  defaults: string[];
+}
+export const qamShortcuts = callable<[], QamShortcuts>("qam_shortcuts");
+export const runShortcut = callable<[shortcutId: string], { message: string; open?: [string, string] }>("run_shortcut");
+
 // Fan control (R24, ADR-0085): curves for the Legion Go 2, full speed for the Legion Go, through the helper.
 export type FanPoint = [number, number];
 export interface FansStatus {
