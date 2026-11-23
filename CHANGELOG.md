@@ -4,6 +4,10 @@ All notable changes to Haversack (called Keepsake until v0.51.0) are listed here
 
 ## [Unreleased]
 
+## [0.60.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Added
 
 - **Launch option presets** on each game's page (Saves, Games). Switch on Proton's own settings without typing them: a Proton log, WineD3D instead of DXVK, turning off fsync or esync, and a short OpenGL extension list. Your other launch options are kept exactly, and **Put back original** restores them as they were.
