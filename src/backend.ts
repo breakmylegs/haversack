@@ -1546,3 +1546,16 @@ export interface SdCard {
   shortcuts: string[];
 }
 export const sdCards = callable<[], SdCard[]>("sd_cards");
+
+// Launch option presets (R29 stage 5, ADR-0097): Proton's own settings, set through Steam.
+export interface LaunchPresets {
+  presets: { id: string; var: string; label: string; about: string; on: boolean }[];
+  options: string;
+  original: string | null;
+  problem: string | null;
+  appid: number;
+  strict: boolean;
+}
+export const launchPresets = callable<[key: string, currentOptions: string], LaunchPresets>("launch_presets");
+export const launchApply = callable<[key: string, currentOptions: string, presets: string[]], { appid: number; options: string }>("launch_apply");
+export const launchRestore = callable<[key: string], { appid: number; options: string }>("launch_restore");

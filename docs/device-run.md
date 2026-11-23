@@ -304,6 +304,10 @@ Keepsake is now called Haversack. This first update moves it across.
     - Note how Steam's overlay shows a paused game.
 57. **SD cards (v0.59.0).** With the SD card in, open Device, Storage: SD cards and drives should list the card with its games, including a non-Steam game installed on it.
     - Take the card out, open the page again: the card should still be listed with its games, "last seen" and not in the device.
+58. **Launch option presets (v0.60.0).** Open a Proton game's page in Saves, Games, Launch options.
+    - Switch on Write a Proton log: Steam's own launch options for the game (its Properties) should show `PROTON_LOG=1 %command%` plus anything it had before. Start the game: `steam-<appid>.log` should appear in your home folder.
+    - Switch it off, then select Put back original: the launch options should be exactly as before.
+    - With the strict launch gate on, the presets should say to turn the gate off first.
 
 ## 5. Send back
 
