@@ -1,8 +1,8 @@
-# Device run for v0.53.0
+# Device run for v0.54.0
 
 No SSH, terminal or laptop is needed. Do the first two parts on each handheld, then the rest with both. "Go" is the Legion Go and "Go 2" the Legion Go 2.
 
-## 1. Install v0.53.0 (each handheld)
+## 1. Install v0.54.0 (each handheld)
 
 Keepsake is now called Haversack. This first update moves it across.
 
@@ -282,7 +282,7 @@ Keepsake is now called Haversack. This first update moves it across.
     - Put the device to sleep and wake it: the Sleep video should play. Restart: the Boot video should play.
     - Select Use Steam's own on both: Steam's own videos should play again.
     - With CSS Loader or Audio Loader installed, their themes or sound packs should be listed by name.
-53. **Sending looks (v0.54.0).** With both handhelds paired and Looks on, and a theme or sound pack installed on the Go 2 only, open Device, Looks on the Go 2 and select Send to Legion Go.
+53. **Sending looks (v0.55.0).** With both handhelds paired and Looks on, and a theme or sound pack installed on the Go 2 only, open Device, Looks on the Go 2 and select Send to Legion Go.
     - On the Go, the theme and pack should appear in CSS Loader and Audio Loader. The Go's own themes should be unchanged.
     - The Go 2's chosen boot video should appear as a choice on the Go's Looks page, "From Legion Go 2". The Go's own boot video should not change until you choose it.
     - Send again: the Go should report everything already there.

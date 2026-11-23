@@ -1104,7 +1104,7 @@ class KeepsakeApp:
                 if reply.get("type") == "error":
                     message = str(reply.get("reason") or reply.get("message") or "")
                     if "unknown" in message.lower():
-                        message = f"{capital(name)} needs Haversack 0.54 or later to take looks"
+                        message = f"{capital(name)} needs Haversack 0.55 or later to take looks"
                     raise ValueError(message or "the other device refused it")
                 await self.emit("keepsake_toast", f"{capital(what)} on the way to {name}.")
             except Exception as exc:  # noqa: BLE001 - reported to the user, never left hanging

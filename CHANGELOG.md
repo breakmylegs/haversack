@@ -12,6 +12,14 @@ All notable changes to Haversack (called Keepsake until v0.51.0) are listed here
 
 - When the other handheld turned down an emulator game, its reason is now shown, not just "refused it".
 
+## [0.54.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
+### Changed
+
+- **No changes from 0.53.0.** A slip in publishing released this version before its changes were merged. They are in 0.55.0.
+
 ## [0.53.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

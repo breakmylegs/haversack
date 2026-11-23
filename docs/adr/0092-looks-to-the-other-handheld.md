@@ -26,7 +26,7 @@ Looks is a separate module, and P13 says modules depend on Core and never on eac
    - Videos must be one of Steam's three file names.
    - `root` is a content hash. No paths, user names or labels cross the wire (P10).
 
-   A device without the kind answers with an error, which the sender shows as "needs Haversack 0.54 or later". Existing requests are unchanged.
+   A device without the kind answers with an error, which the sender shows as "needs Haversack 0.55 or later". Existing requests are unchanged.
 3. **What is sent.**
    - **Themes:** folders with a `theme.json`.
    - **Sound packs:** folders with a `pack.json`.

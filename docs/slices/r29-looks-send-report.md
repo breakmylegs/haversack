@@ -1,4 +1,4 @@
-# R29 stage 1b: looks to the other handheld (v0.54.0)
+# R29 stage 1b: looks to the other handheld (v0.55.0)
 
 ## What changed
 

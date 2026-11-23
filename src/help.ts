@@ -1567,7 +1567,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "The other handheld keeps everything it already has. Only themes and packs it lacks are added, where CSS Loader and Audio Loader find them. Videos arrive as choices on its own Looks page, so its screen only changes when someone picks one there. The other handheld needs Looks switched on, and Haversack 0.54.0 or later."
+    "t": "The other handheld keeps everything it already has. Only themes and packs it lacks are added, where CSS Loader and Audio Loader find them. Videos arrive as choices on its own Looks page, so its screen only changes when someone picks one there. The other handheld needs Looks switched on, and Haversack 0.55.0 or later."
    }
   ]
  },
