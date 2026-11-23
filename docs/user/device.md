@@ -136,3 +136,12 @@ Nothing is lost:
 - While Animation Changer is installed, Haversack only shows the videos and leaves them to it.
 
 The page also lists the themes and sound packs that **CSS Loader** and **Audio Loader** have installed. Haversack does not change themes or sounds itself; install those plugins from Decky's store.
+
+### Sending looks to your other handheld
+
+With Replication on and your handhelds paired, **Send to your other handheld** at the bottom of Looks sends any of:
+- your CSS Loader themes;
+- your Audio Loader sound packs;
+- the animations you chose above.
+
+The other handheld keeps everything it already has. Only themes and packs it lacks are added, where CSS Loader and Audio Loader find them. Videos arrive as choices on its own Looks page, so its screen only changes when someone picks one there. The other handheld needs Looks switched on, and Haversack 0.55.0 or later.

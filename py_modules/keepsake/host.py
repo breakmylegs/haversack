@@ -161,6 +161,7 @@ CALLABLES = frozenset(
         "looks_status",
         "looks_set_animation",
         "looks_reset_animation",
+        "looks_send",
         "device_controllers",
         "reconnect_status",
         "reconnect_set_help",

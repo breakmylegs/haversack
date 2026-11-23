@@ -4,9 +4,21 @@ All notable changes to Haversack (called Keepsake until v0.51.0) are listed here
 
 ## [Unreleased]
 
+### Added
+
+- **Send your looks to your other handheld** (Device, Looks, then Send to your other handheld). Send your CSS Loader themes, Audio Loader sound packs and the animations you chose. The other handheld keeps everything it has: only what it lacks is added, and videos arrive as choices on its Looks page. Both handhelds need Looks and Replication switched on.
+
+### Fixed
+
+- When the other handheld turned down an emulator game, its reason is now shown, not just "refused it".
+
 ## [0.54.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
+### Changed
+
+- **No changes from 0.53.0.** A slip in publishing released this version before its changes were merged. They are in 0.55.0.
 
 ## [0.53.0]
 

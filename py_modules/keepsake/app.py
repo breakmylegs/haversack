@@ -96,6 +96,7 @@ from .jobs import JobTracker
 from .locks import GameLocks
 from .log import log_event, setup_logging, tail
 from .looks import animations as looks_animations
+from .looks import lookplan
 from .looks import themes as looks_themes
 from .loopback_auth import BrowserProbe, LoopbackFlow
 from .modules import Module, ModuleRegistry
@@ -635,6 +636,11 @@ class KeepsakeApp:
                 on_change=self._replication_changed,
                 on_offer=self._replication_offer_arrived,
                 on_state=self._replication_offer_state,
+                kinds={
+                    lookplan.KIND: lookplan.Handler(
+                        self._homebrew, self.paths.runtime_dir, lambda: self.registry.enabled("looks")
+                    )
+                },
             )
             self.game_links = GameLinks(os.path.join(self.paths.runtime_dir, "replication-games.json"))
             restored = await asyncio.to_thread(self.outgoing.restore)
@@ -655,6 +661,8 @@ class KeepsakeApp:
                     # R26 stage 2 (ADR-0087 addendum): emulator games between paired devices
                     "emu-summary": self._serve_emu_summary,
                     "emu-offer": self.incoming.handle_emu_offer,
+                    # R29 stage 1b (ADR-0092): themes, sound packs and videos between paired devices
+                    lookplan.Handler.request: self.incoming.kind_handler(lookplan.KIND),
                 }
             )
             if restored:
@@ -1039,10 +1047,12 @@ class KeepsakeApp:
             found = looks_themes.summary(self._homebrew())
             blocked = "Animation Changer" if found["plugins"]["animations"] else None
             anims = self._animations()
+            sendable = lookplan.available(self._homebrew(), anims)
             return {
                 "enabled": self.registry.enabled("looks"),
                 "animations": anims.status(blocked),
                 "choices": anims.choices(),
+                "sendable": {part: len(names) for part, names in sendable.items()},
                 **found,
             }
 
@@ -1067,6 +1077,45 @@ class KeepsakeApp:
             return await asyncio.to_thread(self._animations().reset, kind)
         except looks_animations.AnimationError as exc:
             raise ValueError(str(exc)) from exc
+
+    async def looks_send(self, peer_id: str, parts: list[str]) -> dict[str, Any]:
+        """Send themes, sound packs or the videos Haversack set to a paired device (R29 stage 1b, ADR-0092)."""
+        self._looks_on()
+        if not self.registry.enabled("replication"):
+            raise ValueError("Replication is off; switch it on in Settings, Modules")
+        try:
+            plan = await asyncio.to_thread(lookplan.plan, self._homebrew(), self._animations(), list(parts))
+        except lookplan.LookPlanError as exc:
+            raise ValueError(str(exc)) from exc
+        name = self._peer_name(peer_id)
+        what = lookplan.describe({part: {"members": members} for part, (_root, members) in plan.items()})
+        extra = {"from": {"name": self.settings.get("deviceName") or ""}}
+
+        async def send() -> None:
+            try:
+                wire = await asyncio.to_thread(
+                    self._outgoing().prepare_parts, lookplan.KIND, f"Looks: {what}", plan, str(peer_id), extra
+                )
+                connection = await self._replication_connect_for(str(peer_id))()
+                try:
+                    reply = await connection.request({"type": lookplan.Handler.request, "offer": wire})
+                finally:
+                    await connection.close()
+                if reply.get("type") == "error":
+                    message = str(reply.get("reason") or reply.get("message") or "")
+                    if "unknown" in message.lower():
+                        message = f"{capital(name)} needs Haversack 0.55 or later to take looks"
+                    raise ValueError(message or "the other device refused it")
+                await self.emit("keepsake_toast", f"{capital(what)} on the way to {name}.")
+            except Exception as exc:  # noqa: BLE001 - reported to the user, never left hanging
+                log_event(
+                    logging.WARNING, "replication.looks_offer_failed", "Looks not offered", error=type(exc).__name__
+                )
+                await self.emit("keepsake_toast", f"Looks were not sent: {exc}")
+
+        self._background.append(asyncio.create_task(send()))
+        log_event(logging.INFO, "replication.looks_offer", "Looks offered", parts=sorted(plan))
+        return {"sending": what}
 
     async def device_battery(self) -> dict[str, Any]:
         """The 80 percent charge limit (R21 stage 4, ADR-0077): who controls it here, and its state."""
@@ -1231,7 +1280,7 @@ class KeepsakeApp:
                 finally:
                     await connection.close()
                 if reply.get("type") == "error":
-                    raise ValueError(str(reply.get("message") or "the other device refused it"))
+                    raise ValueError(str(reply.get("reason") or reply.get("message") or "the other device refused it"))
                 await self.emit("keepsake_toast", f"{unit} is on its way to {self._peer_name(peer_id)}.")
             except Exception as exc:  # noqa: BLE001 - reported to the user, never left hanging
                 log_event(
