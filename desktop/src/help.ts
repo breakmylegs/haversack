@@ -58,7 +58,7 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "**Device:** Device status, Power, Battery, Fans, Controllers, Reconnect help, More device settings."
+    "t": "**Device:** Device status, Power, Battery, Fans, Controllers, Reconnect help, More device settings, Looks."
    },
    {
     "k": "li",
@@ -144,7 +144,7 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "Your device: live readings, performance for each game, power limits, fans, battery, controllers and reconnect help."
+    "t": "Your device: live readings, performance for each game, power limits, fans, battery, controllers, reconnect help, and boot and sleep animations."
    },
    {
     "k": "li",
@@ -1497,11 +1497,49 @@ export const HELP: HelpTopic[] = [
    {
     "k": "h",
     "l": 2,
-    "t": "Coming next"
+    "t": "Looks"
    },
    {
     "k": "p",
-    "t": "Fan curves, and changing the controllers' settings and lights, need root. They wait for a separate decision."
+    "t": "**Device**, **Looks** changes the videos Steam plays when the device starts and when it goes to sleep. First switch on **Looks** in **Settings**, **Modules**."
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "1. Put WebM videos in your **Videos** or **Downloads** folder. Animation Changer's sets are offered too."
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "2. For **Boot**, **Sleep** or **Sleep from the loading screen**, choose a video. It shows the next time the device starts or sleeps."
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "3. **Use Steam's own** goes back."
+   },
+   {
+    "k": "p",
+    "t": "Nothing is lost:"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "If a video was already there, Haversack keeps a copy first, and **Use Steam's own** puts that one back."
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "Haversack never removes a video another tool put there."
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "While Animation Changer is installed, Haversack only shows the videos and leaves them to it."
+   },
+   {
+    "k": "p",
+    "t": "The page also lists the themes and sound packs that **CSS Loader** and **Audio Loader** have installed. Haversack does not change themes or sounds itself; install those plugins from Decky's store."
    }
   ]
  },

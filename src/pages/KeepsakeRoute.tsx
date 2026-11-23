@@ -25,6 +25,7 @@ import { ImportPage } from "./ImportPage";
 import { HelpPage } from "./HelpPage";
 import { InstallerPage } from "./InstallerPage";
 import { LogsPage } from "./LogsPage";
+import { LooksPage } from "./LooksPage";
 import { NowPlaying } from "./NowPlaying";
 import { PowerPanel } from "./PowerPanel";
 import { ReconnectPanel } from "./ReconnectPanel";
@@ -73,6 +74,7 @@ const CONTENT: Record<string, () => ReactElement> = {
   "device/controllers": () => <ControllersPanel />,
   "device/reconnect": () => <ReconnectPanel />,
   "device/other": () => <ExtrasPanel />,
+  "device/looks": () => <LooksPage />,
   "install/install": () => <InstallerPage />,
   "settings/general": () => <SettingsPage part="general" />,
   "settings/cloud": () => <SettingsPage part="cloud" />,

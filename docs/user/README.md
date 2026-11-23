@@ -10,7 +10,7 @@ Haversack's page has seven sections in its sidebar, each with its own entries:
 - **Play:** Now playing and Advisor.
 - **Saves:** Games, Conflicts, History, Activity, Import and export.
 - **Games and devices:** Moving games, Other devices, Emulators, Disk use.
-- **Device:** Device status, Power, Battery, Fans, Controllers, Reconnect help, More device settings.
+- **Device:** Device status, Power, Battery, Fans, Controllers, Reconnect help, More device settings, Looks.
 - **Install.**
 - **Settings:** General, Cloud, Sync and safety, Modules, Quick menu, Updates, Help.
 - **Diagnostics:** Health, Device checks, Tools, Logs.
@@ -36,7 +36,7 @@ Set Haversack up on one device, then on the next. Games whose saves already matc
 - [Conflicts, history and restoring](conflicts-and-history.md): choosing between two saves, and going back to an older one.
 - [Importing from Ludusavi](import-ludusavi.md): bring your existing backups with you.
 - [Storage](storage.md): disk use per game, clearing a shader cache, and resetting a broken prefix without losing your saves.
-- [Your device](device.md): live readings, performance for each game, power limits, fans, battery, controllers and reconnect help.
+- [Your device](device.md): live readings, performance for each game, power limits, fans, battery, controllers, reconnect help, and boot and sleep animations.
 - [Installing games](installer.md): from an ISO, a folder or a network share, on a handheld.
 - [Advisor](advisor.md): recommended settings for your device. It never changes anything.
 - [Replication](replication.md): sending a whole game, or an emulator game, from one device to another.

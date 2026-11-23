@@ -439,6 +439,15 @@ class Plugin:
     async def save_navigation_record(self, record: dict[str, Any]) -> dict[str, Any]:
         return await self.app.save_navigation_record(record)
 
+    async def looks_status(self) -> dict[str, Any]:
+        return await self.app.looks_status()
+
+    async def looks_set_animation(self, kind: str, choice: str) -> dict[str, Any]:
+        return await self.app.looks_set_animation(kind, choice)
+
+    async def looks_reset_animation(self, kind: str) -> dict[str, Any]:
+        return await self.app.looks_reset_animation(kind)
+
     async def device_battery(self) -> dict[str, Any]:
         return await self.app.device_battery()
 

@@ -1499,3 +1499,21 @@ export interface RenameStatus {
 }
 export const renameStatus = callable<[], RenameStatus>("rename_status");
 export const renameFinish = callable<[], RenameStatus>("rename_finish");
+
+// Looks (R29 stage 1, ADR-0091): boot and suspend animations, and the theme plugins read only.
+export type AnimationKind = "boot" | "suspend" | "throbber";
+export interface LooksStatus {
+  enabled: boolean;
+  animations: {
+    videos: Record<AnimationKind, { who: "steam" | "haversack" | "other"; name: string | null; keptOriginal: boolean }>;
+    blockedBy: string | null;
+    steamFound: boolean;
+  };
+  choices: { id: string; name: string; from: string; bytes: number }[];
+  plugins: { css: boolean; audio: boolean; animations: boolean };
+  themes: { name: string; author: string; version: string; preset: boolean }[];
+  sounds: { name: string; author: string; music: boolean }[];
+}
+export const looksStatus = callable<[], LooksStatus>("looks_status");
+export const looksSetAnimation = callable<[kind: AnimationKind, choice: string], LooksStatus["animations"]>("looks_set_animation");
+export const looksResetAnimation = callable<[kind: AnimationKind], LooksStatus["animations"]>("looks_reset_animation");

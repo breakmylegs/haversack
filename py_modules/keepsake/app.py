@@ -95,6 +95,8 @@ from .installer.service import health_checks as installer_health_checks
 from .jobs import JobTracker
 from .locks import GameLocks
 from .log import log_event, setup_logging, tail
+from .looks import animations as looks_animations
+from .looks import themes as looks_themes
 from .loopback_auth import BrowserProbe, LoopbackFlow
 from .modules import Module, ModuleRegistry
 from .newest import NewestChoices
@@ -932,6 +934,18 @@ class KeepsakeApp:
                 unavailable_reason=None if self.host != "windows" else "Device controls are for Linux handhelds.",
             )
         )
+        self.registry.register(
+            Module(
+                "looks",
+                "Looks",
+                "Boot and suspend animations from your own WebM files, and what CSS Loader and Audio Loader have "
+                "installed (ADR-0091).",
+                "Only Steam's three animation files in config/uioverrides/movies, after keeping any video that was "
+                "there first, and its own record of what it wrote. Themes and sounds are only read.",
+                available=self.host != "windows",
+                unavailable_reason=None if self.host != "windows" else "Steam for Windows has no boot animations.",
+            )
+        )
 
     def _steamos(self) -> SteamOSManager:
         return SteamOSManager()
@@ -997,6 +1011,62 @@ class KeepsakeApp:
         await asyncio.to_thread(performance.store.set, int(appid), None)
         self._device_changed()
         return await asyncio.to_thread(performance.status)
+
+    # Looks (R29 stage 1, ADR-0091)
+    def _homebrew(self) -> str:
+        return os.path.join(discovery.real_home(self.home), "homebrew")
+
+    def _animations(self) -> looks_animations.Animations:
+        home = discovery.real_home(self.home)
+        roots = discovery.steam_roots(self.home, self.host)
+        sources = [
+            ("Haversack", os.path.join(self.paths.runtime_dir, "looks", "animations")),
+            ("Animation Changer", os.path.join(self._homebrew(), "data", "Animation Changer", "animations")),
+            ("Videos", os.path.join(home, "Videos")),
+            ("Downloads", os.path.join(home, "Downloads")),
+        ]
+        steam = roots[0] if roots else os.path.join(home, ".steam", "steam")
+        return looks_animations.Animations(steam, self.paths.runtime_dir, sources)
+
+    def _looks_on(self) -> None:
+        if not self.registry.enabled("looks"):
+            raise ValueError("Looks is off; switch it on in Settings, Modules")
+
+    async def looks_status(self) -> dict[str, Any]:
+        """The three animations, the WebM files to choose from, and the theme plugins' themes and sounds."""
+
+        def read() -> dict[str, Any]:
+            found = looks_themes.summary(self._homebrew())
+            blocked = "Animation Changer" if found["plugins"]["animations"] else None
+            anims = self._animations()
+            return {
+                "enabled": self.registry.enabled("looks"),
+                "animations": anims.status(blocked),
+                "choices": anims.choices(),
+                **found,
+            }
+
+        return await asyncio.to_thread(read)
+
+    async def looks_set_animation(self, kind: str, choice: str) -> dict[str, Any]:
+        """Use one of the user's WebM files as Steam's boot or suspend video (a user action)."""
+        self._looks_on()
+        if looks_themes.installed_plugins(self._homebrew())["animations"]:
+            raise ValueError("Animation Changer manages the animations here, so Haversack changes nothing")
+        try:
+            return await asyncio.to_thread(self._animations().apply, kind, choice)
+        except looks_animations.AnimationError as exc:
+            raise ValueError(str(exc)) from exc
+
+    async def looks_reset_animation(self, kind: str) -> dict[str, Any]:
+        """Put Steam's own video, or the one that was there first, back."""
+        self._looks_on()
+        if looks_themes.installed_plugins(self._homebrew())["animations"]:
+            raise ValueError("Animation Changer manages the animations here, so Haversack changes nothing")
+        try:
+            return await asyncio.to_thread(self._animations().reset, kind)
+        except looks_animations.AnimationError as exc:
+            raise ValueError(str(exc)) from exc
 
     async def device_battery(self) -> dict[str, Any]:
         """The 80 percent charge limit (R21 stage 4, ADR-0077): who controls it here, and its state."""

@@ -423,3 +423,10 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 | # | Fact | Status | Source |
 |---|---|---|---|
 | A245 | In Gaming Mode, a `Field` with `focusable` scrolls into view when the D-pad moves focus to it, and the right stick scrolls the page while focus is inside a field taller than the screen | unverified until device run step 51; `focusable`, `highlightOnFocus` and `onActivate` are in `@decky/ui`'s `FieldProps` (verified in `node_modules/@decky/ui/dist`) | `@decky/ui` types, device run |
+
+## Looks (ADR-0091)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A246 | Steam on SteamOS and Bazzite plays `deck_startup.webm`, `steam_os_suspend.webm` and `steam_os_suspend_from_throbber.webm` from `<steam root>/config/uioverrides/movies` at the next boot or sleep, with no restart | verified in Animation Changer's source (`main.py`); unverified on our devices until device run step 52 | TheLogicMaster/SDH-AnimationChanger |
+| A247 | Audio Loader keeps sound packs in `<homebrew>/sounds/<pack>/pack.json`, CSS Loader keeps themes in `<homebrew>/themes/<theme>/theme.json`, and their `plugin.json` names are "Audio Loader" and "CSS Loader" | verified in source (`audio_utils.py`, `plugin.json` of each) | DeckThemes repositories |
