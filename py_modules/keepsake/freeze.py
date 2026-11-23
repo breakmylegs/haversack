@@ -24,7 +24,10 @@ from .log import log_event
 from .procs import ProcInfo, read_proc
 
 FROZEN_FILE = "frozen.json"
-HARD_CEILING_SECONDS = 30.0
+HARD_CEILING_SECONDS = 30.0  # Haversack's own freezes: before launch, around a restore (P11)
+# A pause the user asked for (R29 stage 3, ADR-0094) has its own Freezer, state file and ceiling.
+PAUSED_FILE = "paused.json"
+PAUSE_CEILING_SECONDS = 60 * 60.0
 
 SIGSTOP = getattr(signal, "SIGSTOP", 19)
 SIGCONT = getattr(signal, "SIGCONT", 18)
@@ -39,11 +42,16 @@ class Freezer:
         proc_root: str = "/proc",
         kill: KillFn | None = None,
         ceiling: float = HARD_CEILING_SECONDS,
+        state_file: str = FROZEN_FILE,
+        max_ceiling: float = HARD_CEILING_SECONDS,
+        on_watchdog: Callable[[list[int]], None] | None = None,
     ) -> None:
-        self._path = os.path.join(runtime_dir, FROZEN_FILE)
+        self._path = os.path.join(runtime_dir, state_file)
         self._proc_root = proc_root
         self._kill: KillFn = kill or os.kill
-        self._ceiling = min(float(ceiling), HARD_CEILING_SECONDS)
+        # Never above the user pause's hour, whatever a caller asks; Haversack's own freezes keep 30 s.
+        self._ceiling = min(float(ceiling), float(max_ceiling), PAUSE_CEILING_SECONDS)
+        self._on_watchdog = on_watchdog
         self._lock = threading.RLock()
         self._watchdog: threading.Timer | None = None
         # In-memory copy, so a corrupt or unwritable state file never blocks a resume.
@@ -157,9 +165,15 @@ class Freezer:
 
     def _watchdog_fire(self) -> None:
         try:
-            self.resume_all(reason="watchdog")
+            resumed = self.resume_all(reason="watchdog")
         except Exception:  # noqa: BLE001 - the watchdog must never die silently
             log_event(logging.ERROR, "freeze.watchdog_error", "Watchdog failed to resume processes")
+            return
+        if self._on_watchdog is not None:
+            try:
+                self._on_watchdog(resumed)
+            except Exception:  # noqa: BLE001 - telling the user must never undo the resume
+                log_event(logging.WARNING, "freeze.watchdog_notice_failed", "Could not report a watchdog resume")
 
     def status(self) -> dict[str, Any]:
         with self._lock:

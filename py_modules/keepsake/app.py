@@ -82,7 +82,7 @@ from .device.powerlimits import PowerLimits
 from .device.reconnect_service import ReconnectService
 from .device.steamos import ManagerError, SteamOSManager
 from .engine import SnapshotEngine
-from .freeze import Freezer
+from .freeze import PAUSE_CEILING_SECONDS, PAUSED_FILE, Freezer
 from .fsutil import atomic_write_json, read_json
 from .gameconfig import DEFAULT as GAME_DEFAULTS
 from .gameconfig import GameConfigStore, custom_path_from_absolute
@@ -475,6 +475,16 @@ class KeepsakeApp:
         setup_logging(paths.log_dir)
         self.settings = SettingsStore(paths.settings_dir)
         self.freezer = Freezer(paths.runtime_dir, proc_root=proc_root)
+        # A pause the user asked for (R29 stage 3, ADR-0094): its own record and an hour's watchdog.
+        self.pauser = Freezer(
+            paths.runtime_dir,
+            proc_root=proc_root,
+            ceiling=PAUSE_CEILING_SECONDS,
+            state_file=PAUSED_FILE,
+            max_ceiling=PAUSE_CEILING_SECONDS,
+            on_watchdog=self._pause_watchdog,
+        )
+        self._paused: dict[str, Any] | None = None
         self.jobs = JobTracker(on_idle=self._on_idle)
         self.updater = Updater(paths.runtime_dir, self.version, fetch)
         self._fetch = fetch  # Advisor's sources use the same injected fetcher, so tests never reach the network
@@ -875,6 +885,7 @@ class KeepsakeApp:
             self.controller_settings.start()
 
         async def device_stop() -> None:
+            await self._pause_release("module")  # a paused game never outlives the Device module
             settings, self.controller_settings = self.controller_settings, None
             if settings is not None:
                 await asyncio.to_thread(settings.stop)
@@ -898,6 +909,7 @@ class KeepsakeApp:
 
         async def device_game_exited(payload: dict[str, Any]) -> None:
             self._device_game = None
+            await self._pause_release("exit")
             if self.fans is not None:
                 self.fans.game = None
             if self.performance is not None:
@@ -1116,6 +1128,61 @@ class KeepsakeApp:
         self._background.append(asyncio.create_task(send()))
         log_event(logging.INFO, "replication.looks_offer", "Looks offered", parts=sorted(plan))
         return {"sending": what}
+
+    # Pause the running game (R29 stage 3, ADR-0094)
+    def _pause_watchdog(self, resumed: list[int]) -> None:
+        """The hour is up: the watchdog has already resumed the game; tell the user (from its thread)."""
+        self._paused = None
+        loop = self._loop
+        if loop is not None and not loop.is_closed():
+            loop.call_soon_threadsafe(
+                lambda: self._background.append(
+                    loop.create_task(self.emit("keepsake_toast", "Your game was paused for an hour, so it is running again."))
+                )
+            )
+
+    async def _pause_release(self, reason: str) -> None:
+        if self._paused is not None or self.pauser.recorded():
+            await asyncio.to_thread(self.pauser.resume_all, reason if reason != "user" else "normal")
+        self._paused = None
+
+    async def game_pause_status(self) -> dict[str, Any]:
+        paused = self._paused
+        return {
+            "available": self.registry.enabled("device"),
+            "game": self._device_game,
+            "paused": paused is not None,
+            "since": paused["since"] if paused else None,
+            "limitMinutes": int(PAUSE_CEILING_SECONDS // 60),
+        }
+
+    async def game_pause(self) -> dict[str, Any]:
+        """User action: stop the running game's processes until Resume, at most an hour (P11's watchdog)."""
+        if not self.registry.enabled("device"):
+            raise ValueError("Device controls are off; switch them on in Settings, Modules")
+        appid = self._device_game
+        if appid is None:
+            raise ValueError("no game is running")
+        if self._paused is not None:
+            return await self.game_pause_status()
+        if self._freeze_lock.locked():
+            raise ValueError("Haversack is checking this game's saves; try again in a moment")
+        procs = await asyncio.to_thread(find_game_processes, int(appid), None, self.proc_root)
+        if not procs:
+            raise ValueError("the game's processes were not found")
+        stopped = await asyncio.to_thread(self.pauser.freeze, procs)
+        if not stopped:
+            await asyncio.to_thread(self.pauser.resume_all, "normal")
+            raise ValueError("the game could not be paused")
+        self._paused = {"appid": int(appid), "since": int(time.time())}
+        log_event(logging.INFO, "pause.paused", "Game paused by the user", processes=len(stopped))
+        return await self.game_pause_status()
+
+    async def game_resume(self) -> dict[str, Any]:
+        """User action: let the paused game run again."""
+        await self._pause_release("user")
+        log_event(logging.INFO, "pause.resumed", "Game resumed by the user")
+        return await self.game_pause_status()
 
     async def device_battery(self) -> dict[str, Any]:
         """The 80 percent charge limit (R21 stage 4, ADR-0077): who controls it here, and its state."""
@@ -1547,6 +1614,9 @@ class KeepsakeApp:
         if self.freezer.recorded():
             resumed = await asyncio.to_thread(self.freezer.resume_all, "startup")
             log_event(logging.WARNING, "freeze.startup_release", "Released processes left frozen", count=len(resumed))
+        if self.pauser.recorded():
+            resumed = await asyncio.to_thread(self.pauser.resume_all, "startup")
+            log_event(logging.WARNING, "pause.startup_release", "Resumed a game left paused", count=len(resumed))
         # Principle 3: finish or undo any restore a crash interrupted, before anything else touches saves.
         try:
             for outcome in await asyncio.to_thread(restore.recover, self.paths.runtime_dir):
@@ -6227,6 +6297,8 @@ class KeepsakeApp:
         for moved in self._signin_lingering:
             moved.close()  # a lingering sign-in listener goes with the plugin
         await asyncio.to_thread(self.freezer.resume_all, "unload")
+        await asyncio.to_thread(self.pauser.resume_all, "unload")
+        self._paused = None
         await self.registry.stop_all()
         if self.db is not None:
             self.db.close()

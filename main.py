@@ -457,6 +457,15 @@ class Plugin:
     async def game_art_apply(self, key: str, game_id: int) -> dict[str, Any]:
         return await self.app.game_art_apply(key, game_id)
 
+    async def game_pause_status(self) -> dict[str, Any]:
+        return await self.app.game_pause_status()
+
+    async def game_pause(self) -> dict[str, Any]:
+        return await self.app.game_pause()
+
+    async def game_resume(self) -> dict[str, Any]:
+        return await self.app.game_resume()
+
     async def device_battery(self) -> dict[str, Any]:
         return await self.app.device_battery()
 
