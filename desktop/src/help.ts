@@ -38,7 +38,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "Haversack's page has seven sections in its sidebar, each with its own entries:"
+    "t": "Haversack's page has seven sections in its sidebar. Highlight one to see its pages, then press A to open one. On a section's page, **L1** and **R1** move between its pages, and **B** goes back to the sidebar. Each section opens where you left it."
    },
    {
     "k": "li",
@@ -53,12 +53,12 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "**Games and devices:** Moving games, Other devices, Emulators, Disk use."
+    "t": "**Games and devices:** Moving games, Other devices, Emulators."
    },
    {
     "k": "li",
     "d": 0,
-    "t": "**Device:** Device status, Power, Battery, Fans, Controllers, Reconnect help, More device settings, Looks."
+    "t": "**Device:** Status, Power and battery, Fans, Controllers (with Reconnect help), Storage, Looks."
    },
    {
     "k": "li",
@@ -68,7 +68,7 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "**Settings:** General, Cloud, Sync and safety, Modules, Quick menu, Updates, Help."
+    "t": "**Settings:** General (with the quick menu's shortcuts), Cloud, Sync and safety, Modules, Updates, Help."
    },
    {
     "k": "li",
@@ -81,7 +81,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "The quick access menu shows the game you are playing, games on their way between your devices, and anything that needs you. The desktop app has the same sections down the left."
+    "t": "The quick access menu shows the game you are playing, games on their way between your devices, and anything that needs you. The desktop app has the same sections and pages down the left, each section opening when you click it."
    },
    {
     "k": "h",
@@ -284,7 +284,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "Haversack's panel in the quick access menu can show what you use most. Open **Settings**, **Quick menu**:"
+    "t": "Haversack's panel in the quick access menu can show what you use most. Open **Settings**, **General**, **Quick menu**:"
    },
    {
     "k": "li",
@@ -1058,7 +1058,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "Haversack's **Disk use** tab (in **Games and devices**), on a handheld, shows how much space each game uses: the game, its Proton prefix, its shader cache and its saves. **Count disk use** lists the biggest first. Quit a game before changing anything here."
+    "t": "Haversack's **Storage** page (in **Device**), on a handheld, shows how much space each game uses: the game, its Proton prefix, its shader cache and its saves. **Count disk use** lists the biggest first. Quit a game before changing anything here."
    },
    {
     "k": "h",
@@ -1124,7 +1124,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "**Device**, **Device status** shows:"
+    "t": "**Device**, **Status** shows:"
    },
    {
     "k": "li",
@@ -1182,12 +1182,35 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "h",
-    "l": 2,
-    "t": "Power"
+    "l": 3,
+    "t": "More device settings"
    },
    {
     "k": "p",
-    "t": "**Device**, **Power** has:"
+    "t": "**Device**, **Status** has:"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "**Wi-Fi power saving**, through steamos-manager. Turn it off if streaming or online games stutter."
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "**A BIOS check**, with what is known about your Legion Go's BIOS version."
+   },
+   {
+    "k": "p",
+    "t": "Refresh rate, frame limit and brightness stay in Steam's own quick access menu."
+   },
+   {
+    "k": "h",
+    "l": 2,
+    "t": "Power and battery"
+   },
+   {
+    "k": "p",
+    "t": "**Device**, **Power and battery** has:"
    },
    {
     "k": "li",
@@ -1233,7 +1256,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "With the Haversack Helper installed, **Device**, **Power** also has **Separate power limits**:"
+    "t": "With the Haversack Helper installed, **Device**, **Power and battery** also has **Separate power limits**:"
    },
    {
     "k": "li",
@@ -1253,6 +1276,19 @@ export const HELP: HelpTopic[] = [
    {
     "k": "p",
     "t": "Move the sliders, then select **Apply**. Haversack switches to Custom mode first, because the firmware ignores the limits in any other mode. With a game running, the limits are kept for that game, like the TDP."
+   },
+   {
+    "k": "h",
+    "l": 3,
+    "t": "Battery"
+   },
+   {
+    "k": "p",
+    "t": "**Device**, **Power and battery** has **Stop charging at 80%**, Lenovo's charge limit. It keeps the battery healthier if the device is plugged in for long spells. The same toggle is in the quick access menu."
+   },
+   {
+    "k": "p",
+    "t": "Haversack changes it through Valve's steamos-manager. Where steamos-manager does not offer it yet, Battery shows whether the limit is on and tells you where to change it: Steam's settings, Power."
    },
    {
     "k": "h",
@@ -1325,19 +1361,6 @@ export const HELP: HelpTopic[] = [
    {
     "k": "h",
     "l": 2,
-    "t": "Battery"
-   },
-   {
-    "k": "p",
-    "t": "**Device**, **Battery** has **Stop charging at 80%**, Lenovo's charge limit. It keeps the battery healthier if the device is plugged in for long spells. The same toggle is in the quick access menu."
-   },
-   {
-    "k": "p",
-    "t": "Haversack changes it through Valve's steamos-manager. Where steamos-manager does not offer it yet, Battery shows whether the limit is on and tells you where to change it: Steam's settings, Power."
-   },
-   {
-    "k": "h",
-    "l": 2,
     "t": "Controllers"
    },
    {
@@ -1368,12 +1391,12 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "h",
-    "l": 2,
+    "l": 3,
     "t": "Reconnect help"
    },
    {
     "k": "p",
-    "t": "**Device**, **Reconnect help** is for Bluetooth controllers, often clones, that pair once and then will not reconnect when you press their normal button."
+    "t": "**Device**, **Controllers**, **Reconnect help** is for Bluetooth controllers, often clones, that pair once and then will not reconnect when you press their normal button."
    },
    {
     "k": "li",
@@ -1422,7 +1445,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "The desktop app has the same page under Device, Reconnect help. Install the Haversack Helper from Gaming Mode."
+    "t": "The desktop app has the same page under Device, Controllers, Reconnect help. Install the Haversack Helper from Gaming Mode."
    },
    {
     "k": "p",
@@ -1434,7 +1457,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "h",
-    "l": 3,
+    "l": 4,
     "t": "The Haversack Helper: cable pairing and the SSP gate"
    },
    {
@@ -1474,25 +1497,11 @@ export const HELP: HelpTopic[] = [
    {
     "k": "h",
     "l": 2,
-    "t": "Other"
+    "t": "Storage"
    },
    {
     "k": "p",
-    "t": "**Device**, **More device settings** has:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Wi-Fi power saving**, through steamos-manager. Turn it off if streaming or online games stutter."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**A BIOS check**, with what is known about your Legion Go's BIOS version."
-   },
-   {
-    "k": "p",
-    "t": "Refresh rate, frame limit and brightness stay in Steam's own quick access menu."
+    "t": "**Device**, **Storage** shows the disk space each game uses, clears a shader cache and resets a broken prefix without losing your saves: see Storage."
    },
    {
     "k": "h",
@@ -2339,7 +2348,7 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "3. If you use the helper, install Haversack Helper from **Device**, **Reconnect help**."
+    "t": "3. If you use the helper, install Haversack Helper from **Device**, **Controllers**, **Reconnect help**."
    },
    {
     "k": "p",

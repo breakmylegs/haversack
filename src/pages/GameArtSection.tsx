@@ -14,7 +14,7 @@ export function GameArtSection({ gameKey, gameName }: { gameKey: string; gameNam
   useEffect(() => {
     gameArtStatus(gameKey)
       .then((s) => setMissing(s.nonSteam && s.available ? s.missing : null))
-      .catch(() => setMissing(null));
+      .catch(() => undefined); // keep what is shown (v0.41.1)
   }, [gameKey]);
   if (!missing) return null;
   if (!missing.length) return <Field label="Artwork" description="This game has all its artwork." />;

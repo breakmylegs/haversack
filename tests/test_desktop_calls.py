@@ -26,7 +26,9 @@ def test_every_desktop_call_is_exposed_by_the_host() -> None:
 
 def test_reconnect_help_page_is_registered() -> None:
     text = source()
-    assert re.search(r'\{ id: "reconnect", title: "Reconnect help", group: "Device", render: reconnectPage \}', text)
+    # Since the menu redesign (ADR-0095), Reconnect help is part of Device, Controllers.
+    assert re.search(r'together\(main, "Controllers", controllersPage, reconnectPage\)', text)
+    assert re.search(r'MERGED: Record<string, string> = \{[^}]*reconnect: "controllers"', text)
     for name in (
         "reconnect_status",
         "reconnect_set_help",

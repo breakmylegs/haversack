@@ -1,35 +1,50 @@
-// The full page's sidebar as plain data (layout v3, ADR-0073; fixed in v0.39.1 and v0.41.1).
+// The full page's menu as plain data (layout v3, ADR-0073; v0.39.1, v0.41.1; the redesign, ADR-0095).
 //
-// Steam's SidebarNavigation tracks the selected page and focus by position, and remounts when its
-// pages change. So the list is static: built from LAYOUT alone, never from the module state, the
-// same on every render for as long as the page is open (v0.41.1). Each tab is its own entry and
-// lines separate the sections, so there is no row of tabs inside a page for the D-pad to cross.
+// Two levels. The sidebar holds the seven sections and nothing else. Steam's SidebarNavigation
+// tracks the selected entry and focus by position and remounts when its pages change, so the list
+// is static: built from LAYOUT alone, never from the module state. Each section's sub-pages live on
+// the section's own route as Steam's native Tabs (the pattern Decky's own store uses), so L1 and R1
+// switch them and B goes back to the sidebar. No Tabs inside a sidebar page, and no home-made row.
 // Kept free of React so it can be tested on its own.
 
-import { LAYOUT, LEGACY, ModuleName, ROUTE_PATH, SECTION_IDS, SectionId, firstTab, pagePath, sectionPath } from "./routeData";
+import { LAYOUT, LEGACY, MOVED, ModuleName, ROUTE_PATH, SECTION_IDS, SectionId, pagePath, resolve, sectionPath } from "./routeData";
 
-export type SidebarEntry =
-  | { kind: "page"; section: SectionId; tab: string; title: string; module: ModuleName; route: string }
-  | { kind: "separator" };
-
-/** Every section's tabs, in order, with a line between sections. Takes no input on purpose. */
-export function sidebarEntries(): SidebarEntry[] {
-  const out: SidebarEntry[] = [];
-  LAYOUT.forEach((section, i) => {
-    if (i > 0) out.push({ kind: "separator" });
-    for (const tab of section.tabs) {
-      out.push({ kind: "page", section: section.id, tab: tab.id, title: tab.title, module: tab.module, route: pagePath(section.id, tab.id) });
-    }
-  });
-  return out;
+export interface SidebarEntry {
+  section: SectionId;
+  title: string;
+  route: string;
 }
 
-/** Old addresses that open a page: each section's own address (before v0.41.1 a section was one
- * page) and the pages before v0.32.0. Each goes to a different address, so none can loop. */
-export function legacyRoutes(): { path: string; section: SectionId; tab: string }[] {
-  const out = SECTION_IDS.map((section) => ({ path: sectionPath(section), section, tab: firstTab(section) }));
-  for (const [old, [section, tab]] of Object.entries(LEGACY)) {
-    if (!(SECTION_IDS as string[]).includes(old)) out.push({ path: `${ROUTE_PATH}/${old}`, section, tab });
+/** The seven sections, in order. Takes no input on purpose. */
+export function sidebarEntries(): SidebarEntry[] {
+  return LAYOUT.map((s) => ({ section: s.id, title: s.title, route: sectionPath(s.id) }));
+}
+
+export interface PageRoute {
+  path: string;
+  section: SectionId;
+  page: string;
+  modules: ModuleName[];
+}
+
+/** Every sub-page's own address, one exact route each (no route parameters to parse). */
+export function pageRoutes(): PageRoute[] {
+  return LAYOUT.flatMap((s) =>
+    s.pages.map((p) => ({ path: pagePath(s.id, p.id), section: s.id, page: p.id, modules: p.parts.map((x) => x.module) })),
+  );
+}
+
+/** Old addresses that open a sub-page: pages that moved in the redesign, and the pages before
+ * v0.32.0. Each goes to a sub-page's own address, never to another old one, so none can loop. A
+ * section's own address (a page before v0.41.1) is its sidebar entry again, so it is not here. */
+export function legacyRoutes(): { path: string; section: SectionId; page: string }[] {
+  const out: { path: string; section: SectionId; page: string }[] = [];
+  for (const [old, [s, p]] of Object.entries(MOVED)) out.push({ path: `${ROUTE_PATH}/${old}`, section: s, page: p });
+  for (const [old, [s, p]] of Object.entries(LEGACY)) {
+    if (!(SECTION_IDS as string[]).includes(old)) {
+      const [rs, rp] = resolve(s, p);
+      out.push({ path: `${ROUTE_PATH}/${old}`, section: rs, page: rp });
+    }
   }
   return out;
 }

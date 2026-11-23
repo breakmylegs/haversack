@@ -4,6 +4,25 @@ All notable changes to Haversack (called Keepsake until v0.51.0) are listed here
 
 ## [Unreleased]
 
+### Changed
+
+- **A tidier menu.** Haversack's page has seven sections in its sidebar (Play, Saves, Games and devices, Device, Install, Settings and Diagnostics), each with its own colour.
+  - Highlight a section to see its pages, and press A to open one. On a section's page, L1 and R1 move between its pages (Steam's own tabs), and B goes back to the sidebar. Each section opens where you left it.
+  - Some pages moved:
+    - Reconnect help is now in Device, Controllers;
+    - Battery is in Device, Power and battery;
+    - More device settings is in Device, Status;
+    - Disk use is now Device, Storage;
+    - the quick menu's shortcuts are in Settings, General.
+
+    Old links and quick menu shortcuts still go to the right place.
+  - The desktop app has the same sections and pages, as groups you can open and close.
+
+### Fixed
+
+- A game's Artwork section no longer disappears if checking it fails once.
+- **The desktop app opens again.** From 0.52.0 it stayed on "Loading", because two of its files have capitals in their names and the app's own server refused them.
+
 ## [0.56.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

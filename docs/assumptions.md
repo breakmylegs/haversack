@@ -430,3 +430,10 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 |---|---|---|---|
 | A246 | Steam on SteamOS and Bazzite plays `deck_startup.webm`, `steam_os_suspend.webm` and `steam_os_suspend_from_throbber.webm` from `<steam root>/config/uioverrides/movies` at the next boot or sleep, with no restart | verified in Animation Changer's source (`main.py`); unverified on our devices until device run step 52 | TheLogicMaster/SDH-AnimationChanger |
 | A247 | Audio Loader keeps sound packs in `<homebrew>/sounds/<pack>/pack.json`, CSS Loader keeps themes in `<homebrew>/themes/<theme>/theme.json`, and their `plugin.json` names are "Audio Loader" and "CSS Loader" | verified in source (`audio_utils.py`, `plugin.json` of each) | DeckThemes repositories |
+
+## The menu redesign (ADR-0095)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A248 | `Tabs` from `@decky/ui` as the whole of a route, 40 px from the top, with `activeTab` in state and no `autoFocusContents`, switches tabs with L1 and R1 and the D-pad on its tab bar, and B returns to the previous route | verified in source as Decky Loader's store pattern (`frontend/src/components/store/Store.tsx`); unverified on our devices until device run step 55 | Decky Loader source |
+| A249 | Two `Navigation.Navigate` calls in a row (the section's sidebar entry, then the sub-page) leave the sidebar behind the sub-page, so B from a quick menu link lands on the sidebar | unverified until device run step 55; if it does not hold, B returns to wherever the link was opened from, which is harmless | none yet |

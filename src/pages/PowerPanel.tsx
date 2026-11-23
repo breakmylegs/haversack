@@ -43,7 +43,7 @@ function LimitsEditor({ status, disabled, apply }: { status: PerformanceStatus; 
     return (
       <Field
         label="Separate power limits"
-        description={`Now SPL ${ranges.spl.current} W, SPPT ${ranges.sppt.current} W, FPPT ${ranges.fppt.current} W. Changing them separately needs the Haversack Helper: install it from Device, Reconnect help.`}
+        description={`Now SPL ${ranges.spl.current} W, SPPT ${ranges.sppt.current} W, FPPT ${ranges.fppt.current} W. Changing them separately needs the Haversack Helper: install it from Device, Controllers, Reconnect help.`}
       />
     );
   }

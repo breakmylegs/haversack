@@ -151,11 +151,11 @@ Keepsake is now called Haversack. This first update moves it across.
 
 24. **Never fight (v0.34.0).**
     - In Steam's own performance settings, turn on a per-game TDP limit for that game, then start it. Within a few seconds Haversack should say another app changed it, and leave Steam's value.
-    - If SimpleDeckyTDP or another tool is installed, Device, Power should name it and show the settings read-only.
+    - If SimpleDeckyTDP or another tool is installed, Device, Power and battery should name it and show the settings read-only.
 
 25. **Battery charge limit (v0.35.0).**
     - Run the Device check **Battery charge limit** and photograph it.
-    - Open Device, Battery. Either turn on **Stop charging at 80%**, or note where it tells you to change it.
+    - Open Device, Power and battery. Either turn on **Stop charging at 80%**, or note where it tells you to change it.
     - If you changed it in Steam's settings, Battery should show the new state.
 
 26. **Controllers (v0.36.0).**
@@ -184,7 +184,7 @@ Keepsake is now called Haversack. This first update moves it across.
     - Press each one in turn: the page that opens should match the entry pressed.
     - In a section, move right along its tabs and down into a tab, then press B: focus should go back to the sidebar.
 
-31. **Reconnect help: the list (v0.40.0).** Open Device, Reconnect help.
+31. **Reconnect help: the list (v0.40.0).** Open Device, Controllers, Reconnect help.
     - Every paired Bluetooth device should be listed, with its class, modalias and adapter, and the clone should show the "not from a registered manufacturer" note.
     - Run the Device check "Controller reconnect help": it should pass, with the journal readable.
 32. **Reconnect help: pair and commit.** Turn help on for the clone DualShock 4 only.
@@ -200,7 +200,7 @@ Keepsake is now called Haversack. This first update moves it across.
     - Reboot, then update SteamOS when one is offered: help should still be on and step 32 should still pass.
     - Desktop Mode should stay responsive throughout.
 
-35. **Haversack Helper (v0.41.0).** In Device, Reconnect help, select Install helper.
+35. **Haversack Helper (v0.41.0).** In Device, Controllers, Reconnect help, select Install helper.
     - Decky should ask to install "Haversack Helper", and the card should then say Ready.
     - Run the Device check "Controller reconnect help": the helper should be ready.
 36. **Cable pairing.** With the clone DualShock 4 on a USB cable and help on for it, select Cable pair, then Confirm.
@@ -219,12 +219,12 @@ Keepsake is now called Haversack. This first update moves it across.
     3. Do it once straight after opening Haversack, and once after a minute.
     4. If anything jumps, open Diagnostics, Tools, select Record navigation, repeat the moves for 60 seconds, then export the Device checks results.
 
-40. **Reconnect help in the desktop app (v0.42.0).** In Desktop Mode, open Haversack's desktop app, Device, Reconnect help.
+40. **Reconnect help in the desktop app (v0.42.0).** In Desktop Mode, open Haversack's desktop app, Device, Controllers, Reconnect help.
     - The paired devices and their help switches should match Gaming Mode.
     - Run Diagnose on the clone from there.
     - The app should stay responsive throughout.
 
-41. **Separate power limits (v0.43.0).** With the helper installed, open Device, Power.
+41. **Separate power limits (v0.43.0).** With the helper installed, open Device, Power and battery.
     - Set SPL 20, SPPT 25, FPPT 30 W and select Apply: the mode should switch to Custom, and the values should stay after reopening the page.
     - Start a game, set different limits, quit: the earlier values should come back.
     - Press Legion L plus Y during a game: Haversack should say it paused the profile, and not set the limits again.
@@ -243,7 +243,7 @@ Keepsake is now called Haversack. This first update moves it across.
     - It should install without copying the ISO first.
     - Run the Device check "Network ISO in place": it should report in place available.
 
-46. **Quick menu shortcuts (v0.46.0).** Open Settings, Quick menu.
+46. **Quick menu shortcuts (v0.46.0).** Open Settings, General, Quick menu.
     - Tick Fans and move it to the top with Up: the quick access menu should show it first straight away.
     - Untick Sync now: it should disappear from the menu.
     - Select Use the defaults.
@@ -270,7 +270,7 @@ Keepsake is now called Haversack. This first update moves it across.
     - Press **Remove the old Keepsake**, then **Not now**: nothing should change.
     - Press it again and confirm. Keepsake (and Keepsake Helper, if installed) should disappear from Decky's list. A toast should say how many files were moved and checked.
     - Haversack's panel should now show the usual status. The games, the cloud account (still signed in, no new sign-in) and History should match your notes. Sync now should work, and the other handheld should still see this one's saves.
-    - Open Decky's settings, then Plugins: only Haversack should be listed (plus Haversack Helper once installed from Device, Reconnect help).
+    - Open Decky's settings, then Plugins: only Haversack should be listed (plus Haversack Helper once installed from Device, Controllers, Reconnect help).
     - **The way back (Go only, optional).** Remove Haversack in Decky's settings. Install Keepsake v0.50.0 from the Releases page with Decky's "Install plugin from URL". It should start with everything as it was before step 1.3. Then update again from Keepsake's Updates to return to Haversack (step 1 again).
 51. **Help (v0.52.0).** Open Settings, Help.
     - Choose a few topics with the dropdown: each should show the guide's text, with bold words and numbered steps.
@@ -289,6 +289,14 @@ Keepsake is now called Haversack. This first update moves it across.
 54. **Library extras (v0.56.0).**
     - Open a non-Steam game with no artwork in Saves, Games: Artwork should list what it lacks. Find artwork, pick the game: only those kinds should appear in Steam's library, and any artwork it had should stay.
     - With Advisor's ProtonDB source on, open a Steam game's page in the library: the badge should show the ProtonDB line.
+55. **The new menu (v0.57.0), with the navigation recorder.** In Diagnostics, Tools, start the navigation recorder, then:
+    1. Open the full page from the quick menu (Open Haversack).
+    2. Move down the sidebar slowly to Diagnostics, then back up to Play. The highlight should stay where you put it; each section should show its list of sub-pages, and nothing should open by itself.
+    3. In each section, press A on Open <section>. Use R1 through every sub-page to the last, then L1 back to the first; the D-pad on the tab bar should do the same. Press B: you should be back on the sidebar, on that section.
+    4. Open Device again: it should open on the sub-page you used last.
+    5. From the quick menu, open a shortcut to a sub-page (for example Fans, or Reconnect help): it should open that sub-page directly (Device, Controllers for Reconnect help). Press B: the sidebar should be on that section.
+    6. Do steps 1 to 5 straight after opening Haversack, and again after a minute.
+    7. Stop the recorder and select Export results in Diagnostics, Device checks. The record should show section-open and tab events, and no focus-left-sidebar-unprompted.
 
 ## 5. Send back
 
