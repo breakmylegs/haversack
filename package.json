@@ -1,6 +1,6 @@
 {
   "name": "keepsake",
-  "version": "0.53.0",
+  "version": "0.54.0",
   "description": "Decky Loader plugin that syncs PC game saves between SteamOS and Bazzite handhelds through cloud storage, from Gaming Mode.",
   "type": "module",
   "packageManager": "pnpm@9.15.9",
