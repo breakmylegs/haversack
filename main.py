@@ -466,6 +466,9 @@ class Plugin:
     async def game_resume(self) -> dict[str, Any]:
         return await self.app.game_resume()
 
+    async def sd_cards(self) -> list[dict[str, Any]]:
+        return await self.app.sd_cards()
+
     async def device_battery(self) -> dict[str, Any]:
         return await self.app.device_battery()
 

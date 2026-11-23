@@ -437,3 +437,9 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 |---|---|---|---|
 | A248 | `Tabs` from `@decky/ui` as the whole of a route, 40 px from the top, with `activeTab` in state and no `autoFocusContents`, switches tabs with L1 and R1 and the D-pad on its tab bar, and B returns to the previous route | verified in source as Decky Loader's store pattern (`frontend/src/components/store/Store.tsx`); unverified on our devices until device run step 55 | Decky Loader source |
 | A249 | Two `Navigation.Navigate` calls in a row (the section's sidebar entry, then the sub-page) leave the sidebar behind the sub-page, so B from a quick menu link lands on the sidebar | unverified until device run step 55; if it does not hold, B returns to wherever the link was opened from, which is harmless | none yet |
+
+## SD card index (ADR-0096)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A250 | Steam keeps a removed SD card's entry in `libraryfolders.vdf`, with its `label`, `contentid` and `apps`, until the library is removed in Steam | unverified until device run step 57; if Steam drops the entry, a card that is out is simply not listed | Steam's file format, observed on desktop installs |

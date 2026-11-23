@@ -54,6 +54,7 @@ from . import (
     resolve,
     restore,
     retention,
+    sdcards,
     shortcuts,
     steamcloud,
     storage,
@@ -3751,6 +3752,13 @@ class KeepsakeApp:
             return int(preview.get("totalBytes") or preview.get("bytes") or 0)
         except (OSError, ValueError, KeyError):
             return 0
+
+    async def sd_cards(self) -> list[dict[str, Any]]:
+        """Which games are on which SD card or drive, including cards not inserted (ADR-0096). Read only."""
+        roots = discovery.steam_roots(self.home, self.host)
+        games = (await self.discover_games())["games"]
+        shortcuts = [{"name": g.get("name"), "exe": g.get("exe")} for g in games if g.get("kind") == "shortcut"]
+        return await asyncio.to_thread(sdcards.SdCards(self.paths.runtime_dir).scan, roots, shortcuts)
 
     async def storage_usage(self, key: str | None = None) -> dict[str, Any]:
         """Disk use per game: install, prefix, shader cache and saves. Biggest first; stops after a minute."""

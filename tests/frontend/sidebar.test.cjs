@@ -46,7 +46,7 @@ test("the grouping review: merged and moved sub-pages are where the redesign put
   assert.deepEqual(parts["device/controllers"], ["controllers", "reconnect"]);
   assert.deepEqual(parts["device/power"], ["power", "battery"]);
   assert.deepEqual(parts["device/status"], ["status", "other"]);
-  assert.deepEqual(parts["device/storage"], ["storage"]);
+  assert.deepEqual(parts["device/storage"], ["storage", "cards"]);
   assert.deepEqual(parts["settings/general"], ["general", "quick-menu"]);
   const everyPart = Object.values(parts).flat();
   assert.equal(new Set(everyPart).size, everyPart.length, "each panel is on exactly one sub-page");

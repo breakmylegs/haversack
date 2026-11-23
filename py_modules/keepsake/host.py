@@ -168,6 +168,7 @@ CALLABLES = frozenset(
         "game_pause_status",
         "game_pause",
         "game_resume",
+        "sd_cards",
         "looks_send",
         "device_controllers",
         "reconnect_status",
