@@ -40,7 +40,7 @@ REGISTRY: list[dict[str, Any]] = [
         "open": ["play", "advisor"],
     },
     {"id": "page-install", "kind": "page", "label": "Install", "module": "installer", "open": ["install", "install"]},
-    {"id": "page-storage", "kind": "page", "label": "Disk use", "module": "core", "open": ["games-devices", "disk"]},
+    {"id": "page-storage", "kind": "page", "label": "Storage", "module": "core", "open": ["device", "storage"]},
     {
         "id": "page-diagnostics",
         "kind": "page",
@@ -58,7 +58,7 @@ REGISTRY: list[dict[str, Any]] = [
     {"id": "page-settings", "kind": "page", "label": "Settings", "module": "core", "open": ["settings", "general"]},
     {"id": "page-device", "kind": "page", "label": "Device status", "module": "core", "open": ["device", "status"]},
     {"id": "page-power", "kind": "page", "label": "Power", "module": "device", "open": ["device", "power"]},
-    {"id": "page-battery", "kind": "page", "label": "Battery", "module": "device", "open": ["device", "battery"]},
+    {"id": "page-battery", "kind": "page", "label": "Battery", "module": "device", "open": ["device", "power"]},
     {
         "id": "page-controllers",
         "kind": "page",
@@ -71,7 +71,7 @@ REGISTRY: list[dict[str, Any]] = [
         "kind": "page",
         "label": "Reconnect help",
         "module": "device",
-        "open": ["device", "reconnect"],
+        "open": ["device", "controllers"],
     },
     {"id": "page-fans", "kind": "page", "label": "Fans", "module": "device", "open": ["device", "fans"]},
     {
@@ -79,7 +79,7 @@ REGISTRY: list[dict[str, Any]] = [
         "kind": "page",
         "label": "More device settings",
         "module": "device",
-        "open": ["device", "other"],
+        "open": ["device", "status"],
     },
     # Actions: run straight from the quick access menu, with a toast
     {"id": "sync-now", "kind": "action", "label": "Sync now", "module": "saves"},

@@ -51,7 +51,7 @@ export function ControllerSettingsPanel() {
   }, []);
   if (!s || s.off) return null;
   if (!s.present) return <Field label="Changing the controllers" description="Needs the Legion controllers on the kernel's hid-lenovo-go driver (kernel 7.1 and later, and on the Legion Go the 2025 controller firmware)." />;
-  if (!s.helper.ready) return <Field label="Changing the controllers" description="Needs the Haversack Helper: install it from Device, Reconnect help." />;
+  if (!s.helper.ready) return <Field label="Changing the controllers" description="Needs the Haversack Helper: install it from Device, Controllers, Reconnect help." />;
   if (s.tools.hhd) return <Field label="Changing the controllers" description="Handheld Daemon manages the controllers here, so Haversack only shows their settings." />;
   const current = s.current ?? {};
   const allowed = new Set(s.allowed);

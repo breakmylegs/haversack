@@ -1414,8 +1414,9 @@ function peerItem(peer: PairedDevice, main: HTMLElement): HTMLElement {
 
 // The shell
 
-// Layout v3 (ADR-0073, docs/design/layout-v3.md): the seven sections of Gaming Mode, in the same
-// order, each a group of pages. Install stays in Gaming Mode for now.
+// The menu redesign (ADR-0095, docs/design/layout-v3.md): the same seven sections and sub-page names
+// as Gaming Mode, in the same order. Install stays in Gaming Mode for now. Where Gaming Mode puts two
+// things on one sub-page, so does this; where it splits one page, the cards are shared out by heading.
 const PAGES: Page[] = [
   { id: "overview", title: "Overview", group: "", render: overview },
   { id: "advisor", title: "Advisor", group: "Play", render: advisorPage },
@@ -1423,21 +1424,29 @@ const PAGES: Page[] = [
   { id: "conflicts", title: "Conflicts", group: "Saves", render: conflicts },
   { id: "history", title: "History", group: "Saves", render: history },
   { id: "activity", title: "Activity", group: "Saves", render: activityPage },
-  { id: "import", title: "Import", group: "Saves", render: importPage },
-  { id: "devices", title: "Moving games and devices", group: "Games and devices", render: (main) => devices(main) },
+  { id: "import", title: "Import and export", group: "Saves", render: importPage },
+  {
+    id: "devices",
+    title: "Moving games",
+    group: "Games and devices",
+    render: (main) => onlyCards(main, (m) => devices(m), "Moving games", ["Games kept in step", "Games moving between devices", "Updates from your other devices"]),
+  },
+  {
+    id: "peers",
+    title: "Other devices",
+    group: "Games and devices",
+    render: (main) => onlyCards(main, (m) => devices(m), "Other devices", ["This device", "Pair a device", "Paired devices"]),
+  },
   { id: "emulators", title: "Emulators", group: "Games and devices", render: emulatorsPage },
-  { id: "device", title: "Status", group: "Device", render: deviceStatusPage },
-  { id: "power", title: "Power", group: "Device", render: powerPage },
-  { id: "battery", title: "Battery", group: "Device", render: batteryPage },
+  { id: "device", title: "Status", group: "Device", render: (main) => together(main, "Status", deviceStatusPage, extrasPage) },
+  { id: "power", title: "Power and battery", group: "Device", render: (main) => together(main, "Power and battery", powerPage, batteryPage) },
   { id: "fans", title: "Fans", group: "Device", render: fansPage },
-  { id: "controllers", title: "Controllers", group: "Device", render: controllersPage },
-  { id: "reconnect", title: "Reconnect help", group: "Device", render: reconnectPage },
-  { id: "other", title: "Other", group: "Device", render: extrasPage },
+  { id: "controllers", title: "Controllers", group: "Device", render: (main) => together(main, "Controllers", controllersPage, reconnectPage) },
   { id: "looks", title: "Looks", group: "Device", render: (main) => looksPage(main) },
-  { id: "settings", title: "General and sync", group: "Settings", render: settingsPage },
+  { id: "settings", title: "General", group: "Settings", render: (main) => together(main, "General", (m) => onlyCards(m, settingsPage, "General", ["This device", "Updates", "Export snapshots"]), quickMenuPage) },
   { id: "cloud", title: "Cloud", group: "Settings", render: cloud },
+  { id: "sync", title: "Sync and safety", group: "Settings", render: (main) => onlyCards(main, settingsPage, "Sync and safety", ["Syncing", "Safety checks"]) },
   { id: "modules", title: "Modules", group: "Settings", render: modules },
-  { id: "quick-menu", title: "Quick menu", group: "Settings", render: quickMenuPage },
   { id: "updates", title: "Updates", group: "Settings", render: (main) => updates(main) },
   { id: "help", title: "Help", group: "Settings", render: (main) => helpPage(main) },
   { id: "health", title: "Health", group: "Diagnostics", render: health },
@@ -1445,17 +1454,49 @@ const PAGES: Page[] = [
   { id: "logs", title: "Logs", group: "Diagnostics", render: logsPage },
 ];
 
+// Pages that were merged into another (ADR-0095): old links and the settings search still land.
+const MERGED: Record<string, string> = { battery: "power", reconnect: "controllers", other: "device", "quick-menu": "settings" };
+
+/** Render a page, then keep only the cards under ``keep`` (a sub-page's share of it), under ``title``. */
+async function onlyCards(main: HTMLElement, render: (m: HTMLElement) => Promise<void>, title: string, keep: string[]): Promise<void> {
+  await render(main);
+  for (const card of [...main.querySelectorAll(".card")]) {
+    if (card.parentElement?.closest(".card")) continue; // a card inside a kept card goes with it
+    const heading = card.querySelector("h2")?.textContent ?? "";
+    if (!keep.includes(heading)) card.remove();
+  }
+  const first = main.querySelector("h1");
+  if (first) first.textContent = title;
+}
+
+/** Several pages on one sub-page, each in its own part, under one title. */
+async function together(main: HTMLElement, title: string, ...renders: ((m: HTMLElement) => Promise<void>)[]): Promise<void> {
+  const parts = renders.map(() => h("div", { class: "part" }));
+  replace(main, ...parts);
+  for (let i = 0; i < renders.length; i++) {
+    try {
+      await renders[i](parts[i]);
+    } catch (error) {
+      // One part failing never takes the rest of the sub-page with it.
+      replace(parts[i], h("p", { class: "warn" }, error instanceof ApiError ? error.message : "This part could not be loaded."));
+    }
+    const heading = parts[i].querySelector("h1");
+    if (heading && i === 0) heading.textContent = title;
+    else if (heading) heading.replaceWith(h("h2", { class: "part-title" }, heading.textContent ?? ""));
+  }
+}
+
 // The settings search: every setting's label and the page it is on. Choosing one opens that
 // page and highlights the setting.
 const SETTINGS_INDEX: { label: string; page: string }[] = [
-  ["Device name", "settings"], ["Background sync", "settings"], ["Show a message after each save", "settings"],
-  ["Safety gates", "settings"], ["Refuse if more than", "settings"], ["Refuse if the total size", "settings"],
-  ["Launch check timeout", "settings"], ["Steam games", "settings"], ["Registry keys", "settings"],
-  ["Detect Steam Cloud", "settings"], ["Snapshot when the device sleeps", "settings"], ["Other launchers", "settings"],
+  ["Device name", "settings"], ["Background sync", "sync"], ["Show a message after each save", "sync"],
+  ["Safety gates", "sync"], ["Refuse if more than", "sync"], ["Refuse if the total size", "sync"],
+  ["Launch check timeout", "sync"], ["Steam games", "sync"], ["Registry keys", "sync"],
+  ["Detect Steam Cloud", "sync"], ["Snapshot when the device sleeps", "sync"], ["Other launchers", "sync"],
   ["Save locations", "cloud"], ["OneDrive", "cloud"], ["Google Drive", "cloud"], ["WebDAV", "cloud"], ["S3", "cloud"],
   ["Sign in", "cloud"], ["Modules", "modules"], ["Replication", "modules"], ["Advisor", "modules"], ["Installer", "modules"],
   ["Pre-releases", "updates"], ["Check for updates", "updates"], ["Roll back", "updates"],
-  ["Let other devices reach this one", "devices"], ["Pair a device", "devices"], ["Listen on", "devices"],
+  ["Let other devices reach this one", "peers"], ["Pair a device", "peers"], ["Listen on", "peers"],
 ].map(([label, page]) => ({ label, page }));
 
 function settingsSearch(): HTMLElement {
@@ -1633,7 +1674,7 @@ function limitsSection(s: PerformanceDesk, locked: boolean, apply: (values: Reco
   if (!p?.available || !p.ranges) return null;
   const r = p.ranges;
   if (!p.ready) {
-    return h("p", { class: "small" }, `Power limits now: SPL ${r.spl.current} W, SPPT ${r.sppt.current} W, FPPT ${r.fppt.current} W. Changing them separately needs the Haversack Helper (install it from Gaming Mode: Device, Reconnect help).`);
+    return h("p", { class: "small" }, `Power limits now: SPL ${r.spl.current} W, SPPT ${r.sppt.current} W, FPPT ${r.fppt.current} W. Changing them separately needs the Haversack Helper (install it from Gaming Mode: Device, Controllers, Reconnect help).`);
   }
   const words = { spl: "SPL, sustained", sppt: "SPPT, slow boost", fppt: "FPPT, fast boost" } as const;
   const inputs = (Object.keys(words) as (keyof typeof words)[]).map((key) => {
@@ -1759,7 +1800,7 @@ async function fansPage(main: HTMLElement): Promise<void> {
     ].join(", "),
   );
   const parts: (HTMLElement | null)[] = [h("h1", {}, "Fans"), now];
-  if (!s.helper.ready) parts.push(h("p", { class: "small" }, "Changing the fan needs the Haversack Helper (install it from Gaming Mode: Device, Reconnect help)."));
+  if (!s.helper.ready) parts.push(h("p", { class: "small" }, "Changing the fan needs the Haversack Helper (install it from Gaming Mode: Device, Controllers, Reconnect help)."));
   if (others.length) parts.push(h("p", { class: "warn" }, `${others.join(", ")} controls the fan here; Haversack only shows the readings.`));
   if (s.problem) parts.push(h("p", { class: "warn" }, s.problem));
   if (s.helper.ready && go2 && !d.validated) {
@@ -1955,7 +1996,7 @@ async function controllerSettingsSection(again: () => Promise<void>): Promise<HT
     return box;
   }
   if (!s.helper.ready) {
-    box.append(h("p", { class: "small" }, "Needs the Haversack Helper (install it from Gaming Mode: Device, Reconnect help)."));
+    box.append(h("p", { class: "small" }, "Needs the Haversack Helper (install it from Gaming Mode: Device, Controllers, Reconnect help)."));
     return box;
   }
   if (s.tools.hhd) {
@@ -2114,8 +2155,8 @@ async function reconnectPage(main: HTMLElement): Promise<void> {
       ready
         ? `Haversack Helper ready (version ${s.helper?.version}): cable pairing, the SSP gate and the Bluetooth capture are available.`
         : s.helper?.problem === "version"
-          ? "The Haversack Helper does not match this Haversack. Update it from Gaming Mode: Device, Reconnect help."
-          : "Cable pairing, the SSP gate and the Bluetooth capture need the Haversack Helper. Install it from Gaming Mode: Device, Reconnect help.",
+          ? "The Haversack Helper does not match this Haversack. Update it from Gaming Mode: Device, Controllers, Reconnect help."
+          : "Cable pairing, the SSP gate and the Bluetooth capture need the Haversack Helper. Install it from Gaming Mode: Device, Controllers, Reconnect help.",
     ),
     devices.length
       ? h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Device"), h("th", {}, "Class and modalias"), h("th", {}, "Adapter"), h("th", {}, "State"), h("th", {}, "Notes"))), h("tbody", {}, ...devices.map(deviceRow)))
@@ -2210,9 +2251,11 @@ async function logsPage(main: HTMLElement): Promise<void> {
 }
 
 async function show(id: string): Promise<void> {
-  const page = PAGES.find((p) => p.id === id) ?? PAGES[0];
+  const page = PAGES.find((p) => p.id === (MERGED[id] ?? id)) ?? PAGES[0];
   const main = document.getElementById("main") as HTMLElement;
   document.querySelectorAll("nav button").forEach((b) => b.setAttribute("aria-current", String(b.id === `nav-${page.id}`)));
+  // The section holding the page opens; the others stay as the user left them.
+  document.getElementById(`nav-${page.id}`)?.closest("details")?.setAttribute("open", "");
   replace(main, h("p", { class: "loading" }, "Loading"));
   try {
     await page.render(main);
@@ -2231,21 +2274,23 @@ function start(): void {
     );
     return;
   }
+  // A proper left navigation for a mouse and keyboard (ADR-0095): each section is a collapsible group.
   const groups: HTMLElement[] = [];
-  let current = "";
-  for (const p of PAGES) {
-    if (p.group !== current) {
-      current = p.group;
-      if (current) groups.push(h("h3", { class: "group" }, current));
-    }
+  const button = (p: Page): HTMLElement => {
     const item = h("button", { type: "button", id: `nav-${p.id}` }, p.title);
     item.addEventListener("click", () => void show(p.id));
-    groups.push(item);
+    return item;
+  };
+  for (const p of PAGES.filter((x) => !x.group)) groups.push(button(p));
+  for (const group of [...new Set(PAGES.map((p) => p.group).filter(Boolean))]) {
+    groups.push(h("details", { class: "nav-section" }, h("summary", {}, group), ...PAGES.filter((p) => p.group === group).map(button)));
   }
   replace(nav, settingsSearch(), ...groups);
   onEvents((event, args) => {
     if (event === "keepsake_toast" && typeof args[0] === "string") toast(args[0]);
-    if (event === "keepsake_replication" && document.getElementById("nav-devices")?.getAttribute("aria-current") === "true") void show("devices");
+    for (const id of ["devices", "peers"]) {
+      if (event === "keepsake_replication" && document.getElementById(`nav-${id}`)?.getAttribute("aria-current") === "true") void show(id);
+    }
     if (event === "keepsake_signin") {
       const result = args[0] as { status?: string; reason?: string; method?: string } | undefined;
       toast(result?.status !== "signed-in" ? `Sign-in did not complete: ${result?.reason ?? "unknown reason"}` : result.method === "phone" ? "Signed in with your phone. Haversack is signed in; you can close any sign-in tab left open." : "Signed in.");

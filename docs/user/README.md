@@ -6,18 +6,18 @@ Haversack keeps your PC game saves in step between your devices: SteamOS and Baz
 
 Haversack was called Keepsake until version 0.51.0. Updating moved everything across, and nothing was lost ([Updates](updates.md)).
 
-Haversack's page has seven sections in its sidebar, each with its own entries:
+Haversack's page has seven sections in its sidebar. Highlight one to see its pages, then press A to open one. On a section's page, **L1** and **R1** move between its pages, and **B** goes back to the sidebar. Each section opens where you left it.
 - **Play:** Now playing and Advisor.
 - **Saves:** Games, Conflicts, History, Activity, Import and export.
-- **Games and devices:** Moving games, Other devices, Emulators, Disk use.
-- **Device:** Device status, Power, Battery, Fans, Controllers, Reconnect help, More device settings, Looks.
+- **Games and devices:** Moving games, Other devices, Emulators.
+- **Device:** Status, Power and battery, Fans, Controllers (with Reconnect help), Storage, Looks.
 - **Install.**
-- **Settings:** General, Cloud, Sync and safety, Modules, Quick menu, Updates, Help.
+- **Settings:** General (with the quick menu's shortcuts), Cloud, Sync and safety, Modules, Updates, Help.
 - **Diagnostics:** Health, Device checks, Tools, Logs.
 
 This guide is also in Haversack itself, under **Settings**, **Help**, so you can read it on the handheld.
 
-The quick access menu shows the game you are playing, games on their way between your devices, and anything that needs you. The desktop app has the same sections down the left.
+The quick access menu shows the game you are playing, games on their way between your devices, and anything that needs you. The desktop app has the same sections and pages down the left, each section opening when you click it.
 
 ## Getting started
 

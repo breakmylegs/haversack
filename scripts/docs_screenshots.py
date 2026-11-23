@@ -227,6 +227,18 @@ class SampleApp:
             "busy": None,
         }
 
+    async def qam_shortcuts(self) -> dict[str, Any]:
+        # Settings, General shows the quick menu's shortcuts below the general settings (ADR-0095).
+        from keepsake import shortcuts
+
+        offered = shortcuts.available({"saves": True, "replication": True, "device": True}, [])
+        return {
+            "available": offered,
+            "shown": shortcuts.shown(None, offered),
+            "chosen": list(shortcuts.DEFAULT),
+            "defaults": list(shortcuts.DEFAULT),
+        }
+
     async def list_conflicts(self) -> list[dict[str, Any]]:
         return [CONFLICT]
 
@@ -369,7 +381,7 @@ def capture(out_dir: str, browser: str | None = None) -> list[str]:
                 ],
                 check=True,
                 capture_output=True,
-                timeout=120,
+                timeout=300,  # slow laptops: Edge can take minutes per page
             )
             written.append(target)
     finally:

@@ -29,7 +29,7 @@ The Quick Access Menu shows the current game's sync state, any conflicts, availa
 
 ## Your quick menu
 
-Haversack's panel in the quick access menu can show what you use most. Open **Settings**, **Quick menu**:
+Haversack's panel in the quick access menu can show what you use most. Open **Settings**, **General**, **Quick menu**:
 - tick the shortcuts you want, and move them with **Up** and **Down**;
 - they can be pages to open, actions that run straight from the menu, or status lines;
 - shortcuts for modules you have switched off are not offered;

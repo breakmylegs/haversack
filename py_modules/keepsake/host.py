@@ -52,7 +52,9 @@ PORT_TRIES = 10
 MAX_BODY = 1024 * 1024
 CALL_TIMEOUT = 300.0
 STATE_FILE = "host.json"
-UI_SCRIPT = re.compile(r"/dist/[a-z][a-z0-9_-]{0,40}\.js")  # the compiled desktop interface (ADR-0040)
+# The compiled desktop interface (ADR-0040). Mixed case: helpPage.js and looksPage.js were refused until
+# v0.57.0, which left the desktop app on "Loading". A name is still one path segment, letters first.
+UI_SCRIPT = re.compile(r"/dist/[A-Za-z][A-Za-z0-9_-]{0,40}\.js")
 
 # The KeepsakeApp methods the Decky plugin exposes through main.py; tests/test_host.py keeps them equal.
 CALLABLES = frozenset(

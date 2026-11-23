@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { qamShortcuts, QamShortcuts, setSetting, Shortcut } from "../backend";
 import { plainError } from "../format";
 
-// Settings, Quick menu (layout v3 addendum, ADR-0073): choose and order the shortcuts in
+// Settings, General, Quick menu (layout v3 addendum, ADR-0073): choose and order the shortcuts in
 // Haversack's quick access menu panel. Up and Down move with the controller. Open Haversack is
 // always there. Each change is saved at once and the panel follows straight away.
 

@@ -31,10 +31,14 @@ def test_page_targets_are_sidebar_pages() -> None:
     """Every page shortcut opens a page that exists in the static sidebar (src/routeData.ts)."""
     with open(os.path.join(ROOT, "src", "routeData.ts"), encoding="utf-8") as handle:
         layout = handle.read()
-    sections = re.findall(r'id: "([a-z-]+)",\n    title: "[^"]+",\n    tabs: \[(.*?)\n    \]', layout, re.DOTALL)
-    sections += re.findall(r'\{ id: "([a-z-]+)", title: "[^"]+", tabs: \[(.*?)\] \}', layout)
-    pages = {(sid, tab) for sid, body in sections for tab in re.findall(r'\{ id: "([a-z-]+)"', body)}
-    assert ("device", "fans") in pages and ("games-devices", "disk") in pages
+    body = layout[layout.index("export const LAYOUT") : layout.index("export const MOVED")]
+    starts = [(m.start(), m.group(1)) for m in re.finditer(r'^    id: "([a-z-]+)",$', body, re.M)]
+    pages = set()
+    for i, (at, sid) in enumerate(starts):
+        segment = body[at : starts[i + 1][0] if i + 1 < len(starts) else len(body)]
+        pages |= {(sid, page) for page in re.findall(r'\{ id: "([a-z-]+)", title:', segment)}
+    assert ("device", "fans") in pages and ("device", "storage") in pages and ("device", "controllers") in pages
+    assert len({sid for sid, _ in pages}) == 7  # the redesign's seven sections (ADR-0095)
     for entry in shortcuts.REGISTRY:
         if entry["kind"] == "page":
             assert tuple(entry["open"]) in pages, entry["id"]

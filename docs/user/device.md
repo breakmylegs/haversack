@@ -4,7 +4,7 @@ Haversack's **Device** section shows your handheld, and lets you choose its perf
 
 ## Status
 
-**Device**, **Device status** shows:
+**Device**, **Status** shows:
 
 - the model Haversack recognised;
 - its power range and screen;
@@ -19,9 +19,17 @@ Haversack's **Device** section shows your handheld, and lets you choose its perf
 
 Haversack only reads these.
 
-## Power
+### More device settings
 
-**Device**, **Power** has:
+**Device**, **Status** has:
+- **Wi-Fi power saving**, through steamos-manager. Turn it off if streaming or online games stutter.
+- **A BIOS check**, with what is known about your Legion Go's BIOS version.
+
+Refresh rate, frame limit and brightness stay in Steam's own quick access menu.
+
+## Power and battery
+
+**Device**, **Power and battery** has:
 
 - **Mode:** Quiet, Balanced, Performance or Custom. On the Legion Go these are the same modes as Legion L + Y.
 - **TDP:** the power limit in watts. Setting it switches to Custom, the only mode where the firmware uses it.
@@ -38,12 +46,18 @@ Haversack changes these settings through Valve's steamos-manager, and never need
 
 ### Separate power limits
 
-With the Haversack Helper installed, **Device**, **Power** also has **Separate power limits**:
+With the Haversack Helper installed, **Device**, **Power and battery** also has **Separate power limits**:
 - **SPL** is the sustained power;
 - **SPPT** is the slow boost;
 - **FPPT** is the fast boost.
 
 Move the sliders, then select **Apply**. Haversack switches to Custom mode first, because the firmware ignores the limits in any other mode. With a game running, the limits are kept for that game, like the TDP.
+
+### Battery
+
+**Device**, **Power and battery** has **Stop charging at 80%**, Lenovo's charge limit. It keeps the battery healthier if the device is plugged in for long spells. The same toggle is in the quick access menu.
+
+Haversack changes it through Valve's steamos-manager. Where steamos-manager does not offer it yet, Battery shows whether the limit is on and tells you where to change it: Steam's settings, Power.
 
 ## Fans
 
@@ -63,12 +77,6 @@ Move the sliders, then select **Apply**. Haversack switches to Custom mode first
 
 If another fan tool is installed (or Handheld Daemon is running), Haversack only shows the readings.
 
-## Battery
-
-**Device**, **Battery** has **Stop charging at 80%**, Lenovo's charge limit. It keeps the battery healthier if the device is plugged in for long spells. The same toggle is in the quick access menu.
-
-Haversack changes it through Valve's steamos-manager. Where steamos-manager does not offer it yet, Battery shows whether the limit is on and tells you where to change it: Steam's settings, Power.
-
 ## Controllers
 
 **Device**, **Controllers** shows each controller's battery, the settings the controllers report, and the stick lights. Remap buttons, set dead zones and use the gyro in Steam's controller settings.
@@ -81,9 +89,9 @@ Leave **Keep my changes** on, and Haversack applies them again when the controll
 
 The power LED cannot be changed: every known way needs a kernel module or memory access that Haversack will not use.
 
-## Reconnect help
+### Reconnect help
 
-**Device**, **Reconnect help** is for Bluetooth controllers, often clones, that pair once and then will not reconnect when you press their normal button.
+**Device**, **Controllers**, **Reconnect help** is for Bluetooth controllers, often clones, that pair once and then will not reconnect when you press their normal button.
 
 1. Pair the controller in Steam's Bluetooth settings.
 2. Find it in the list and turn on help for it. Help acts only on the controllers you turn it on for.
@@ -95,13 +103,13 @@ The power LED cannot be changed: every known way needs a kernel module or memory
    - **Export report bundle**: the last diagnosis and the Bluetooth journal lines in a zip, to share on an issue. This handheld's address is replaced.
    - **Full report mode** (DualShock 4 only): for clones that send reduced reports, such as a missing touchpad or motion.
 
-The desktop app has the same page under Device, Reconnect help. Install the Haversack Helper from Gaming Mode.
+The desktop app has the same page under Device, Controllers, Reconnect help. Install the Haversack Helper from Gaming Mode.
 
 The list also shows a note when a controller's address is not from a registered manufacturer. That is only information: Haversack never acts on it.
 
 If a controller connects and drops at once, Haversack suggests a diagnosis. It does nothing to the controller unless you choose.
 
-### The Haversack Helper: cable pairing and the SSP gate
+#### The Haversack Helper: cable pairing and the SSP gate
 
 The lasting fixes need root, so they run in a small separate plugin, the **Haversack Helper**. Select **Install helper** at the top of Reconnect help. Haversack checks the helper's signature, and Decky asks you to confirm. After each Haversack update, select **Update helper**.
 
@@ -114,13 +122,9 @@ The lasting fixes need root, so they run in a small separate plugin, the **Haver
 - **SSP gate:** offered when the diagnosis says the controller is refused while security starts. It lowers Bluetooth security for the whole adapter, so it asks twice. Secure Simple Pairing comes back on while you pair, when you switch the gate off, and by itself if Haversack stops.
 - **Bluetooth capture:** with the helper, Diagnose also records 40 seconds of Bluetooth traffic, to tell the causes apart.
 
-## Other
+## Storage
 
-**Device**, **More device settings** has:
-- **Wi-Fi power saving**, through steamos-manager. Turn it off if streaming or online games stutter.
-- **A BIOS check**, with what is known about your Legion Go's BIOS version.
-
-Refresh rate, frame limit and brightness stay in Steam's own quick access menu.
+**Device**, **Storage** shows the disk space each game uses, clears a shader cache and resets a broken prefix without losing your saves: see [Storage](storage.md).
 
 ## Looks
 

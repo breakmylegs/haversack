@@ -146,3 +146,17 @@ Unknown IDs are kept in the setting, so a later version's shortcuts survive a do
 - **Assumptions:** A219 and A220.
 - **The user guide** (`docs/user/`) uses the new names, with the desktop screenshots regenerated from the real interface.
 - **Device run:** part 4, steps 19 to 21.
+
+## Addendum (v0.57.0): the menu redesign
+
+Peter asked for fewer top-level entries with the sub-pages inside each section, on Steam's native tabs. ADR-0095 records the decision and its evidence. In short:
+- **The sidebar** is the seven sections only, static, each with a coloured icon.
+- **Each section's own page** holds its sub-pages as Steam's `Tabs`, in the pattern Decky's own store uses, so L1 and R1 switch them and B goes back to the sidebar.
+- **No nesting:** `Tabs` is never placed inside a sidebar page, because no well-built plugin does that without heavy workarounds.
+- **The grouping review:**
+  - Reconnect help joins Controllers;
+  - Battery joins Power;
+  - More device settings joins Status;
+  - Disk use becomes Device, Storage;
+  - the quick menu's shortcuts join Settings, General.
+- **The v0.41.1 rules stand,** and a source-level test keeps the home-made tab row out.

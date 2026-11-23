@@ -152,6 +152,8 @@ NAV_KINDS = {
     "focus",
     "focus-left-sidebar-unprompted",
     "input",
+    "section-open",  # the menu redesign (ADR-0095): a section's own page with its tabs
+    "tab",  # L1, R1 or the D-pad on the tab bar switched sub-page
 }
 NAV_DETAIL = re.compile(r"^[A-Za-z0-9/_:@.-]{0,80}$")
 
