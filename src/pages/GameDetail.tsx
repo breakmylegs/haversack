@@ -22,6 +22,7 @@ import { ProposalCard } from "./ProposalCard";
 import { LaunchGatePanel } from "./LaunchGatePanel";
 import { SnapshotsPanel } from "./SnapshotsPanel";
 import { SyncPanel } from "./SyncPanel";
+import { GameArtSection } from "./GameArtSection";
 import { SendPanel } from "./SendPanel";
 import { InStepPanel } from "./InStepPanel";
 import { UninstallPanel } from "./UninstallPanel";
@@ -277,6 +278,7 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
       )}
       {match.gameKey && <SnapshotsPanel gameKey={gameKey} gameName={game.name} />}
       {game.kind === "shortcut" && <SendPanel gameKey={gameKey} gameName={game.name} />}
+      {game.kind === "shortcut" && <GameArtSection gameKey={gameKey} gameName={game.name} />}
       {game.kind === "shortcut" && <InStepPanel appid={game.appid} />}
       {(game.kind === "shortcut" || game.kind === "steam") && <UninstallPanel gameKey={gameKey} onGone={onBack} />}
 

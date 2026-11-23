@@ -615,14 +615,28 @@ class Installer:
         Same route as an installed game's artwork: staged here, set by Steam's own artwork call
         (P15), only after the user chose the game on SteamGridDB. Returns how many were queued.
         """
-        if self.art is None:
-            raise InstallerError("SteamGridDB artwork is not available")
         if not 2**31 <= int(appid) < 2**32:
             raise InstallerError("only a non-Steam game's streaming tile needs artwork")
+        return self._queue_art(int(appid), int(game_id), None, "stream")
+
+    def queue_game_art(self, appid: int, game_id: int, missing: set[int]) -> int:
+        """User action (R29 stage 2, ADR-0093): SteamGridDB's images for a non-Steam game, but only the
+        kinds of artwork it has none of, so nothing the user or another tool set is ever replaced."""
+        if not 2**31 <= int(appid) < 2**32:
+            raise InstallerError("only non-Steam games get artwork from SteamGridDB here")
+        if not missing:
+            raise InstallerError("this game already has all its artwork")
+        return self._queue_art(int(appid), int(game_id), set(missing), "game")
+
+    def _queue_art(self, appid: int, game_id: int, only: set[int] | None, prefix: str) -> int:
+        if self.art is None:
+            raise InstallerError("SteamGridDB artwork is not available")
         queued = 0
         try:
             for item in self.art.choose(int(game_id)):
-                name = f"stream{int(appid)}-{item['label']}"
+                if only is not None and item["assetType"] not in only:
+                    continue
+                name = f"{prefix}{int(appid)}-{item['label']}"
                 path = os.path.join(self._staging(), name)
                 kind = self.art.download(item["url"], path)
                 staged = f"{name}.{kind}"

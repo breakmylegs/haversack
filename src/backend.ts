@@ -336,7 +336,11 @@ export interface NewestChoice {
   at: number;
 }
 // R18 (ADR-0081): the badge in Steam's library, and artwork for streaming tiles.
-export const libraryBadge = callable<[appid: number], { state: string; label: string } | null>("library_badge");
+export const libraryBadge = callable<[appid: number], { state: string; label: string; detail?: string } | null>("library_badge");
+
+// Artwork for any non-Steam game (R29 stage 2, ADR-0093): only the kinds it has none of.
+export const gameArtStatus = callable<[key: string], { nonSteam: boolean; missing: string[]; available: boolean }>("game_art_status");
+export const gameArtApply = callable<[key: string, gameId: number], { queued: number }>("game_art_apply");
 export const installerStreamTiles = callable<[], { appid: number; name: string; devices: string[] }[]>("installer_stream_tiles");
 export const installerStreamArtSearch = callable<[title: string], { id: number; name: string; verified: boolean }[]>("installer_stream_art_search");
 export const installerStreamArtApply = callable<[appid: number, gameId: number], { queued: number }>("installer_stream_art_apply");

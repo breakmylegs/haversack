@@ -286,6 +286,9 @@ Keepsake is now called Haversack. This first update moves it across.
     - On the Go, the theme and pack should appear in CSS Loader and Audio Loader. The Go's own themes should be unchanged.
     - The Go 2's chosen boot video should appear as a choice on the Go's Looks page, "From Legion Go 2". The Go's own boot video should not change until you choose it.
     - Send again: the Go should report everything already there.
+54. **Library extras (v0.56.0).**
+    - Open a non-Steam game with no artwork in Saves, Games: Artwork should list what it lacks. Find artwork, pick the game: only those kinds should appear in Steam's library, and any artwork it had should stay.
+    - With Advisor's ProtonDB source on, open a Steam game's page in the library: the badge should show the ProtonDB line.
 
 ## 5. Send back
 

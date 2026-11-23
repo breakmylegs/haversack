@@ -23,7 +23,7 @@ import uuid
 import zipfile
 from collections.abc import Callable, Coroutine, Mapping
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import urlsplit
 
 from . import (
@@ -5766,11 +5766,60 @@ class KeepsakeApp:
         await self.emit("keepsake_steam_ops")
         return {"queued": queued}
 
+    # Library extras (R29 stage 2, ADR-0093)
+    # A grid file's suffix to Steam's library asset type.
+    ART_SUFFIX: ClassVar[dict[str, int]] = {"p": 0, "": 3, "_hero": 1, "_logo": 2}
+    ART_LABELS: ClassVar[dict[int, str]] = {0: "cover", 3: "wide cover", 1: "background", 2: "logo"}
+
+    @classmethod
+    def _missing_art(cls, game: dict[str, Any]) -> list[int]:
+        """The kinds of library artwork a game has no custom image for, in Steam's grid folder."""
+        appid = str(game.get("appid") or "")
+        has = set()
+        for name in game.get("artwork") or []:
+            stem = os.path.splitext(str(name))[0]
+            if stem.startswith(appid) and stem[len(appid) :] in cls.ART_SUFFIX:
+                has.add(cls.ART_SUFFIX[stem[len(appid) :]])
+        return [t for t in (0, 3, 1, 2) if t not in has]
+
+    async def game_art_status(self, key: str) -> dict[str, Any]:
+        """For a non-Steam game: which kinds of artwork it lacks, so Find artwork fills only those."""
+        game = await self._game(str(key))
+        non_steam = int(game.get("appid") or 0) >= 2**31
+        missing = self._missing_art(game) if non_steam else []
+        return {
+            "nonSteam": non_steam,
+            "missing": [self.ART_LABELS[t] for t in missing],
+            "available": self.installer is not None and non_steam,
+        }
+
+    async def game_art_apply(self, key: str, game_id: int) -> dict[str, Any]:
+        """User action: SteamGridDB's images for the kinds of artwork the game lacks, set through Steam (P15)."""
+        game = await self._game(str(key))
+        try:
+            queued = await asyncio.to_thread(
+                self._installer().queue_game_art, int(game["appid"]), int(game_id), set(self._missing_art(game))
+            )
+        except InstallerError as exc:
+            raise ValueError(str(exc)) from exc
+        log_event(logging.INFO, "installer.game_art", "Artwork queued for a non-Steam game", images=queued)
+        await self.emit("keepsake_steam_ops")
+        return {"queued": queued}
+
     async def library_badge(self, appid: int) -> dict[str, Any] | None:
-        """The badge on a game's page in Steam's library (R18, ADR-0081): its saves, or where it streams from."""
+        """The badge on a game's page in Steam's library (R18, ADR-0081): its saves, or where it streams from,
+        with Advisor's ProtonDB line under it when that source is on (R29 stage 2, ADR-0093)."""
         if not self.settings.get("libraryBadges"):
             return None
-        appid = int(appid)
+        badge = await self._library_badge(int(appid))
+        line = None
+        if self.advisor is not None and int(appid) < 2**31:
+            line = await asyncio.to_thread(self.advisor.protondb_line, int(appid))
+        if line is None:
+            return badge
+        return {**badge, "detail": line} if badge else {"state": "info", "label": line}
+
+    async def _library_badge(self, appid: int) -> dict[str, Any] | None:
         verdict = (await asyncio.to_thread(self.remote_copies.steam_verdicts)).get(appid)
         if verdict and verdict.get("steam") == discovery.REMOTE:
             devices = verdict.get("clients") or []

@@ -45,6 +45,10 @@ An ISO on a share that is already mounted is opened where it is, with nothing co
 
 With your own [SteamGridDB](https://www.steamgriddb.com) API key in Settings, Haversack can find artwork for the new shortcut. Your key is never sent anywhere except SteamGridDB.
 
+## Artwork for any non-Steam game
+
+Any non-Steam game's page in **Saves**, **Games** has **Artwork** when the game is missing a cover, a wide cover, a background or a logo. Press **Find artwork** and pick the game on SteamGridDB. Haversack adds only the kinds the game has none of, through Steam, so artwork you or another tool set is never replaced. It uses the same SteamGridDB key as installed games.
+
 ## Artwork for streaming tiles
 
 Steam lists non-Steam games installed on your other devices as streaming tiles, with no artwork. At the bottom of **Install**, **Artwork for streaming tiles** lists them. Press **Find artwork**, pick the game on SteamGridDB (your SteamGridDB key, set up as for installed games), and Haversack sets the tile's artwork through Steam.
