@@ -297,6 +297,11 @@ Keepsake is now called Haversack. This first update moves it across.
     5. From the quick menu, open a shortcut to a sub-page (for example Fans, or Reconnect help): it should open that sub-page directly (Device, Controllers for Reconnect help). Press B: the sidebar should be on that section.
     6. Do steps 1 to 5 straight after opening Haversack, and again after a minute.
     7. Stop the recorder and select Export results in Diagnostics, Device checks. The record should show section-open and tab events, and no focus-left-sidebar-unprompted.
+56. **Pausing a game (v0.58.0).** Start a game, open the quick access menu and select Pause game.
+    - The game should stop (no sound, no movement), and Steam's menus should keep working. Resume game should let it carry on where it was.
+    - Pause it again and quit the game from Steam: the game should close normally.
+    - Pause it again, then disable Haversack in Decky's settings: the game should carry on within a few seconds.
+    - Note how Steam's overlay shows a paused game.
 
 ## 5. Send back
 

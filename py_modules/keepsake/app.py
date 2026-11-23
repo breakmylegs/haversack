@@ -1139,7 +1139,9 @@ class KeepsakeApp:
         if loop is not None and not loop.is_closed():
             loop.call_soon_threadsafe(
                 lambda: self._background.append(
-                    loop.create_task(self.emit("keepsake_toast", "Your game was paused for an hour, so it is running again."))
+                    loop.create_task(
+                        self.emit("keepsake_toast", "Your game was paused for an hour, so it is running again.")
+                    )
                 )
             )
 

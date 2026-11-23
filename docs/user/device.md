@@ -59,6 +59,17 @@ Move the sliders, then select **Apply**. Haversack switches to Custom mode first
 
 Haversack changes it through Valve's steamos-manager. Where steamos-manager does not offer it yet, Battery shows whether the limit is on and tells you where to change it: Steam's settings, Power.
 
+### Pausing a game
+
+While a game runs, the quick access menu's **Now playing** has **Pause game**. The game stops where it is, and the rest of Steam keeps working. **Resume game** lets it carry on.
+
+A paused game always carries on by itself:
+- after an hour;
+- when Haversack stops or you switch off Device in Settings, Modules;
+- the next time Haversack starts, if the device was restarted while the game was paused.
+
+Haversack never pauses a game while it is checking that game's saves.
+
 ## Fans
 
 **Device**, **Fans** shows the temperature and fan speed. With the Haversack Helper installed:

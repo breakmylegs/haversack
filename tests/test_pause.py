@@ -64,7 +64,9 @@ def make_app(tmp_path: Any, monkeypatch: Any) -> tuple[Any, FakeKill]:
     kill = FakeKill()
     app.pauser._kill = kill
     monkeypatch.setattr(
-        app_module, "find_game_processes", lambda appid, compat, proc_root: [read_proc(50, proc_root), read_proc(51, proc_root)]
+        app_module,
+        "find_game_processes",
+        lambda appid, compat, proc_root: [read_proc(50, proc_root), read_proc(51, proc_root)],
     )
     return app, kill
 
@@ -113,7 +115,7 @@ def test_a_paused_game_is_released_when_it_exits_or_the_module_stops(tmp_path: A
 
 
 def test_a_pause_left_by_a_crash_is_released_at_the_next_start(tmp_path: Any, monkeypatch: Any) -> None:
-    app, kill = make_app(tmp_path, monkeypatch)
+    app, _kill = make_app(tmp_path, monkeypatch)
 
     async def crash() -> None:
         app._device_game = APPID
@@ -126,10 +128,11 @@ def test_a_pause_left_by_a_crash_is_released_at_the_next_start(tmp_path: Any, mo
 
     async def start() -> None:
         await again.start()
+        # Released by the start itself, before anything else runs (not by the stop below).
+        assert {(50, SIGCONT), (51, SIGCONT)} <= set(kill2.calls) and again.pauser.recorded() == []
         await again.stop()
 
     asyncio.run(start())
-    assert {(50, SIGCONT), (51, SIGCONT)} <= set(kill2.calls) and again.pauser.recorded() == []
 
 
 def test_unload_releases_a_paused_game(tmp_path: Any, monkeypatch: Any) -> None:
