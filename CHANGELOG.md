@@ -4,6 +4,10 @@ All notable changes to Haversack (called Keepsake until v0.51.0) are listed here
 
 ## [Unreleased]
 
+## [0.51.1]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Changed
 
 - **The project now lives at github.com/breakmylegs/haversack.** Old links, the install link and every earlier version's update check reach it through GitHub's redirect, so nothing needs doing.
