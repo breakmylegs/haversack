@@ -277,6 +277,11 @@ Keepsake is now called Haversack. This first update moves it across.
     - Move down with the D-pad: focus should go from section to section, and the page should scroll to follow. Use the right stick to scroll within a long section.
     - On opening the page, nothing should take focus by itself, and the sidebar should not move.
     - In Desktop Mode, the desktop app's Settings, Help should show the same text.
+52. **Looks (v0.53.0).** Put two WebM videos in the Go's Videos folder. Switch on Looks in Settings, Modules, then open Device, Looks.
+    - Both videos should be listed. Choose one for Boot and the other for Sleep.
+    - Put the device to sleep and wake it: the Sleep video should play. Restart: the Boot video should play.
+    - Select Use Steam's own on both: Steam's own videos should play again.
+    - With CSS Loader or Audio Loader installed, their themes or sound packs should be listed by name.
 
 ## 5. Send back
 

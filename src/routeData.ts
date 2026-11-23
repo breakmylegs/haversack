@@ -10,7 +10,7 @@ export const SETUP_PATH = "/keepsake-setup";
 export type SectionId = "play" | "saves" | "games-devices" | "device" | "install" | "settings" | "diagnostics";
 export const SECTION_IDS: SectionId[] = ["play", "saves", "games-devices", "device", "install", "settings", "diagnostics"];
 
-export type ModuleName = "saves" | "core" | "installer" | "advisor" | "replication" | "device";
+export type ModuleName = "saves" | "core" | "installer" | "advisor" | "replication" | "device" | "looks";
 
 export interface TabSpec {
   id: string;
@@ -68,6 +68,7 @@ export const LAYOUT: SectionSpec[] = [
       { id: "controllers", title: "Controllers", module: "core" },
       { id: "reconnect", title: "Reconnect help", module: "device" },
       { id: "other", title: "More device settings", module: "device" },
+      { id: "looks", title: "Looks", module: "looks" },
     ],
   },
   { id: "install", title: "Install", tabs: [{ id: "install", title: "Install", module: "installer" }] },

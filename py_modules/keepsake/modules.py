@@ -24,6 +24,7 @@ DEFAULT_FLAGS = {
     "installer": True,
     "desktop": True,
     "device": True,
+    "looks": False,  # writes outside the earlier allowlist, so the user switches it on (ADR-0091)
 }
 
 

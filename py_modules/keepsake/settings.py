@@ -75,7 +75,7 @@ DEFAULTS: dict[str, Any] = {
     "streamTidyVerified": False,
 }
 SIGNIN_METHODS = ("browser", "phone")
-MODULE_NAMES = ("saves", "advisor", "replication", "installer", "desktop", "device")
+MODULE_NAMES = ("saves", "advisor", "replication", "installer", "desktop", "device", "looks")
 
 # Keys the frontend may change. deviceId and schemaVersion are managed here.
 USER_KEYS = frozenset(

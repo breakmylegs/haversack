@@ -122,6 +122,17 @@ The lasting fixes need root, so they run in a small separate plugin, the **Haver
 
 Refresh rate, frame limit and brightness stay in Steam's own quick access menu.
 
-## Coming next
+## Looks
 
-Fan curves, and changing the controllers' settings and lights, need root. They wait for a separate decision.
+**Device**, **Looks** changes the videos Steam plays when the device starts and when it goes to sleep. First switch on **Looks** in **Settings**, **Modules**.
+
+1. Put WebM videos in your **Videos** or **Downloads** folder. Animation Changer's sets are offered too.
+2. For **Boot**, **Sleep** or **Sleep from the loading screen**, choose a video. It shows the next time the device starts or sleeps.
+3. **Use Steam's own** goes back.
+
+Nothing is lost:
+- If a video was already there, Haversack keeps a copy first, and **Use Steam's own** puts that one back.
+- Haversack never removes a video another tool put there.
+- While Animation Changer is installed, Haversack only shows the videos and leaves them to it.
+
+The page also lists the themes and sound packs that **CSS Loader** and **Audio Loader** have installed. Haversack does not change themes or sounds itself; install those plugins from Decky's store.

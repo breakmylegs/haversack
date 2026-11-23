@@ -4,6 +4,11 @@ All notable changes to Haversack (called Keepsake until v0.51.0) are listed here
 
 ## [Unreleased]
 
+### Added
+
+- **Boot and sleep animations** (Device, Looks, in Gaming Mode and the desktop app). Choose one of your own WebM videos for when the device starts or goes to sleep. **Use Steam's own** goes back, and a video that was there before is kept and brought back. Switch on **Looks** in Settings, Modules first. While Animation Changer is installed, Haversack leaves the videos to it.
+- **Themes and sounds at a glance:** the same page lists what CSS Loader and Audio Loader have installed.
+
 ## [0.52.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

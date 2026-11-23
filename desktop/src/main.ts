@@ -4,6 +4,7 @@
 import { ApiError, call, hasToken, initialPage, onEvents } from "./api.js";
 import { lineChart } from "./charts.js";
 import { helpPage } from "./helpPage.js";
+import { looksPage } from "./looksPage.js";
 import { h, replace, size, when } from "./dom.js";
 import { sortableTable } from "./table.js";
 import type {
@@ -1432,6 +1433,7 @@ const PAGES: Page[] = [
   { id: "controllers", title: "Controllers", group: "Device", render: controllersPage },
   { id: "reconnect", title: "Reconnect help", group: "Device", render: reconnectPage },
   { id: "other", title: "Other", group: "Device", render: extrasPage },
+  { id: "looks", title: "Looks", group: "Device", render: (main) => looksPage(main) },
   { id: "settings", title: "General and sync", group: "Settings", render: settingsPage },
   { id: "cloud", title: "Cloud", group: "Settings", render: cloud },
   { id: "modules", title: "Modules", group: "Settings", render: modules },
