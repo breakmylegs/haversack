@@ -11,7 +11,7 @@ interface DeckyBackendLike {
   call?: (route: string, ...args: unknown[]) => Promise<unknown>;
 }
 
-export const RELEASES_PAGE = "https://github.com/breakmylegs/keepsake/releases";
+export const RELEASES_PAGE = "https://github.com/breakmylegs/haversack/releases";
 
 export function handOffAvailable(): boolean {
   const backend = (window as unknown as { DeckyBackend?: DeckyBackendLike }).DeckyBackend;

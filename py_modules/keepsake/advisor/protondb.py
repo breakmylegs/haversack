@@ -29,7 +29,7 @@ from ..fsutil import atomic_write_bytes
 
 INDEX_FILE = "protondb-index.json.gz"
 RELEASE_TAG = "protondb-index"
-URL = f"https://github.com/breakmylegs/keepsake/releases/download/{RELEASE_TAG}/{INDEX_FILE}"
+URL = f"https://github.com/breakmylegs/haversack/releases/download/{RELEASE_TAG}/{INDEX_FILE}"
 REFRESH_AFTER = 31 * 24 * 60 * 60
 RETRY_AFTER = 60 * 60
 MAX_BYTES = 30 * 1024 * 1024

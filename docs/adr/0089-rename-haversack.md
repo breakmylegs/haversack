@@ -119,3 +119,13 @@ The repository is renamed `breakmylegs/haversack` after v0.51.0 is published and
 - **Known gap:** reinstalling an old Keepsake while Haversack runs makes both run until the next Decky restart, when Haversack holds again. The way-back instructions say to remove Haversack first.
 - **Threat model:** T162.
 - **Device run:** step 50.
+
+## Outcome (23 November 2026)
+
+v0.51.0 was published and verified, then the repository was renamed `breakmylegs/haversack`. Checks through the old addresses:
+- the API 301-redirects to `repositories/1458035581`;
+- `.../keepsake/releases/latest/download/Keepsake.zip` redirects to v0.51.0's asset;
+- v0.25.0's updater, run against the old address, offers v0.51.0 with a valid signature.
+
+Branch protection and visibility are unchanged. The code, manifests and current docs moved to the new name in v0.51.1; historical records keep the old one.
+

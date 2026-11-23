@@ -82,7 +82,7 @@ The built-in Google clients' secrets ship in the release packages but are never 
 | Asset | Used by |
 |---|---|
 | `Keepsake-v<version>.zip` | The in-plugin updater and the rebuild check below |
-| `Keepsake.zip` | First install: `https://github.com/breakmylegs/keepsake/releases/latest/download/Keepsake.zip` |
+| `Keepsake.zip` | First install: `https://github.com/breakmylegs/haversack/releases/latest/download/Keepsake.zip` |
 | `Keepsake-desktop-v<version>.zip` | The PC package for Windows and Linux PCs (ADR-0042) |
 | `Keepsake-v<version>.sbom.cdx.json` | The software bill of materials: every shipped third-party component (ADR-0050) |
 | `SHA256SUMS` | Every asset above, one line each, so one signature covers them all |

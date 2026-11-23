@@ -10,7 +10,7 @@ The PC version is a preview: the main screens are in place, and more follow.
    ```
    winget install Python.Python.3.13
    ```
-2. Download `Keepsake-desktop-v<version>.zip` from the [latest release](https://github.com/breakmylegs/keepsake/releases/latest) and unzip it anywhere.
+2. Download `Keepsake-desktop-v<version>.zip` from the [latest release](https://github.com/breakmylegs/haversack/releases/latest) and unzip it anywhere.
 3. Double-click `install.pyw` in that folder.
 
 Keepsake installs into `%LOCALAPPDATA%\Keepsake\app`, starts when you sign in to Windows, and opens in your browser. It needs no administrator rights. To open it later, run `keepsake.pyw` in that folder. The download is covered by the release's signature, which Keepsake also checks on every update.

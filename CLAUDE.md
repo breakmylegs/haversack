@@ -9,7 +9,7 @@ This file holds the objective, principles, escalation rules and conventions from
 ## Fixed names
 
 - Plugin name **Haversack** (renamed from Keepsake in v0.51.0, ADR-0089). It is the plugin folder, the settings folder and, once renamed after v0.51.0, the repository name. The cloud data folder (OneDrive `Apps/Keepsake`), the OAuth registrations' names, the Python package `keepsake` and internal identifiers keep the Keepsake name (ADR-0089). Do not rename either set again.
-- Repository: `breakmylegs/keepsake` (public). Commits use the GitHub noreply identity configured in the local git config.
+- Repository: `breakmylegs/haversack` (public). Commits use the GitHub noreply identity configured in the local git config.
 
 ## 1. Objective
 

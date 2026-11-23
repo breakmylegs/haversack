@@ -27,7 +27,7 @@ from typing import Any
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROVIDED_AT_RUN_TIME = {"@decky/ui", "react", "react-dom"}
 SBOM_NAME = "keepsake-sbom.cdx.json"
-REPOSITORY = "https://github.com/breakmylegs/keepsake/"
+REPOSITORY = "https://github.com/breakmylegs/haversack/"
 
 
 def asset_name(plugin: str, version: str) -> str:

@@ -78,7 +78,7 @@ Alternative without SSH: copy the zip to the device and use Decky, Settings, Dev
 To put a published release on a device (no SSH or development build needed): Decky, Settings, Developer, Install Plugin from URL, then paste
 
 ```
-https://github.com/breakmylegs/keepsake/releases/latest/download/Keepsake.zip
+https://github.com/breakmylegs/haversack/releases/latest/download/Keepsake.zip
 ```
 
 After that, updates come through Keepsake's Updates page. A development build deployed over SSH replaces a released one, and the next release offered on the Updates page replaces it again.

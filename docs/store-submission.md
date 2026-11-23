@@ -31,7 +31,7 @@ Sources: the Decky wiki's "Submitting plugins" and "Review and testing" pages (w
    ```
    git clone https://github.com/<you>/decky-plugin-database
    cd decky-plugin-database
-   git submodule add https://github.com/breakmylegs/keepsake plugins/Keepsake
+   git submodule add https://github.com/breakmylegs/haversack plugins/Keepsake
    cd plugins/Keepsake
    git checkout v<version>
    cd ../..

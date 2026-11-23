@@ -21,7 +21,7 @@ from . import minisign, release_key
 from .fsutil import atomic_write_json, read_json
 from .net import Fetcher, NetError, check_url
 
-REPO = "breakmylegs/keepsake"
+REPO = "breakmylegs/haversack"
 # Haversack from v0.51.0 (ADR-0089). Releases before it carry only Keepsake zips, so they are never offered.
 PLUGIN_NAME = "Haversack"
 RELEASES_URL = f"https://api.github.com/repos/{REPO}/releases?per_page=30"

@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
 
-USER_AGENT = "Keepsake (+https://github.com/breakmylegs/keepsake)"
+USER_AGENT = "Keepsake (+https://github.com/breakmylegs/haversack)"
 DEFAULT_TIMEOUT = 15.0
 DEFAULT_MAX_BYTES = 4 * 1024 * 1024
 
