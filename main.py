@@ -451,6 +451,12 @@ class Plugin:
     async def looks_send(self, peer_id: str, parts: list[str]) -> dict[str, Any]:
         return await self.app.looks_send(peer_id, parts)
 
+    async def game_art_status(self, key: str) -> dict[str, Any]:
+        return await self.app.game_art_status(key)
+
+    async def game_art_apply(self, key: str, game_id: int) -> dict[str, Any]:
+        return await self.app.game_art_apply(key, game_id)
+
     async def device_battery(self) -> dict[str, Any]:
         return await self.app.device_battery()
 

@@ -23,11 +23,12 @@ const COLOURS: Record<string, string> = {
   pending: STATUS.warn,
   streaming: STATUS.neutral,
   off: STATUS.neutral,
+  info: STATUS.info,
   "not-synced": STATUS.neutral,
 };
 
 function Badge({ appid }: { appid: number }) {
-  const [badge, setBadge] = useState<{ state: string; label: string } | null>(null);
+  const [badge, setBadge] = useState<{ state: string; label: string; detail?: string } | null>(null);
   useEffect(() => {
     libraryBadge(appid)
       .then(setBadge)
@@ -51,6 +52,7 @@ function Badge({ appid }: { appid: number }) {
       }}
     >
       Haversack · {badge.label}
+      {badge.detail && <div style={{ fontSize: 12, opacity: 0.85 }}>{badge.detail}</div>}
     </div>
   );
 }

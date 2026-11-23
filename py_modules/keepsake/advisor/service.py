@@ -79,6 +79,7 @@ class Advisor:
         self.pcgw_state: dict[str, Any] = {"enabled": False, "error": None, "cached": False, "data": None}
         self.protondb = protondb.ProtonDbIndex(cache_dir, fetch=protondb_fetch)
         self.protondb_state: dict[str, Any] = {"enabled": False, "error": None, "summary": None}
+        self._badge_cache: dict[int, str | None] = {}  # appid to the library badge's ProtonDB line (ADR-0093)
         self._ai_key = ai_key
         self.ai_providers = {pid: (cls(ai_transport) if ai_transport else cls()) for pid, cls in ai.PROVIDERS.items()}
         self.ai_usage = ai.Usage(cache_dir)
@@ -446,6 +447,23 @@ class Advisor:
             + ([pcgw.ATTRIBUTION] if self.pcgw_state.get("data") else [])
             + ([protondb.ATTRIBUTION] if self.protondb_state.get("enabled") else []),
         }
+
+    def protondb_line(self, appid: int) -> str | None:
+        """One line for the library badge (R29 stage 2, ADR-0093), read only: from the index already on this
+        device, never downloading it, and only while the ProtonDB source is on. Looked up once per game."""
+        if not self.settings().get("sourceProtonDb") or self.protondb.header() is None:
+            return None
+        appid = int(appid)
+        if appid not in self._badge_cache:
+            found = protondb.summary(self.protondb.lookup(appid), self.protondb.header(), appid)
+            line = None
+            if found and found["share"] is not None:  # no share without reports
+                reports = found["reports"]
+                line = f"ProtonDB: {found['share']}% of {reports} report{'' if reports == 1 else 's'} say it works"
+            if len(self._badge_cache) >= 500:
+                self._badge_cache.clear()
+            self._badge_cache[appid] = line
+        return self._badge_cache[appid]
 
     def health(self) -> list[dict[str, Any]]:
         generic = bool(self.device.get("generic"))

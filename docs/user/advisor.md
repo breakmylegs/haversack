@@ -31,7 +31,7 @@ Each source can be switched off, and each is contacted only while it is on:
 
 - **Deck Verified** community reports, from deckverified.games.
 - **PCGamingWiki**, using your own PCGamingWiki bot password.
-- **ProtonDB** reports, from Haversack's own monthly index. Games are looked up on your device, so no game is named to anyone.
+- **ProtonDB** reports, from Haversack's own monthly index. Games are looked up on your device, so no game is named to anyone. While this source is on, Haversack's badge on a Steam game's page in your library also shows how many ProtonDB reports say the game works.
 - **Are We Anti-Cheat Yet**, to warn about games whose anti-cheat blocks Proton.
 
 ## Optional AI explanations

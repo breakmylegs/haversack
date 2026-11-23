@@ -1702,6 +1702,15 @@ export const HELP: HelpTopic[] = [
    {
     "k": "h",
     "l": 2,
+    "t": "Artwork for any non-Steam game"
+   },
+   {
+    "k": "p",
+    "t": "Any non-Steam game's page in **Saves**, **Games** has **Artwork** when the game is missing a cover, a wide cover, a background or a logo. Press **Find artwork** and pick the game on SteamGridDB. Haversack adds only the kinds the game has none of, through Steam, so artwork you or another tool set is never replaced. It uses the same SteamGridDB key as installed games."
+   },
+   {
+    "k": "h",
+    "l": 2,
     "t": "Artwork for streaming tiles"
    },
    {
@@ -1799,7 +1808,7 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "**ProtonDB** reports, from Haversack's own monthly index. Games are looked up on your device, so no game is named to anyone."
+    "t": "**ProtonDB** reports, from Haversack's own monthly index. Games are looked up on your device, so no game is named to anyone. While this source is on, Haversack's badge on a Steam game's page in your library also shows how many ProtonDB reports say the game works."
    },
    {
     "k": "li",
