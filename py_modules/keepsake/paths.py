@@ -24,9 +24,9 @@ class PluginPaths:
         home = source.get("DECKY_USER_HOME") or os.path.expanduser("~")
         fallback = os.path.join(home, "homebrew")
         return cls(
-            settings_dir=source.get("DECKY_PLUGIN_SETTINGS_DIR", os.path.join(fallback, "settings", "Keepsake")),
-            runtime_dir=source.get("DECKY_PLUGIN_RUNTIME_DIR", os.path.join(fallback, "data", "Keepsake")),
-            log_dir=source.get("DECKY_PLUGIN_LOG_DIR", os.path.join(fallback, "logs", "Keepsake")),
+            settings_dir=source.get("DECKY_PLUGIN_SETTINGS_DIR", os.path.join(fallback, "settings", "Haversack")),
+            runtime_dir=source.get("DECKY_PLUGIN_RUNTIME_DIR", os.path.join(fallback, "data", "Haversack")),
+            log_dir=source.get("DECKY_PLUGIN_LOG_DIR", os.path.join(fallback, "logs", "Haversack")),
             plugin_dir=source.get("DECKY_PLUGIN_DIR", os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
         )
 

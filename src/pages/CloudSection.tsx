@@ -54,24 +54,24 @@ const FORMS: Partial<Record<Backend, FieldSpec[]>> = {
 };
 
 const GRANT: Partial<Record<Backend, string>> = {
-  onedrive: "Microsoft asks you to allow Keepsake access to Apps/Keepsake only.",
-  gdrive: "Google asks you to allow Keepsake access to its own app data only.",
+  onedrive: "Microsoft's page shows the app's registered name, Keepsake: allow it access to Apps/Keepsake only.",
+  gdrive: "Google's page shows the app's registered name, Keepsake: allow it access to its own app data only.",
 };
 
 // v0.41.1: no page takes focus by itself, so after the browser sign-in focus stays where Steam
 // puts it, and right or A goes back into the page (this replaces ADR-0044's refocus).
 
 const WHY_PHONE: Record<"onedrive" | "gdrive", string> = {
-  onedrive: "Keepsake shows a code to enter on your phone.",
-  gdrive: "Google does not allow sign-in inside Steam's browser, so Keepsake shows a code to enter on your phone.",
+  onedrive: "Haversack shows a code to enter on your phone.",
+  gdrive: "Google does not allow sign-in inside Steam's browser, so Haversack shows a code to enter on your phone.",
 };
 
 const HELP: Record<Backend, string> = {
   local: "Snapshots stay in a test store on this device. Nothing is shared with your other devices.",
-  onedrive: "Sign in with your Microsoft account. Keepsake can read and write only the Apps/Keepsake folder in your OneDrive, never your other files.",
-  gdrive: "Sign in with your Google account. Keepsake can use only its own hidden app folder in your Google Drive, never your files.",
-  webdav: "Your own WebDAV server, such as Nextcloud. It must refuse to overwrite files (Keepsake checks).",
-  s3: "Amazon S3 or an S3-compatible service. It must support conditional writes (Keepsake checks).",
+  onedrive: "Sign in with your Microsoft account. Haversack can read and write only the Apps/Keepsake folder in your OneDrive, never your other files.",
+  gdrive: "Sign in with your Google account. Haversack can use only its own hidden app folder in your Google Drive, never your files.",
+  webdav: "Your own WebDAV server, such as Nextcloud. It must refuse to overwrite files (Haversack checks).",
+  s3: "Amazon S3 or an S3-compatible service. It must support conditional writes (Haversack checks).",
   direct:
     "No account and no cloud: each device keeps its own copy of your saves' history, and paired devices fetch what they lack from each other when they can reach each other. Needs Replication and a paired device. There is no copy away from your devices.",
 };
@@ -102,8 +102,8 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
         return null;
       });
       toaster.toast({
-        title: "Keepsake",
-        body: result.status !== "signed-in" ? `Sign-in did not complete: ${result.reason}` : result.method === "phone" ? "Signed in with your phone. Keepsake is signed in; you can close any sign-in tab left open." : "Signed in.",
+        title: "Haversack",
+        body: result.status !== "signed-in" ? `Sign-in did not complete: ${result.reason}` : result.method === "phone" ? "Signed in with your phone. Haversack is signed in; you can close any sign-in tab left open." : "Signed in.",
       });
       void refresh();
     });
@@ -128,9 +128,9 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
     setBusy(true);
     try {
       const message = await work();
-      if (message) toaster.toast({ title: "Keepsake", body: message });
+      if (message) toaster.toast({ title: "Haversack", body: message });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
       await refresh();
@@ -196,7 +196,7 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
   const useOwnClient = (on: boolean) => {
     setAdvanced(on);
     if (on || !own) return;
-    // Back to Keepsake's built-in client. A saved sign-in keeps refreshing with the client it was made with.
+    // Back to Haversack's built-in client. A saved sign-in keeps refreshing with the client it was made with.
     void run(async () => {
       if (view === "onedrive") {
         onSettings(await setSetting("onedriveClientId", ""));
@@ -205,7 +205,7 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
         setConfig(await setBackendConfig("gdrive", { clientId: "", clientSecret: "" }));
         setDraft({ clientId: "" });
       }
-      return "Your own client ID is cleared. Keepsake's built-in sign-in is used from the next sign-in.";
+      return "Your own client ID is cleared. Haversack's built-in sign-in is used from the next sign-in.";
     });
   };
 
@@ -216,7 +216,7 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
         description={
           status?.problem
             ? `Needs attention: ${status.problem}`
-            : "Every snapshot goes to each location. Add more for extra copies; when saves differ, Keepsake looks at all of them."
+            : "Every snapshot goes to each location. Add more for extra copies; when saves differ, Haversack looks at all of them."
         }
       />
       {(locations?.locations ?? []).length > 1 &&
@@ -254,8 +254,8 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
           label="Advanced: use my own client ID"
           description={
             own
-              ? "Your own app registration is in use. Turn this off to use Keepsake's built-in sign-in."
-              : "Only if you have your own app registration. Keepsake's built-in sign-in needs none."
+              ? "Your own app registration is in use. Turn this off to use Haversack's built-in sign-in."
+              : "Only if you have your own app registration. Haversack's built-in sign-in needs none."
           }
           checked={advanced || own}
           disabled={locked}
@@ -320,7 +320,7 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
       {oauth && !signedIn && available?.browser && available?.phone && (
         <ToggleField
           label="Sign in with this device's browser"
-          description={method === "browser" ? "Keepsake opens the sign-in page in Steam's browser." : WHY_PHONE[provider]}
+          description={method === "browser" ? "Haversack opens the sign-in page in Steam's browser." : WHY_PHONE[provider]}
           checked={method === "browser"}
           disabled={locked || Boolean(code)}
           onChange={setPreferred}
@@ -330,7 +330,7 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
       {code?.method === "browser" && (
         <Field
           label="Finish signing in in the browser"
-          description={`Sign in on the ${view === "gdrive" ? "Google" : "Microsoft"} page and allow access for Keepsake. ${
+          description={`Sign in on the ${view === "gdrive" ? "Google" : "Microsoft"} page and allow access for Haversack. ${
             GRANT[view] ?? ""
           } Then come back here. This waits ${Math.round(code.expiresIn / 60)} minutes.`}
           childrenLayout="below"
@@ -359,7 +359,7 @@ export function CloudSection({ settings, onSettings }: { settings: Settings; onS
           label="Sign in with your phone"
           description={`Open ${code.verificationUri} or scan the code, then enter the code below. Check the page is on ${
             view === "gdrive" ? "google.com" : "microsoft.com"
-          } and asks for access for Keepsake. ${GRANT[view] ?? ""} The code expires in ${Math.round(code.expiresIn / 60)} minutes.`}
+          } and asks for access for Haversack. ${GRANT[view] ?? ""} The code expires in ${Math.round(code.expiresIn / 60)} minutes.`}
           childrenLayout="below"
         >
           <div style={{ fontSize: 40, fontWeight: "bold", letterSpacing: 4, margin: "8px 0" }}>{code.userCode}</div>

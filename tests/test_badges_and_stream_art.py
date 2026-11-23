@@ -46,7 +46,7 @@ def test_badges_show_the_saves_or_where_a_tile_streams_from(device):
         return off, synced, streaming, unknown, hidden
 
     off, synced, streaming, unknown, hidden = asyncio.run(go())
-    assert off == {"state": "off", "label": "Saves: not synced by Keepsake"}
+    assert off == {"state": "off", "label": "Saves: not synced by Haversack"}
     assert synced == {"state": "synced", "label": "Saves: in step"}
     assert streaming == {"state": "streaming", "label": "Streams from Legion Go 2"}
     assert unknown is None and hidden is None
@@ -62,7 +62,7 @@ def test_a_conflict_shows_on_the_badge(device):
         state.update(gk, conflict={"kind": "fork", "heads": [], "localFiles": 1, "raised": 1.0})
         return await a.app.library_badge(4171510507)
 
-    assert asyncio.run(go()) == {"state": "conflict", "label": "Saves: conflict, open Keepsake"}
+    assert asyncio.run(go()) == {"state": "conflict", "label": "Saves: conflict, open Haversack"}
 
 
 def test_only_non_steam_streaming_tiles_are_offered_artwork(device):

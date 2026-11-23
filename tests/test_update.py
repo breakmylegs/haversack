@@ -24,7 +24,7 @@ def release(tag, prerelease=False, draft=False, assets=True, body="Notes"):
     items = []
     if assets:
         items = [
-            {"name": f"Keepsake-v{version}.zip", "browser_download_url": f"https://github.com/r/{tag}/zip"},
+            {"name": f"Haversack-v{version}.zip", "browser_download_url": f"https://github.com/r/{tag}/zip"},
             {"name": "SHA256SUMS", "browser_download_url": f"https://github.com/r/{tag}/sums"},
         ]
     return {
@@ -103,8 +103,8 @@ def test_select_latest_respects_channel_and_completeness():
 
 
 def test_parse_sums():
-    text = f"{DIGEST}  Keepsake-v0.2.0.zip\n{'CD' * 32} *Other.zip\nnot a line\n{'zz' * 32}  Bad.zip\n"
-    assert parse_sums(text) == {"Keepsake-v0.2.0.zip": DIGEST, "Other.zip": "cd" * 32}
+    text = f"{DIGEST}  Haversack-v0.2.0.zip\n{'CD' * 32} *Other.zip\nnot a line\n{'zz' * 32}  Bad.zip\n"
+    assert parse_sums(text) == {"Haversack-v0.2.0.zip": DIGEST, "Other.zip": "cd" * 32}
 
 
 def test_check_finds_update_and_notifies_once(tmp_path):
@@ -167,8 +167,8 @@ def make_ready(tmp_path, current="0.2.0", sums_text=None):
     gh = FakeGitHub(
         [release("v0.2.1"), release("v0.2.0"), release("v0.1.0", assets=False)],
         sums={
-            "https://github.com/r/v0.2.1/sums": sums_text or f"{DIGEST}  Keepsake-v0.2.1.zip\n",
-            "https://github.com/r/v0.2.0/sums": f"{'cd' * 32}  Keepsake-v0.2.0.zip\n",
+            "https://github.com/r/v0.2.1/sums": sums_text or f"{DIGEST}  Haversack-v0.2.1.zip\n",
+            "https://github.com/r/v0.2.0/sums": f"{'cd' * 32}  Haversack-v0.2.0.zip\n",
         },
     )
     updater = Updater(str(tmp_path), current, gh, clock=Clock(), public_key=CHECKSUM_ONLY)
@@ -177,17 +177,29 @@ def make_ready(tmp_path, current="0.2.0", sums_text=None):
 
 
 def test_stable_keepsake_zip_asset_does_not_confuse_the_updater(tmp_path):
-    # Releases also carry Keepsake.zip (same bytes) for the fixed "latest" URL, listed first here on purpose.
+    # Releases also carry Haversack.zip (same bytes) for the fixed "latest" URL, listed first here on purpose.
     payload = release("v0.2.1")
-    payload["assets"].insert(0, {"name": "Keepsake.zip", "browser_download_url": "https://github.com/r/v0.2.1/stable"})
-    sums = f"{'cd' * 32}  Keepsake.zip\n{DIGEST}  Keepsake-v0.2.1.zip\n"
+    payload["assets"].insert(0, {"name": "Haversack.zip", "browser_download_url": "https://github.com/r/v0.2.1/stable"})
+    sums = f"{'cd' * 32}  Haversack.zip\n{DIGEST}  Haversack-v0.2.1.zip\n"
     gh = FakeGitHub([payload], sums={"https://github.com/r/v0.2.1/sums": sums})
     updater = Updater(str(tmp_path), "0.2.0", gh, clock=Clock(), public_key=CHECKSUM_ONLY)
     status = updater.check("stable")
     assert status["latest"]["zip_url"] == "https://github.com/r/v0.2.1/zip"
     result = updater.prepare("v0.2.1", busy_reason=None)
     assert result["artifact"] == "https://github.com/r/v0.2.1/zip"
-    assert result["sha256"] == DIGEST  # the versioned zip's line, not Keepsake.zip's
+    assert result["sha256"] == DIGEST  # the versioned zip's line, not Haversack.zip's
+
+
+def test_keepsake_releases_are_never_offered_to_haversack(tmp_path):
+    # Before v0.51.0 a release carried only Keepsake zips. Installing one from Haversack would add a second
+    # plugin beside it (ADR-0089), so such a release is incomplete here and never offered.
+    old = release("v0.50.0")
+    old["assets"][0]["name"] = "Keepsake-v0.50.0.zip"
+    gh = FakeGitHub([old, release("v0.49.0")], sums={})
+    updater = Updater(str(tmp_path), "0.49.0", gh, clock=Clock(), public_key=CHECKSUM_ONLY)
+    status = updater.check("stable")
+    assert status["updateAvailable"] is False
+    assert updater.prepare("v0.50.0", busy_reason=None) == {"ok": False, "reason": "incomplete-release"}
 
 
 def test_prepare_returns_decky_arguments(tmp_path):
@@ -197,7 +209,7 @@ def test_prepare_returns_decky_arguments(tmp_path):
         "signed": False,  # no release key pinned yet (ADR-0023)
         "ok": True,
         "artifact": "https://github.com/r/v0.2.1/zip",
-        "name": "Keepsake",
+        "name": "Haversack",
         "version": "dev",
         "displayVersion": "0.2.1",
         "sha256": DIGEST,
@@ -242,8 +254,8 @@ def test_prepare_sums_download_failure(tmp_path):
 
 def test_prepare_rejects_zip_on_disallowed_host(tmp_path):
     payload = [release("v0.2.1")]
-    payload[0]["assets"][0]["browser_download_url"] = "https://evil.example.com/Keepsake-v0.2.1.zip"
-    gh = FakeGitHub(payload, sums={"https://github.com/r/v0.2.1/sums": f"{DIGEST}  Keepsake-v0.2.1.zip\n"})
+    payload[0]["assets"][0]["browser_download_url"] = "https://evil.example.com/Haversack-v0.2.1.zip"
+    gh = FakeGitHub(payload, sums={"https://github.com/r/v0.2.1/sums": f"{DIGEST}  Haversack-v0.2.1.zip\n"})
     updater = Updater(str(tmp_path), "0.2.0", gh, clock=Clock(), public_key=CHECKSUM_ONLY)
     updater.check("stable")
     assert updater.prepare("v0.2.1", busy_reason=None)["reason"] == "disallowed-host"

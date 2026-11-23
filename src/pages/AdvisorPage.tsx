@@ -48,9 +48,9 @@ const SECTION_TITLES: [keyof AdvisorRecommendation["lines"], string][] = [
 async function copyText(text: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
-    toaster.toast({ title: "Keepsake", body: "Copied." });
+    toaster.toast({ title: "Haversack", body: "Copied." });
   } catch {
-    toaster.toast({ title: "Keepsake", body: "Copy is not available here. The text is shown so you can type it." });
+    toaster.toast({ title: "Haversack", body: "Copy is not available here. The text is shown so you can type it." });
   }
 }
 
@@ -127,7 +127,7 @@ function Recommendation({ rec }: { rec: AdvisorRecommendation }) {
 }
 
 // PCGamingWiki (optional, off by default): which upscalers and frame generation the game supports. Uses the
-// user's own bot password; the login goes to Keepsake's backend secrets and never comes back to this page.
+// user's own bot password; the login goes to Haversack's backend secrets and never comes back to this page.
 function PcgwSection({ view, busy, act }: { view: AdvisorView; busy: boolean; act: (work: () => Promise<AdvisorView>) => Promise<void> }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -141,9 +141,9 @@ function PcgwSection({ view, busy, act }: { view: AdvisorView; busy: boolean; ac
       await savePcgwLogin("pcgw", { username: username.trim(), password: password.trim() });
       setPassword("");
       await act(advisorRefresh);
-      toaster.toast({ title: "Keepsake", body: "PCGamingWiki login saved." });
+      toaster.toast({ title: "Haversack", body: "PCGamingWiki login saved." });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     }
   };
 
@@ -181,7 +181,7 @@ function PcgwSection({ view, busy, act }: { view: AdvisorView; busy: boolean; ac
       )}
       <ToggleField
         label="ProtonDB (optional)"
-        description="Adds ProtonDB reports from handhelds with the same chip families. Downloads Keepsake's ProtonDB index (up to 30 MB) once a month and looks games up on this device, so no game is named to anyone."
+        description="Adds ProtonDB reports from handhelds with the same chip families. Downloads Haversack's ProtonDB index (up to 30 MB) once a month and looks games up on this device, so no game is named to anyone."
         checked={settings.sourceProtonDb}
         disabled={busy}
         onChange={(on) => void act(() => advisorSettings({ sourceProtonDb: on }))}
@@ -203,7 +203,7 @@ function PcgwSection({ view, busy, act }: { view: AdvisorView; busy: boolean; ac
 }
 
 // Optional AI advice (P18): off until a provider is chosen and its key added. Asked only from the button, shown
-// as unverified, never acted on. The key goes to Keepsake's backend secrets and never comes back to this page.
+// as unverified, never acted on. The key goes to Haversack's backend secrets and never comes back to this page.
 function AiSection({ view, busy, act }: { view: AdvisorView; busy: boolean; act: (work: () => Promise<AdvisorView>) => Promise<void> }) {
   const [key, setKey] = useState("");
   const [models, setModels] = useState<{ id: string; label: string }[]>([]);
@@ -218,9 +218,9 @@ function AiSection({ view, busy, act }: { view: AdvisorView; busy: boolean; act:
       await saveAiKey(provider.id, { apiKey: key.trim() });
       setKey("");
       await act(advisorView);
-      toaster.toast({ title: "Keepsake", body: `${provider.name} key saved.` });
+      toaster.toast({ title: "Haversack", body: `${provider.name} key saved.` });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     }
   };
 
@@ -229,7 +229,7 @@ function AiSection({ view, busy, act }: { view: AdvisorView; busy: boolean; act:
     try {
       setModels(await advisorAiModels(provider.id));
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     }
   };
 
@@ -305,7 +305,7 @@ export function AdvisorPage() {
     try {
       setView(await work());
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -326,14 +326,14 @@ export function AdvisorPage() {
       const found = await discoverGames(false);
       setGames(found.games);
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Could not list games: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Could not list games: ${plainError(err)}` });
     }
   };
 
   const saveSteamId = () => {
     const id = Number(steamId.trim());
     if (!game || !Number.isInteger(id) || id <= 0) {
-      toaster.toast({ title: "Keepsake", body: "Enter the game's Steam app ID, a whole number." });
+      toaster.toast({ title: "Haversack", body: "Enter the game's Steam app ID, a whole number." });
       return;
     }
     void act(() => advisorSettings({ steamIdOverrides: { ...settings.steamIdOverrides, [String(game.appid)]: id } }));

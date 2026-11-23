@@ -267,5 +267,5 @@ def test_with_ask_me_a_conflict_is_announced_and_left(pair):
         return await b.app.list_conflicts()
 
     assert len(asyncio.run(go())) == 1
-    assert "Save conflict for Example Quest. Open Keepsake to choose." in b.toasts()
+    assert "Save conflict for Example Quest. Open Haversack to choose." in b.toasts()
     assert not b.app._newest_running

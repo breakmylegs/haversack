@@ -106,17 +106,24 @@ def ensure_clean_main(runner: Runner) -> None:
 
 
 def stable_zip_name() -> str:
-    """The unversioned asset behind the fixed URL .../releases/latest/download/Keepsake.zip."""
+    """The unversioned asset behind the fixed URL .../releases/latest/download/Haversack.zip."""
     return f"{package.plugin_name()}.zip"
+
+
+# Keepsake became Haversack in v0.51.0 (ADR-0089). Every Keepsake updater looks for its old asset names, so
+# the same bytes are published under them too: the update then installs Haversack, which moves the data across.
+OLD_NAME = "Keepsake"
 
 
 def build_assets(out_dir: str, version: str, notes: str) -> list[str]:
     """Build the zips, SHA256SUMS and notes; return the files to upload, SHA256SUMS last.
 
-    Two zips with the same bytes are published: ``Keepsake-v<version>.zip``,
+    Two zips with the same bytes are published: ``Haversack-v<version>.zip``,
     which the in-plugin updater and the reproducible-build check use, and
-    ``Keepsake.zip``, so a first install can always use the same URL.
-    ``SHA256SUMS`` lists both, so its signature covers both names.
+    ``Haversack.zip``, so a first install can always use the same URL. Copies
+    under the old names (``Keepsake-v<version>.zip``, ``Keepsake.zip`` and the PC
+    package's ``Keepsake-desktop-v<version>.zip``) serve installed Keepsakes.
+    ``SHA256SUMS`` lists every name, so its signature covers them all.
     """
     if os.path.isdir(out_dir):
         shutil.rmtree(out_dir)
@@ -141,15 +148,30 @@ def build_assets(out_dir: str, version: str, notes: str) -> list[str]:
     sbom_path = sbom.write(os.path.join(out_dir, sbom.asset_name(package.plugin_name(), version)), ROOT)
     with open(sbom_path, "rb") as handle:
         sbom_digest = hashlib.sha256(handle.read()).hexdigest()
+    names = {expected, stable_zip_name(), os.path.basename(desktop_path)}
+    old = [
+        (source, name, d)
+        for source, name, d in (
+            (zip_path, f"{OLD_NAME}-v{version}.zip", digest),
+            (zip_path, f"{OLD_NAME}.zip", digest),
+            (desktop_path, f"{OLD_NAME}-desktop-v{version}.zip", desktop_digest),
+        )
+        if name not in names
+    ]
+    old_paths = []
+    for source, name, _ in old:
+        old_paths.append(os.path.join(out_dir, name))
+        shutil.copyfile(source, old_paths[-1])
     sums_path = os.path.join(out_dir, SUMS_NAME)
     with open(sums_path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(
             f"{digest}  {expected}\n{digest}  {stable_zip_name()}\n{desktop_digest}  {os.path.basename(desktop_path)}\n"
             f"{helper_digest}  {os.path.basename(helper_path)}\n{sbom_digest}  {os.path.basename(sbom_path)}\n"
         )
+        handle.writelines(f"{d}  {name}\n" for _, name, d in old)
     with open(os.path.join(out_dir, "notes.md"), "w", encoding="utf-8", newline="\n") as handle:
         handle.write(notes)
-    return [zip_path, stable_path, desktop_path, helper_path, sbom_path, sums_path]
+    return [zip_path, stable_path, desktop_path, helper_path, sbom_path, *old_paths, sums_path]
 
 
 def pinned_key() -> str:
@@ -171,7 +193,7 @@ def sign(
     that installed devices would refuse is never published (and the verifier is re-proved against the
     real minisign tool every release).
     """
-    comment = f"Keepsake v{version}"
+    comment = f"Haversack v{version}"
     signature: str | None = None
     if signing.is_set_up():
         try:
@@ -283,7 +305,7 @@ def publish(
     if dry_run:
         print(f"Dry run: assets for {tag} are in {out_dir}. No tag or release was created.")
         return out_dir
-    runner(["git", "tag", "-a", tag, "-m", f"Keepsake {tag}"])
+    runner(["git", "tag", "-a", tag, "-m", f"Haversack {tag}"])
     runner(["git", "push", "origin", tag])
     command = [
         "gh",
@@ -293,7 +315,7 @@ def publish(
         *files,
         "--verify-tag",
         "--title",
-        f"Keepsake {tag}",
+        f"Haversack {tag}",
         "--notes-file",
         os.path.join(out_dir, "notes.md"),
     ]

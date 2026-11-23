@@ -759,13 +759,13 @@ def test_helper_zip_is_version_locked_and_root_flagged(tmp_path: Any) -> None:
     path = package.build_helper(str(tmp_path))
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
-        version = archive.read("keepsake-helper/VERSION").decode().strip()
-        meta = json.loads(archive.read("keepsake-helper/package.json"))
-        plugin = json.loads(archive.read("keepsake-helper/plugin.json"))
+        version = archive.read("haversack-helper/VERSION").decode().strip()
+        meta = json.loads(archive.read("haversack-helper/package.json"))
+        plugin = json.loads(archive.read("haversack-helper/plugin.json"))
     assert version == package.version() == meta["version"]
-    assert plugin["flags"] == ["root"] and plugin["name"] == "Keepsake Helper"
-    assert "keepsake-helper/py_modules/keepsake_helper/server.py" in names
-    assert "keepsake-helper/dist/index.js" in names
+    assert plugin["flags"] == ["root"] and plugin["name"] == "Haversack Helper"
+    assert "haversack-helper/py_modules/keepsake_helper/server.py" in names
+    assert "haversack-helper/dist/index.js" in names
     assert not any("test" in n or n.endswith(".pyc") for n in names)
     with open(os.path.join(ROOT, "plugin.json"), encoding="utf-8") as handle:
         assert "root" not in json.load(handle)["flags"]  # Keepsake itself never runs as root (P8)
@@ -781,11 +781,11 @@ def test_prepare_helper_needs_a_signed_release() -> None:
                 "name": n,
                 "browser_download_url": f"https://github.com/breakmylegs/keepsake/releases/download/v0.41.0/{n}",
             }
-            for n in ("Keepsake-v0.41.0.zip", "Keepsake-helper-v0.41.0.zip", "SHA256SUMS")
+            for n in ("Haversack-v0.41.0.zip", "Haversack-helper-v0.41.0.zip", "SHA256SUMS")
         ],
     }
     parsed = update.parse_releases([release])[0]
-    assert parsed.helper_url and parsed.helper_url.endswith("Keepsake-helper-v0.41.0.zip")
+    assert parsed.helper_url and parsed.helper_url.endswith("Haversack-helper-v0.41.0.zip")
 
     class U(update.Updater):
         def _state(self) -> dict[str, Any]:

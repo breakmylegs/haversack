@@ -36,13 +36,13 @@ const REASONS: Record<string, string> = {
   busy: "Update after the current sync.",
   "unknown-release": "That release was not found. Check for updates and try again.",
   "incomplete-release": "That release is missing its zip or SHA256SUMS file, so it cannot be verified.",
-  "disallowed-host": "That release points at a download address Keepsake does not trust.",
+  "disallowed-host": "That release points at a download address Haversack does not trust.",
   offline: "GitHub could not be reached. Try again when online.",
   "sums-unavailable": "The release's SHA256SUMS file could not be downloaded.",
   "sums-missing-zip": "SHA256SUMS does not list the release zip, so it cannot be verified.",
-  "unsigned-release": "That release is not signed, so Keepsake will not install it.",
+  "unsigned-release": "That release is not signed, so Haversack will not install it.",
   "signature-unavailable": "The release's signature could not be downloaded. Try again later.",
-  "bad-signature": "The release's signature is not valid for Keepsake's release key, so it was not installed.",
+  "bad-signature": "The release's signature is not valid for Haversack's release key, so it was not installed.",
 };
 
 export function reasonText(reason: string): string {

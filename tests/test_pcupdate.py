@@ -40,7 +40,7 @@ def release_payload(version="0.27.0", desktop=True, signed=True):
     ]
     if desktop:
         assets.append(
-            {"name": f"Keepsake-desktop-v{version}.zip", "browser_download_url": f"https://github.com/r/{tag}/desktop"}
+            {"name": f"Haversack-desktop-v{version}.zip", "browser_download_url": f"https://github.com/r/{tag}/desktop"}
         )
     if signed:
         assets.append({"name": "SHA256SUMS.minisig", "browser_download_url": f"https://github.com/r/{tag}/sig"})
@@ -64,7 +64,7 @@ class FakeGitHub:
 
 
 def ready_updater(tmp_path, data, payload=None, sums=None, signature=None, key=None):
-    sums = sums if sums is not None else f"{hashlib.sha256(data).hexdigest()}  Keepsake-desktop-v0.27.0.zip\n".encode()
+    sums = sums if sums is not None else f"{hashlib.sha256(data).hexdigest()}  Haversack-desktop-v0.27.0.zip\n".encode()
     gh = FakeGitHub(payload or release_payload(), sums, signature or signature_text(sums))
     updater = Updater(str(tmp_path / "runtime"), "0.26.0", gh, public_key=key or public_text())
     os.makedirs(tmp_path / "runtime", exist_ok=True)
@@ -101,7 +101,7 @@ def test_the_pc_package_is_approved_only_under_a_valid_signature(tmp_path):
         "ok": True,
         "signed": True,
         "url": "https://github.com/r/v0.27.0/desktop",
-        "name": "Keepsake-desktop-v0.27.0.zip",
+        "name": "Haversack-desktop-v0.27.0.zip",
         "version": "0.27.0",
         "sha256": hashlib.sha256(data).hexdigest(),
     }
@@ -119,7 +119,7 @@ def test_the_pc_package_is_approved_only_under_a_valid_signature(tmp_path):
 )
 def test_the_pc_package_is_refused_without_proof(tmp_path, case, reason):
     data = package_zip()
-    sums = f"{hashlib.sha256(data).hexdigest()}  Keepsake-desktop-v0.27.0.zip\n".encode()
+    sums = f"{hashlib.sha256(data).hexdigest()}  Haversack-desktop-v0.27.0.zip\n".encode()
     kwargs = {}
     if case == "unsigned":
         kwargs["payload"] = release_payload(signed=False)
@@ -128,7 +128,7 @@ def test_the_pc_package_is_refused_without_proof(tmp_path, case, reason):
     elif case == "no-desktop-asset":
         kwargs["payload"] = release_payload(desktop=False)
     elif case == "sums-without-desktop":
-        kwargs["sums"] = b"ab" * 32 + b"  Keepsake-v0.27.0.zip\n"
+        kwargs["sums"] = b"ab" * 32 + b"  Haversack-v0.27.0.zip\n"
     updater = ready_updater(tmp_path, data, **kwargs)
     tag = "v9.9.9" if case == "unknown-tag" else "v0.27.0"
     result = updater.prepare_desktop(tag)

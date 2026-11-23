@@ -17,13 +17,13 @@ export function GameLocations({ gameKey, config, onConfig }: { gameKey: string; 
   const toggle = (id: Backend, on: boolean) => {
     const next = on ? [...chosen, id] : chosen.filter((c) => c !== id);
     if (!next.length) {
-      toaster.toast({ title: "Keepsake", body: "A game needs at least one save location." });
+      toaster.toast({ title: "Haversack", body: "A game needs at least one save location." });
       return;
     }
     const all = inUse.every((b) => next.includes(b));
     void setGameLocations(gameKey, all ? null : next)
       .then(onConfig)
-      .catch((err) => toaster.toast({ title: "Keepsake", body: plainError(err) }));
+      .catch((err) => toaster.toast({ title: "Haversack", body: plainError(err) }));
   };
   return (
     <>

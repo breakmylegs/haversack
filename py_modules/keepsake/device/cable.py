@@ -217,7 +217,7 @@ def read_stored_host(selected: str, nodes: list[HidNode], get: Get = get_feature
         return {
             "ok": False,
             "state": "permission",
-            "message": "Keepsake may not read this controller over USB without root. The root helper "
+            "message": "Haversack may not read this controller over USB without root. The root helper "
             "(next release) can.",
         }
     return {"ok": False, "state": "unreadable", "message": "The controller did not answer over USB."}

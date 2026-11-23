@@ -261,7 +261,7 @@ def test_signin_problem_toasts_once_until_it_recovers(pair):
         await a.app._warn_signin()
 
     run(go())
-    assert a.toasts().count("OneDrive sign-in needs attention. Open Keepsake, Settings, to sign in again.") == 2
+    assert a.toasts().count("OneDrive sign-in needs attention. Open Haversack, Settings, to sign in again.") == 2
 
 
 def test_sync_now_refuses_while_busy(pair):

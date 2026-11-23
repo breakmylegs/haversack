@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { libraryBadge } from "./backend";
 import { STATUS } from "./format";
 
-// Keepsake's badge on a game's page in Steam's library (R18, ADR-0081): its saves' state, or the
+// Haversack's badge on a game's page in Steam's library (R18, ADR-0081): its saves' state, or the
 // device a streaming tile streams from. Steam's page is not ours, so the patch is defensive:
 // if the page does not look as expected, or anything throws, the page is left exactly as Steam
 // drew it. The badge only reads; switching it off is Settings, General, "Badges in Steam's library".
 
 const ROUTE = "/library/app/:appid";
 
-// Steam's render tree has no types; this is the one place Keepsake walks it.
+// Steam's render tree has no types; this is the one place Haversack walks it.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SteamTree = any;
 
@@ -50,7 +50,7 @@ function Badge({ appid }: { appid: number }) {
         pointerEvents: "none",
       }}
     >
-      Keepsake · {badge.label}
+      Haversack · {badge.label}
     </div>
   );
 }

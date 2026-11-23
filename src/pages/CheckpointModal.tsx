@@ -32,7 +32,7 @@ function CheckpointModal({
     try {
       const result = await snapshotGame(gameKey, name);
       toaster.toast({
-        title: "Keepsake",
+        title: "Haversack",
         body:
           result.status === "published"
             ? `Checkpoint "${name.trim()}" saved for ${gameName}. Find it in History.`
@@ -43,7 +43,7 @@ function CheckpointModal({
       closeModal?.();
       onDone?.();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Checkpoint not saved: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Checkpoint not saved: ${plainError(err)}` });
       setBusy(false);
     }
   };

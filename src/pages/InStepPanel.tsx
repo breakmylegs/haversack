@@ -28,9 +28,9 @@ export function InStepPanel({ appid }: { appid: number }) {
     setBusy(true);
     try {
       await work();
-      if (done) toaster.toast({ title: "Keepsake", body: done });
+      if (done) toaster.toast({ title: "Haversack", body: done });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
       await load();

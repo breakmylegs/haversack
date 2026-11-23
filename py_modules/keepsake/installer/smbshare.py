@@ -183,7 +183,7 @@ class Share:
                 raise RemoteError(f"could not find {self.home}") from exc
             # Resolved once: the addresses checked are the ones connected to.
             if not addresses or not host_is_private(host, lambda _h: addresses):
-                raise RemoteError(f"{self.home} is not on your local network; Keepsake only uses Windows shares there")
+                raise RemoteError(f"{self.home} is not on your local network; Haversack only uses Windows shares there")
             self._ip = addresses[0]
         return self._ip
 

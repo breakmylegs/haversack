@@ -228,7 +228,7 @@ class SleepGuard:
                             "/org/freedesktop/login1",
                             "org.freedesktop.login1.Manager",
                             "Inhibit",
-                            [what, "Keepsake", why, mode],
+                            [what, "Haversack", why, mode],
                         )
                         self.fds.extend(reply["fds"][:1])
                 finally:

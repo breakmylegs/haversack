@@ -72,7 +72,7 @@ def describe(record: Mapping[str, Any], name_of: Callable[[str], str]) -> str | 
     elif event == "import.ludusavi_all":
         template = "Finished importing Ludusavi backups."
     elif event in ("update.applied", "update.pc_installed"):
-        template = "Updated Keepsake."
+        template = "Updated Haversack."
     else:
         template = None
     return template.format(game=game) if template else None

@@ -152,7 +152,7 @@ export function KeepsakeRoute() {
   }, []);
   return (
     <div ref={rootRef} data-keepsake-root="" style={{ marginTop: 40, height: "calc(100% - 40px)" }}>
-      <SidebarNavigation title="Keepsake" showTitle pages={PAGES} />
+      <SidebarNavigation title="Haversack" showTitle pages={PAGES} />
     </div>
   );
 }

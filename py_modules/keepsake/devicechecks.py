@@ -129,7 +129,7 @@ async def check_addresses(ctx: Context) -> dict[str, Any]:
     if not lan and not overlay:
         return result("fail", "No home network or VPN address: connect to Wi-Fi and run it again.", **counts)
     if not bindable:
-        return result("fail", "Addresses found, but Keepsake cannot listen on any of them.", **counts)
+        return result("fail", "Addresses found, but Haversack cannot listen on any of them.", **counts)
     return result("pass", f"{len(lan)} home network and {len(overlay)} VPN address(es); listening works.", **counts)
 
 
@@ -187,10 +187,10 @@ async def check_firewall(ctx: Context) -> dict[str, Any]:
     udp = _covers(ports, discovery.PORT, "udp") or "mdns" in services
     details = {"firewalld": True, "zone": zone, "tcp47110": tcp, "udp5353": udp}
     if tcp and udp:
-        return result("pass", f"firewalld's {zone} zone already allows Keepsake.", **details)
+        return result("pass", f"firewalld's {zone} zone already allows Haversack.", **details)
     return result(
         "warn",
-        f"firewalld's {zone} zone may block Keepsake: allow TCP 47110 and UDP 5353 (Health says how).",
+        f"firewalld's {zone} zone may block Haversack: allow TCP 47110 and UDP 5353 (Health says how).",
         **details,
     )
 
@@ -357,7 +357,7 @@ async def check_file_systems(ctx: Context) -> dict[str, Any]:
 
 async def check_sleep(_ctx: Context) -> dict[str, Any]:
     guard = SleepGuard()
-    held = guard.acquire("Keepsake device check")
+    held = guard.acquire("Haversack device check")
     count = len(guard.fds) if guard.fds else (1 if guard.windows else 0)
     guard.release()
     if not held:
@@ -391,7 +391,7 @@ async def check_steam_folders(ctx: Context) -> dict[str, Any]:
         os.mkdir(probe)
         os.rmdir(probe)
     except OSError as exc:
-        return result("fail", f"Keepsake cannot write in Steam's compatdata folder ({exc.strerror}).")
+        return result("fail", f"Haversack cannot write in Steam's compatdata folder ({exc.strerror}).")
     tool_note = (
         "compatibilitytools.d exists"
         if os.path.isdir(tools)
@@ -446,7 +446,7 @@ async def check_link_speed(ctx: Context) -> dict[str, Any]:
             received += await one()
         seconds = time.perf_counter() - started
     except link.Refused:
-        return result("fail", "The other device runs an older Keepsake: update both, then run it again.")
+        return result("fail", "The other device runs an older Haversack: update both, then run it again.")
     except (link.LinkError, OSError) as exc:
         return result("fail", f"The link dropped during the test ({type(exc).__name__}).")
     finally:
@@ -469,7 +469,7 @@ async def check_find(ctx: Context) -> dict[str, Any]:
     if any(d["id"] == peer["id"] for d in found):
         return result("pass", "The other handheld answers Find devices.", devices=len(found))
     if found:
-        return result("warn", "Other Keepsake devices answered, but not the paired one.", devices=len(found))
+        return result("warn", "Other Haversack devices answered, but not the paired one.", devices=len(found))
     return result(
         "fail", "No device answered: on the other one, switch on Let other devices reach this one.", devices=0
     )
@@ -566,7 +566,7 @@ async def check_network_iso(ctx: Context) -> dict[str, Any]:
         return result("pass", f"An ISO on a {iso['fstype']} share opens in place. " + ", ".join(parts) + ".", **details)
     return result(
         "warn",
-        f"An ISO on a {iso['fstype']} share could not be opened in place, so Keepsake copies it first. "
+        f"An ISO on a {iso['fstype']} share could not be opened in place, so Haversack copies it first. "
         + ", ".join(parts)
         + ".",
         **details,
@@ -639,12 +639,12 @@ async def check_see_other(ctx: Context) -> dict[str, Any]:
     if found:
         return result(
             "pass",
-            f"{len(found)} other Keepsake {'device answers' if len(found) == 1 else 'devices answer'}.",
+            f"{len(found)} other Haversack {'device answers' if len(found) == 1 else 'devices answer'}.",
             devices=len(found),
         )
     return result(
         "fail",
-        "No other Keepsake device answered: on the other one, switch on Let other devices reach this one, on the same "
+        "No other Haversack device answered: on the other one, switch on Let other devices reach this one, on the same "
         "network. Typing its address still works.",
         devices=0,
     )
@@ -729,7 +729,7 @@ async def check_performance_control(ctx: Context) -> dict[str, Any]:
     if found.get("tools"):
         return result(
             "warn",
-            "; ".join(parts) + f". {', '.join(found['tools'])} manages performance, so Keepsake only shows it.",
+            "; ".join(parts) + f". {', '.join(found['tools'])} manages performance, so Haversack only shows it.",
             **details,
         )
     return result("pass", "; ".join(parts) + f". Written and read back: {found.get('writeBack')}.", **details)
@@ -751,12 +751,12 @@ async def check_charge_limit(ctx: Context) -> dict[str, Any]:
     }
     state = {True: "on", False: "off", None: "unknown"}[found.get("limited")]
     if found.get("control") == "steamos-manager":
-        return result("pass", f"Keepsake can set it through steamos-manager; the limit is {state}.", **details)
+        return result("pass", f"Haversack can set it through steamos-manager; the limit is {state}.", **details)
     if firmware.get("chargeTypes") or firmware.get("threshold") is not None:
         return result(
             "warn",
             f"The kernel shows the limit ({state}), but steamos-manager does not offer it here, "
-            "so Keepsake only shows it. " + str(found.get("where") or ""),
+            "so Haversack only shows it. " + str(found.get("where") or ""),
             **details,
         )
     return result("fail", "Neither steamos-manager nor the kernel shows a charge limit on this device.", **details)
@@ -810,7 +810,7 @@ async def check_bios(ctx: Context) -> dict[str, Any]:
         return result("warn", "The BIOS version could not be read.", **details)
     if not found.get("known"):
         return result(
-            "pass", f"BIOS {found['version']}: Keepsake knows of no problems with this model's BIOS.", **details
+            "pass", f"BIOS {found['version']}: Haversack knows of no problems with this model's BIOS.", **details
         )
     text = " ".join(found.get("notes") or []) or "No known problems."
     return result(
@@ -831,7 +831,7 @@ async def check_tray_responsive(ctx: Context) -> dict[str, Any]:
     found = await probe()
     details = {k: found.get(k) for k in ("trayMs", "statusMs", "tray", "page")}
     if not found.get("tray") and found.get("statusMs") is None:
-        return result("skip", "No Keepsake tray is running here: run this in Desktop Mode.", **details)
+        return result("skip", "No Haversack tray is running here: run this in Desktop Mode.", **details)
     slow = []
     if found.get("trayMs") is not None and found["trayMs"] > TRAY_LIMIT_MS:
         slow.append(f"the tray took {found['trayMs']:.0f} ms to answer")
@@ -936,7 +936,7 @@ async def check_fan_control(ctx: Context) -> dict[str, Any]:
     if others:
         parts.append("other fan control: " + ", ".join(others))
     if not (found.get("helper") or {}).get("ready"):
-        return result("warn", "; ".join(parts) + ". The Keepsake Helper is not ready.", **found)
+        return result("warn", "; ".join(parts) + ". The Haversack Helper is not ready.", **found)
     status = "pass" if found.get("model") and not others and found.get("rpm") is not None else "warn"
     return result(status, "; ".join(parts) + ".", **found)
 
@@ -998,7 +998,7 @@ async def run(check_id: str, ctx: Context) -> dict[str, Any]:
 def summary(version: str, results: list[dict[str, Any]], model: str) -> str:
     """One short line per check, for the screen and the QR code."""
     letters = {"pass": "OK", "warn": "WARN", "fail": "FAIL", "skip": "SKIP"}
-    lines = [f"Keepsake {version} device checks, {model}"]
+    lines = [f"Haversack {version} device checks, {model}"]
     for item in results:
         lines.append(f"{item['id']}: {letters.get(item['status'], item['status'])} {item['found'][:90]}")
     return "\n".join(lines)

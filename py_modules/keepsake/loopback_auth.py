@@ -43,31 +43,31 @@ PORT_TRIES = 8  # ports tried to find one free on both 127.0.0.1 and ::1
 AUTHORIZE_HOSTS = {"login.microsoftonline.com", "accounts.google.com"}
 
 DONE_PAGE = (
-    "<!doctype html><meta charset=utf-8><title>Keepsake</title>"
+    "<!doctype html><meta charset=utf-8><title>Haversack</title>"
     "<body style='font-family:sans-serif;text-align:center;margin-top:20vh'>"
-    "<h1>You're signed in</h1><p>You can close this tab and go back to Keepsake.</p>"
+    "<h1>You're signed in</h1><p>You can close this tab and go back to Haversack.</p>"
 )
 FAILED_PAGE = (
-    "<!doctype html><meta charset=utf-8><title>Keepsake</title>"
+    "<!doctype html><meta charset=utf-8><title>Haversack</title>"
     "<body style='font-family:sans-serif;text-align:center;margin-top:20vh'>"
-    "<h1>Sign-in did not complete</h1><p>Close this tab and try again in Keepsake.</p>"
+    "<h1>Sign-in did not complete</h1><p>Close this tab and try again in Haversack.</p>"
 )
 ELSEWHERE_PAGE = (
-    "<!doctype html><meta charset=utf-8><title>Keepsake</title>"
+    "<!doctype html><meta charset=utf-8><title>Haversack</title>"
     "<body style='font-family:sans-serif;text-align:center;margin-top:20vh'>"
-    "<h1>You're signed in</h1><p>You finished signing in on your phone, so Keepsake is signed in. "
+    "<h1>You're signed in</h1><p>You finished signing in on your phone, so Haversack is signed in. "
     "You can close this tab.</p>"
 )
 MOVED_PAGE = (
-    "<!doctype html><meta charset=utf-8><title>Keepsake</title>"
+    "<!doctype html><meta charset=utf-8><title>Haversack</title>"
     "<body style='font-family:sans-serif;text-align:center;margin-top:20vh'>"
-    "<h1>Sign-in moved to your phone</h1><p>Keepsake stopped waiting for this tab. Finish on your phone, "
-    "or start again in Keepsake. You can close this tab.</p>"
+    "<h1>Sign-in moved to your phone</h1><p>Haversack stopped waiting for this tab. Finish on your phone, "
+    "or start again in Haversack. You can close this tab.</p>"
 )
 EXPIRED_PAGE = (
-    "<!doctype html><meta charset=utf-8><title>Keepsake</title>"
+    "<!doctype html><meta charset=utf-8><title>Haversack</title>"
     "<body style='font-family:sans-serif;text-align:center;margin-top:20vh'>"
-    "<h1>This sign-in timed out</h1><p>Close this tab and start again in Keepsake.</p>"
+    "<h1>This sign-in timed out</h1><p>Close this tab and start again in Haversack.</p>"
 )
 # What the listener shows once the attempt has ended, by how it ended.
 ENDED_PAGES = {

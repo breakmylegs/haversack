@@ -78,12 +78,12 @@ export function UpdatesPage() {
     stopWaiting();
     const listener = () => {
       stopWaiting();
-      toaster.toast({ title: "Keepsake", body: "Sync finished. Preparing the update." });
+      toaster.toast({ title: "Haversack", body: "Sync finished. Preparing the update." });
       void install(release);
     };
     idleListener.current = addEventListener(IDLE_EVENT, listener);
     setWaitingTag(release.tag);
-    setMessage("Keepsake will offer the update when the current sync finishes.");
+    setMessage("Haversack will offer the update when the current sync finishes.");
   };
 
   const latest = status?.latest ?? null;
@@ -132,7 +132,7 @@ export function UpdatesPage() {
           </Focusable>
         </Field>
       )}
-      {status && !status.updateAvailable && <Field label="Keepsake is up to date." />}
+      {status && !status.updateAvailable && <Field label="Haversack is up to date." />}
 
       <Field label="All releases" description={`Install any release to roll back. Releases page: ${RELEASES_PAGE}`} />
       {(status?.releases ?? []).map((release) => {

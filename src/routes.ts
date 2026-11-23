@@ -1,4 +1,4 @@
-// Route paths for Keepsake's pages.
+// Route paths for Haversack's pages.
 import { Navigation } from "@decky/ui";
 import { navlog } from "./navlog";
 import { SectionId, pagePath } from "./routeData";

@@ -117,7 +117,7 @@ class Provider:
         try:
             return json.loads(response.body)
         except ValueError as exc:
-            raise AiError(f"{self.name} sent an answer Keepsake cannot read.") from exc
+            raise AiError(f"{self.name} sent an answer Haversack cannot read.") from exc
 
     def list_models(self, key: str) -> list[dict[str, str]]:
         raise NotImplementedError

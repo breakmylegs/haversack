@@ -39,9 +39,9 @@ export async function call<T>(name: string, ...args: unknown[]): Promise<T> {
   try {
     body = (await response.json()) as typeof body;
   } catch {
-    throw new ApiError(`Keepsake answered ${response.status}`);
+    throw new ApiError(`Haversack answered ${response.status}`);
   }
-  if (!body.ok) throw new ApiError(body.error ?? `Keepsake answered ${response.status}`);
+  if (!body.ok) throw new ApiError(body.error ?? `Haversack answered ${response.status}`);
   return body.result as T;
 }
 

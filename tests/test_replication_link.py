@@ -511,7 +511,7 @@ def test_the_responder_refuses_an_initiator_using_its_own_identity(tmp_path):
                 server_hostname=None,
             )
             await link.send_frame(writer, {"type": "pair-request", "v": 1, "deviceId": A.device_id, "name": "x"})
-            with pytest.raises(link.LinkError, match="different Keepsake version"):
+            with pytest.raises(link.LinkError, match="different Haversack version"):
                 await link.read_frame(reader, timeout=5)
             writer.close()
         finally:

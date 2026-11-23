@@ -39,7 +39,7 @@ export function NavigationRecorder() {
       }
     };
     if (startRecording(SECONDS, (events) => void done(events))) setState("recording");
-    else toaster.toast({ title: "Navigation record", body: "Open this from Keepsake's full page, and only one recording at a time." });
+    else toaster.toast({ title: "Navigation record", body: "Open this from Haversack's full page, and only one recording at a time." });
   };
   return (
     <Field

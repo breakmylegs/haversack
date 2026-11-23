@@ -29,7 +29,7 @@ export function ExtrasPanel() {
             setBusy(true);
             deviceSetWifiPowerSaving(on)
               .then(setS)
-              .catch((err) => toaster.toast({ title: "Keepsake", body: plainError(err) }))
+              .catch((err) => toaster.toast({ title: "Haversack", body: plainError(err) }))
               .finally(() => setBusy(false));
           }}
         />
@@ -42,13 +42,13 @@ export function ExtrasPanel() {
           bios.notes.length
             ? bios.notes.join(" ")
             : bios.known
-              ? "Keepsake knows of no problems with this BIOS."
-              : "Keepsake has no BIOS notes for this model."
+              ? "Haversack knows of no problems with this BIOS."
+              : "Haversack has no BIOS notes for this model."
         }
       />
       <Field
         label="Display"
-        description="Refresh rate, frame limit and brightness are in Steam's own quick access menu, under Performance and Display. Keepsake leaves them to Steam."
+        description="Refresh rate, frame limit and brightness are in Steam's own quick access menu, under Performance and Display. Haversack leaves them to Steam."
       />
     </>
   );

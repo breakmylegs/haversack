@@ -470,7 +470,7 @@ class Installer:
         if not prefix:
             raise InstallerError("start the installer shortcut once and quit it, so Proton creates its prefix first")
         if self.running(int(job["appid"]), prefix):
-            raise InstallerError("quit the installer first; Keepsake never changes a prefix while it runs")
+            raise InstallerError("quit the installer first; Haversack never changes a prefix while it runs")
         try:
             made = cdrom.add_drive(
                 prefix, job["mount"], job["device"], os.path.join(self.work_dir, "registry-backups"), self.symlink

@@ -434,7 +434,7 @@ export interface ControllersStatus {
 }
 export const deviceControllers = callable<[], ControllersStatus>("device_controllers");
 
-// Changing the controllers and the stick lights (R24, ADR-0086), through the Keepsake Helper.
+// Changing the controllers and the stick lights (R24, ADR-0086), through the Haversack Helper.
 export interface ControllerSettingsStatus {
   off?: boolean;
   problem: string | null;
@@ -937,7 +937,7 @@ export interface GameMatch extends MatchInfo {
   enabled: boolean;
   sync: SyncWord;
   steamCloud: SteamCloud;
-  /** ADR-0063: who last switched sync: never, the user, or Keepsake for a Steam game without Steam Cloud. */
+  /** ADR-0063: who last switched sync: never, the user, or Haversack for a Steam game without Steam Cloud. */
   enabledSource?: "user" | "auto" | null;
   hasRegistry: boolean;
   /** ADR-0049: a newer save from another device, not taken in yet. */
@@ -1079,7 +1079,7 @@ export interface CloudStatus {
   googleSignedIn: boolean;
   directReady?: boolean;
   direct?: { peers: number; copied: number; unreachable: string[]; at: number } | null;
-  /** ADR-0032: Keepsake's own sign-in client is built in, so no client ID is needed. */
+  /** ADR-0032: Haversack's own sign-in client is built in, so no client ID is needed. */
   builtInClient: { onedrive: boolean; gdrive: boolean };
   /** The user has saved their own client, which is used instead of the built-in one. */
   ownClient: { onedrive: boolean; gdrive: boolean };
@@ -1386,7 +1386,7 @@ export interface AdvisorView {
     data: { page: string; url: string; upscaling: string[]; frameGen: string[]; hdr: string | null; rayTracing: string | null; attribution: string } | null;
   };
   pcgwLogin?: boolean;
-  /** Keepsake's ProtonDB index (ADR-0035): looked up on the device, never by asking ProtonDB. */
+  /** Haversack's ProtonDB index (ADR-0035): looked up on the device, never by asking ProtonDB. */
   protondb?: {
     enabled: boolean;
     error: string | null;
@@ -1487,3 +1487,15 @@ export const locationsStatus = callable<[], LocationsStatus>("locations_status")
 export const addLocation = callable<[backend: Backend], LocationsStatus>("add_location");
 export const removeLocation = callable<[backend: Backend], LocationsStatus>("remove_location");
 export const setGameLocations = callable<[key: string, names: Backend[] | null], GameConfig>("set_game_locations");
+
+// Haversack becomes Haversack (ADR-0089): held while the old plugin is installed, then its data moves across.
+export interface RenameStatus {
+  moved: { from: string; at?: string; files?: number } | null;
+  oldInstalled: boolean;
+  oldHelper: boolean;
+  hold: boolean;
+  started: boolean;
+  error: string;
+}
+export const renameStatus = callable<[], RenameStatus>("rename_status");
+export const renameFinish = callable<[], RenameStatus>("rename_finish");

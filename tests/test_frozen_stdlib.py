@@ -92,9 +92,9 @@ def run_blocked(tmp_path, blocked=NOT_BUNDLED):
     env = {
         **os.environ,
         "DECKY_USER_HOME": str(home),
-        "DECKY_PLUGIN_SETTINGS_DIR": str(home / "homebrew/settings/Keepsake"),
-        "DECKY_PLUGIN_RUNTIME_DIR": str(home / "homebrew/data/Keepsake"),
-        "DECKY_PLUGIN_LOG_DIR": str(home / "homebrew/logs/Keepsake"),
+        "DECKY_PLUGIN_SETTINGS_DIR": str(home / "homebrew/settings/Haversack"),
+        "DECKY_PLUGIN_RUNTIME_DIR": str(home / "homebrew/data/Haversack"),
+        "DECKY_PLUGIN_LOG_DIR": str(home / "homebrew/logs/Haversack"),
         "DECKY_PLUGIN_DIR": ROOT,
         "HOME": str(home),
     }

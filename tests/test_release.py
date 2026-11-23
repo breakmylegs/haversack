@@ -134,17 +134,22 @@ def test_version_order_and_prerelease():
 def test_publish_dry_run_builds_assets_without_git_changes(repo):
     runner = FakeRunner()
     out_dir = release.publish(device_tested=False, dry_run=True, runner=runner, check=lambda: 0)
-    zip_path = os.path.join(out_dir, "Keepsake-v0.2.1.zip")
+    zip_path = os.path.join(out_dir, "Haversack-v0.2.1.zip")
     with open(zip_path, "rb") as handle:
         digest = hashlib.sha256(handle.read()).hexdigest()
-    with open(os.path.join(out_dir, "Keepsake-desktop-v0.2.1.zip"), "rb") as handle:
+    with open(os.path.join(out_dir, "Haversack-desktop-v0.2.1.zip"), "rb") as handle:
         desktop = hashlib.sha256(handle.read()).hexdigest()
-    with open(os.path.join(out_dir, "Keepsake-v0.2.1.sbom.cdx.json"), "rb") as handle:
+    with open(os.path.join(out_dir, "Haversack-helper-v0.2.1.zip"), "rb") as handle:
+        helper = hashlib.sha256(handle.read()).hexdigest()
+    with open(os.path.join(out_dir, "Haversack-v0.2.1.sbom.cdx.json"), "rb") as handle:
         sbom_bytes = handle.read()
     with open(os.path.join(out_dir, "SHA256SUMS"), encoding="utf-8") as handle:
         assert handle.read() == (
+            f"{digest}  Haversack-v0.2.1.zip\n{digest}  Haversack.zip\n{desktop}  Haversack-desktop-v0.2.1.zip\n"
+            f"{helper}  Haversack-helper-v0.2.1.zip\n"
+            f"{hashlib.sha256(sbom_bytes).hexdigest()}  Haversack-v0.2.1.sbom.cdx.json\n"
+            # The same bytes under Keepsake's names, so installed Keepsakes update (ADR-0089).
             f"{digest}  Keepsake-v0.2.1.zip\n{digest}  Keepsake.zip\n{desktop}  Keepsake-desktop-v0.2.1.zip\n"
-            f"{hashlib.sha256(sbom_bytes).hexdigest()}  Keepsake-v0.2.1.sbom.cdx.json\n"
         )
     sbom = json.loads(sbom_bytes)
     assert sbom["metadata"]["component"]["version"] == "0.2.1"
@@ -157,8 +162,8 @@ def test_publish_dry_run_builds_assets_without_git_changes(repo):
 def test_stable_zip_is_a_byte_identical_copy(repo):
     out_dir = release.publish(device_tested=False, dry_run=True, runner=FakeRunner(), check=lambda: 0)
     with (
-        open(os.path.join(out_dir, "Keepsake-v0.2.1.zip"), "rb") as versioned,
-        open(os.path.join(out_dir, "Keepsake.zip"), "rb") as stable,
+        open(os.path.join(out_dir, "Haversack-v0.2.1.zip"), "rb") as versioned,
+        open(os.path.join(out_dir, "Haversack.zip"), "rb") as stable,
     ):
         assert versioned.read() == stable.read()
 
@@ -218,8 +223,8 @@ def test_publish_refuses_without_the_google_client_secrets(repo, content, messag
 def test_the_secrets_file_ships_in_both_packages(repo):
     out_dir = release.publish(device_tested=False, dry_run=True, runner=FakeRunner(), check=lambda: 0)
     for name, inner in (
-        ("Keepsake-v0.2.1.zip", "Keepsake/py_modules/keepsake/client_secrets.json"),
-        ("Keepsake-desktop-v0.2.1.zip", "Keepsake-desktop/py_modules/keepsake/client_secrets.json"),
+        ("Haversack-v0.2.1.zip", "Haversack/py_modules/keepsake/client_secrets.json"),
+        ("Haversack-desktop-v0.2.1.zip", "Keepsake-desktop/py_modules/keepsake/client_secrets.json"),
     ):
         with zipfile.ZipFile(os.path.join(out_dir, name)) as archive:
             assert json.loads(archive.read(inner))["googleDesktopClientSecret"] == "GOCSPX-test-desk"
@@ -259,9 +264,12 @@ def test_publish_tags_pushes_and_creates_release(repo):
     assert runner.commands(("git", "push", "origin", "v0.2.1"))
     (create,) = runner.commands(("gh", "release", "create"))
     assert "--prerelease" not in create
-    assert any(arg.endswith("Keepsake-v0.2.1.zip") for arg in create)
-    assert any(os.path.basename(arg) == "Keepsake.zip" for arg in create)  # the stable "latest" asset
-    assert any(os.path.basename(arg) == "Keepsake-desktop-v0.2.1.zip" for arg in create)  # the PC package
+    assert any(arg.endswith("Haversack-v0.2.1.zip") for arg in create)
+    assert any(os.path.basename(arg) == "Haversack.zip" for arg in create)  # the stable "latest" asset
+    assert any(os.path.basename(arg) == "Haversack-desktop-v0.2.1.zip" for arg in create)  # the PC package
+    # Installed Keepsakes (v0.25.0's updater included) find their usual names (ADR-0089).
+    for old in ("Keepsake-v0.2.1.zip", "Keepsake.zip", "Keepsake-desktop-v0.2.1.zip"):
+        assert any(os.path.basename(arg) == old for arg in create)
     assert any(arg.endswith("SHA256SUMS") for arg in create)
     # Tag before release, release last.
     assert runner.calls.index(create) == len(runner.calls) - 1

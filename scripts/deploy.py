@@ -5,7 +5,7 @@ Reads ``deploy.local.json`` (git-ignored) from the repository root:
     {"host": "steamdeck.local", "user": "deck", "port": 22}
 
 Builds the zip with scripts/package.py, copies it to the device, replaces
-~/homebrew/plugins/Keepsake and restarts Decky Loader. The plugins folder is
+~/homebrew/plugins/Haversack and restarts Decky Loader. The plugins folder is
 owned by root on a standard Decky install, so the remote step uses sudo and
 prompts for the device password in the terminal. This is a development
 convenience only: the plugin itself never runs as root.

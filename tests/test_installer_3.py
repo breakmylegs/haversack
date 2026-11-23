@@ -106,7 +106,7 @@ def test_a_drive_changed_outside_keepsake_is_left_alone(env, monkeypatch):  # no
     installer.add_cd_drive(job["id"])
     drive = os.path.join(str(prefix), "pfx", "dosdevices", "d:")
     fake.links[drive] = "/somewhere/else"
-    with pytest.raises(InstallerError, match="outside Keepsake"):
+    with pytest.raises(InstallerError, match="outside Haversack"):
         installer.swap_disc(job["id"], "Disc 2.iso")
     assert fake.links[drive] == "/somewhere/else"
     assert udisks.detached() == ["/dev/loop8"]  # the disc mounted for the swap is released again

@@ -173,7 +173,7 @@ export function GamesPage() {
       const outcome = await refreshManifest(true);
       if (outcome.reason === "busy") return; // the running update keeps reporting its progress
       toaster.toast({
-        title: "Keepsake",
+        title: "Haversack",
         body: outcome.ok
           ? outcome.games
             ? `Manifest updated: ${outcome.games.toLocaleString()} games with save data.`
@@ -181,7 +181,7 @@ export function GamesPage() {
           : `Manifest not updated: ${MANIFEST_REASONS[outcome.reason ?? ""] ?? outcome.reason}.`,
       });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Manifest not updated: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Manifest not updated: ${plainError(err)}` });
     } finally {
       setRefreshing(false);
       setProgress(null);
@@ -228,7 +228,7 @@ export function GamesPage() {
   const bulk = (on: boolean) => {
     const targets = syncable.filter((g) => Boolean(matches[g.key]?.enabled) !== on);
     if (!targets.length) {
-      toaster.toast({ title: "Keepsake", body: on ? "Every shown game already syncs." : "None of the shown games sync." });
+      toaster.toast({ title: "Haversack", body: on ? "Every shown game already syncs." : "None of the shown games sync." });
       return;
     }
     showModal(
@@ -250,10 +250,10 @@ export function GamesPage() {
               done += 1;
             }
           } catch (err) {
-            toaster.toast({ title: "Keepsake", body: `Stopped after ${done} games: ${plainError(err)}` });
+            toaster.toast({ title: "Haversack", body: `Stopped after ${done} games: ${plainError(err)}` });
           } finally {
             setBulkBusy(false);
-            toaster.toast({ title: "Keepsake", body: on ? `${done} games now sync.` : `${done} games no longer sync.` });
+            toaster.toast({ title: "Haversack", body: on ? `${done} games now sync.` : `${done} games no longer sync.` });
             void scan(false);
           }
         }}
@@ -277,9 +277,9 @@ export function GamesPage() {
               : r.pending
                 ? `Quit ${name} first, then try again.`
                 : `${name} is already up to date.`;
-      toaster.toast({ title: "Keepsake", body });
+      toaster.toast({ title: "Haversack", body });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBulkBusy(false);
       void scan(false);
@@ -340,7 +340,7 @@ export function GamesPage() {
       {cloudDetection && Object.values(matches).some((m) => m.steamCloud === "no-cloud" && !m.enabled) && (
         <Field
           label={`${Object.values(matches).filter((m) => m.steamCloud === "no-cloud" && !m.enabled).length} Steam games have no Steam Cloud saves`}
-          description="Keepsake can sync them like your non-Steam games."
+          description="Haversack can sync them like your non-Steam games."
           childrenLayout="inline"
         >
           <DialogButton
@@ -348,7 +348,7 @@ export function GamesPage() {
             disabled={scanning}
             onClick={() =>
               void enableSteamWithoutCloud()
-                .then((r) => toaster.toast({ title: "Keepsake", body: `Sync turned on for ${r.enabled.length} Steam games.` }))
+                .then((r) => toaster.toast({ title: "Haversack", body: `Sync turned on for ${r.enabled.length} Steam games.` }))
                 .then(() => scan(false))
             }
           >
@@ -375,7 +375,7 @@ export function GamesPage() {
       {waiting.length > 0 && (
         <Field
           label={`${waiting.length} ${waiting.length === 1 ? "match needs" : "matches need"} your approval`}
-          description="Keepsake found likely matches it is not certain about. They are at the top of the list: approve each one there, or review them one by one."
+          description="Haversack found likely matches it is not certain about. They are at the top of the list: approve each one there, or review them one by one."
           childrenLayout="inline"
         >
           <DialogButton style={{ width: "auto" }} onClick={() => setSelected(waiting[0])}>

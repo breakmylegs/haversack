@@ -36,9 +36,9 @@ export function HistoryPage() {
   const act = async (work: () => Promise<string>) => {
     setBusy(true);
     try {
-      toaster.toast({ title: "Keepsake", body: await work() });
+      toaster.toast({ title: "Haversack", body: await work() });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
       await refresh();

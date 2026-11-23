@@ -78,9 +78,9 @@ class SteamGridDB:
         try:
             body = json.loads(response.body)
         except ValueError as exc:
-            raise ArtworkError("SteamGridDB sent an answer Keepsake cannot read") from exc
+            raise ArtworkError("SteamGridDB sent an answer Haversack cannot read") from exc
         if not isinstance(body, dict) or not body.get("success") or not isinstance(body.get("data"), list):
-            raise ArtworkError("SteamGridDB sent an answer Keepsake cannot read")
+            raise ArtworkError("SteamGridDB sent an answer Haversack cannot read")
         return body["data"]
 
     def search(self, title: str) -> list[dict[str, Any]]:

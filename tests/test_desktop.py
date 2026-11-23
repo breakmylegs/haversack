@@ -32,7 +32,7 @@ from keepsake.paths import PluginPaths
         ("u(ia{sv}av)", [3, (0, {}, [])]),
         ("a(ia{sv})", [[(1, {"enabled": ("b", False)}), (2, {})]]),
         ("ai", [[]]),
-        ("(sa(iiay)ss)", [("", [(1, 1, [255, 0])], "Keepsake", "ok")]),
+        ("(sa(iiay)ss)", [("", [(1, 1, [255, 0])], "Haversack", "ok")]),
     ],
 )
 def test_wire_format_round_trips(signature, values):
@@ -177,9 +177,9 @@ def test_backend_status_line(tmp_path):
     runtime = runtime_with_state(tmp_path)
     assert tray.backend(runtime, opener_for({"conflicts": 0})) == (
         "http://127.0.0.1:47120/#token=tok",
-        "Keepsake is running",
+        "Haversack is running",
     )
-    assert tray.backend(runtime, opener_for({"conflicts": 2}))[1] == "Keepsake is running: 2 save conflicts to resolve"
+    assert tray.backend(runtime, opener_for({"conflicts": 2}))[1] == "Haversack is running: 2 save conflicts to resolve"
     assert tray.backend(runtime, opener_for({}, ok=False)) == (None, tray.NOT_REACHABLE)
 
     def refused(request, timeout):
@@ -205,7 +205,7 @@ def test_tray_properties_menu_and_events(tmp_path, monkeypatch):
     assert item.handle(call("Get", tray.PROPS_IFACE, tray.MENU_PATH, [tray.MENU_IFACE, "Version"])) == ("v", [("u", 3)])
     _revision, layout = item.handle(call("GetLayout", tray.MENU_IFACE, tray.MENU_PATH, [0, -1, []]))[1]
     labels = [child[1][1].get("label", ("s", "-"))[1] for child in layout[2]]
-    assert labels == ["Keepsake is running", "-", "Open Keepsake", "Quit"]
+    assert labels == ["Haversack is running", "-", "Open Haversack", "Quit"]
     assert layout[2][2][1][1]["enabled"] == ("b", True)
     item.handle(call("Event", tray.MENU_IFACE, tray.MENU_PATH, [tray.MENU_OPEN, "clicked", ("s", ""), 0]))
     assert item.open_after and item.wanted.is_set()  # the refresher opens it, never the D-Bus thread

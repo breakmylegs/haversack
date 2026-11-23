@@ -60,7 +60,7 @@ def load_mapping(game_folder: str) -> dict[str, Any]:
         raise LudusaviError(f"cannot read {MAPPING_FILE}: {exc}") from exc
     for value in entries.values():
         if isinstance(value, YamlSubsetError):
-            raise LudusaviError(f"{MAPPING_FILE} uses YAML Keepsake cannot read: {value}")
+            raise LudusaviError(f"{MAPPING_FILE} uses YAML Haversack cannot read: {value}")
     if not isinstance(entries.get("name"), str) or not isinstance(entries.get("backups"), list):
         raise LudusaviError(f"{MAPPING_FILE} has no game name or backups")
     drives = entries.get("drives") if isinstance(entries.get("drives"), dict) else {}
@@ -273,7 +273,7 @@ def extract(game_folder: str, backup_id: str, staging: str) -> dict[str, Any]:
             backup, size, expected = plan[original]
             mapped = to_logical(original)
             if mapped is None:
-                skipped.append({"path": original, "reason": "not in a save folder Keepsake knows"})
+                skipped.append({"path": original, "reason": "not in a save folder Haversack knows"})
                 continue
             if mapped in seen:
                 skipped.append({"path": original, "reason": "another file maps to the same place"})

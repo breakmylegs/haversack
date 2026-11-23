@@ -1,8 +1,10 @@
-# Keepsake
+# Haversack
 
-Keepsake is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin that syncs PC game saves between SteamOS and Bazzite handhelds through cloud storage, operated entirely from Gaming Mode.
+Formerly Keepsake: updating from Keepsake moves everything across, and nothing is lost (see the changelog for v0.51.0).
 
-It is built for non-Steam shortcuts installed into their own Proton prefixes, whose compatdata IDs differ on every device. Saves are stored under canonical logical roots, so the same game finds its saves on each device whatever its local prefix is called, and Keepsake recognises the same game on both devices even when the shortcuts are named differently.
+Haversack is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin that syncs PC game saves between SteamOS and Bazzite handhelds through cloud storage, operated entirely from Gaming Mode.
+
+It is built for non-Steam shortcuts installed into their own Proton prefixes, whose compatdata IDs differ on every device. Saves are stored under canonical logical roots, so the same game finds its saves on each device whatever its local prefix is called, and Haversack recognises the same game on both devices even when the shortcuts are named differently.
 
 **[User guide](docs/user/README.md):** getting started on a handheld, a Linux PC or Windows, a guide to each feature, privacy and questions and answers.
 
@@ -28,22 +30,22 @@ It is built for non-Steam shortcuts installed into their own Proton prefixes, wh
 First install on a new device uses one URL that never changes:
 
 ```
-https://github.com/breakmylegs/keepsake/releases/latest/download/Keepsake.zip
+https://github.com/breakmylegs/keepsake/releases/latest/download/Haversack.zip
 ```
 
 1. In Decky Loader, open Settings, General, and enable Developer mode (once per device).
 2. Open Decky, Settings, Developer, Install Plugin from URL, and paste the URL above.
-3. After that, updates come through Keepsake's Settings, Updates.
+3. After that, updates come through Haversack's Settings, Updates.
 
-The URL always gives the newest stable release; pre-releases are only offered through the Updates page on the Pre-release channel. Each release also has a versioned copy, `Keepsake-v<version>.zip`, with the same bytes, and `SHA256SUMS` lists both names.
+The URL always gives the newest stable release; pre-releases are only offered through the Updates page on the Pre-release channel. Each release also has a versioned copy, `Haversack-v<version>.zip`, with the same bytes. Copies named `Keepsake.zip` and `Keepsake-v<version>.zip` serve installs from before the rename, and `SHA256SUMS` lists every name.
 
 ## First run
 
-Open Keepsake from the Quick Access Menu and choose **Set up Keepsake**. The wizard walks through:
+Open Haversack from the Quick Access Menu and choose **Set up Haversack**. The wizard walks through:
 
 1. **Device name**, shown next to this device's saves on your other devices.
 2. **Cloud.** Choose OneDrive, Google Drive, WebDAV or S3, and sign in ([Cloud storage and sign-in](docs/user/cloud.md)).
-3. **Scan games** and **review matches**: approve any match Keepsake is not sure about.
+3. **Scan games** and **review matches**: approve any match Haversack is not sure about.
 4. **Choose games** to sync. Steam games are hidden by default because Steam Cloud covers them.
 5. **Dry run**: see what the first sync will do for each game. Nothing changes until you confirm.
 
@@ -53,7 +55,7 @@ Moving from Ludusavi? Follow [docs/cutover.md](docs/cutover.md).
 
 ## Installing games
 
-Keepsake's **Install** page installs a Windows game from an ISO file or a folder into its own Steam shortcut and Proton prefix, all from Gaming Mode. It adds an `Install: <Title>` shortcut that runs the installer; you install into the folder Keepsake shows, quit, choose the game's program, and the same shortcut then starts the game.
+Haversack's **Install** page installs a Windows game from an ISO file or a folder into its own Steam shortcut and Proton prefix, all from Gaming Mode. It adds an `Install: <Title>` shortcut that runs the installer; you install into the folder Haversack shows, quit, choose the game's program, and the same shortcut then starts the game.
 
 If an installer asks for the disc, press **Installer wants a disc drive** and start the installer again. To install from a NAS, mount the share first (for example by opening it in Dolphin in Desktop Mode); it then appears on the Install page.
 
@@ -62,7 +64,7 @@ If an installer asks for the disc, press **Installer wants a disc drive** and st
 ## Help
 
 - [docs/troubleshooting.md](docs/troubleshooting.md): what each message means and what to do.
-- Keepsake, Diagnostics, Health, Run checks: health checks for sign-in, sync, conflicts, prefixes and the manifest.
+- Haversack, Diagnostics, Health, Run checks: health checks for sign-in, sync, conflicts, prefixes and the manifest.
 - [CHANGELOG.md](CHANGELOG.md): what changed in each version.
 
 ## Development

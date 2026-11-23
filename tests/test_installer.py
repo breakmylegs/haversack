@@ -225,7 +225,7 @@ def test_app_routes_an_unsynced_exit_and_op_results_to_the_installer(tmp_path):
     assert after_add["jobs"][0]["state"] == "run-installer" and after_add["jobs"][0]["appid"] == 3000000077
     assert handled == {"handled": 0}  # Saves does not sync it ...
     assert after_exit["jobs"][0]["state"] == "choose-game"  # ... but the Installer heard it close
-    assert ("keepsake_toast", ("Folder Game: choose the game's program in Keepsake, Installer.",)) in a.events
+    assert ("keepsake_toast", ("Folder Game: choose the game's program in Haversack, Installer.",)) in a.events
 
 
 # Slice 22

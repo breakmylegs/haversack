@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { FanPoint, FansStatus, fansAssign, fansHandBack, fansSaveProfile, fansSelftest, fansSetOptions, fansStatus } from "../backend";
 import { plainError } from "../format";
 
-// Device, Fans (R24, ADR-0085). The Legion Go 2's fan follows a curve through the Keepsake Helper;
+// Device, Fans (R24, ADR-0085). The Legion Go 2's fan follows a curve through the Haversack Helper;
 // the Legion Go gets full fan speed. Readings refresh in place every few seconds: nothing on the
 // page is removed or remounted by a refresh, so the focus stays where it is.
 
@@ -153,11 +153,11 @@ export function FansPanel() {
       <Field label="Now" description={readings(s)} />
       {!s.helper.ready && (
         <Field
-          label="Keepsake Helper"
-          description="Changing the fan needs the Keepsake Helper: install it from Device, Reconnect help. The readings above need nothing."
+          label="Haversack Helper"
+          description="Changing the fan needs the Haversack Helper: install it from Device, Reconnect help. The readings above need nothing."
         />
       )}
-      {others.length > 0 && <Field label="Another fan control is active" description={`${others.join(", ")}. Keepsake only shows the readings, so the two never fight.`} />}
+      {others.length > 0 && <Field label="Another fan control is active" description={`${others.join(", ")}. Haversack only shows the readings, so the two never fight.`} />}
       {s.problem && <Field label="Paused" description={s.problem} />}
       {s.helper.ready && !d.model && <Field label="Fan control" description="Fan control is for the Legion Go and Legion Go 2." />}
       {s.helper.ready && go2 && !d.validated && (
@@ -171,8 +171,8 @@ export function FansPanel() {
       {s.helper.ready && go2 && d.validated && others.length === 0 && (
         <>
           <ToggleField
-            label="Keepsake controls the fan"
-            description="Follows your curve, and gives the fan back to the firmware within seconds if Keepsake stops. At 101 °C it runs at full speed whatever the curve says."
+            label="Haversack controls the fan"
+            description="Follows your curve, and gives the fan back to the firmware within seconds if Haversack stops. At 101 °C it runs at full speed whatever the curve says."
             checked={s.settings.enabled}
             onChange={(on) => !busy && void run(() => fansSetOptions({ enabled: on }))}
           />
@@ -207,7 +207,7 @@ export function FansPanel() {
           {d.fullSpeedAttribute ? (
             <ToggleField
               label="Full fan speed"
-              description="Runs the fan flat out, held while Keepsake runs; it switches off by itself within seconds if Keepsake stops."
+              description="Runs the fan flat out, held while Haversack runs; it switches off by itself within seconds if Haversack stops."
               checked={s.settings.fullSpeed}
               onChange={(on) => !busy && void run(() => fansSetOptions({ fullSpeed: on }))}
             />
@@ -216,12 +216,12 @@ export function FansPanel() {
           )}
           <Field
             label="Fan curves on the Legion Go"
-            description="The Legion Go's own fan table can only be changed through acpi_call, a kernel module SteamOS does not include and Keepsake will not install. Curves arrive when the kernel offers them."
+            description="The Legion Go's own fan table can only be changed through acpi_call, a kernel module SteamOS does not include and Haversack will not install. Curves arrive when the kernel offers them."
           />
         </>
       )}
       {s.helper.ready && (d.controlling || s.settings.enabled || s.settings.fullSpeed) && (
-        <Field label="Give the fan back to the firmware" description="Switches Keepsake's fan control off now.">
+        <Field label="Give the fan back to the firmware" description="Switches Haversack's fan control off now.">
           <DialogButton onClick={() => !busy && void run(() => fansHandBack(), "The firmware controls the fan again.")}>Hand back</DialogButton>
         </Field>
       )}

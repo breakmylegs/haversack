@@ -26,7 +26,7 @@ export function BatteryPanel({ compact = false }: { compact?: boolean }) {
     setBusy(true);
     deviceSetChargeLimit(on)
       .then(setStatus)
-      .catch((err) => toaster.toast({ title: "Keepsake", body: plainError(err) }))
+      .catch((err) => toaster.toast({ title: "Haversack", body: plainError(err) }))
       .finally(() => setBusy(false));
   };
   const controllable = status.control === "steamos-manager";
@@ -49,7 +49,7 @@ export function BatteryPanel({ compact = false }: { compact?: boolean }) {
       ) : (
         <Field
           label={`Charge limit: ${state}`}
-          description={`This device's steamos-manager does not let Keepsake change it. ${status.where ?? ""}`}
+          description={`This device's steamos-manager does not let Haversack change it. ${status.where ?? ""}`}
         />
       )}
       {status.firmware.chargeTypes && <Field label="Firmware" description={`Charge types: ${status.firmware.chargeTypes}`} />}

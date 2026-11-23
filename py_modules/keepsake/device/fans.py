@@ -295,7 +295,7 @@ class Fans:
             return None
         tools = self.tools()
         if tools:
-            self.problem = f"{', '.join(tools)} controls the fan here; Keepsake only shows it"
+            self.problem = f"{', '.join(tools)} controls the fan here; Haversack only shows it"
             return None
         if self._model() == "go1":
             return self._go1(data)

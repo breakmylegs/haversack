@@ -89,9 +89,9 @@ class PcgwClient:
         try:
             data = json.loads(response.body)
         except ValueError as exc:
-            raise PcgwError("PCGamingWiki sent an answer Keepsake cannot read.") from exc
+            raise PcgwError("PCGamingWiki sent an answer Haversack cannot read.") from exc
         if not isinstance(data, dict):
-            raise PcgwError("PCGamingWiki sent an answer Keepsake cannot read.")
+            raise PcgwError("PCGamingWiki sent an answer Haversack cannot read.")
         return data
 
     def login(self) -> None:

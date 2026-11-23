@@ -1,7 +1,7 @@
 // The navigation recorder (v0.41.1): "Record navigation for 60 seconds" in Diagnostics, Tools.
 //
 // While it runs it notes, with times from the start:
-// - Keepsake's own navigations and redirects;
+// - Haversack's own navigations and redirects;
 // - mounts and unmounts of the full page and of each sidebar page;
 // - every programmatic focus() call;
 // - where focus goes, sidebar or page;

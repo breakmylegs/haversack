@@ -112,10 +112,10 @@ export function NetworkSource({
     const listener = addEventListener<[NetDownload]>(PROGRESS_EVENT, (status) => {
       setDownload(status);
       if (status.running) return;
-      if (status.job) toaster.toast({ title: "Keepsake", body: `${status.name} downloaded. Choose the installer program.` });
-      else if (status.cancelled) toaster.toast({ title: "Keepsake", body: "Download cancelled. The partial file was deleted." });
+      if (status.job) toaster.toast({ title: "Haversack", body: `${status.name} downloaded. Choose the installer program.` });
+      else if (status.cancelled) toaster.toast({ title: "Haversack", body: "Download cancelled. The partial file was deleted." });
       else if (status.redirectHost) askRedirect(status.redirectHost);
-      else if (status.error) toaster.toast({ title: "Keepsake", body: `Download failed: ${status.error}` });
+      else if (status.error) toaster.toast({ title: "Haversack", body: `Download failed: ${status.error}` });
       onChanged();
     });
     return () => removeEventListener(PROGRESS_EVENT, listener);
@@ -146,7 +146,7 @@ export function NetworkSource({
     try {
       await work();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -169,7 +169,7 @@ export function NetworkSource({
       }
       setFolder(listing.url);
       setEntries(listing.entries);
-      if (!listing.entries.length) toaster.toast({ title: "Keepsake", body: "No folders or ISO files here." });
+      if (!listing.entries.length) toaster.toast({ title: "Haversack", body: "No folders or ISO files here." });
     });
 
   const start = (entry: NetEntry) =>
@@ -242,7 +242,7 @@ export function NetworkSource({
       {protocol === "nfs" && (
         <Field
           label="NFS needs the share mounted"
-          description="Keepsake cannot mount NFS without root. Mount it once (for example in Desktop Mode or with an fstab entry) and it appears in the places above."
+          description="Haversack cannot mount NFS without root. Mount it once (for example in Desktop Mode or with an fstab entry) and it appears in the places above."
         />
       )}
       {form && (
@@ -281,7 +281,7 @@ export function NetworkSource({
                       const found = await installerNetFindSmb();
                       setServers(found.servers);
                       if (!found.servers.length) {
-                        toaster.toast({ title: "Keepsake", body: "No shares answered. Check the server is on, or type its address." });
+                        toaster.toast({ title: "Haversack", body: "No shares answered. Check the server is on, or type its address." });
                       }
                     })
                   }
@@ -328,7 +328,7 @@ export function NetworkSource({
               <ToggleField label="Remember this location" checked={remember} disabled={busy} onChange={setRemember} />
             </>
           )}
-          <Field label="SHA-256 checksum (optional)" description="If the server lists one, enter it and Keepsake checks the download." childrenLayout="below">
+          <Field label="SHA-256 checksum (optional)" description="If the server lists one, enter it and Haversack checks the download." childrenLayout="below">
             <TextField value={sha256} disabled={busy} onChange={(e) => setSha256(e.target.value)} />
           </Field>
           <Focusable style={{ display: "flex", gap: 8, margin: "8px 0" }}>

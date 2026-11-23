@@ -55,7 +55,7 @@ export function ReplicationPage({ part = "devices" }: { part?: "moving" | "devic
   const refresh = () =>
     replicationStatus()
       .then(setStatus)
-      .catch((err) => toaster.toast({ title: "Keepsake", body: plainError(err) }));
+      .catch((err) => toaster.toast({ title: "Haversack", body: plainError(err) }));
 
   useEffect(() => {
     void refresh();
@@ -77,9 +77,9 @@ export function ReplicationPage({ part = "devices" }: { part?: "moving" | "devic
       const result = await work();
       if (result && typeof result === "object" && "listener" in result) setStatus(result as ReplicationStatus);
       else await refresh();
-      if (done) toaster.toast({ title: "Keepsake", body: done });
+      if (done) toaster.toast({ title: "Haversack", body: done });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -111,7 +111,7 @@ export function ReplicationPage({ part = "devices" }: { part?: "moving" | "devic
     <div>
       <Field
         label="Your devices"
-        description="Keepsake links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once: send a request from one, accept it on the other, and type the code it shows."
+        description="Haversack links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once: send a request from one, accept it on the other, and type the code it shows."
       />
 
 
@@ -380,7 +380,7 @@ function TransfersSection() {
     try {
       setStatus(await work());
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -455,9 +455,9 @@ function OffersSection() {
     setBusy(true);
     try {
       await work();
-      if (done) toaster.toast({ title: "Keepsake", body: done });
+      if (done) toaster.toast({ title: "Haversack", body: done });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
       await refresh();
@@ -467,11 +467,11 @@ function OffersSection() {
   const applyUpdate = async (offer: IncomingOffer) => {
     try {
       await replicationApplyUpdate(offer.id, false);
-      toaster.toast({ title: "Keepsake", body: `Taking the update to ${offer.title}. Your saves and settings stay as they are.` });
+      toaster.toast({ title: "Haversack", body: `Taking the update to ${offer.title}. Your saves and settings stay as they are.` });
       await refresh();
     } catch (err) {
       if (!String(err).includes("changed on this device too")) {
-        toaster.toast({ title: "Keepsake", body: plainError(err) });
+        toaster.toast({ title: "Haversack", body: plainError(err) });
         return;
       }
       showModal(

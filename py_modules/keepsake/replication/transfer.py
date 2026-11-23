@@ -678,7 +678,7 @@ def roll_back(job: Job) -> None:
 def remove_staging(staging: str) -> None:
     """Delete a job's staging folder. Only ever a folder named like one, never anything else."""
     if not os.path.basename(staging).startswith(STAGING_PREFIX):
-        raise TransferError("refusing to remove a folder that is not Keepsake staging")
+        raise TransferError("refusing to remove a folder that is not Haversack staging")
     if not os.path.lexists(staging):
         return
 
@@ -714,6 +714,6 @@ def recover(staging: str) -> Job | None:
             remove_staging(staging)
             return job
     if job.state in ("running", "waiting", "verifying", "promoting"):
-        job.state, job.reason = "paused", "Keepsake restarted; resume to carry on"
+        job.state, job.reason = "paused", "Haversack restarted; resume to carry on"
         save_journal(job)
     return job

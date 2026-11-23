@@ -150,7 +150,7 @@ class SettingsStore:
 
     def _write(self, data: dict[str, Any]) -> None:
         if self.read_only:
-            raise SettingsError("settings are read-only because a newer Keepsake wrote them; please update")
+            raise SettingsError("settings are read-only because a newer Haversack wrote them; please update")
         atomic_write_json(self._path, {**self._extra, **data})
 
     def all(self) -> dict[str, Any]:

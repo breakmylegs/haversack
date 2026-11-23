@@ -52,7 +52,7 @@ def render(kind: str, plugin_dir: str, runtime_dir: str, version: str) -> str:
     lines = [
         "[Desktop Entry]",
         "Type=Application",
-        "Name=Keepsake",
+        "Name=Haversack",
         "Comment=Your saves, games and devices, in Desktop Mode",
         f"Exec={exec_line}",
         f"Icon={icon}",

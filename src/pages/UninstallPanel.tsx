@@ -1,7 +1,7 @@
 // Uninstall (ADR-0065). Steam games: an optional final backup, then Steam's own uninstall wizard. Non-Steam
 // games: a confirmation screen listing every folder that will be deleted, with sizes and free space after,
 // Cancel focused first; then the final backup, the shortcut and its artwork through Steam, the folders, and
-// Keepsake's own records, in the background with progress and Stop.
+// Haversack's own records, in the background with progress and Stop.
 import { DialogButton, Field, Focusable, ModalRoot, ToggleField, showModal } from "@decky/ui";
 import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
@@ -13,7 +13,7 @@ const STATES: Record<string, string> = {
   "backing-up": "Saving a final backup",
   "removing-shortcut": "Removing the shortcut from Steam",
   deleting: "Deleting folders",
-  cleaning: "Tidying Keepsake's records",
+  cleaning: "Tidying Haversack's records",
   done: "Uninstalled",
   failed: "Stopped",
   cancelled: "Stopped",
@@ -32,14 +32,14 @@ function ConfirmModal({ plan, closeModal, onStarted }: { plan: UninstallPlan; cl
     try {
       if (plan.steam) {
         await uninstallSteam(plan.key, !skipBackup);
-        toaster.toast({ title: "Keepsake", body: "Steam's uninstall is open. Confirm it there." });
+        toaster.toast({ title: "Haversack", body: "Steam's uninstall is open. Confirm it there." });
       } else {
         await uninstallStart(plan.key, skipBackup);
         onStarted();
       }
       closeModal?.();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -50,7 +50,7 @@ function ConfirmModal({ plan, closeModal, onStarted }: { plan: UninstallPlan; cl
         label={`Uninstall ${plan.name}?`}
         description={
           plan.steam
-            ? "Steam removes the game itself: its install folder and library entry. Keepsake deletes nothing."
+            ? "Steam removes the game itself: its install folder and library entry. Haversack deletes nothing."
             : `These folders will be deleted from this device (${sizeText(total)}). The shortcut and its artwork are removed from Steam.`
         }
       />
@@ -111,7 +111,7 @@ export function UninstallPanel({ gameKey, onGone }: { gameKey: string; onGone: (
       const plan = await uninstallPlan(gameKey);
       showModal(<ConfirmModal plan={plan} onStarted={() => void uninstallStatus().then(setJob)} />);
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     }
   };
   const running = job && !["done", "failed", "cancelled"].includes(job.state);

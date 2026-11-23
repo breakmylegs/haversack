@@ -28,7 +28,7 @@ def make_repo(root, version="1.2.3", changelog=None, plugin_extra=None):
     for name in ("main.py", "LICENSE", "README.md", "THIRD_PARTY_NOTICES.md"):
         (root / name).write_text(name)
     (root / "package.json").write_text(json.dumps({"version": version}))
-    (root / "plugin.json").write_text(json.dumps({"name": "Keepsake", **(plugin_extra or {})}))
+    (root / "plugin.json").write_text(json.dumps({"name": "Haversack", **(plugin_extra or {})}))
     (root / "CHANGELOG.md").write_text(changelog if changelog is not None else f"# Changelog\n\n## [{version}]\n")
     # The PC package's inputs (ADR-0038, P5).
     (root / "desktop" / "dist").mkdir(parents=True)
@@ -67,28 +67,28 @@ def test_package_layout_modes_and_determinism(tmp_path, monkeypatch):
     monkeypatch.setattr(package, "ROOT", str(repo))
     first = package.build(str(tmp_path / "out1"))
     second = package.build(str(tmp_path / "out2"))
-    assert os.path.basename(first) == "Keepsake-v1.2.3.zip"
+    assert os.path.basename(first) == "Haversack-v1.2.3.zip"
     with open(first, "rb") as a, open(second, "rb") as b:
         assert hashlib.sha256(a.read()).hexdigest() == hashlib.sha256(b.read()).hexdigest()
     with zipfile.ZipFile(first) as archive:
         names = archive.namelist()
-        assert "Keepsake/plugin.json" in names
-        assert "Keepsake/dist/index.js" in names
-        assert "Keepsake/THIRD_PARTY_NOTICES.md" in names  # MIT notice for bundled qrcode-generator
-        assert "Keepsake/py_modules/keepsake/__init__.py" in names
+        assert "Haversack/plugin.json" in names
+        assert "Haversack/dist/index.js" in names
+        assert "Haversack/THIRD_PARTY_NOTICES.md" in names  # MIT notice for bundled qrcode-generator
+        assert "Haversack/py_modules/keepsake/__init__.py" in names
         assert not any("__pycache__" in n or n.endswith(".pyc") for n in names)
-        assert all(n.startswith("Keepsake/") for n in names)
+        assert all(n.startswith("Haversack/") for n in names)
         # Decky finds the plugin by a plugin.json exactly one folder deep.
-        assert [n for n in names if n.endswith("/plugin.json") and n.count("/") == 1] == ["Keepsake/plugin.json"]
-        gate = archive.getinfo("Keepsake/bin/keepsake-gate")
+        assert [n for n in names if n.endswith("/plugin.json") and n.count("/") == 1] == ["Haversack/plugin.json"]
+        gate = archive.getinfo("Haversack/bin/keepsake-gate")
         assert (gate.external_attr >> 16) & 0o777 == 0o755
-        assert archive.read("Keepsake/bin/keepsake-gate") == b'#!/bin/sh\nexec "$@"\n'
-        assert (archive.getinfo("Keepsake/main.py").external_attr >> 16) & 0o777 == 0o644
+        assert archive.read("Haversack/bin/keepsake-gate") == b'#!/bin/sh\nexec "$@"\n'
+        assert (archive.getinfo("Haversack/main.py").external_attr >> 16) & 0o777 == 0o644
         # Desktop Mode: the plugin serves the desktop interface and ships the tray's icon (ADR-0068).
         for shipped in ("desktop/index.html", "desktop/app.css", "desktop/dist/main.js"):
-            assert f"Keepsake/{shipped}" in names
-        assert "Keepsake/assets/icons/hicolor/256x256/apps/keepsake-tray.png" in names
-        assert "Keepsake/desktop/install.pyw" not in names  # the PC installer stays in the PC package
+            assert f"Haversack/{shipped}" in names
+        assert "Haversack/assets/icons/hicolor/256x256/apps/keepsake-tray.png" in names
+        assert "Haversack/desktop/install.pyw" not in names  # the PC installer stays in the PC package
 
 
 def test_the_pc_package_is_deterministic_and_holds_the_core_and_the_desktop_ui(tmp_path, monkeypatch):
@@ -98,7 +98,7 @@ def test_the_pc_package_is_deterministic_and_holds_the_core_and_the_desktop_ui(t
     monkeypatch.setattr(package, "ROOT", str(repo))
     first = package.build_desktop(str(tmp_path / "out1"))
     second = package.build_desktop(str(tmp_path / "out2"))
-    assert os.path.basename(first) == "Keepsake-desktop-v1.2.3.zip"
+    assert os.path.basename(first) == "Haversack-desktop-v1.2.3.zip"
     with open(first, "rb") as a, open(second, "rb") as b:
         assert a.read() == b.read()
     with zipfile.ZipFile(first) as archive:
@@ -215,7 +215,7 @@ def test_device_archive_skips_git_ignored_files(tmp_path):
 
 def test_device_onedrive_command():
     command = test_on_device.remote_command([], onedrive=True)
-    assert command.startswith('KEEPSAKE_ONEDRIVE_TOKEN_FILE="$HOME/homebrew/settings/Keepsake/onedrive-token.json"')
+    assert command.startswith('KEEPSAKE_ONEDRIVE_TOKEN_FILE="$HOME/homebrew/settings/Haversack/onedrive-token.json"')
     assert command.endswith("keepsake-test -m onedrive -s")
 
 

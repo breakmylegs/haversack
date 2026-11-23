@@ -152,7 +152,7 @@ class ControllerSettings:
         refused = [k for k in values if k not in allowed]
         if refused:
             raise SettingsError(
-                "Handheld Daemon manages the controller here; Keepsake only shows it"
+                "Handheld Daemon manages the controller here; Haversack only shows it"
                 if not allowed
                 else f"another tool manages {', '.join(refused)}"
             )

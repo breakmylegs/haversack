@@ -48,9 +48,9 @@ export function SyncPanel({
   const act = async (work: () => Promise<string>) => {
     setBusy(true);
     try {
-      toaster.toast({ title: "Keepsake", body: await work() });
+      toaster.toast({ title: "Haversack", body: await work() });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
       await refresh();
@@ -67,7 +67,7 @@ export function SyncPanel({
         label="Sync this game"
         description={
           kind === "steam"
-            ? "Steam games sync, back up and restore exactly like non-Steam games. If this game also uses Steam Cloud, Steam keeps a copy too, and Keepsake asks you whenever the two disagree."
+            ? "Steam games sync, back up and restore exactly like non-Steam games. If this game also uses Steam Cloud, Steam keeps a copy too, and Haversack asks you whenever the two disagree."
             : "Keep this game's saves in step between your devices."
         }
         checked={enabled}

@@ -183,14 +183,14 @@ class Session:
             parts = urlsplit(url)
             parts.port  # noqa: B018 (raises on a bad port)
         except ValueError as exc:
-            raise RemoteError("the server sent an address Keepsake cannot use") from exc
+            raise RemoteError("the server sent an address Haversack cannot use") from exc
         host = (parts.hostname or "").lower()
         if parts.scheme not in ("http", "https") or not host:
-            raise RemoteError("the server sent an address Keepsake cannot use")
+            raise RemoteError("the server sent an address Haversack cannot use")
         if host not in self.allowed:
             raise RedirectElsewhere(host)
         if parts.scheme == "http" and not host_is_private(host, self.resolve):
-            raise RemoteError(f"{host} is not on your local network, so Keepsake only connects to it with https://")
+            raise RemoteError(f"{host} is not on your local network, so Haversack only connects to it with https://")
 
     def open(
         self, url: str, headers: dict[str, str] | None = None, method: str = "GET", body: bytes | None = None
@@ -200,7 +200,7 @@ class Session:
         Returns the response and the final address.
         """
         if method not in ("GET", "PROPFIND"):
-            raise RemoteError("Keepsake only reads from network locations")
+            raise RemoteError("Haversack only reads from network locations")
         current = url
         for _ in range(MAX_REDIRECTS + 1):
             self._check_hop(current)
@@ -228,11 +228,11 @@ class Session:
                     following = urljoin(current, location)
                     scheme = urlsplit(following).scheme
                 except ValueError as exc:
-                    raise RemoteError("the server sent a redirect Keepsake cannot use") from exc
+                    raise RemoteError("the server sent a redirect Haversack cannot use") from exc
                 if scheme not in ("http", "https"):
-                    raise RemoteError("the server sent a redirect Keepsake cannot use")
+                    raise RemoteError("the server sent a redirect Haversack cannot use")
                 if parts.scheme == "https" and scheme != "https":
-                    raise RemoteError("the server tried to move you from https:// to plain http://; Keepsake refused")
+                    raise RemoteError("the server tried to move you from https:// to plain http://; Haversack refused")
                 current = following
                 continue
             return response, current
@@ -463,7 +463,7 @@ class LocationStore:
             Session(webdav.to_http(url) if dav else url, username, password or kept)
         if existing is None:
             if len(items) >= LOCATIONS_MAX:
-                raise RemoteError(f"Keepsake remembers up to {LOCATIONS_MAX} locations; forget one first")
+                raise RemoteError(f"Haversack remembers up to {LOCATIONS_MAX} locations; forget one first")
             existing = {"id": uuid.uuid4().hex[:12]}
             items.append(existing)
         existing.update(url=url, username=username)

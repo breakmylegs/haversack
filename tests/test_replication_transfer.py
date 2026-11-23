@@ -480,7 +480,7 @@ def test_recovery_at_startup(tmp_path):
 
 
 def test_only_staging_folders_are_ever_removed(tmp_path):
-    with pytest.raises(transfer.TransferError, match="not Keepsake staging"):
+    with pytest.raises(transfer.TransferError, match="not Haversack staging"):
         transfer.remove_staging(str(tmp_path))
     assert tmp_path.exists()
 

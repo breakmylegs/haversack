@@ -31,7 +31,7 @@ export function usePerformance(): [PerformanceStatus | null, (s: PerformanceStat
   return [status, setStatus];
 }
 
-// Separate SPL, SPPT and FPPT (ADR-0084), through the Keepsake Helper. The sliders are local until
+// Separate SPL, SPPT and FPPT (ADR-0084), through the Haversack Helper. The sliders are local until
 // Apply, so moving one never writes to the firmware.
 function LimitsEditor({ status, disabled, apply }: { status: PerformanceStatus; disabled: boolean; apply: (limits: PowerLimitValues) => void }) {
   const ranges = status.powerLimits?.ranges;
@@ -43,7 +43,7 @@ function LimitsEditor({ status, disabled, apply }: { status: PerformanceStatus; 
     return (
       <Field
         label="Separate power limits"
-        description={`Now SPL ${ranges.spl.current} W, SPPT ${ranges.sppt.current} W, FPPT ${ranges.fppt.current} W. Changing them separately needs the Keepsake Helper: install it from Device, Reconnect help.`}
+        description={`Now SPL ${ranges.spl.current} W, SPPT ${ranges.sppt.current} W, FPPT ${ranges.fppt.current} W. Changing them separately needs the Haversack Helper: install it from Device, Reconnect help.`}
       />
     );
   }
@@ -107,7 +107,7 @@ export function PowerPanel({ compact = false }: { compact?: boolean }) {
     try {
       setStatus(await deviceApply(values, game));
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -121,9 +121,9 @@ export function PowerPanel({ compact = false }: { compact?: boolean }) {
           label="Performance"
           description={
             locked
-              ? `${status.tools.join(", ")} manages performance on this device, so Keepsake only shows it. Turn off its per-game profiles, or remove it, to let Keepsake do this.`
+              ? `${status.tools.join(", ")} manages performance on this device, so Haversack only shows it. Turn off its per-game profiles, or remove it, to let Haversack do this.`
               : game
-                ? "Changes here are kept for the game you are playing and applied each time it starts. When it exits, Keepsake puts back what was there before."
+                ? "Changes here are kept for the game you are playing and applied each time it starts. When it exits, Haversack puts back what was there before."
                 : "Start a game to keep settings for it. A change made now lasts until something else changes it."
           }
         />
@@ -168,7 +168,7 @@ export function PowerPanel({ compact = false }: { compact?: boolean }) {
             onClick={() =>
               void deviceForget(game)
                 .then(setStatus)
-                .catch((err) => toaster.toast({ title: "Keepsake", body: plainError(err) }))
+                .catch((err) => toaster.toast({ title: "Haversack", body: plainError(err) }))
             }
           >
             Forget it

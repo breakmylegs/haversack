@@ -939,7 +939,7 @@ class Incoming:
             if os.path.isdir(final) and not os.listdir(final):
                 os.rmdir(final)  # an empty folder Steam may have made already
             if os.path.lexists(final):
-                self._update(offer_id, state="failed", reason=f"{final} already exists; Keepsake will not replace it")
+                self._update(offer_id, state="failed", reason=f"{final} already exists; Haversack will not replace it")
                 return
             record = self._update(offer_id, prefixFinal=final)
             os.replace(targets["prefix"], final)

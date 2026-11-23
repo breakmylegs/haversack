@@ -200,7 +200,8 @@ def test_the_callables_match_the_decky_plugin():
     tree = ast.parse((ROOT / "main.py").read_text(encoding="utf-8"))
     plugin = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "Plugin")
     exposed = {f.name for f in plugin.body if isinstance(f, ast.AsyncFunctionDef) and not f.name.startswith("_")}
-    assert exposed == set(host_module.CALLABLES)
+    decky_only = {"rename_status", "rename_finish"}  # the move from Keepsake happens only under Decky (ADR-0089)
+    assert exposed - decky_only == set(host_module.CALLABLES)
 
 
 @pytest.mark.parametrize("which", ["windows", "linux-desktop"])

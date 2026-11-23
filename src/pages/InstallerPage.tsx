@@ -71,9 +71,9 @@ export function InstallerPage() {
     setBusy(true);
     try {
       await work();
-      if (done) toaster.toast({ title: "Keepsake", body: done });
+      if (done) toaster.toast({ title: "Haversack", body: done });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
       await refresh();
@@ -97,7 +97,7 @@ export function InstallerPage() {
         busyInstall ? "Added to the queue. It starts when the current install ends." : "Ready. Choose the installer program.",
       );
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Nothing chosen: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Nothing chosen: ${plainError(err)}` });
     }
   };
 
@@ -106,7 +106,7 @@ export function InstallerPage() {
       const picked = await openFilePicker(FOLDER, status?.libraryRoot ?? "/home", false, true);
       await act(() => setSetting("libraryRoot", picked.realpath || picked.path), "Games will be installed there.");
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Nothing chosen: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Nothing chosen: ${plainError(err)}` });
     }
   };
 
@@ -121,7 +121,7 @@ export function InstallerPage() {
     act(async () => {
       const found = await installerArtworkSearch(job.id);
       setMatches((m) => ({ ...m, [job.id]: found }));
-      if (!found.length) toaster.toast({ title: "Keepsake", body: "SteamGridDB has no game by that name." });
+      if (!found.length) toaster.toast({ title: "Haversack", body: "SteamGridDB has no game by that name." });
     });
 
   if (status && !status.running) {
@@ -181,7 +181,7 @@ export function InstallerPage() {
       )}
       {status && !status.udisks && <Field label="ISO files are not available" description="udisksctl is missing on this system. Copy the disc to a folder instead." />}
       {status?.artwork && !status.artworkKey && (
-        <Field label="SteamGridDB API key" description="Optional. Lets Keepsake add artwork to games you install. Get a key from your SteamGridDB profile, API." childrenLayout="below">
+        <Field label="SteamGridDB API key" description="Optional. Lets Haversack add artwork to games you install. Get a key from your SteamGridDB profile, API." childrenLayout="below">
           <TextField value={apiKey} disabled={busy} bIsPassword onChange={(e) => setApiKey(e.target.value)} />
           <DialogButton
             style={{ width: "auto", marginTop: 8 }}

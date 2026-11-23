@@ -183,7 +183,7 @@ def navigation_record(record: Any) -> dict[str, Any]:
 IDENTITY_CACHE_SECONDS = 600
 HISTORY_MAX = 200
 CONFIG_STATE_FILE = "config-revisions.json"
-TOAST_SIGNIN = "{name} sign-in needs attention. Open Keepsake, Settings, to sign in again."
+TOAST_SIGNIN = "{name} sign-in needs attention. Open Haversack, Settings, to sign in again."
 BACKEND_NAMES = {
     "local": "Test store on this device",
     "onedrive": "OneDrive",
@@ -210,8 +210,8 @@ MODE_WORDS = {"low-power": "Quiet", "balanced": "Balanced", "performance": "Perf
 SYNC_RESULT = {
     "published": "saved to the cloud",
     "unchanged": "already up to date",
-    "conflict": "save conflict, open Keepsake",
-    "published-fork": "save conflict, open Keepsake",
+    "conflict": "save conflict, open Haversack",
+    "published-fork": "save conflict, open Haversack",
     "quarantined": "a suspicious save was kept here",
 }
 DEVICE_WATCH_SECONDS = 5.0  # after applying a profile, look once more for another app setting its own value
@@ -266,10 +266,10 @@ AUTO_PULL_KINDS = ("heroic", "lutris", "bottles", "emulator")
 AUTO_SYNC_METHODS = ("steam-id", "title", "manual")  # matches with known save locations (ADR-0063)
 SCRUB_FILE = "integrity.json"
 SCRUB_INTERVAL = 7 * 24 * 3600
-EXPORT_README = """Keepsake export
+EXPORT_README = """Haversack export
 
 Each folder holds one game. Each zip is one snapshot of that game's save files, named by
-date and snapshot id, and checked against Keepsake's records when it was exported.
+date and snapshot id, and checked against Haversack's records when it was exported.
 
 Inside a zip, files sit under neutral folder names rather than paths from one device:
   winLocalAppData  Windows %LOCALAPPDATA% (in a Proton prefix: AppData/Local)
@@ -299,7 +299,7 @@ def export_folder(folder: Any) -> str:
     if not os.path.isdir(path):
         raise ValueError("that folder does not exist")
     if not os.access(path, os.W_OK):
-        raise ValueError("Keepsake cannot write to that folder")
+        raise ValueError("Haversack cannot write to that folder")
     return path
 
 
@@ -500,7 +500,8 @@ class KeepsakeApp:
                 "saves",
                 "Saves",
                 "Keeps game saves in step between your devices through the cloud.",
-                "Save files of the games you choose, their registry keys if you allow it, and Keepsake's own settings.",
+                "Save files of the games you choose, their registry keys if you allow it, and Haversack's own "
+                "settings.",
                 health=saves_health,
             )
         )
@@ -726,7 +727,7 @@ class KeepsakeApp:
             Module(
                 "desktop",
                 "Desktop",
-                "Keepsake in Desktop Mode: starts with your desktop, in the system tray. Click the icon to open it.",
+                "Haversack in Desktop Mode: starts with your desktop, in the system tray. Click the icon to open it.",
                 "A Desktop Mode start-up entry and app-menu entry, and a page on 127.0.0.1 only this device can open.",
                 start=desktop_start,
                 stop=desktop_stop,
@@ -770,7 +771,7 @@ class KeepsakeApp:
                 job = await asyncio.to_thread(self.installer.installer_exited, int(payload["appid"]))
                 if job:
                     await self.emit(
-                        "keepsake_toast", f"{job['title']}: choose the game's program in Keepsake, Installer."
+                        "keepsake_toast", f"{job['title']}: choose the game's program in Haversack, Installer."
                     )
 
         async def installer_health() -> list[dict[str, Any]]:
@@ -900,7 +901,7 @@ class KeepsakeApp:
             if status["tools"]:
                 state, detail = (
                     "warn",
-                    f"{', '.join(status['tools'])} manages performance here; Keepsake only shows it.",
+                    f"{', '.join(status['tools'])} manages performance here; Haversack only shows it.",
                 )
             elif not status["available"]:
                 state, detail = "warn", f"Performance controls are not available: {status['problem']}"
@@ -922,7 +923,7 @@ class KeepsakeApp:
                 "Device",
                 "This handheld's performance modes, TDP and CPU boost, per game, through Valve's steamos-manager.",
                 "Nothing on disk but its own profiles file. Device settings change only through steamos-manager, "
-                "and what Keepsake changed is put back when the game exits.",
+                "and what Haversack changed is put back when the game exits.",
                 start=device_start,
                 stop=device_stop,
                 health=device_health,
@@ -1123,7 +1124,7 @@ class KeepsakeApp:
         except (replication_link.LinkError, OSError) as exc:
             raise ValueError(f"{capital(name)} could not be reached: {exc}") from exc
         if reply.get("type") != "emu-summary":
-            raise ValueError(f"{capital(name)} needs Keepsake 0.49 or later to take emulator games")
+            raise ValueError(f"{capital(name)} needs Haversack 0.49 or later to take emulator games")
         return {k: reply.get(k) or [] for k in ("systems", "emulators", "configs", "games")}
 
     async def emulator_send(self, peer_id: str, system: str, unit: str, with_keys: bool = False) -> dict[str, Any]:
@@ -1441,7 +1442,7 @@ class KeepsakeApp:
         elif not self.settings.get("setupComplete") and self.game_configs.any_enabled():
             # Upgraded from a version without the setup wizard: games are already set up.
             self.settings.set("setupComplete", True)
-        log_event(logging.INFO, "app.start", "Keepsake backend started", version=self.version)
+        log_event(logging.INFO, "app.start", "Haversack backend started", version=self.version)
         try:
             self.db = await asyncio.to_thread(open_db, self.paths.runtime_dir)
             self.steam_ops = SteamOps(self.db) if self.db else None
@@ -1686,7 +1687,7 @@ class KeepsakeApp:
             names = ", ".join(auto_enabled[:3]) + (f" and {count - 3} more" if count > 3 else "")
             await self.emit(
                 "keepsake_toast",
-                f"Now syncing {names}: Steam does not back up their saves. Turn any off in Keepsake's Games list.",
+                f"Now syncing {names}: Steam does not back up their saves. Turn any off in Haversack's Games list.",
             )
         # Games needing attention first, then by name (Peter, 16 November 2026).
         mismatched = await asyncio.to_thread(discovery.load_mismatches, self.paths.runtime_dir)
@@ -1858,7 +1859,7 @@ class KeepsakeApp:
             label = found["candidate"].get("title") or found["candidate"]["gameKey"]
             await self.emit(
                 "keepsake_toast",
-                f"{game['name']} looks like {label}. Open Keepsake to approve or choose another match.",
+                f"{game['name']} looks like {label}. Open Haversack to approve or choose another match.",
             )
             log_event(
                 logging.INFO,
@@ -2348,7 +2349,7 @@ class KeepsakeApp:
     async def _snapshot_context(self, key: str) -> dict[str, Any]:
         """Everything needed to snapshot or restore a game, failing closed when anything is uncertain."""
         if self.settings.read_only:
-            raise ValueError("settings are in read-only safe mode; update Keepsake first")
+            raise ValueError("settings are in read-only safe mode; update Haversack first")
         game = await self._game(key)
         if discovery.sync_blocked(self.paths.runtime_dir, key):
             raise ValueError("the running prefix did not match; snapshots are blocked for this game")
@@ -2941,7 +2942,7 @@ class KeepsakeApp:
         """A conflict appeared. With "When saves differ" set to "Take the newest", settle it by time
         (ADR-0080); otherwise ask, as always."""
         if self.settings.get("conflictPolicy") != "newest":
-            await self.emit("keepsake_toast", f"Save conflict for {game['name']}. Open Keepsake to choose.")
+            await self.emit("keepsake_toast", f"Save conflict for {game['name']}. Open Haversack to choose.")
             return
         key = str(game["key"])
         if key in self._newest_running:
@@ -2969,7 +2970,9 @@ class KeepsakeApp:
             return {"status": "no-conflict"}
         decision = newest.decide(details.get("sides") or [], time.time())
         if decision["choice"] is None:
-            await self.emit("keepsake_toast", f"Save conflict for {game['name']}: {decision['reason']}. Open Keepsake.")
+            await self.emit(
+                "keepsake_toast", f"Save conflict for {game['name']}: {decision['reason']}. Open Haversack."
+            )
             return {"status": "asked", **decision}
         try:
             result = await self.resolve_conflict(key, decision["choice"], decision["head"])
@@ -3140,7 +3143,7 @@ class KeepsakeApp:
                     if session.get("warnedFor") != game.get("last_played"):
                         self._record_session(ctx.game_key, warnedFor=float(game.get("last_played") or 0))
                         await self.emit(
-                            "keepsake_toast", f"{game['name']} was played while Keepsake was not running. Saved now."
+                            "keepsake_toast", f"{game['name']} was played while Haversack was not running. Saved now."
                         )
                     outcome = {**outcome, "playedWithoutKeepsake": True}
                 if outcome.get("status") == "conflict" or outcome.get("push") == "published-fork":
@@ -3802,7 +3805,7 @@ class KeepsakeApp:
         if not chosen:
             raise ValueError("there is nothing to export: no synced game was found")
         stamp = time.strftime("%Y-%m-%d %H%M", time.localtime())
-        out_dir = await asyncio.to_thread(_new_folder, target_root, f"Keepsake export {stamp}")
+        out_dir = await asyncio.to_thread(_new_folder, target_root, f"Haversack export {stamp}")
         index: list[dict[str, Any]] = []
         with self.jobs.job("export"):
             for game, gk in chosen:
@@ -4114,7 +4117,7 @@ class KeepsakeApp:
             await self.emit(
                 "keepsake_toast",
                 f"{found['name']} was hidden in Steam, perhaps from your other device. "
-                "Open Keepsake's Games page to show it again.",
+                "Open Haversack's Games page to show it again.",
             )
         outcome["tidied"] = 0
         if self.settings.get("tidyAutomatically") and self.settings.get("streamTidyVerified"):
@@ -4760,7 +4763,7 @@ class KeepsakeApp:
                     f"Saves could not be pushed first ({type(exc).__name__}); the copy has the saves on this device.",
                 )
             if pushed.get("status") == "conflict":
-                raise ValueError("this game has a save conflict; resolve it in Keepsake first, then send it")
+                raise ValueError("this game has a save conflict; resolve it in Haversack first, then send it")
         extra = {
             "from": {"name": str(self.settings.get("deviceName") or "Unnamed device")},
             "gameKey": config.get("gameKey"),
@@ -5166,7 +5169,7 @@ class KeepsakeApp:
         except (replication_link.LinkError, OSError) as exc:
             raise ValueError(f"{self._peer_name(peer_id)} could not be reached: {exc}") from exc
         if reply.get("type") == "error":
-            raise ValueError(f"update Keepsake on {self._peer_name(peer_id)} to get games from it")
+            raise ValueError(f"update Haversack on {self._peer_name(peer_id)} to get games from it")
         listed = reply.get("games")
         games: list[Any] = listed if isinstance(listed, list) else []
         return [
@@ -5663,7 +5666,7 @@ class KeepsakeApp:
             if int(game.get("appid") or 0) != appid:
                 continue
             if not config.get("enabled") or not gk:
-                return {"state": "off", "label": "Saves: not synced by Keepsake"}
+                return {"state": "off", "label": "Saves: not synced by Haversack"}
             state = states.get(gk) or {}
             found = newer_save(state)
             if found:
@@ -5680,7 +5683,7 @@ class KeepsakeApp:
         games = (await self.discover_games(True))["games"]
         game = next((g for g in games if g["appid"] == job["appid"]), None)
         if game is None:
-            raise ValueError("Keepsake cannot see the new shortcut yet; try again in a moment")
+            raise ValueError("Haversack cannot see the new shortcut yet; try again in a moment")
         return {"key": game["key"], "replication": self.registry.enabled("replication")}
 
     async def installer_swap_disc(self, job_id: int, disc: str) -> dict[str, Any]:
@@ -5759,7 +5762,7 @@ class KeepsakeApp:
             error=type(exc).__name__,
         )
         return (
-            f"Keepsake could not {what} ({type(exc).__name__}). Check the address, user name and "
+            f"Haversack could not {what} ({type(exc).__name__}). Check the address, user name and "
             "password; if it keeps happening, export diagnostics from Settings."
         )
 
@@ -6060,7 +6063,7 @@ class KeepsakeApp:
         if self.db is not None:
             self.db.close()
             self.db, self.steam_ops = None, None
-        log_event(logging.INFO, "app.stop", "Keepsake backend stopped")
+        log_event(logging.INFO, "app.stop", "Haversack backend stopped")
 
     # Settings
 
@@ -6118,7 +6121,7 @@ class KeepsakeApp:
             return {
                 "message": f"Checked {r.get('games', 0)} games."
                 if r.get("ok")
-                else "Keepsake is busy; try again in a moment."
+                else "Haversack is busy; try again in a moment."
             }
         if sid == "get-game":
             return {"message": "Choose Games on a device, then Get this game.", "open": ["games-devices", "devices"]}
@@ -6135,7 +6138,7 @@ class KeepsakeApp:
             return {
                 "message": f"Update available: v{latest.get('version')}."
                 if r.get("updateAvailable")
-                else "Keepsake is up to date."
+                else "Haversack is up to date."
             }
         if sid == "next-mode":
             status = await self.device_performance()
@@ -6396,7 +6399,7 @@ class KeepsakeApp:
 BADGE_LABELS = {
     "synced": "Saves: in step",
     "pending": "Saves: waiting to upload",
-    "conflict": "Saves: conflict, open Keepsake",
+    "conflict": "Saves: conflict, open Haversack",
     "quarantined": "Saves: a suspicious save was kept here",
     "not-synced": "Saves: not synced yet",
 }

@@ -67,9 +67,9 @@ def fetch(appid: int | None, name: str | None, fetcher: Callable[..., net.HttpRe
     try:
         data = json.loads(response.body)
     except ValueError as exc:
-        raise SourceError("Deck Verified sent an answer Keepsake cannot read.") from exc
+        raise SourceError("Deck Verified sent an answer Haversack cannot read.") from exc
     if not isinstance(data, dict):
-        raise SourceError("Deck Verified sent an answer Keepsake cannot read.")
+        raise SourceError("Deck Verified sent an answer Haversack cannot read.")
     return data
 
 

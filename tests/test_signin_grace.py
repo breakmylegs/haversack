@@ -112,7 +112,7 @@ def test_a_cancelled_attempt_says_it_moved_to_the_phone_then_that_the_phone_work
         status, body = visit(port, "/")
         assert (
             status == 200
-            and "signing in on your phone, so Keepsake is signed in" in body
+            and "signing in on your phone, so Haversack is signed in" in body
             and "You're signed in" in body
         )
     finally:
@@ -226,7 +226,7 @@ def test_the_app_tells_an_open_browser_tab_when_the_phone_sign_in_worked(setup, 
     (status, body), port = asyncio.run(run())
     signed = [e[1][0] for e in events if e[0] == "keepsake_signin" and e[1][0].get("status") == "signed-in"]
     assert signed and signed[0]["method"] == "phone"
-    assert status == 200 and "signing in on your phone, so Keepsake is signed in" in body
+    assert status == 200 and "signing in on your phone, so Haversack is signed in" in body
     with pytest.raises(OSError):
         visit(port, "/")  # gone with the plugin
 

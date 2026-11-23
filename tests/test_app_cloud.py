@@ -110,7 +110,7 @@ def test_sign_in_registers_device_and_snapshots_go_to_onedrive(setup, monkeypatc
 
     shown, status, snap, listing, tested = asyncio.run(run())
     assert shown["userCode"] == "WXYZ-1234"
-    assert events[0] == ("keepsake_signin", ({"status": "signed-in", "registered": True},))
+    assert events[0] == ("keepsake_signin", ({"status": "signed-in", "registered": True, "method": "phone"},))
     assert status["signedIn"] is True and status["signingIn"] is False
     device_id = app.settings.get("deviceId")
     assert f"registry/devices/{device_id}.json" in fake.files
