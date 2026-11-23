@@ -243,7 +243,7 @@ def build(path: str, out_dir: str) -> str:
         "source": "https://github.com/bdefore/protondb-data",
         "licence": "ODbL 1.0 (database), DbCL 1.0 (contents). Derived from ProtonDB data.",
         "attribution": ATTRIBUTION,
-        "builder": "https://github.com/breakmylegs/keepsake/blob/main/scripts/protondb_index.py",
+        "builder": "https://github.com/breakmylegs/haversack/blob/main/scripts/protondb_index.py",
         "records_read": total,
         "apps": len(kept),
     }

@@ -30,7 +30,7 @@ It is built for non-Steam shortcuts installed into their own Proton prefixes, wh
 First install on a new device uses one URL that never changes:
 
 ```
-https://github.com/breakmylegs/keepsake/releases/latest/download/Haversack.zip
+https://github.com/breakmylegs/haversack/releases/latest/download/Haversack.zip
 ```
 
 1. In Decky Loader, open Settings, General, and enable Developer mode (once per device).

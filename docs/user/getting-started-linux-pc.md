@@ -7,7 +7,7 @@ The PC version is a preview: the main screens are in place, and more follow.
 ## 1. Install
 
 1. You need Python 3.11 or newer. Most distributions already have it as `python3`.
-2. Download `Keepsake-desktop-v<version>.zip` from the [latest release](https://github.com/breakmylegs/keepsake/releases/latest) and unzip it anywhere.
+2. Download `Keepsake-desktop-v<version>.zip` from the [latest release](https://github.com/breakmylegs/haversack/releases/latest) and unzip it anywhere.
 3. In that folder, run:
    ```
    python3 install.pyw

@@ -779,7 +779,7 @@ def test_prepare_helper_needs_a_signed_release() -> None:
         "assets": [
             {
                 "name": n,
-                "browser_download_url": f"https://github.com/breakmylegs/keepsake/releases/download/v0.41.0/{n}",
+                "browser_download_url": f"https://github.com/breakmylegs/haversack/releases/download/v0.41.0/{n}",
             }
             for n in ("Haversack-v0.41.0.zip", "Haversack-helper-v0.41.0.zip", "SHA256SUMS")
         ],

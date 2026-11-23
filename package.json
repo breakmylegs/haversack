@@ -20,7 +20,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/breakmylegs/keepsake.git"
+    "url": "git+https://github.com/breakmylegs/haversack.git"
   },
   "keywords": [
     "decky",
@@ -31,9 +31,9 @@
   "author": "breakmylegs",
   "license": "BSD-3-Clause",
   "bugs": {
-    "url": "https://github.com/breakmylegs/keepsake/issues"
+    "url": "https://github.com/breakmylegs/haversack/issues"
   },
-  "homepage": "https://github.com/breakmylegs/keepsake#readme",
+  "homepage": "https://github.com/breakmylegs/haversack#readme",
   "devDependencies": {
     "@decky/rollup": "^1.0.2",
     "@decky/ui": "^4.16.5",

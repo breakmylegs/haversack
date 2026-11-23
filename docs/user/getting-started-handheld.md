@@ -7,7 +7,7 @@ For SteamOS and Bazzite handhelds with [Decky Loader](https://github.com/SteamDe
 1. In Decky, open **Settings**, then **General**, and turn on **Developer mode**. You only do this once per device.
 2. In Decky, open **Settings**, then **Developer**, then **Install Plugin from URL**, and enter:
    ```
-   https://github.com/breakmylegs/keepsake/releases/latest/download/Keepsake.zip
+   https://github.com/breakmylegs/haversack/releases/latest/download/Keepsake.zip
    ```
 3. After that, Keepsake updates itself from its own **Settings**, **Updates** tab ([Updates](updates.md)).
 

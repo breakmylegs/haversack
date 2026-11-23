@@ -37,7 +37,7 @@ Each check says what is wrong and what to do. Most warnings are a game waiting f
 Yes. Settings, **Export snapshots** copies them out as plain zip files with a list of their contents. See [Conflicts, history and restoring](conflicts-and-history.md#exporting-your-saves).
 
 **Where do I report a problem?**
-Open an issue on [GitHub](https://github.com/breakmylegs/keepsake/issues). For a security problem, use **Report a vulnerability** on the repository's Security tab instead, so it stays private. Diagnostics, then **Export diagnostics**, makes a file you can attach. Tokens and passwords are removed from it, but read it first.
+Open an issue on [GitHub](https://github.com/breakmylegs/haversack/issues). For a security problem, use **Report a vulnerability** on the repository's Security tab instead, so it stays private. Diagnostics, then **Export diagnostics**, makes a file you can attach. Tokens and passwords are removed from it, but read it first.
 
 **Why does my library show my other handheld's games with Stream instead of Play?**
 That is Steam Remote Play. When your other device is on with Steam running, Steam lists the games installed there in this device's library, so you can stream them. A non-Steam game installed on the other device shows as a tile with **Stream**. If you have the same game on both, you may see it twice. Keepsake never treats these as games on this device: they are left out of the Games list, save sync, Send to, Replication, Advisor and Uninstall. Keepsake's Games page says how many there are, and **Show games you can stream from another device** lists them.

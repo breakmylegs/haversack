@@ -4,7 +4,7 @@ Build prompt section 19. The interim setup (the Ludusavi flatpak with decky-ludu
 
 ## 1. Legion Go 2 first (the starting source)
 
-1. Install Keepsake from `https://github.com/breakmylegs/keepsake/releases/latest/download/Keepsake.zip` (Decky, Settings, Developer, Install Plugin from URL).
+1. Install Keepsake from `https://github.com/breakmylegs/haversack/releases/latest/download/Keepsake.zip` (Decky, Settings, Developer, Install Plugin from URL).
 2. Open it and complete the setup wizard: device name, OneDrive sign-in (`docs/setup-entra.md`), scan, review matches, choose the non-Steam games.
 3. In decky-ludusavi, turn off automatic sync for every game Keepsake now syncs. Keepsake's health check warns while decky-ludusavi is active alongside synced games.
 4. Play and quit each game once, or use Sync now: the first pushes upload the current saves.

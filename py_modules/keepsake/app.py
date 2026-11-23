@@ -1384,7 +1384,7 @@ class KeepsakeApp:
         if not self.credentials.configured("pcgw"):
             return None
         c = self.credentials.load("pcgw")
-        user_agent = f"Keepsake/{self.version} (+https://github.com/breakmylegs/keepsake)"
+        user_agent = f"Keepsake/{self.version} (+https://github.com/breakmylegs/haversack)"
         return PcgwClient(str(c["username"]), str(c["password"]), user_agent)
 
     def _advisor_map_game(self, appid: int) -> dict[str, Any]:
