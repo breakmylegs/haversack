@@ -4,6 +4,10 @@ All notable changes to Haversack (called Keepsake until v0.51.0) are listed here
 
 ## [Unreleased]
 
+## [0.58.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Added
 
 - **Pause game** in the quick access menu's Now playing. It stops the running game where it is until you press **Resume game**. It always carries on by itself after an hour, or if Haversack stops or the device restarts.
