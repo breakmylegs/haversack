@@ -1540,6 +1540,34 @@ export const HELP: HelpTopic[] = [
    {
     "k": "p",
     "t": "The page also lists the themes and sound packs that **CSS Loader** and **Audio Loader** have installed. Haversack does not change themes or sounds itself; install those plugins from Decky's store."
+   },
+   {
+    "k": "h",
+    "l": 3,
+    "t": "Sending looks to your other handheld"
+   },
+   {
+    "k": "p",
+    "t": "With Replication on and your handhelds paired, **Send to your other handheld** at the bottom of Looks sends any of:"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "your CSS Loader themes;"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "your Audio Loader sound packs;"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "the animations you chose above."
+   },
+   {
+    "k": "p",
+    "t": "The other handheld keeps everything it already has. Only themes and packs it lacks are added, where CSS Loader and Audio Loader find them. Videos arrive as choices on its own Looks page, so its screen only changes when someone picks one there. The other handheld needs Looks switched on, and Haversack 0.54.0 or later."
    }
   ]
  },

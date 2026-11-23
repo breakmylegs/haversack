@@ -11,6 +11,7 @@ interface Looks {
   enabled: boolean;
   animations: { videos: Record<Kind, Video>; blockedBy: string | null; steamFound: boolean };
   choices: { id: string; name: string; from: string }[];
+  sendable: Record<"themes" | "sounds" | "animations", number>;
   plugins: { css: boolean; audio: boolean; animations: boolean };
   themes: { name: string }[];
   sounds: { name: string }[];
@@ -28,8 +29,40 @@ function now(v: Video): string {
   return "Now: Steam's own.";
 }
 
+const PARTS: [string, string][] = [
+  ["themes", "CSS Loader themes"],
+  ["sounds", "Audio Loader sound packs"],
+  ["animations", "The animations chosen above"],
+];
+
+/** Sending looks to a paired handheld (ADR-0092): only what it lacks is added there. */
+async function sendSection(s: Looks, problem: (text: string) => void): Promise<HTMLElement> {
+  let peers: { id: string; name: string }[] = [];
+  try {
+    peers = (await call<{ peers: { id: string; name: string }[] }>("replication_status")).peers;
+  } catch {
+    peers = [];
+  }
+  if (!peers.length) return h("p", { class: "small" }, "To send looks, pair your other handheld first (Moving games and devices, with Replication on).");
+  const to = h("select", { "aria-label": "Send to" }, ...peers.map((p) => h("option", { value: p.id }, p.name))) as HTMLSelectElement;
+  const boxes = PARTS.map(([part, label]) => {
+    const box = h("input", { type: "checkbox", checked: s.sendable[part as keyof Looks["sendable"]] > 0, disabled: !s.sendable[part as keyof Looks["sendable"]] }) as HTMLInputElement;
+    return { part, box, row: h("label", { class: "switch" }, box, ` ${label} (${s.sendable[part as keyof Looks["sendable"]]} here)`) };
+  });
+  const button = h("button", {}, "Send") as HTMLButtonElement;
+  button.addEventListener("click", () => {
+    const parts = boxes.filter((b) => b.box.checked).map((b) => b.part);
+    if (!parts.length) return problem("Choose something to send.");
+    call<{ sending: string }>("looks_send", to.value, parts)
+      .then((r) => problem(`Getting ${r.sending} ready to send.`))
+      .catch((error) => problem(error instanceof ApiError ? error.message : "That did not work."));
+  });
+  return h("div", { class: "card" }, h("h2", {}, "Send to your other handheld"), h("p", { class: "small" }, "It keeps everything it already has: only what it lacks is added. Videos arrive as choices on its own Looks page."), h("p", {}, "To ", to), ...boxes.map((b) => h("p", {}, b.row)), h("p", {}, button));
+}
+
 export async function looksPage(main: HTMLElement, problem = ""): Promise<void> {
   const s = await call<Looks>("looks_status");
+  const note = h("p", { class: "small" });
   const act = async (method: string, ...args: unknown[]) => {
     try {
       await call(method, ...args);
@@ -62,6 +95,8 @@ export async function looksPage(main: HTMLElement, problem = ""): Promise<void> 
     h("h2", {}, "Themes and sounds"),
     h("p", {}, s.plugins.css ? `CSS Loader themes: ${s.themes.map((t) => t.name).join(", ") || "none yet"}.` : "Themes come from CSS Loader, in Decky's store."),
     h("p", {}, s.plugins.audio ? `Audio Loader sound packs: ${s.sounds.map((p) => p.name).join(", ") || "none yet"}.` : "Sound packs come from Audio Loader, in Decky's store."),
+    s.enabled ? await sendSection(s, (text) => (note.textContent = text)) : null,
+    note,
     problem ? h("p", { class: "warn" }, problem) : null,
   );
 }

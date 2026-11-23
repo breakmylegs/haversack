@@ -22,7 +22,7 @@ import stat
 import sys
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from ..fsutil import atomic_write_json, read_json
@@ -303,6 +303,40 @@ class Outgoing:
         self._save(offers)
         return wire
 
+    def prepare_parts(
+        self,
+        kind: str,
+        title: str,
+        parts: dict[str, tuple[str, builtins.list[str]]],
+        peer_id: str,
+        extra: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Offer chosen top-level ``members`` of folders to ``peer_id``, for an offer kind another module
+        owns (R29 stage 1b, ADR-0092): ``{part: (root, members)}``. Slow: run in a thread."""
+        offers = self._load()
+        if len(offers) >= MAX_OFFERS:
+            raise OfferError(f"at most {MAX_OFFERS} games can be on offer; withdraw one first")
+        offer_id = sendgame.new_offer_id()
+        folder = os.path.join(self.work_dir, offer_id)
+        os.makedirs(folder, exist_ok=True)
+        record_shares, wire_shares = {}, {}
+        for part, (root, members) in parts.items():
+            manifest = mf.build(root, only(members))
+            manifest_file = os.path.join(folder, f"{part}.json")
+            atomic_write_json(manifest_file, manifest)
+            share = self.shares.add(root, manifest, {peer_id})
+            record_shares[part] = {"share": share.id, "root": root, "manifestFile": manifest_file}
+            wire_shares[part] = {
+                "share": share.id,
+                "root": manifest["root"],
+                "bytes": mf.total_bytes(manifest),
+                "members": sorted(members),
+            }
+        wire = {"kind": kind, "id": offer_id, "shares": wire_shares, **extra}
+        offers[offer_id] = {"peer": peer_id, "title": title, "shares": record_shares, "created": time.time()}
+        self._save(offers)
+        return wire
+
     def prepare_update(
         self,
         link_id: str,
@@ -441,8 +475,12 @@ class Incoming:
         on_change: Callable[[], None] | None = None,
         on_offer: Callable[[dict[str, Any]], None] | None = None,
         on_state: Callable[[str, dict[str, Any]], None] | None = None,
+        kinds: dict[str, Any] | None = None,
     ) -> None:
         self.path = path
+        # Offer kinds other modules own (ADR-0092): each has validate, targets and finish, so Replication
+        # carries them without reaching into those modules (P13).
+        self.kinds = dict(kinds or {})
         self.transfers = transfers
         self.enqueue_op = enqueue_op
         self.places = places  # libraryRoot, compatdata, tools, art and home on this device
@@ -548,6 +586,53 @@ class Incoming:
         if new and self.on_offer:
             self.on_offer(offer)
         return {"type": "offer-received", "id": offer["id"]}
+
+    def kind_handler(self, kind: str) -> Callable[[Session, dict[str, Any]], Awaitable[dict[str, Any]]]:
+        """The request handler for an offer kind another module owns (``looks-offer``, ADR-0092)."""
+
+        async def handle(session: Session, message: dict[str, Any]) -> dict[str, Any]:
+            owner = self.kinds.get(kind)
+            raw = message.get("offer")
+            if owner is None:
+                raise ServeError(f"this device does not take {kind} offers")
+            try:
+                clean = owner.validate(raw)
+            except ValueError as exc:
+                raise ServeError(str(exc)) from exc
+            if not OFFER_ID.match(str(clean.get("id", ""))):
+                raise ServeError("the offer is not valid")
+            sender = (
+                (raw.get("from") or {}).get("name")
+                if isinstance(raw, dict) and isinstance(raw.get("from"), dict)
+                else None
+            )
+            offer = {
+                **clean,
+                "kind": kind,
+                "from": clean_name(sender),
+                "compatTool": None,
+                "art": [],
+                "update": None,
+                "launchOptions": "",
+                "droppedOptions": [],
+                "gameKey": None,
+                "savesEnabled": False,
+                "pull": None,
+            }
+            offers = self._load()
+            if offer["id"] not in offers and sum(1 for r in offers.values() if r["state"] == "offered") >= MAX_OFFERS:
+                raise ServeError("that device already has too many offers waiting")
+            new = offer["id"] not in offers
+            offers.setdefault(
+                offer["id"], {"offer": offer, "peer": session.peer_id, "state": "offered", "received": time.time()}
+            )
+            self._save(offers)
+            self._changed()
+            if new and self.on_offer:
+                self.on_offer(offer)
+            return {"type": "offer-received", "id": offer["id"]}
+
+        return handle
 
     def _emu_places(self) -> tuple[str, str]:
         home = self.places().get("home", "")
@@ -678,6 +763,18 @@ class Incoming:
             raise OfferError("that offer has gone")
         offer, places = record["offer"], self.places()
         targets: dict[str, str] = {}
+        owner = self.kinds.get(str(offer.get("kind")))
+        if owner is not None:
+            try:
+                targets = owner.targets(offer, offer_id)
+            except (ValueError, OSError) as exc:
+                raise OfferError(str(exc)) from exc
+            for scope, target in targets.items():
+                parent = os.path.dirname(target)
+                needed = policy.space_needed(offer["shares"][scope]["bytes"])
+                if shutil.disk_usage(parent).free < needed:
+                    raise OfferError(f"not enough space in {parent}")
+            return {"targets": targets, "toolMissing": False}
         if offer.get("kind") == "emulator":
             home, roms = self._emu_places()
             try:
@@ -841,7 +938,9 @@ class Incoming:
             done = set(record.get("doneScopes", [])) | {next(s for s, j in record["jobs"].items() if j == job.id)}
             record = self._update(offer_id, doneScopes=sorted(done))
             if done >= set(record["jobs"]):
-                if record["offer"].get("kind") == "emulator":
+                if record["offer"].get("kind") in self.kinds:
+                    self._kind_finish(offer_id)
+                elif record["offer"].get("kind") == "emulator":
                     self._emu_finish(offer_id)
                 elif record["offer"].get("update"):
                     record = self._update(offer_id, state="done")  # files only: the shortcut stays as it is
@@ -849,6 +948,21 @@ class Incoming:
                         self.on_done(record)
                 else:
                     self._register(offer_id)
+
+    def _kind_finish(self, offer_id: str) -> None:
+        """Hand the copied parts to the module that owns the offer kind, which puts them in place."""
+        record = self._load()[offer_id]
+        offer = record["offer"]
+        try:
+            done = self.kinds[offer["kind"]].finish(offer, record["targets"])
+        except (OSError, ValueError) as exc:
+            self._update(offer_id, state="failed", reason=f"the copy could not be put in place: {exc}")
+            return
+        record = self._update(
+            offer_id, state="done", placed=done["placed"], skipped=done["skipped"], reason=done.get("reason")
+        )
+        if self.on_done:
+            self.on_done(record)
 
     def _emu_finish(self, offer_id: str) -> None:
         record = self._load()[offer_id]
