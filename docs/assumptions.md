@@ -417,3 +417,9 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 | A242 | Decky's quick menu shows plugins missing from `pluginOrder` (index -1 sorts them first), so Haversack appears at the top | verified in source (`frontend/src/components/PluginView.tsx`) | Decky Loader source |
 | A243 | The frontend route `utilities/uninstall_plugin(name)` stops the plugin's backend with `uninstall=True` (running `_uninstall`), removes it from Decky's lists and deletes only its code folder; settings, data and logs stay | verified in source (`utilities.py`, `browser.py`) | Decky Loader source |
 | A244 | Renaming an Entra app registration does not rename an existing OneDrive app folder, and a new sign-in after a rename may use a new folder | unverified, so the registration keeps the name "Keepsake" (fail closed) | Microsoft Graph documentation does not state it |
+
+## In-app Help (ADR-0090)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A245 | In Gaming Mode, a `Field` with `focusable` scrolls into view when the D-pad moves focus to it, and the right stick scrolls the page while focus is inside a field taller than the screen | unverified until device run step 51; `focusable`, `highlightOnFocus` and `onActivate` are in `@decky/ui`'s `FieldProps` (verified in `node_modules/@decky/ui/dist`) | `@decky/ui` types, device run |

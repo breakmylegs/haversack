@@ -22,6 +22,7 @@ import { GamesPage } from "./GamesPage";
 import { HealthSection } from "./HealthSection";
 import { HistoryPage } from "./HistoryPage";
 import { ImportPage } from "./ImportPage";
+import { HelpPage } from "./HelpPage";
 import { InstallerPage } from "./InstallerPage";
 import { LogsPage } from "./LogsPage";
 import { NowPlaying } from "./NowPlaying";
@@ -79,6 +80,7 @@ const CONTENT: Record<string, () => ReactElement> = {
   "settings/modules": () => <SettingsPage part="modules" />,
   "settings/quick-menu": () => <ShortcutsEditor />,
   "settings/updates": () => <SettingsPage part="updates" />,
+  "settings/help": () => <HelpPage />,
   "diagnostics/health": () => <HealthSection />,
   "diagnostics/checks": () => <DeviceChecks />,
   "diagnostics/tools": () => <DiagnosticsPage />,

@@ -93,3 +93,10 @@ figure.chart .key::before { content: ""; display: inline-block; width: 10px; hei
 .series-3.line { stroke: #009e73; } .series-3.dot { fill: #009e73; } .key.series-3::before { background: #009e73; }
 .series-4.line { stroke: #cc79a7; } .series-4.dot { fill: #cc79a7; } .key.series-4::before { background: #cc79a7; }
 .check.info strong { color: var(--accent); }
+
+/* Settings, Help (ADR-0090): list items indented by depth. */
+.help-item { margin-top: 2px; margin-bottom: 2px; }
+.help-d0 { margin-left: 12px; }
+.help-d1 { margin-left: 30px; }
+.help-d2 { margin-left: 48px; }
+.help-d3 { margin-left: 66px; }

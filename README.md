@@ -1,76 +1,76 @@
+<p align="center"><img src="assets/logo.svg" width="128" height="128" alt="Haversack logo: a satchel on teal"></p>
+
 # Haversack
 
-Formerly Keepsake: updating from Keepsake moves everything across, and nothing is lost (see the changelog for v0.51.0).
+Haversack carries your games, saves and settings between your handhelds and PCs. It is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin for SteamOS and Bazzite, used entirely from Gaming Mode with the controller, and it also runs on Linux and Windows PCs.
 
-Haversack is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin that syncs PC game saves between SteamOS and Bazzite handhelds through cloud storage, operated entirely from Gaming Mode.
+Haversack was called Keepsake until version 0.51.0. Updating from Keepsake moves everything across, and nothing is lost ([how](docs/user/updates.md#keepsake-is-now-haversack)).
 
-It is built for non-Steam shortcuts installed into their own Proton prefixes, whose compatdata IDs differ on every device. Saves are stored under canonical logical roots, so the same game finds its saves on each device whatever its local prefix is called, and Haversack recognises the same game on both devices even when the shortcuts are named differently.
-
-**[User guide](docs/user/README.md):** getting started on a handheld, a Linux PC or Windows, a guide to each feature, privacy and questions and answers.
+**[User guide](docs/user/README.md)**: getting started on a handheld, a Linux PC or Windows, a guide to each feature, privacy, and questions and answers. The same guide is inside Haversack, under Settings, Help.
 
 ## What it does
 
-- Checks the cloud before a game starts (pausing it for a moment) and saves after it quits.
-- Asks you whenever both devices have new progress. It never silently overwrites a save, and whichever save you do not choose is kept.
-- Keeps a history of snapshots with restore, pin and undo. Suspicious saves (many files gone) are kept on the device instead of being uploaded.
-- Works with OneDrive, Google Drive, WebDAV (for example Nextcloud) and S3.
-- Imports old Ludusavi backups, syncs registry keys for games that need them, and leaves Steam games with Steam Cloud alone.
-- Updates itself from Settings, Updates.
+Haversack has parts you switch on or off in Settings, Modules:
+
+- **Saves.** Your PC game saves follow you between devices, through your own OneDrive, Google Drive, WebDAV or S3 storage, or directly between your devices.
+  - Built for non-Steam games installed into their own Proton prefixes, whose folders differ on every device. The same game is recognised on each device, even when its shortcut is named differently.
+  - Haversack checks for a newer save before a game starts (pausing it for a moment) and saves after you quit.
+  - When two devices both have new progress, it asks you. The save you do not choose stays in History.
+  - Every restore can be undone, and a save that suddenly loses most of its files is kept on the device, not uploaded.
+  - Steam games without Steam Cloud sync automatically. It can also import Ludusavi backups.
+- **Replication.** Send a whole game from one device to another over your home network or your own VPN, with its Proton version, artwork and launch options. Games then stay in step, and emulator games can be sent too.
+- **Advisor.** Recommended settings for your device from Deck Verified, ProtonDB and PCGamingWiki, and optionally an AI provider you choose. It only advises and never changes anything.
+- **Install.** Install a Windows game from an ISO, a folder or a network share into its own Steam shortcut and Proton prefix.
+- **Device.** On the Legion Go and Legion Go 2:
+  - performance for each game, power limits, fan curves, the battery charge limit and controller lights;
+  - help for controllers that will not reconnect.
+- **Desktop.** The same features in Desktop Mode and on PCs, in a small app in your browser.
 
 ## Principles
 
-- Never silently overwrite a save. When both sides changed, you choose.
-- Cloud snapshots are written once and never modified.
-- Every restore is reversible.
-- Content hashes decide; timestamps only inform.
-- No Desktop Mode, no terminal, no root, no bundled binaries.
+- **Never silently overwrite a save.** When both sides changed, you choose.
+- **Snapshots are immutable.** Cloud snapshots are written once and never modified.
+- **Every restore is reversible.**
+- **Hashes decide, timestamps inform.** Content hashes decide; timestamps only inform.
+- **Gaming Mode first.** No Desktop Mode, no terminal and no root are needed. Nothing is bundled or downloaded as a program.
+- **Nothing is sent anywhere you did not choose.** Haversack has no server and collects nothing ([privacy](docs/user/privacy.md)).
 
 ## Install
 
-First install on a new device uses one URL that never changes:
+**On a handheld**, install from one address that never changes:
 
 ```
 https://github.com/breakmylegs/haversack/releases/latest/download/Haversack.zip
 ```
 
-1. In Decky Loader, open Settings, General, and enable Developer mode (once per device).
-2. Open Decky, Settings, Developer, Install Plugin from URL, and paste the URL above.
-3. After that, updates come through Haversack's Settings, Updates.
+1. In Decky Loader, open Settings, General, and switch on Developer mode (once per device).
+2. Open Decky, Settings, Developer, **Install Plugin from URL**, and paste the address above.
+3. Open Haversack in the Quick Access Menu and choose **Set up Haversack**: name the device, sign in to your cloud, and choose your games. Nothing changes until you confirm the dry run.
+4. After that, Haversack updates itself from Settings, Updates. Every release is signed, and Haversack checks the signature before installing.
 
-The URL always gives the newest stable release; pre-releases are only offered through the Updates page on the Pre-release channel. Each release also has a versioned copy, `Haversack-v<version>.zip`, with the same bytes. Copies named `Keepsake.zip` and `Keepsake-v<version>.zip` serve installs from before the rename, and `SHA256SUMS` lists every name.
+**On a PC,** follow [Linux PC](docs/user/getting-started-linux-pc.md) or [Windows PC](docs/user/getting-started-windows.md).
 
-## First run
-
-Open Haversack from the Quick Access Menu and choose **Set up Haversack**. The wizard walks through:
-
-1. **Device name**, shown next to this device's saves on your other devices.
-2. **Cloud.** Choose OneDrive, Google Drive, WebDAV or S3, and sign in ([Cloud storage and sign-in](docs/user/cloud.md)).
-3. **Scan games** and **review matches**: approve any match Haversack is not sure about.
-4. **Choose games** to sync. Steam games are hidden by default because Steam Cloud covers them.
-5. **Dry run**: see what the first sync will do for each game. Nothing changes until you confirm.
-
-Then set it up on your other device the same way. Games whose saves already match adopt silently; any that differ ask you which save to keep.
+Each release also has `Haversack-v<version>.zip` with the same bytes. Copies named `Keepsake.zip` and `Keepsake-v<version>.zip` serve installs from before the rename. `SHA256SUMS` lists every name and is signed.
 
 Moving from Ludusavi? Follow [docs/cutover.md](docs/cutover.md).
 
-## Installing games
-
-Haversack's **Install** page installs a Windows game from an ISO file or a folder into its own Steam shortcut and Proton prefix, all from Gaming Mode. It adds an `Install: <Title>` shortcut that runs the installer; you install into the folder Haversack shows, quit, choose the game's program, and the same shortcut then starts the game.
-
-If an installer asks for the disc, press **Installer wants a disc drive** and start the installer again. To install from a NAS, mount the share first (for example by opening it in Dolphin in Desktop Mode); it then appears on the Install page.
-
-**An installer is a Windows program that runs with your user's rights. A Proton prefix is not a sandbox.** Only install software you trust.
-
 ## Help
 
+- **In Haversack:** Settings, Help (this guide), and Diagnostics, Health, **Run checks**.
 - [docs/troubleshooting.md](docs/troubleshooting.md): what each message means and what to do.
-- Haversack, Diagnostics, Health, Run checks: health checks for sign-in, sync, conflicts, prefixes and the manifest.
 - [CHANGELOG.md](CHANGELOG.md): what changed in each version.
 
 ## Development
 
-See [docs/dev-setup.md](docs/dev-setup.md). Contributions: [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md). Design decisions are in [docs/adr/](docs/adr/), the threat model in [docs/threat-model.md](docs/threat-model.md).
+- **Setup:** [docs/dev-setup.md](docs/dev-setup.md).
+- **Contributions:** [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Security reports:** [SECURITY.md](SECURITY.md).
+- **Design decisions:** [docs/adr/](docs/adr/). The threat model is in [docs/threat-model.md](docs/threat-model.md).
 
 ## Licence
 
-BSD-3-Clause. Based on [decky-plugin-template](https://github.com/SteamDeckHomebrew/decky-plugin-template), whose notice is kept in [LICENSE](LICENSE). Save location data comes from the [Ludusavi manifest](https://github.com/mtkennerly/ludusavi-manifest) (MIT), credited in the app next to the data. Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+BSD-3-Clause. Based on [decky-plugin-template](https://github.com/SteamDeckHomebrew/decky-plugin-template), whose notice is kept in [LICENSE](LICENSE).
+
+- **Save locations** come from the [Ludusavi manifest](https://github.com/mtkennerly/ludusavi-manifest) (MIT), credited in the app next to the data.
+- **The logo and icons** were drawn for this project.
+- **Third-party notices** are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
