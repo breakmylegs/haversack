@@ -4,6 +4,10 @@ All notable changes to Haversack (called Keepsake until v0.51.0) are listed here
 
 ## [Unreleased]
 
+## [0.56.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Added
 
 - **Artwork for any non-Steam game** (its page in Saves, Games). When a game is missing a cover, wide cover, background or logo, Find artwork adds just those from SteamGridDB, through Steam. Artwork you already set is never replaced.
