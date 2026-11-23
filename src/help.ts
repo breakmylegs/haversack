@@ -623,6 +623,39 @@ export const HELP: HelpTopic[] = [
    {
     "k": "h",
     "l": 2,
+    "t": "A game's launch options"
+   },
+   {
+    "k": "p",
+    "t": "A game's page in **Saves**, **Games** has **Launch options**, with switches for Proton's own settings:"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "**Write a Proton log** (PROTON_LOG=1), saved as steam-.log in your home folder;"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "**Use WineD3D instead of DXVK**, for graphics problems;"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "**Turn off fsync**, and **Turn off esync** on Proton before version 11, for games that hang;"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "**Short OpenGL extension list**, for old games that crash at start."
+   },
+   {
+    "k": "p",
+    "t": "Haversack keeps the rest of the launch options exactly as they were, and changes them only through Steam when you press a switch. The first time, it keeps a copy of the options as they were, so **Put back original** restores them exactly. A game that uses the strict launch gate keeps its launch options for the gate: turn the gate off first."
+   },
+   {
+    "k": "h",
+    "l": 2,
     "t": "What Haversack will never do"
    },
    {

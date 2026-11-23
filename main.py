@@ -469,6 +469,15 @@ class Plugin:
     async def sd_cards(self) -> list[dict[str, Any]]:
         return await self.app.sd_cards()
 
+    async def launch_presets(self, key: str, current_options: str) -> dict[str, Any]:
+        return await self.app.launch_presets(key, current_options)
+
+    async def launch_apply(self, key: str, current_options: str, presets: list[str]) -> dict[str, Any]:
+        return await self.app.launch_apply(key, current_options, presets)
+
+    async def launch_restore(self, key: str) -> dict[str, Any]:
+        return await self.app.launch_restore(key)
+
     async def device_battery(self) -> dict[str, Any]:
         return await self.app.device_battery()
 

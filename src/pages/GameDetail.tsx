@@ -23,6 +23,7 @@ import { LaunchGatePanel } from "./LaunchGatePanel";
 import { SnapshotsPanel } from "./SnapshotsPanel";
 import { SyncPanel } from "./SyncPanel";
 import { GameArtSection } from "./GameArtSection";
+import { LaunchOptionsPanel } from "./LaunchOptionsPanel";
 import { SendPanel } from "./SendPanel";
 import { InStepPanel } from "./InStepPanel";
 import { UninstallPanel } from "./UninstallPanel";
@@ -275,6 +276,9 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
           mode={config.launchGate}
           onMode={(m) => setConfig({ ...config, launchGate: m })}
         />
+      )}
+      {(game.kind === "steam" || game.kind === "shortcut") && (
+        <LaunchOptionsPanel key={`launch-${config.launchGate}`} gameKey={gameKey} appid={game.appid} />
       )}
       {match.gameKey && <SnapshotsPanel gameKey={gameKey} gameName={game.name} />}
       {game.kind === "shortcut" && <SendPanel gameKey={gameKey} gameName={game.name} />}

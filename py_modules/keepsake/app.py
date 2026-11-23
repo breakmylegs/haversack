@@ -40,6 +40,7 @@ from . import (
     hosts,
     identity,
     launchers,
+    launchopts,
     lifecycle,
     manifest,
     net,
@@ -3066,6 +3067,45 @@ class KeepsakeApp:
             log_event(logging.INFO, "playtime.failed", "Playtime not recorded", error=str(exc))
 
     # Strict wrapper: the frontend reads and writes launch options; the backend keeps the originals.
+
+    # Launch option presets (R29 stage 5, ADR-0097)
+    def _launch_editable(self, key: str) -> None:
+        if self.game_configs.get(key).get("launchGate", "freeze") == "strict":
+            raise ValueError("this game uses the strict launch gate; turn it off first, then change its launch options")
+
+    async def launch_presets(self, key: str, current_options: str) -> dict[str, Any]:
+        """The presets and which are on, for the launch options Steam has now (read by the page)."""
+        game = await self._game(key)
+        original = await asyncio.to_thread(launchopts.Originals(self.paths.runtime_dir).get, int(game["appid"]))
+        found = launchopts.status(str(current_options), original)
+        strict = self.game_configs.get(key).get("launchGate", "freeze") == "strict"
+        return {**found, "appid": int(game["appid"]), "strict": strict}
+
+    async def launch_apply(self, key: str, current_options: str, presets: list[str]) -> dict[str, Any]:
+        """User action: the launch options with exactly ``presets`` on. The page sets them through Steam
+        and reads them back; the options as they were are kept first (P15)."""
+        self._launch_editable(key)
+        game = await self._game(key)
+        try:
+            options = launchopts.compose(str(current_options), [str(p) for p in presets])
+        except launchopts.LaunchError as exc:
+            raise ValueError(str(exc)) from exc
+        await asyncio.to_thread(
+            launchopts.Originals(self.paths.runtime_dir).keep, int(game["appid"]), str(current_options)
+        )
+        log_event(logging.INFO, "launch.presets", "Launch option presets changed", presets=sorted(presets))
+        return {"appid": int(game["appid"]), "options": options}
+
+    async def launch_restore(self, key: str) -> dict[str, Any]:
+        """User action: the launch options as they were before Haversack first changed them."""
+        self._launch_editable(key)
+        game = await self._game(key)
+        store = launchopts.Originals(self.paths.runtime_dir)
+        original = await asyncio.to_thread(store.get, int(game["appid"]))
+        if original is None:
+            raise ValueError("Haversack has not changed this game's launch options")
+        await asyncio.to_thread(store.forget, int(game["appid"]))
+        return {"appid": int(game["appid"]), "options": original}
 
     async def strict_wrap(self, key: str, current_options: str) -> dict[str, Any]:
         game = await self._game(key)

@@ -62,6 +62,16 @@ When another device has saved a game since this one last synced it, the game's r
 
 Each game's page shows how long you have played it across your devices, for example "Played 12 h 30 min on your devices", with the time on each one. Sessions under a minute and over a day are not counted. Playtime is shown for your information only, and never decides which save is kept.
 
+## A game's launch options
+
+A game's page in **Saves**, **Games** has **Launch options**, with switches for Proton's own settings:
+- **Write a Proton log** (`PROTON_LOG=1`), saved as `steam-<app>.log` in your home folder;
+- **Use WineD3D instead of DXVK**, for graphics problems;
+- **Turn off fsync**, and **Turn off esync** on Proton before version 11, for games that hang;
+- **Short OpenGL extension list**, for old games that crash at start.
+
+Haversack keeps the rest of the launch options exactly as they were, and changes them only through Steam when you press a switch. The first time, it keeps a copy of the options as they were, so **Put back original** restores them exactly. A game that uses the strict launch gate keeps its launch options for the gate: turn the gate off first.
+
 ## What Haversack will never do
 
 - **Overwrite a save without asking.** When both devices have new progress, you choose ([Conflicts, history and restoring](conflicts-and-history.md)).
