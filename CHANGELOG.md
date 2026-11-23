@@ -4,6 +4,10 @@ All notable changes to Haversack (called Keepsake until v0.51.0) are listed here
 
 ## [Unreleased]
 
+## [0.52.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Added
 
 - **Help inside Haversack** (Settings, Help, in Gaming Mode and the desktop app). The whole user guide, readable with the controller: choose a topic, then move from section to section. It is built from the same text as the online guide, so the two always match.
