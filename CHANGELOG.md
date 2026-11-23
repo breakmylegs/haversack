@@ -4,6 +4,10 @@ All notable changes to Haversack (called Keepsake until v0.51.0) are listed here
 
 ## [Unreleased]
 
+## [0.51.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Changed
 
 - **Keepsake is now called Haversack, and nothing is lost.** Update as usual from Updates. Decky then installs Haversack beside Keepsake, at the top of its list, and Haversack's quick menu shows one card.
