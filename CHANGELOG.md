@@ -4,6 +4,10 @@ All notable changes to Haversack (called Keepsake until v0.51.0) are listed here
 
 ## [Unreleased]
 
+## [0.57.0]
+
+> **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.
+
 ### Changed
 
 - **A tidier menu.** Haversack's page has seven sections in its sidebar (Play, Saves, Games and devices, Device, Install, Settings and Diagnostics), each with its own colour.
