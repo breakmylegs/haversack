@@ -31,7 +31,7 @@ Each source can be switched off, and each is contacted only while it is on:
 
 - **Deck Verified** community reports, from deckverified.games.
 - **PCGamingWiki**, using your own PCGamingWiki bot password.
-- **ProtonDB** reports, from Keepsake's own monthly index. Games are looked up on your device, so no game is named to anyone.
+- **ProtonDB** reports, from Haversack's own monthly index. Games are looked up on your device, so no game is named to anyone.
 - **Are We Anti-Cheat Yet**, to warn about games whose anti-cheat blocks Proton.
 
 ## Optional AI explanations

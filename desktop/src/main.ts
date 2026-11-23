@@ -3,6 +3,7 @@
 
 import { ApiError, call, hasToken, initialPage, onEvents } from "./api.js";
 import { lineChart } from "./charts.js";
+import { helpPage } from "./helpPage.js";
 import { h, replace, size, when } from "./dom.js";
 import { sortableTable } from "./table.js";
 import type {
@@ -1436,6 +1437,7 @@ const PAGES: Page[] = [
   { id: "modules", title: "Modules", group: "Settings", render: modules },
   { id: "quick-menu", title: "Quick menu", group: "Settings", render: quickMenuPage },
   { id: "updates", title: "Updates", group: "Settings", render: (main) => updates(main) },
+  { id: "help", title: "Help", group: "Settings", render: (main) => helpPage(main) },
   { id: "health", title: "Health", group: "Diagnostics", render: health },
   { id: "checks", title: "Device checks", group: "Diagnostics", render: deviceChecksPage },
   { id: "logs", title: "Logs", group: "Diagnostics", render: logsPage },

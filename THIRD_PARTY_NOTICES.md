@@ -1,6 +1,10 @@
 # Third-party notices
 
-Keepsake includes or uses the following third-party works.
+Haversack (called Keepsake until v0.51.0) includes or uses the following third-party works.
+
+## Logo and icons
+
+The logo (`assets/logo.svg`, `assets/logo.png`) and the tray icon are original artwork drawn for Haversack in November 2026, a satchel on teal. They contain no third-party artwork, fonts or icon sets, and are under the project's BSD-3-Clause licence. The status colours follow the Okabe-Ito palette (Okabe and Ito, "Color Universal Design", 2008), which is a published colour set, not artwork.
 
 ## qrcode-generator (bundled in dist/index.js)
 
@@ -65,10 +69,10 @@ Copyright © 2021 Starz0r, Curve
 
 Licensed under the MIT licence, with the same terms as above.
 
-## ProtonDB (Keepsake's index, downloaded at run time when switched on, not bundled)
+## ProtonDB (Haversack's index, downloaded at run time when switched on, not bundled)
 
 Contains information from ProtonDB, made available under the Open Database License (ODbL) 1.0, https://opendatacommons.org/licenses/odbl/1-0/. Individual contents are under the Database Contents License (DbCL) 1.0. Source: the monthly dumps at https://github.com/bdefore/protondb-data. Keepsake's index (the `protondb-index` release) is a derived database, shared under the ODbL; `scripts/protondb_index.py` builds it.
 
 ## Deck Verified (fetched at run time, not bundled)
 
-Community reports come from Deck Verified by DeckSettings, https://deckverified.games. The report data is GPL-3.0. Keepsake shows it with a link to each report and caches it on the device only. No report data is part of Keepsake.
+Community reports come from Deck Verified by DeckSettings, https://deckverified.games. The report data is GPL-3.0. Haversack shows it with a link to each report and caches it on the device only. No report data is part of Keepsake.

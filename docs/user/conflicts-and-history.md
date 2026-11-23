@@ -2,19 +2,19 @@
 
 ## Conflicts
 
-A conflict means a game's saves changed on two devices since they last agreed. For example, you played on your handheld on the train while your PC was offline, then played on the PC too. Keepsake cannot know which progress you want, so it asks.
+A conflict means a game's saves changed on two devices since they last agreed. For example, you played on your handheld on the train while your PC was offline, then played on the PC too. Haversack cannot know which progress you want, so it asks.
 
 ![The Conflicts page on a PC](images/desktop-conflicts.png)
 
 1. Open **Conflicts** and choose **Compare and choose**.
-2. Keepsake shows each side: the device, when its save last changed, how many files and the size. It also lists each file that is new, gone or changed on that side since the two devices last agreed. Keepsake never picks for you by date, unless you turn on Take the newest (below).
+2. Haversack shows each side: the device, when its save last changed, how many files and the size. It also lists each file that is new, gone or changed on that side since the two devices last agreed. Haversack never picks for you by date, unless you turn on Take the newest (below).
 3. Choose **Keep this device's save** or **Use the save from ...**, then press again to confirm. Or choose **Decide later**.
 
-The save you do not choose is kept in History and pinned, so you can always go back to it. Until you choose, Keepsake does not sync that game, and the game stays playable with the save it has.
+The save you do not choose is kept in History and pinned, so you can always go back to it. Until you choose, Haversack does not sync that game, and the game stays playable with the save it has.
 
 ### Take the newest instead
 
-If you would rather not be asked, set **Settings**, **Sync and safety**, **When saves differ** to **Take the newest**. Keepsake then keeps the newer version by itself, but only when it can be sure:
+If you would rather not be asked, set **Settings**, **Sync and safety**, **When saves differ** to **Take the newest**. Haversack then keeps the newer version by itself, but only when it can be sure:
 - exactly two versions differ;
 - they are at least 2 minutes apart;
 - no device's clock looks wrong.
@@ -29,7 +29,7 @@ Every snapshot of every game is listed in **History**, newest first, with the de
 
 On a handheld, open a game in **Games** to see its snapshots and:
 
-- **Restore** an older snapshot. Keepsake first takes a snapshot of the current save, so you can undo the restore.
+- **Restore** an older snapshot. Haversack first takes a snapshot of the current save, so you can undo the restore.
 - **Restore some files**: see what restoring that snapshot would change, file by file, and restore only the files you choose. Every other file stays as it is, and this can be undone too.
 - **Save checkpoint**: keep a named copy of the current save, for example "Before the final boss". Checkpoints are pinned, so they are kept until you remove them. While you play, **Save checkpoint** is also in the Quick Access Menu. Save in the game first.
 - **Undo restore** to go back to the save you had before.
@@ -38,21 +38,21 @@ On a handheld, open a game in **Games** to see its snapshots and:
 
 ## Activity
 
-**Activity** lists what Keepsake did, newest first, in plain words: saves sent to the cloud, saves brought in from your other devices, checkpoints, restores and anything that needs your choice. The detailed log stays in **Logs**.
+**Activity** lists what Haversack did, newest first, in plain words: saves sent to the cloud, saves brought in from your other devices, checkpoints, restores and anything that needs your choice. The detailed log stays in **Logs**.
 
 ![The Activity page on a PC](images/desktop-activity.png)
 
 ## Checking the cloud copies
 
-Once a week, Keepsake checks that the cloud copies of each game's important snapshots are intact: the newest ones, the pinned ones, and the ones each device synced from. **Check cloud integrity** in Diagnostics (handheld) or on the Health page (PC) checks every snapshot at once. If a copy is damaged or missing, Health says so and the game's History offers **Repair**, which saves a fresh copy of your current save. Your save on the device is never affected.
+Once a week, Haversack checks that the cloud copies of each game's important snapshots are intact: the newest ones, the pinned ones, and the ones each device synced from. **Check cloud integrity** in Diagnostics (handheld) or on the Health page (PC) checks every snapshot at once. If a copy is damaged or missing, Health says so and the game's History offers **Repair**, which saves a fresh copy of your current save. Your save on the device is never affected.
 
 ## Exporting your saves
 
-You can take your saves out of Keepsake at any time. In **Saves**, **Import and export**, **Export snapshots** copies them as plain zip files to a folder you choose, such as an SD card or a USB drive: either the latest snapshot of each game, or every snapshot. The export folder also holds a list of what each zip contains, and a short note explaining the folder names inside the zips. Nothing already in that folder is overwritten.
+You can take your saves out of Haversack at any time. In **Saves**, **Import and export**, **Export snapshots** copies them as plain zip files to a folder you choose, such as an SD card or a USB drive: either the latest snapshot of each game, or every snapshot. The export folder also holds a list of what each zip contains, and a short note explaining the folder names inside the zips. Nothing already in that folder is overwritten.
 
 ## Clean-up
 
-Keepsake thins out old snapshots over time. It always keeps:
+Haversack thins out old snapshots over time. It always keeps:
 - the last 10 automatic snapshots;
 - one a day for 30 days;
 - one a month for 12 months.
@@ -64,4 +64,4 @@ It never removes:
 - anything younger than 7 days;
 - snapshots you made by hand, merges, and imported backups.
 
-Only the saved files of an old snapshot are removed. A small record of it stays, so Keepsake can still follow each save's history.
+Only the saved files of an old snapshot are removed. A small record of it stays, so Haversack can still follow each save's history.

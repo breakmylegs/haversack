@@ -272,6 +272,11 @@ Keepsake is now called Haversack. This first update moves it across.
     - Haversack's panel should now show the usual status. The games, the cloud account (still signed in, no new sign-in) and History should match your notes. Sync now should work, and the other handheld should still see this one's saves.
     - Open Decky's settings, then Plugins: only Haversack should be listed (plus Haversack Helper once installed from Device, Reconnect help).
     - **The way back (Go only, optional).** Remove Haversack in Decky's settings. Install Keepsake v0.50.0 from the Releases page with Decky's "Install plugin from URL". It should start with everything as it was before step 1.3. Then update again from Keepsake's Updates to return to Haversack (step 1 again).
+51. **Help (v0.52.0).** Open Settings, Help.
+    - Choose a few topics with the dropdown: each should show the guide's text, with bold words and numbered steps.
+    - Move down with the D-pad: focus should go from section to section, and the page should scroll to follow. Use the right stick to scroll within a long section.
+    - On opening the page, nothing should take focus by itself, and the sidebar should not move.
+    - In Desktop Mode, the desktop app's Settings, Help should show the same text.
 
 ## 5. Send back
 
