@@ -29,6 +29,7 @@ import { GameTransfersCompact } from "./pages/GameTransfers";
 import { ReconnectQam } from "./pages/ReconnectQam";
 import { BatteryPanel } from "./pages/BatteryPanel";
 import { PowerPanel } from "./pages/PowerPanel";
+import { PauseButton } from "./pages/PauseButton";
 import { openCheckpointModal } from "./pages/CheckpointModal";
 import { openWhatsNew } from "./pages/WhatsNewModal";
 import { KeepsakeRoute, LegacyRedirect, SectionRoute } from "./pages/KeepsakeRoute";
@@ -206,6 +207,7 @@ function Content() {
               Save checkpoint
             </ButtonItem>
           </PanelSectionRow>
+          <PauseButton />
           <PowerPanel compact />
           <AdvisorQam onOpen={() => openSection("play", "advisor")} />
         </PanelSection>

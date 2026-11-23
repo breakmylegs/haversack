@@ -1524,3 +1524,15 @@ export const looksSetAnimation = callable<[kind: AnimationKind, choice: string],
 export const looksResetAnimation = callable<[kind: AnimationKind], LooksStatus["animations"]>("looks_reset_animation");
 export type LooksPart = "themes" | "sounds" | "animations";
 export const looksSend = callable<[peerId: string, parts: LooksPart[]], { sending: string }>("looks_send");
+
+// Pause the running game (R29 stage 3, ADR-0094): until Resume, at most an hour.
+export interface PauseStatus {
+  available: boolean;
+  game: number | null;
+  paused: boolean;
+  since: number | null;
+  limitMinutes: number;
+}
+export const gamePauseStatus = callable<[], PauseStatus>("game_pause_status");
+export const gamePause = callable<[], PauseStatus>("game_pause");
+export const gameResume = callable<[], PauseStatus>("game_resume");

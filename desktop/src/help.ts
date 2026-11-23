@@ -1292,6 +1292,38 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "h",
+    "l": 3,
+    "t": "Pausing a game"
+   },
+   {
+    "k": "p",
+    "t": "While a game runs, the quick access menu's **Now playing** has **Pause game**. The game stops where it is, and the rest of Steam keeps working. **Resume game** lets it carry on."
+   },
+   {
+    "k": "p",
+    "t": "A paused game always carries on by itself:"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "after an hour;"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "when Haversack stops or you switch off Device in Settings, Modules;"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "the next time Haversack starts, if the device was restarted while the game was paused."
+   },
+   {
+    "k": "p",
+    "t": "Haversack never pauses a game while it is checking that game's saves."
+   },
+   {
+    "k": "h",
     "l": 2,
     "t": "Fans"
    },
