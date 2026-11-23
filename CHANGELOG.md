@@ -4,6 +4,10 @@ All notable changes to Haversack (called Keepsake until v0.51.0) are listed here
 
 ## [Unreleased]
 
+### Added
+
+- **What is on each SD card** (Device, Storage). Every card and drive Steam knows, with its games by name, even when the card is out of the device.
+
 ## [0.58.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

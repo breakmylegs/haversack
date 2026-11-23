@@ -1536,3 +1536,13 @@ export interface PauseStatus {
 export const gamePauseStatus = callable<[], PauseStatus>("game_pause_status");
 export const gamePause = callable<[], PauseStatus>("game_pause");
 export const gameResume = callable<[], PauseStatus>("game_resume");
+
+// Which games are on which SD card or drive, including cards not inserted (R29 stage 4, ADR-0096).
+export interface SdCard {
+  label: string;
+  inserted: boolean;
+  lastSeen: number | null;
+  games: string[];
+  shortcuts: string[];
+}
+export const sdCards = callable<[], SdCard[]>("sd_cards");

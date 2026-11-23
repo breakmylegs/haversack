@@ -73,7 +73,7 @@ export const LAYOUT: SectionSpec[] = [
       { id: "power", title: "Power and battery", about: "Performance for each game, power limits and the charge limit.", parts: [part("power", "device"), part("battery", "device")] },
       { id: "fans", title: "Fans", about: "Fan curves for each game.", parts: [part("fans", "device")] },
       { id: "controllers", title: "Controllers", about: "Controller settings and lights, and reconnect help.", parts: [part("controllers", "core"), part("reconnect", "device")] },
-      { id: "storage", title: "Storage", about: "Disk use per game, shader caches and resetting a prefix.", parts: [part("storage", "core")] },
+      { id: "storage", title: "Storage", about: "Disk use per game, shader caches, resetting a prefix, and what is on each SD card.", parts: [part("storage", "core"), part("cards", "core")] },
       { id: "looks", title: "Looks", about: "Boot and sleep animations, themes and sounds.", parts: [part("looks", "looks")] },
     ],
   },

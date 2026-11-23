@@ -302,6 +302,8 @@ Keepsake is now called Haversack. This first update moves it across.
     - Pause it again and quit the game from Steam: the game should close normally.
     - Pause it again, then disable Haversack in Decky's settings: the game should carry on within a few seconds.
     - Note how Steam's overlay shows a paused game.
+57. **SD cards (v0.59.0).** With the SD card in, open Device, Storage: SD cards and drives should list the card with its games, including a non-Steam game installed on it.
+    - Take the card out, open the page again: the card should still be listed with its games, "last seen" and not in the device.
 
 ## 5. Send back
 

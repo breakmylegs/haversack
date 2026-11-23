@@ -1101,6 +1101,19 @@ export const HELP: HelpTopic[] = [
    {
     "k": "p",
     "t": "Until step 3, **Undo reset** puts the old prefix back exactly as it was. Haversack will not reset a game that is installed inside its own prefix, because that would move the game itself."
+   },
+   {
+    "k": "h",
+    "l": 2,
+    "t": "What is on each SD card"
+   },
+   {
+    "k": "p",
+    "t": "Below the games, **SD cards and drives** lists every card and drive Steam knows, and the games on each, even when the card is not in the device. Cards in the device come first. A card that is out shows when Haversack last saw it."
+   },
+   {
+    "k": "p",
+    "t": "Steam games are listed by name. Non-Steam games are listed when their program is on the card. Haversack only reads this, and the card names never leave your device."
    }
   ]
  },

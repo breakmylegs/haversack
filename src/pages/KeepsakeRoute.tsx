@@ -30,6 +30,7 @@ import { NowPlaying } from "./NowPlaying";
 import { PowerPanel } from "./PowerPanel";
 import { ReconnectPanel } from "./ReconnectPanel";
 import { ReplicationPage } from "./ReplicationPage";
+import { SdCardsPanel } from "./SdCardsPanel";
 import { SettingsPage } from "./SettingsPage";
 import { ShortcutsEditor } from "./ShortcutsEditor";
 import { StoragePage } from "./StoragePage";
@@ -79,6 +80,7 @@ const PARTS: Record<string, () => ReactElement> = {
   controllers: () => <ControllersPanel />,
   reconnect: () => <ReconnectPanel />,
   storage: () => <StoragePage />,
+  cards: () => <SdCardsPanel />,
   looks: () => <LooksPage />,
   install: () => <InstallerPage />,
   general: () => <SettingsPage part="general" />,
