@@ -1,8 +1,8 @@
-# Device run for v0.53.0
+# Device run for v0.54.0
 
 No SSH, terminal or laptop is needed. Do the first two parts on each handheld, then the rest with both. "Go" is the Legion Go and "Go 2" the Legion Go 2.
 
-## 1. Install v0.53.0 (each handheld)
+## 1. Install v0.54.0 (each handheld)
 
 Keepsake is now called Haversack. This first update moves it across.
 
