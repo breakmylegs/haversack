@@ -75,7 +75,10 @@ One long "Status" section, then the Advisor's section:
 ### Principles
 
 - **Seven sections in the full page**, grouped by what the player is doing. They are the same seven, in the same order, on the desktop.
-- **v0.41.1: every sub-page is its own sidebar entry**, grouped by section with a line between sections, as in Steam's own settings. The list is fixed: a module that is off keeps its entries, which say so inside. (Until v0.41.1 sub-pages were a row of tabs inside each page; see the ADR-0073 addendum for why that changed.)
+- **v0.57.0, the menu redesign (ADR-0095): two levels.**
+  - **The sidebar** holds the seven sections only, each with a coloured icon. It is fixed: a module that is off keeps its sub-pages, which say so inside. Highlighting a section shows its list of sub-pages, and opens nothing.
+  - **A section's own page** holds its sub-pages as Steam's native tabs, as Decky's own store does. L1 and R1 switch them, and B goes back to the sidebar. Each section opens on the last sub-page used.
+  - **History:** v0.32.0 to v0.41.0 used a home-made row of tabs inside each sidebar page, and v0.41.1 to v0.56.0 gave every sub-page its own sidebar entry. The ADR-0073 addenda and ADR-0095 say why each changed.
 - **A module's settings live with the module**, in its own tab. Settings holds only what is everyone's: this device, cloud, modules, updates.
 - **The same patterns everywhere:**
   - one confirmation pattern: a modal in Gaming Mode, a dialog on the desktop;
@@ -97,22 +100,22 @@ The first-run tips leave the quick access menu: they are on the first page shown
 
 ### Full page (Gaming Mode)
 
-| Section | Tabs | From today |
+| Section | Sub-pages (v0.57.0) | What they hold |
 |---|---|---|
-| **Play** | Now playing, Advisor | Now playing is new: the running or last game, its sync state, Save checkpoint, the last session card and the Advisor's top recommendations. Advisor is today's Advisor page. |
-| **Saves** | Games, Conflicts, History, Activity, Import and export | Games (with each game's detail page), Conflicts, History and Activity as they are. Import and export joins the Ludusavi import and the zip export (from Settings). |
-| **Games and devices** | Moving games, Other devices, Disk use | Moving games holds the bars, updates waiting and low-level transfers. Other devices holds pairing, the listener, paired devices and Games on a device. Disk use is today's Storage. |
-| **Device** | Status, then Power, Fans, Battery, Controllers, Display as R21's stages ship | Status is new: the model and profile Keepsake detected, battery and charging. |
-| **Install** | Install (as today) | Today's Install page. Its library folder setting moves into it from Settings. |
-| **Settings** | General, Cloud, Sync and safety, Modules, Updates | General: device name, device ID, safe mode, Setup. Cloud: today's Cloud section. Sync and safety: background sync, safety gates, the launch check timeout, toasts, Steam games, registry keys, Steam Cloud, sleep snapshots, other launchers, tidy copies. Modules: as today. Updates: today's Updates page and the pre-release switch. |
-| **Diagnostics** | Health, Device checks, Tools, Logs | Health, the device checks and Logs as today. Tools holds the probes, the freeze test, the sign-in browser test and the diagnostics export. |
+| **Play** | Now playing, Advisor | The running or last game, its saves and Save checkpoint; Advisor's recommendations. |
+| **Saves** | Games, Conflicts, History, Activity, Import and export | Each game and its detail page; conflicts; snapshots; what Haversack did; the Ludusavi import and the zip export. |
+| **Games and devices** | Moving games, Other devices, Emulators | Bars, updates waiting and games kept in step; pairing, the listener and paired devices; emulator games. |
+| **Device** | Status, Power and battery, Fans, Controllers, Storage, Looks | Status with More device settings (Wi-Fi power saving, the BIOS check); performance, power limits and the charge limit; fan curves; controller settings and lights with Reconnect help; disk use per game, shader caches and prefix reset; animations, themes and sounds. |
+| **Install** | Install | Disc images, network locations, the queue, artwork for streaming tiles. |
+| **Settings** | General, Cloud, Sync and safety, Modules, Updates, Help | Device name, device ID, safe mode, Setup and the quick menu's shortcuts; cloud; syncing and safety; modules; updates; the user guide. |
+| **Diagnostics** | Health, Device checks, Tools, Logs | As before. |
 
 **Names.**
 - "Devices" becomes **Other devices**, inside Games and devices, so **Device** is free for this handheld.
-- "Storage" becomes **Disk use**.
+- "Storage" became **Disk use** in v0.32.0, and **Device, Storage** in v0.57.0.
 - "Import saves" becomes **Import and export**.
 
-**Old links still work.** `/games`, `/conflicts`, `/history`, `/import`, `/advisor`, `/devices`, `/install`, `/settings`, `/updates`, `/activity`, `/storage`, `/logs` and `/diagnostics` open the new section at the right tab.
+**Old links still work.** `/games`, `/conflicts`, `/history`, `/import`, `/advisor`, `/devices`, `/install`, `/settings`, `/updates`, `/activity`, `/storage`, `/logs` and `/diagnostics` open the new section at the right tab. So do the v0.41.1 addresses of sub-pages that moved in v0.57.0 (Device, Battery; Device, Reconnect help; Device, More device settings; Games and devices, Disk use; Settings, Quick menu).
 
 ### Desktop app
 

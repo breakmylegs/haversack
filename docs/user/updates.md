@@ -28,7 +28,7 @@ Version 0.51.0 renamed Keepsake to Haversack. On a handheld, update Keepsake as 
 
 1. Open Haversack in the Quick Access Menu. It shows one card, "Keepsake is now called Haversack". Until you go on, Keepsake keeps working and Haversack does nothing, so the two never sync at once.
 2. Press **Remove the old Keepsake** and confirm. Haversack removes Keepsake (and Keepsake Helper, if you had it), copies your settings, sign-ins, games and history across, checks every file, and starts.
-3. If you use the helper, install Haversack Helper from **Device**, **Reconnect help**.
+3. If you use the helper, install Haversack Helper from **Device**, **Controllers**, **Reconnect help**.
 
 Nothing is lost:
 - Your old copy stays on the device.

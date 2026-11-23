@@ -24,11 +24,27 @@ def read(path: str) -> str:
 
 def test_keepsake_route_builds_the_sidebar_once() -> None:
     text = read(os.path.join(ROOT, "src", "pages", "KeepsakeRoute.tsx"))
-    route = text[text.index("export function KeepsakeRoute") : text.index("export function LegacyRedirect")]
+    route = text[text.index("export function KeepsakeRoute") : text.index("export function SectionRoute")]
     assert "useState" not in route and "setTimeout" not in route and "modulesStatus" not in route
-    assert re.search(r"<SidebarNavigation [^>]*pages=\{PAGES\}", route)
+    assert re.search(r"<SidebarNavigation [^>]*pages=\{SIDEBAR\}", route)
     assert "key=" not in route
-    assert re.search(r"^const PAGES: .*= sidebarEntries\(\)", text, re.MULTILINE)
+    assert re.search(r"^const SIDEBAR: .*= sidebarEntries\(\)", text, re.MULTILINE)
+
+
+def test_sub_pages_are_steams_native_tabs_on_their_own_page() -> None:
+    """The redesign (ADR-0095): Tabs only on a section's own route, built once, never told to take focus;
+    the sidebar's entries are plain lists, and there is no home-made tab row anywhere."""
+    text = read(os.path.join(ROOT, "src", "pages", "KeepsakeRoute.tsx"))
+    section = text[text.index("export function SectionRoute") : text.index("export function LegacyRedirect")]
+    assert re.search(r"<Tabs tabs=\{tabsRef\.current\}", section) and not re.search(r"autoFocusContents\s*[=:]", text)
+    lists = text[text.index("function SectionList") : text.index("const SIDEBAR")]
+    assert "<Tabs" not in lists and "Focusable" not in lists  # no Tabs inside a sidebar page
+    for path in SOURCES:
+        source = read(path)
+        assert not re.search(
+            r"flow-children=\"horizontal\"[\s\S]{0,400}DialogButton[\s\S]{0,200}openSection", source
+        ), path
+        assert "<Tabs" not in source or path.endswith("KeepsakeRoute.tsx"), path
 
 
 def test_no_page_takes_focus_by_itself() -> None:
@@ -74,3 +90,16 @@ def test_navigation_record_keeps_ids_and_counts_only() -> None:
     assert [e["kind"] for e in clean["events"]] == ["page-mount", "focus", "focus-call", "page-mount"]
     assert clean["events"][3] == {"t": 14, "kind": "page-mount", "detail": {"count": 2}}
     assert navigation_record(None) == {"summary": {}, "events": []}
+
+
+def test_the_recorder_keeps_the_redesigns_tab_events() -> None:
+    record = {
+        "events": [
+            {"t": 1, "kind": "section-open", "detail": {"section": "device", "page": "controllers"}},
+            {"t": 2, "kind": "tab", "detail": {"section": "device", "from": "controllers", "to": "fans"}},
+        ]
+    }
+    assert [e["detail"] for e in navigation_record(record)["events"]] == [
+        {"section": "device", "page": "controllers"},
+        {"section": "device", "from": "controllers", "to": "fans"},
+    ]

@@ -35,6 +35,15 @@ header { grid-column: 1 / -1; display: flex; align-items: center; gap: 24px; pad
 .brand { font-weight: 700; font-size: 1.125rem; }
 nav { display: flex; flex-direction: column; gap: 2px; padding: 12px; background: var(--panel); border-right: 1px solid var(--line); }
 nav .group { margin: 14px 8px 4px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+/* The menu redesign (ADR-0095): each section is a collapsible group of its sub-pages. */
+nav details.nav-section { margin: 4px 0; }
+nav details.nav-section > summary { padding: 7px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; color: var(--text); list-style: none; }
+nav details.nav-section > summary::-webkit-details-marker { display: none; }
+nav details.nav-section > summary::before { content: "\25B8"; display: inline-block; width: 1em; color: var(--muted); }
+nav details.nav-section[open] > summary::before { content: "\25BE"; }
+nav details.nav-section > summary:focus-visible, nav button:focus-visible { outline: 2px solid var(--info, #56b4e9); outline-offset: 1px; }
+nav details.nav-section > button { display: block; width: 100%; padding-left: 28px; }
+.part + .part { margin-top: 24px; }
 nav button { background: none; border: 0; padding: 7px 12px; border-radius: 6px; color: var(--muted); cursor: pointer; font: inherit; text-align: left; }
 nav button:hover { color: var(--text); }
 nav button[aria-current="true"] { background: var(--bg); color: var(--text); font-weight: 600; }

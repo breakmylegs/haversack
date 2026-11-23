@@ -154,7 +154,7 @@ export function FansPanel() {
       {!s.helper.ready && (
         <Field
           label="Haversack Helper"
-          description="Changing the fan needs the Haversack Helper: install it from Device, Reconnect help. The readings above need nothing."
+          description="Changing the fan needs the Haversack Helper: install it from Device, Controllers, Reconnect help. The readings above need nothing."
         />
       )}
       {others.length > 0 && <Field label="Another fan control is active" description={`${others.join(", ")}. Haversack only shows the readings, so the two never fight.`} />}

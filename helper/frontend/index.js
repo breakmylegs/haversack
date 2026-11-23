@@ -1,5 +1,5 @@
 // Haversack Helper's quick menu entry. Hand-written against Decky's globals (DFL, SP_REACT): the
-// helper has no screens of its own; Haversack shows its state under Device, Reconnect help.
+// helper has no screens of its own; Haversack shows its state under Device, Controllers, Reconnect help.
 const h = SP_REACT.createElement;
 const definePlugin = (fn) => (...args) => fn(...args);
 
@@ -12,7 +12,7 @@ function Content() {
       null,
       h(DFL.Field, {
         label: "Used by Haversack",
-        description: "This helper runs as root and does only a few Bluetooth jobs that Haversack asks for. Open Haversack, Device, Reconnect help.",
+        description: "This helper runs as root and does only a few Bluetooth jobs that Haversack asks for. Open Haversack, Device, Controllers, Reconnect help.",
       }),
     ),
   );

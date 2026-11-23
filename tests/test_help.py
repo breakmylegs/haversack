@@ -99,9 +99,9 @@ def test_the_gate_runs_the_help_check() -> None:
 
 def test_the_page_is_in_the_sidebar_and_the_desktop_app() -> None:
     with open(os.path.join(ROOT, "src", "routeData.ts"), encoding="utf-8") as handle:
-        assert '{ id: "help", title: "Help", module: "core" }' in handle.read()
+        assert '{ id: "help", title: "Help", about: "The user guide.", parts: [part("help", "core")] }' in handle.read()
     with open(os.path.join(ROOT, "src", "pages", "KeepsakeRoute.tsx"), encoding="utf-8") as handle:
-        assert '"settings/help": () => <HelpPage />' in handle.read()
+        assert "help: () => <HelpPage />" in handle.read()
     with open(os.path.join(ROOT, "desktop", "src", "main.ts"), encoding="utf-8") as handle:
         assert "render: (main) => helpPage(main)" in handle.read()
     with open(os.path.join(ROOT, "src", "pages", "HelpPage.tsx"), encoding="utf-8") as handle:

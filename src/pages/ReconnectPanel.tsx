@@ -18,7 +18,7 @@ import {
 import { plainError } from "../format";
 import { CablePairing, HelperCard, SspGateCard } from "./ReconnectHelper";
 
-// Device, Reconnect help (R22, ADR-0082): for Bluetooth Classic controllers that pair but do not
+// Device, Controllers, Reconnect help (R22, ADR-0082): for Bluetooth Classic controllers that pair but do not
 // reconnect. Every paired device is listed; help acts only on the ones the user turns it on for,
 // by adapter and address. Nothing is inferred from a device's name, class or modalias.
 

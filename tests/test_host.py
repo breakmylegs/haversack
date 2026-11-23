@@ -177,6 +177,8 @@ def test_the_desktop_interface_is_served_from_a_fixed_list_only(tmp_path):
         status, body, headers = request(api, "GET", "/dist/main.js")
         assert status == 200 and headers["Content-Type"].startswith("text/javascript") and body == b"export {};"
         assert request(api, "GET", "/app.css")[2]["Content-Type"].startswith("text/css")
+        (ui / "dist" / "helpPage.js").write_text("export const x = 1;")
+        assert request(api, "GET", "/dist/helpPage.js")[0] == 200  # mixed case: refused before v0.57.0
         for path in (
             "/dist/../secret.txt",
             "/dist/%2e%2e%2fsecret.txt",
@@ -194,6 +196,15 @@ def test_the_desktop_interface_is_served_from_a_fixed_list_only(tmp_path):
         server.shutdown()
         server.server_close()
         loop.call_soon_threadsafe(loop.stop)
+
+
+def test_every_desktop_module_is_one_the_host_serves():
+    """Each desktop/src file compiles to dist/<name>.js; a name the host refuses breaks the whole app,
+    as helpPage.js and looksPage.js did from v0.52.0 to v0.56.0 (it stayed on "Loading")."""
+    names = [p.stem for p in (ROOT / "desktop" / "src").glob("*.ts")]
+    assert "helpPage" in names and "main" in names
+    for name in names:
+        assert host_module.UI_SCRIPT.fullmatch(f"/dist/{name}.js"), name
 
 
 def test_the_callables_match_the_decky_plugin():
