@@ -1,8 +1,19 @@
 # Changelog
 
-All notable changes to Keepsake are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
+All notable changes to Haversack (called Keepsake until v0.51.0) are listed here. Versions follow [Semantic Versioning](https://semver.org/). Each release uses its section below as release notes.
 
 ## [Unreleased]
+
+### Changed
+
+- **Keepsake is now called Haversack, and nothing is lost.** Update as usual from Updates. Decky then installs Haversack beside Keepsake, at the top of its list, and Haversack's quick menu shows one card.
+  - Press **Remove the old Keepsake** and confirm. Haversack copies your settings, sign-ins, games list and history across, checks every file, and starts.
+  - Until you press it, Keepsake keeps working as before, and Haversack does nothing, so the two never sync at once.
+  - Your old copy stays on the device: to go back, remove Haversack and install an old Keepsake from the Releases page.
+  - Your cloud folder keeps its name (Apps/Keepsake in OneDrive), so your other handheld carries on even before it updates.
+  - Microsoft's and Google's sign-in pages still show the registered name, Keepsake.
+  - If you use the helper, Keepsake Helper is removed with Keepsake: install Haversack Helper from Device, Reconnect help.
+- **A new logo:** a satchel on teal.
 
 ## [0.50.0]
 

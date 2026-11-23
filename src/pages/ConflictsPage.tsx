@@ -24,7 +24,7 @@ export function ConflictsPage() {
     <div>
       <Field
         label="Open conflicts"
-        description="A conflict means two versions of a save exist and Keepsake will not guess. Until you choose, the game plays with this device's save and is not pulled from the cloud."
+        description="A conflict means two versions of a save exist and Haversack will not guess. Until you choose, the game plays with this device's save and is not pulled from the cloud."
       />
       {error && <Field label="Could not load conflicts" description={error} />}
       {conflicts && conflicts.length === 0 && <Field label="No conflicts" description="Every synced game agrees with the cloud." />}

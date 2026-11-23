@@ -46,7 +46,7 @@ export function DiagnosticsPage() {
   const confirmFreeze = () => {
     const appid = runningAppId();
     if (!appid) {
-      toaster.toast({ title: "Keepsake", body: "No game is running." });
+      toaster.toast({ title: "Haversack", body: "No game is running." });
       return;
     }
     showModal(
@@ -60,7 +60,7 @@ export function DiagnosticsPage() {
           try {
             const result = await freezeTest(appid, FREEZE_SECONDS);
             toaster.toast({
-              title: "Keepsake freeze test",
+              title: "Haversack freeze test",
               body: result.ok
                 ? `Paused ${result.stopped} processes and resumed ${result.resumed}.`
                 : `Not run: ${result.reason ?? "unknown reason"}.`,
@@ -79,7 +79,7 @@ export function DiagnosticsPage() {
     <div>
       <Field
         label="Diagnostics"
-        description="Facts about this device for troubleshooting. The export is saved in Keepsake's settings folder on this device and includes the health checks."
+        description="Facts about this device for troubleshooting. The export is saved in Haversack's settings folder on this device and includes the health checks."
       />
       <NavigationRecorder />
       <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "8px 0" }}>
@@ -143,9 +143,9 @@ export function DiagnosticsPage() {
         <DialogButton
           style={{ width: "auto" }}
           onClick={() => {
-            toaster.toast({ title: "Keepsake", body: `Simulated sync job running for ${SIMULATED_JOB_SECONDS} seconds.` });
+            toaster.toast({ title: "Haversack", body: `Simulated sync job running for ${SIMULATED_JOB_SECONDS} seconds.` });
             simulateSyncJob(SIMULATED_JOB_SECONDS)
-              .then(() => toaster.toast({ title: "Keepsake", body: "Simulated sync job finished." }))
+              .then(() => toaster.toast({ title: "Haversack", body: "Simulated sync job finished." }))
               .catch(() => undefined);
           }}
         >

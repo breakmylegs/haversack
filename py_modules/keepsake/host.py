@@ -498,7 +498,7 @@ def make_handler(api: Api) -> type[BaseHTTPRequestHandler]:
                 self._json(403, {"ok": False, "error": "requests from other sites are refused"})
                 return False
             if token is not None and not hmac.compare_digest(token.encode(), api.token.encode()):
-                self._json(401, {"ok": False, "error": "open Keepsake from its own launcher"})
+                self._json(401, {"ok": False, "error": "open Haversack from its own launcher"})
                 return False
             return True
 
@@ -615,8 +615,8 @@ def serve(api: Api, port: int = DEFAULT_PORT, tries: int = PORT_TRIES) -> Thread
 
 
 PLACEHOLDER = (
-    b"<!doctype html><meta charset=utf-8><title>Keepsake</title>"
-    b"<p>Keepsake is running. The desktop interface arrives in a later release (ADR-0038).</p>"
+    b"<!doctype html><meta charset=utf-8><title>Haversack</title>"
+    b"<p>Haversack is running. The desktop interface arrives in a later release (ADR-0038).</p>"
 )
 
 
@@ -644,7 +644,7 @@ async def run(port: int, open_browser: bool) -> None:
     os.makedirs(paths.runtime_dir, exist_ok=True)
     atomic_write_json(os.path.join(paths.runtime_dir, STATE_FILE), {"port": api.port, "token": api.token})
     url = f"http://127.0.0.1:{api.port}/#token={api.token}"  # the fragment never reaches a server
-    print(f"Keepsake ({host}) is running on http://127.0.0.1:{api.port}/", flush=True)
+    print(f"Haversack ({host}) is running on http://127.0.0.1:{api.port}/", flush=True)
     if open_browser:
         webbrowser.open(url)
     loop = asyncio.get_running_loop()
@@ -675,7 +675,7 @@ async def run(port: int, open_browser: bool) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m keepsake.host", description="Keepsake on a PC (ADR-0038)")
+    parser = argparse.ArgumentParser(prog="python -m keepsake.host", description="Haversack on a PC (ADR-0038)")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--open", action="store_true", help="open the desktop interface in the browser")
     options = parser.parse_args(argv)

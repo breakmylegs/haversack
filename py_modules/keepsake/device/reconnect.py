@@ -307,13 +307,13 @@ ADVICE = {
     "O2": (
         "The controller calls, but the handshake fails",
         "The controller reaches this handheld and is turned away: the pairing key does not match. "
-        "Cable pairing gives both sides a new key (it needs the Keepsake Helper). Until then, put "
+        "Cable pairing gives both sides a new key (it needs the Haversack Helper). Until then, put "
         "it in pairing mode and use Reconnect.",
     ),
     "O3": (
         "The controller is refused while security starts",
         "The controller opens its connection a moment too early and BlueZ turns it away. The SSP "
-        "gate fixes this (it needs the Keepsake Helper; read its warning first). Until then, put it "
+        "gate fixes this (it needs the Haversack Helper; read its warning first). Until then, put it "
         "in pairing mode and use Reconnect.",
     ),
     "O4": (
@@ -348,7 +348,7 @@ ADVICE = {
     "OK": ("The controller reconnected", "Nothing to fix: it reconnected with its normal button."),
     "NONE": (
         "Nothing was seen",
-        "Keepsake saw nothing in the time allowed. Make sure the controller was off for 10 seconds "
+        "Haversack saw nothing in the time allowed. Make sure the controller was off for 10 seconds "
         "before you pressed its button, and try again.",
     ),
 }

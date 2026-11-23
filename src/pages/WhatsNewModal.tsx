@@ -13,7 +13,7 @@ function WhatsNewModal({ version, notes, closeModal }: { version: string; notes:
     .filter((line, i, all) => line.trim() || (i > 0 && all[i - 1].trim()));
   return (
     <ModalRoot onCancel={closeModal} closeModal={closeModal}>
-      <div style={{ fontSize: 20, fontWeight: "bold", marginBottom: 8 }}>What's new in Keepsake {version}</div>
+      <div style={{ fontSize: 20, fontWeight: "bold", marginBottom: 8 }}>What's new in Haversack {version}</div>
       <div style={{ maxHeight: "60vh", overflowY: "auto", whiteSpace: "pre-wrap", fontSize: 14 }}>
         {lines.length ? lines.join("\n") : "This version has no release notes."}
       </div>

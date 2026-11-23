@@ -1,11 +1,11 @@
 {
-  "name": "Keepsake",
+  "name": "Haversack",
   "author": "breakmylegs",
   "flags": [],
   "api_version": 1,
   "publish": {
     "tags": ["saves", "sync", "cloud"],
-    "description": "Syncs PC game saves between handhelds through cloud storage, from Gaming Mode.",
+    "description": "Carries your games, saves and settings between your handhelds, from Gaming Mode.",
     "image": "https://opengraph.githubassets.com/1/breakmylegs/keepsake"
   }
 }

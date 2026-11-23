@@ -79,7 +79,7 @@ def test_the_hold_rule(percent, mains, game, waits):
 def test_a_method_call_is_laid_out_as_d_bus_expects():
     message = sleepguard.method_call(
         7, "org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager", "Inhibit",
-        ["sleep", "Keepsake", "Copying", "delay"],
+        ["sleep", "Haversack", "Copying", "delay"],
     )  # fmt: skip
     assert message[:4] == b"l\x01\x00\x01"
     body_len, serial, fields_len = struct.unpack("<III", message[4:16])

@@ -132,7 +132,7 @@ def test_an_unexpected_fault_is_a_plain_message_not_a_raw_exception(device, monk
         raise AttributeError("'NoneType' object has no attribute 'listShares'")
 
     monkeypatch.setattr(smbshare, "list_folder", broken)
-    with pytest.raises(ValueError, match=r"^Keepsake could not browse that location \(AttributeError\)\. Check"):
+    with pytest.raises(ValueError, match=r"^Haversack could not browse that location \(AttributeError\)\. Check"):
         run(app.installer_net_browse({"url": "smb://nas/", "username": "player", "password": "pw"}))
 
     def search_broken(*args, **kwargs):

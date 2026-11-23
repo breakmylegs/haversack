@@ -1,4 +1,4 @@
-// Keepsake's desktop interface for PCs and Desktop Mode (ADR-0038, ADR-0040).
+// Haversack's desktop interface for PCs and Desktop Mode (ADR-0038, ADR-0040).
 // Plain TypeScript and the DOM: no framework, no third-party code, nothing from another origin.
 
 import { ApiError, call, hasToken, initialPage, onEvents } from "./api.js";
@@ -262,7 +262,7 @@ async function history(main: HTMLElement): Promise<void> {
   );
 }
 
-// Activity: what Keepsake did, in plain words (ADR-0048)
+// Activity: what Haversack did, in plain words (ADR-0048)
 
 async function activityPage(main: HTMLElement): Promise<void> {
   const entries = await call<ActivityEntry[]>("activity", 100);
@@ -448,7 +448,7 @@ async function games(main: HTMLElement, filter = ""): Promise<void> {
   replace(
     main,
     h("h1", {}, "Games"),
-    h("p", {}, "Turn sync on for the games whose saves should follow you. Keepsake finds each game's saves from the Ludusavi manifest."),
+    h("p", {}, "Turn sync on for the games whose saves should follow you. Haversack finds each game's saves from the Ludusavi manifest."),
     h("div", { class: "actions" }, search, state, syncable.length ? bulk(true) : null, syncable.length ? bulk(false) : null),
     shown.length
       ? sortableTable(
@@ -484,7 +484,7 @@ function sendButtons(g: GameMatch, peers: PairedDevice[]): HTMLElement | null {
     ...peers.map((peer) =>
       button(`Send to ${peer.name}`, async () => {
         const ok = window.confirm(
-          `Send ${g.name} to ${peer.name}? Keepsake checks it has space, then copies the game, its prefix, its compatibility tool and its artwork there and adds it to Steam. It starts by itself; either device can stop and remove it.`,
+          `Send ${g.name} to ${peer.name}? Haversack checks it has space, then copies the game, its prefix, its compatibility tool and its artwork there and adds it to Steam. It starts by itself; either device can stop and remove it.`,
         );
         if (!ok) return;
         const r = await call<{ title: string; droppedOptions: string[] }>("replication_send", g.key, peer.id);
@@ -614,7 +614,7 @@ async function settingsPage(main: HTMLElement): Promise<void> {
   replace(
     main,
     h("h1", {}, "Settings"),
-    s.readOnly ? h("p", { class: "warn" }, "A newer Keepsake wrote these settings, so they are read-only here. Update Keepsake.") : null,
+    s.readOnly ? h("p", { class: "warn" }, "A newer Haversack wrote these settings, so they are read-only here. Update Haversack.") : null,
     h(
       "div",
       { class: "card" },
@@ -631,7 +631,7 @@ async function settingsPage(main: HTMLElement): Promise<void> {
       "div",
       { class: "card" },
       h("h2", {}, "Syncing"),
-      h("p", { class: "small" }, "While no game runs, Keepsake checks for saves from your other devices this often (10 to 240 minutes)."),
+      h("p", { class: "small" }, "While no game runs, Haversack checks for saves from your other devices this often (10 to 240 minutes)."),
       h(
         "div",
         { class: "actions" },
@@ -640,7 +640,7 @@ async function settingsPage(main: HTMLElement): Promise<void> {
       ),
       h("label", { class: "switch" }, toasts, " Notify after each sync"),
       h("label", {}, "When saves differ ", differ),
-      h("p", { class: "small" }, "Take the newest: when exactly two versions differ, their times are far enough apart and no clock looks wrong, Keepsake keeps the newer one and pins the other in History, with Undo."),
+      h("p", { class: "small" }, "Take the newest: when exactly two versions differ, their times are far enough apart and no clock looks wrong, Haversack keeps the newer one and pins the other in History, with Undo."),
     ),
     h(
       "div",
@@ -695,7 +695,7 @@ async function importPage(main: HTMLElement): Promise<void> {
   replace(
     main,
     h("h1", {}, "Import from Ludusavi"),
-    h("p", {}, "Brings your Ludusavi backups into Keepsake's history, so nothing from before is lost. Your Ludusavi backups are only read, never changed."),
+    h("p", {}, "Brings your Ludusavi backups into Haversack's history, so nothing from before is lost. Your Ludusavi backups are only read, never changed."),
     status.running || status.total ? importProgress(status, main) : null,
     h(
       "div",
@@ -794,7 +794,7 @@ async function cloud(main: HTMLElement): Promise<void> {
             signedIn[p.id]
               ? "Signed in."
               : status.methods?.[p.id]?.browser
-                ? `Not signed in. A ${p.page} page opens in a new tab: sign in and allow access for Keepsake.`
+                ? `Not signed in. A ${p.page} page opens in a new tab: sign in and allow access for Haversack.`
                 : "Not signed in.",
           ),
           h(
@@ -892,13 +892,13 @@ function signInButton(id: "onedrive" | "gdrive", label: string, main: HTMLElemen
 // Updates (the PC host updates itself, ADR-0043)
 
 const updateRefusals: Record<string, string> = {
-  "not-installed": "Keepsake is running from a folder, not installed, so it cannot update itself here.",
+  "not-installed": "Haversack is running from a folder, not installed, so it cannot update itself here.",
   "no-pc-package": "This release has no PC package.",
   "unsigned-release": "This release is not signed, so it is refused.",
   "bad-signature": "This release's signature is not valid, so it is refused.",
   "sums-missing-zip": "This release's checksums do not list the PC package.",
   offline: "GitHub could not be reached.",
-  busy: "Keepsake is busy. Try again when it has finished.",
+  busy: "Haversack is busy. Try again when it has finished.",
 };
 
 function refusal(result: PcResult): string {
@@ -907,14 +907,14 @@ function refusal(result: PcResult): string {
 
 function restartButton(): HTMLButtonElement {
   return button(
-    "Restart Keepsake now",
+    "Restart Haversack now",
     async () => {
       const result = await call<PcResult>("pc_restart");
       if (!result.ok) {
         toast(refusal(result));
         return;
       }
-      replace(document.getElementById("main") as HTMLElement, h("h1", {}, "Restarting"), h("p", {}, "Keepsake opens again in a new tab in a few seconds. You can close this one."));
+      replace(document.getElementById("main") as HTMLElement, h("h1", {}, "Restarting"), h("p", {}, "Haversack opens again in a new tab in a few seconds. You can close this one."));
     },
     "primary",
   );
@@ -937,10 +937,10 @@ async function updates(main: HTMLElement, check?: UpdateCheck, installed?: strin
       h("dt", {}, "Previous version"),
       h("dd", {}, status.previous ?? "None kept"),
     ),
-    h("p", { class: "small" }, "Every update is checked against Keepsake's release signature before anything is installed. Your settings and saves are never touched."),
+    h("p", { class: "small" }, "Every update is checked against Haversack's release signature before anything is installed. Your settings and saves are never touched."),
     check?.error ? h("p", { class: "warn" }, `Could not check: ${check.error}`) : null,
-    check && !check.error && !offer ? h("p", {}, latest && check.updateAvailable ? `Keepsake ${latest.version} has no PC package yet.` : "Keepsake is up to date.") : null,
-    installed ? h("p", {}, `Keepsake ${installed} is installed. It starts when Keepsake restarts.`) : null,
+    check && !check.error && !offer ? h("p", {}, latest && check.updateAvailable ? `Haversack ${latest.version} has no PC package yet.` : "Haversack is up to date.") : null,
+    installed ? h("p", {}, `Haversack ${installed} is installed. It starts when Haversack restarts.`) : null,
     h(
       "div",
       { class: "actions" },
@@ -1038,7 +1038,7 @@ async function devices(main: HTMLElement, found: FoundDevice[] | null = null): P
   replace(
     main,
     h("h1", {}, "Devices"),
-    h("p", {}, "Keepsake links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once by checking that both screens show the same code."),
+    h("p", {}, "Haversack links your own devices directly, on your home network or your own VPN. Nothing goes through the cloud. Pair each device once by checking that both screens show the same code."),
     transfersDashboard(offered.activity ?? [], main),
     offersCard(offered, main),
     linked.length ? linksCard(linked, main) : null,
@@ -1271,7 +1271,7 @@ function peerGamesList(peer: PairedDevice, main: HTMLElement): HTMLElement | nul
             "td",
             {},
             button("Get this game", async () => {
-              if (!window.confirm(`Get ${g.title} from ${peer.name}? Keepsake checks there is space here first. Nothing here is replaced.`)) return;
+              if (!window.confirm(`Get ${g.title} from ${peer.name}? Haversack checks there is space here first. Nothing here is replaced.`)) return;
               await call("replication_get_game", peer.id, g.id, g.title);
               toast(`${g.title} is coming from ${peer.name}.`);
               await devices(main);
@@ -1603,7 +1603,7 @@ async function powerPage(main: HTMLElement): Promise<void> {
       "p",
       { class: locked ? "warn" : "" },
       locked
-        ? `${s.tools.join(", ")} manages performance on this device, so Keepsake only shows it.`
+        ? `${s.tools.join(", ")} manages performance on this device, so Haversack only shows it.`
         : s.game
           ? "Changes are kept for the game you are playing and applied each time it starts."
           : "Start a game to keep settings for it.",
@@ -1623,13 +1623,13 @@ async function powerPage(main: HTMLElement): Promise<void> {
   );
 }
 
-// Separate SPL, SPPT and FPPT (ADR-0084), through the Keepsake Helper.
+// Separate SPL, SPPT and FPPT (ADR-0084), through the Haversack Helper.
 function limitsSection(s: PerformanceDesk, locked: boolean, apply: (values: Record<string, unknown>) => Promise<void>): HTMLElement | null {
   const p = s.powerLimits;
   if (!p?.available || !p.ranges) return null;
   const r = p.ranges;
   if (!p.ready) {
-    return h("p", { class: "small" }, `Power limits now: SPL ${r.spl.current} W, SPPT ${r.sppt.current} W, FPPT ${r.fppt.current} W. Changing them separately needs the Keepsake Helper (install it from Gaming Mode: Device, Reconnect help).`);
+    return h("p", { class: "small" }, `Power limits now: SPL ${r.spl.current} W, SPPT ${r.sppt.current} W, FPPT ${r.fppt.current} W. Changing them separately needs the Haversack Helper (install it from Gaming Mode: Device, Reconnect help).`);
   }
   const words = { spl: "SPL, sustained", sppt: "SPPT, slow boost", fppt: "FPPT, fast boost" } as const;
   const inputs = (Object.keys(words) as (keyof typeof words)[]).map((key) => {
@@ -1658,7 +1658,7 @@ async function batteryPage(main: HTMLElement): Promise<void> {
     h("p", {}, "Stopping at 80% keeps the battery healthier if the device is plugged in for long spells. It is Lenovo's only charge limit on the Legion Go and Go 2."),
     s.control === "steamos-manager"
       ? h("label", { class: "switch" }, box, " Stop charging at 80%")
-      : h("p", { class: "warn" }, `Charge limit: ${state}. This device's steamos-manager does not let Keepsake change it. ${s.where ?? ""}`),
+      : h("p", { class: "warn" }, `Charge limit: ${state}. This device's steamos-manager does not let Haversack change it. ${s.where ?? ""}`),
     s.firmware.chargeTypes ? h("p", { class: "small" }, `Firmware charge types: ${s.firmware.chargeTypes}`) : null,
   );
 }
@@ -1708,7 +1708,7 @@ async function quickMenuPage(main: HTMLElement): Promise<void> {
   replace(
     main,
     h("h1", {}, "Quick menu"),
-    h("p", {}, "What Keepsake's panel in the quick access menu shows, in order. Open Keepsake is always there, last."),
+    h("p", {}, "What Haversack's panel in the quick access menu shows, in order. Open Haversack is always there, last."),
     chosen.length ? list : h("p", { class: "small" }, "No shortcuts chosen."),
     others.length ? h("h2", {}, "Add") : null,
     others.length
@@ -1755,21 +1755,21 @@ async function fansPage(main: HTMLElement): Promise<void> {
     ].join(", "),
   );
   const parts: (HTMLElement | null)[] = [h("h1", {}, "Fans"), now];
-  if (!s.helper.ready) parts.push(h("p", { class: "small" }, "Changing the fan needs the Keepsake Helper (install it from Gaming Mode: Device, Reconnect help)."));
-  if (others.length) parts.push(h("p", { class: "warn" }, `${others.join(", ")} controls the fan here; Keepsake only shows the readings.`));
+  if (!s.helper.ready) parts.push(h("p", { class: "small" }, "Changing the fan needs the Haversack Helper (install it from Gaming Mode: Device, Reconnect help)."));
+  if (others.length) parts.push(h("p", { class: "warn" }, `${others.join(", ")} controls the fan here; Haversack only shows the readings.`));
   if (s.problem) parts.push(h("p", { class: "warn" }, s.problem));
   if (s.helper.ready && go2 && !d.validated) {
     parts.push(
       h("p", {}, `BIOS ${d.firmware?.bios ?? "?"} with EC ${d.firmware?.ec ?? "?"} is not on the checked list. The fan test asks for one speed for up to 15 seconds, checks the fan gets there and gives it back.`),
       h("div", { class: "actions" }, button("Run the fan test", async () => {
         const r = await call<{ passed: boolean }>("fans_selftest");
-        toast(r.passed ? "The fan test passed." : "The fan test did not pass: Keepsake will not control this fan.");
+        toast(r.passed ? "The fan test passed." : "The fan test did not pass: Haversack will not control this fan.");
         await again();
       })),
     );
   }
   if (s.helper.ready && go2 && d.validated && !others.length) {
-    const enabled = h("input", { type: "checkbox", checked: s.settings.enabled, "aria-label": "Keepsake controls the fan" }) as HTMLInputElement;
+    const enabled = h("input", { type: "checkbox", checked: s.settings.enabled, "aria-label": "Haversack controls the fan" }) as HTMLInputElement;
     enabled.addEventListener("change", () => void call("fans_set_options", { enabled: enabled.checked }).then(again, fail));
     const smooth = h("input", { type: "checkbox", checked: s.settings.smooth, "aria-label": "Smooth curve" }) as HTMLInputElement;
     smooth.addEventListener("change", () => void call("fans_set_options", { smooth: smooth.checked }).then(again, fail));
@@ -1832,7 +1832,7 @@ async function fansPage(main: HTMLElement): Promise<void> {
     });
     draw();
     parts.push(
-      h("label", { class: "switch" }, enabled, " Keepsake controls the fan (back to the firmware within seconds if Keepsake stops; full speed at 101 °C)"),
+      h("label", { class: "switch" }, enabled, " Haversack controls the fan (back to the firmware within seconds if Haversack stops; full speed at 101 °C)"),
       h("label", { class: "switch" }, smooth, " Smooth curve (off: stepped)"),
       h("h2", {}, "Curve"),
       h("div", { class: "actions" }, h("label", {}, "Profile ", select)),
@@ -1860,8 +1860,8 @@ async function fansPage(main: HTMLElement): Promise<void> {
     const full = h("input", { type: "checkbox", checked: s.settings.fullSpeed, disabled: !d.fullSpeedAttribute, "aria-label": "Full fan speed" }) as HTMLInputElement;
     full.addEventListener("change", () => void call("fans_set_options", { fullSpeed: full.checked }).then(again, fail));
     parts.push(
-      h("label", { class: "switch" }, full, d.fullSpeedAttribute ? " Full fan speed (switches off by itself if Keepsake stops)" : " Full fan speed (needs kernel 7.2)"),
-      h("p", { class: "small" }, "The Legion Go's own fan table can only be changed through acpi_call, a kernel module SteamOS does not include and Keepsake will not install."),
+      h("label", { class: "switch" }, full, d.fullSpeedAttribute ? " Full fan speed (switches off by itself if Haversack stops)" : " Full fan speed (needs kernel 7.2)"),
+      h("p", { class: "small" }, "The Legion Go's own fan table can only be changed through acpi_call, a kernel module SteamOS does not include and Haversack will not install."),
     );
   }
   if (s.helper.ready && (d.controlling || s.settings.enabled || s.settings.fullSpeed)) {
@@ -1925,7 +1925,7 @@ async function emulatorsPage(main: HTMLElement): Promise<void> {
   );
 }
 
-// Changing the controllers and the stick lights (ADR-0086), through the Keepsake Helper.
+// Changing the controllers and the stick lights (ADR-0086), through the Haversack Helper.
 const CONTROLLER_CHOICES: Record<string, [string, string[]]> = {
   mode: ["Controller mode", ["xinput", "dinput"]],
   os_mode: ["Button chords for", ["linux", "windows"]],
@@ -1951,11 +1951,11 @@ async function controllerSettingsSection(again: () => Promise<void>): Promise<HT
     return box;
   }
   if (!s.helper.ready) {
-    box.append(h("p", { class: "small" }, "Needs the Keepsake Helper (install it from Gaming Mode: Device, Reconnect help)."));
+    box.append(h("p", { class: "small" }, "Needs the Haversack Helper (install it from Gaming Mode: Device, Reconnect help)."));
     return box;
   }
   if (s.tools.hhd) {
-    box.append(h("p", { class: "warn" }, "Handheld Daemon manages the controllers here, so Keepsake only shows their settings."));
+    box.append(h("p", { class: "warn" }, "Handheld Daemon manages the controllers here, so Haversack only shows their settings."));
     return box;
   }
   const keep = h("input", { type: "checkbox", checked: true, "aria-label": "Keep my changes" }) as HTMLInputElement;
@@ -2108,10 +2108,10 @@ async function reconnectPage(main: HTMLElement): Promise<void> {
       "p",
       { class: ready ? "" : "small" },
       ready
-        ? `Keepsake Helper ready (version ${s.helper?.version}): cable pairing, the SSP gate and the Bluetooth capture are available.`
+        ? `Haversack Helper ready (version ${s.helper?.version}): cable pairing, the SSP gate and the Bluetooth capture are available.`
         : s.helper?.problem === "version"
-          ? "The Keepsake Helper does not match this Keepsake. Update it from Gaming Mode: Device, Reconnect help."
-          : "Cable pairing, the SSP gate and the Bluetooth capture need the Keepsake Helper. Install it from Gaming Mode: Device, Reconnect help.",
+          ? "The Haversack Helper does not match this Haversack. Update it from Gaming Mode: Device, Reconnect help."
+          : "Cable pairing, the SSP gate and the Bluetooth capture need the Haversack Helper. Install it from Gaming Mode: Device, Reconnect help.",
     ),
     devices.length
       ? h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Device"), h("th", {}, "Class and modalias"), h("th", {}, "Adapter"), h("th", {}, "State"), h("th", {}, "Notes"))), h("tbody", {}, ...devices.map(deviceRow)))
@@ -2122,7 +2122,7 @@ async function reconnectPage(main: HTMLElement): Promise<void> {
           "section",
           {},
           h("h2", {}, "SSP gate"),
-          h("p", { class: "warn" }, "The SSP gate lowers Bluetooth security for the whole adapter, for every device. While it is on, new pairings use the older PIN method and Secure Connections protection is lost. SSP goes back on while pairing, when you switch the gate off, and if Keepsake stops."),
+          h("p", { class: "warn" }, "The SSP gate lowers Bluetooth security for the whole adapter, for every device. While it is on, new pairings use the older PIN method and Secure Connections protection is lost. SSP goes back on while pairing, when you switch the gate off, and if Haversack stops."),
           h("p", {}, gate?.on ? `On (now: ${gate.state}).` : "Off."),
           gate?.on
             ? h("div", { class: "actions" }, button("Switch the SSP gate off", async () => (await call("reconnect_set_ssp_gate", false, "", ""), await again())), gate.state === "needs-confirm" ? button("Restart Bluetooth to turn SSP off", async () => (await call("reconnect_ssp_confirm"), await again())) : null)
@@ -2147,7 +2147,7 @@ async function extrasPage(main: HTMLElement): Promise<void> {
     s.wifiPowerSaving !== null ? h("label", { class: "switch" }, wifi, " Wi-Fi power saving (saves battery; turn off if streaming stutters)") : h("p", { class: "small" }, "Wi-Fi power saving: not offered by this device's steamos-manager."),
     h("h2", {}, `BIOS ${s.bios.version ?? "unknown"}`),
     s.bios.notes.length ? h("ul", { class: s.bios.level === "ok" ? "" : "warn" }, ...s.bios.notes.map((n) => h("li", {}, n))) : h("p", {}, s.bios.known ? "No known problems with this BIOS." : "No BIOS notes for this model."),
-    h("p", { class: "small" }, "Refresh rate, frame limit and brightness are in Steam's own settings; Keepsake leaves them to Steam."),
+    h("p", { class: "small" }, "Refresh rate, frame limit and brightness are in Steam's own settings; Haversack leaves them to Steam."),
   );
 }
 
@@ -2191,7 +2191,7 @@ async function logsPage(main: HTMLElement): Promise<void> {
   replace(
     main,
     h("h1", {}, "Logs"),
-    h("p", {}, "Keepsake's own log, newest first. It never holds passwords, tokens or the contents of your saves."),
+    h("p", {}, "Haversack's own log, newest first. It never holds passwords, tokens or the contents of your saves."),
     sortableTable(
       "logs",
       [
@@ -2213,7 +2213,7 @@ async function show(id: string): Promise<void> {
   try {
     await page.render(main);
   } catch (error) {
-    replace(main, h("h1", {}, page.title), h("p", { class: "warn" }, error instanceof ApiError ? error.message : "Keepsake could not be reached."));
+    replace(main, h("h1", {}, page.title), h("p", { class: "warn" }, error instanceof ApiError ? error.message : "Haversack could not be reached."));
   }
 }
 
@@ -2222,8 +2222,8 @@ function start(): void {
   if (!hasToken()) {
     replace(
       document.getElementById("main") as HTMLElement,
-      h("h1", {}, "Open Keepsake from its launcher"),
-      h("p", {}, "For your safety this page only works when Keepsake opens it, with its own one-time link."),
+      h("h1", {}, "Open Haversack from its launcher"),
+      h("p", {}, "For your safety this page only works when Haversack opens it, with its own one-time link."),
     );
     return;
   }
@@ -2244,7 +2244,7 @@ function start(): void {
     if (event === "keepsake_replication" && document.getElementById("nav-devices")?.getAttribute("aria-current") === "true") void show("devices");
     if (event === "keepsake_signin") {
       const result = args[0] as { status?: string; reason?: string; method?: string } | undefined;
-      toast(result?.status !== "signed-in" ? `Sign-in did not complete: ${result?.reason ?? "unknown reason"}` : result.method === "phone" ? "Signed in with your phone. Keepsake is signed in; you can close any sign-in tab left open." : "Signed in.");
+      toast(result?.status !== "signed-in" ? `Sign-in did not complete: ${result?.reason ?? "unknown reason"}` : result.method === "phone" ? "Signed in with your phone. Haversack is signed in; you can close any sign-in tab left open." : "Signed in.");
       if (document.getElementById("nav-cloud")?.getAttribute("aria-current") === "true") void show("cloud");
     }
   }, ["keepsake_toast", "keepsake_signin", "keepsake_replication"]);

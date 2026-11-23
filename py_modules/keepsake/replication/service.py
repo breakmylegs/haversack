@@ -296,7 +296,7 @@ def health_checks(links: Links | None, host: str, proc_root: str = "/proc") -> l
                 "Encrypted link",
                 "fail",
                 "This device's Python cannot make Replication's encrypted link (it has no TLS-PSK), so Replication "
-                "stays off. A Keepsake or system update may bring it.",
+                "stays off. A Haversack or system update may bring it.",
             )
         ]
     checks = [check("replication-link", "Encrypted link", "ok", "This device can make the encrypted link.")]

@@ -40,10 +40,10 @@ export function ProposalCard({
   const run = async (work: () => Promise<unknown>, done: string) => {
     try {
       await work();
-      toaster.toast({ title: "Keepsake", body: done });
+      toaster.toast({ title: "Haversack", body: done });
       onChanged();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not changed: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Not changed: ${plainError(err)}` });
     }
   };
 
@@ -52,7 +52,7 @@ export function ProposalCard({
   return (
     <Field
       label={`Is this ${label(proposal.candidate)}?`}
-      description={`Keepsake thinks ${gameName} is the same game as ${label(proposal.candidate)} (${why(proposal.candidate)}), but is not certain. Approve it, choose another, or say it is not this game.`}
+      description={`Haversack thinks ${gameName} is the same game as ${label(proposal.candidate)} (${why(proposal.candidate)}), but is not certain. Approve it, choose another, or say it is not this game.`}
       childrenLayout="below"
     >
       <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

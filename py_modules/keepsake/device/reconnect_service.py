@@ -236,7 +236,7 @@ class ReconnectService:
         hci = hcilog.signs(btsnoop) if btsnoop else None
         diagnosis = classify(watched["bond"], watched["events"], signs, hci=hci)
         diagnosis["journal"] = "unavailable" if journal_problem else "read"
-        diagnosis["capture"] = "read" if btsnoop else (capture_problem or "needs the Keepsake Helper")
+        diagnosis["capture"] = "read" if btsnoop else (capture_problem or "needs the Haversack Helper")
         await asyncio.to_thread(self.rules.record, a, m, diagnosis)
         key = rule_key(a, m)
         self.captures[key] = {
@@ -275,7 +275,7 @@ class ReconnectService:
             "usb": capture.get("usb"),
             "diagnosis": capture.get("diagnosis"),
             "journalProblem": capture.get("journalProblem"),
-            "hciCapture": "hci.btsnoop" if capture.get("btsnoop") else "none (needs the Keepsake Helper)",
+            "hciCapture": "hci.btsnoop" if capture.get("btsnoop") else "none (needs the Haversack Helper)",
         }
         lines = redact(capture.get("journal", []), a if redact_adapter else None)
         if redact_adapter and isinstance(report["usb"], dict) and report["usb"].get("host") == a:
@@ -302,9 +302,9 @@ class ReconnectService:
         status = self.helper.status()
         if not status.get("ready"):
             raise ValueError(
-                "update the Keepsake Helper to match Keepsake"
+                "update the Haversack Helper to match Haversack"
                 if status.get("problem") == "version"
-                else "install the Keepsake Helper first"
+                else "install the Haversack Helper first"
             )
 
     def _cable_pair(self, a: str, m: str, order: str) -> dict[str, Any]:

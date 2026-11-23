@@ -5,7 +5,7 @@ import { installerStreamArtApply, installerStreamArtSearch, installerStreamTiles
 import { plainError } from "../format";
 
 // Artwork for streaming tiles (R18, ADR-0081): Steam lists a non-Steam game installed on another
-// device with no artwork. Pick it on SteamGridDB and Keepsake sets the tile's artwork through
+// device with no artwork. Pick it on SteamGridDB and Haversack sets the tile's artwork through
 // Steam, as for an installed game. Only after the user chooses the game.
 
 type Tile = { appid: number; name: string; devices: string[] };
@@ -25,7 +25,7 @@ export function StreamArtSection() {
     try {
       setPicking({ tile, results: await installerStreamArtSearch(tile.name) });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -34,10 +34,10 @@ export function StreamArtSection() {
     setBusy(true);
     try {
       const r = await installerStreamArtApply(tile.appid, gameId);
-      toaster.toast({ title: "Keepsake", body: `${r.queued} images going to ${tile.name}'s streaming tile.` });
+      toaster.toast({ title: "Haversack", body: `${r.queued} images going to ${tile.name}'s streaming tile.` });
       setPicking(null);
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -46,7 +46,7 @@ export function StreamArtSection() {
     <>
       <Field
         label="Artwork for streaming tiles"
-        description="Steam shows non-Steam games installed on your other devices with no artwork. Find each one on SteamGridDB (your SteamGridDB key, under Install) and Keepsake sets the tile's artwork through Steam."
+        description="Steam shows non-Steam games installed on your other devices with no artwork. Find each one on SteamGridDB (your SteamGridDB key, under Install) and Haversack sets the tile's artwork through Steam."
       />
       {tiles.map((tile) => (
         <Field

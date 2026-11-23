@@ -87,7 +87,7 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
     try {
       setPreview(await previewGame(gameKey));
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Preview failed: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Preview failed: ${plainError(err)}` });
     } finally {
       setBusy(false);
     }
@@ -99,17 +99,17 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
       .catch(() => undefined); // offline or not synced: simply not shown
     load()
       .then(runPreview)
-      .catch((err) => toaster.toast({ title: "Keepsake", body: plainError(err) }));
+      .catch((err) => toaster.toast({ title: "Haversack", body: plainError(err) }));
   }, [gameKey]);
 
   const change = async (changes: Partial<GameConfig>, done: string) => {
     try {
       setConfig(await updateGameConfig(gameKey, changes));
-      toaster.toast({ title: "Keepsake", body: done });
+      toaster.toast({ title: "Haversack", body: done });
       await load();
       await runPreview();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not saved: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Not saved: ${plainError(err)}` });
     }
   };
 
@@ -118,10 +118,10 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
     try {
       const picked = await openFilePicker(FOLDER, start, false, true);
       setConfig(await addCustomPath(gameKey, picked.realpath || picked.path));
-      toaster.toast({ title: "Keepsake", body: "Custom path added." });
+      toaster.toast({ title: "Haversack", body: "Custom path added." });
       await runPreview();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not added: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Not added: ${plainError(err)}` });
     }
   };
 
@@ -216,9 +216,9 @@ export function GameDetail({ gameKey, onBack }: { gameKey: string; onBack: () =>
           label="Steam Cloud"
           description={
             steamCloud === "cloud"
-              ? "This game uses Steam Cloud, which already keeps its saves in step. Keepsake is not needed for it."
+              ? "This game uses Steam Cloud, which already keeps its saves in step. Haversack is not needed for it."
               : steamCloud === "no-cloud"
-                ? "No Steam Cloud saves found for this game. Keepsake can sync it."
+                ? "No Steam Cloud saves found for this game. Haversack can sync it."
                 : "Not played yet, so Steam Cloud use is unknown."
           }
         />

@@ -218,7 +218,7 @@ class Connection:
     def __init__(self, address: str | None = None, timeout: float = 5.0) -> None:
         path = session_socket(address)
         if path is None:
-            raise DBusError("no session bus: Keepsake's tray needs a desktop session")
+            raise DBusError("no session bus: Haversack's tray needs a desktop session")
         if not hasattr(socket, "AF_UNIX"):
             raise DBusError("this system has no D-Bus socket support")
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)  # type: ignore[attr-defined, unused-ignore]

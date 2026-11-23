@@ -1,7 +1,7 @@
 """Build the plugin zip in the layout Decky Loader expects.
 
-    out/Keepsake-v<version>.zip
-      Keepsake/
+    out/Haversack-v<version>.zip
+      Haversack/
         dist/index.js
         main.py
         py_modules/keepsake/...
@@ -129,6 +129,10 @@ DESKTOP_FILES = (  # (source in the repository, path in the PC package)
 )
 
 
+# The folder inside the PC package keeps its first name: installed PCs check it before updating (ADR-0089).
+DESKTOP_FOLDER = "Keepsake-desktop"
+
+
 def desktop_name() -> str:
     return f"{plugin_name()}-desktop-v{version()}.zip"
 
@@ -152,10 +156,10 @@ def collect_desktop() -> list[tuple[str, str]]:
 
 
 def build_desktop(out_dir: str) -> str:
-    """Build ``Keepsake-desktop-v<version>.zip``, deterministic like the plugin zip."""
+    """Build ``Haversack-desktop-v<version>.zip``, deterministic like the plugin zip."""
     os.makedirs(out_dir, exist_ok=True)
     target = os.path.join(out_dir, desktop_name())
-    folder = f"{plugin_name()}-desktop"
+    folder = DESKTOP_FOLDER
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for src, rel in collect_desktop():
             info = zipfile.ZipInfo(f"{folder}/{rel}", date_time=FIXED_TIME)
@@ -171,9 +175,9 @@ def build_desktop(out_dir: str) -> str:
     return target
 
 
-# The root helper (ADR-0083): a separate plugin, version-locked to Keepsake, under the same signature.
+# The root helper (ADR-0083): a separate plugin, version-locked to Haversack, under the same signature.
 HELPER = os.path.join(ROOT, "helper")
-HELPER_FOLDER = "keepsake-helper"
+HELPER_FOLDER = "haversack-helper"
 
 
 def helper_name() -> str:
@@ -197,7 +201,7 @@ def collect_helper() -> list[tuple[str, str]]:
 
 
 def build_helper(out_dir: str) -> str:
-    """Build ``Keepsake-helper-v<version>.zip``, deterministic, with its version stamped in."""
+    """Build ``Haversack-helper-v<version>.zip``, deterministic, with its version stamped in."""
     os.makedirs(out_dir, exist_ok=True)
     target = os.path.join(out_dir, helper_name())
     with open(os.path.join(HELPER, "package.json"), encoding="utf-8") as handle:

@@ -55,7 +55,7 @@ CHECK_EVERY = 30.0
 CHECK_TIMEOUT = 1.0  # the plugin answers from memory: anything slower is "not reachable"
 SIGNAL_GAP = 2.0  # signals at most this often, so they can never flood the bus
 MENU_STATUS, MENU_OPEN, MENU_QUIT = 1, 2, 3
-NOT_REACHABLE = "Keepsake's plugin cannot be reached from Desktop Mode. Is Decky Loader running?"
+NOT_REACHABLE = "Haversack's plugin cannot be reached from Desktop Mode. Is Decky Loader running?"
 
 
 def instance_address() -> str:
@@ -105,7 +105,7 @@ def backend(
     if not isinstance(answer, dict) or not answer.get("ok"):
         return None, NOT_REACHABLE
     status = answer.get("result") if isinstance(answer.get("result"), dict) else {}
-    line = "Keepsake is running"
+    line = "Haversack is running"
     conflicts = int(status.get("conflicts") or 0) if isinstance(status, dict) else 0
     if conflicts:
         line += f": {conflicts} save {'conflict' if conflicts == 1 else 'conflicts'} to resolve"
@@ -121,7 +121,7 @@ def menu_layout(status: str, reachable: bool) -> tuple[Any, ...]:
     children = [
         item(MENU_STATUS, {"label": ("s", status), "enabled": ("b", False)}),
         item(10, {"type": ("s", "separator")}),
-        item(MENU_OPEN, {"label": ("s", "Open Keepsake"), "enabled": ("b", reachable)}),
+        item(MENU_OPEN, {"label": ("s", "Open Haversack"), "enabled": ("b", reachable)}),
         item(MENU_QUIT, {"label": ("s", "Quit")}),
     ]
     return (0, {"children-display": ("s", "submenu")}, children)
@@ -146,7 +146,7 @@ class Tray:
         )
         self.portal = portal or open_with_portal
         self.link: str | None = None
-        self.status = "Checking Keepsake's plugin..."
+        self.status = "Checking Haversack's plugin..."
         self.revision = 1
         self.running = True
         self.send_lock = threading.Lock()  # sending only: the D-Bus thread alone reads the socket
@@ -219,11 +219,11 @@ class Tray:
     def item_properties(self) -> dict[str, tuple[str, Any]]:
         with self.state_lock:
             status = self.status
-        tooltip: tuple[str, list[Any], str, str] = ("", [], "Keepsake", status)
+        tooltip: tuple[str, list[Any], str, str] = ("", [], "Haversack", status)
         return {
             "Category": ("s", "ApplicationStatus"),
             "Id": ("s", "keepsake"),
-            "Title": ("s", "Keepsake"),
+            "Title": ("s", "Haversack"),
             "Status": ("s", "Active"),
             "IconName": ("s", "keepsake-tray"),
             "IconThemePath": ("s", os.path.join(self.plugin_dir, "assets", "icons")),
@@ -366,7 +366,7 @@ def open_with_portal(link: str) -> bool:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="keepsake-tray")
     parser.add_argument("--runtime", required=True, help="the plugin's runtime folder (holds host.json)")
-    parser.add_argument("--open", action="store_true", help="open Keepsake's window as well")
+    parser.add_argument("--open", action="store_true", help="open Haversack's window as well")
     options = parser.parse_args(argv)
     if hand_over("open" if options.open else "ping"):
         return 0  # one is running: it opened the window if asked
@@ -380,7 +380,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         conn = dbus.Connection()
     except (dbus.DBusError, OSError) as exc:
-        print(f"Keepsake's tray needs a desktop session: {exc}", file=sys.stderr)
+        print(f"Haversack's tray needs a desktop session: {exc}", file=sys.stderr)
         return 1
     tray = Tray(options.runtime, plugin_dir, conn)
     try:

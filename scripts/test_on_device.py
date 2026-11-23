@@ -47,7 +47,7 @@ cd "$run"
 """
 
 
-ONEDRIVE_TOKEN = "$HOME/homebrew/settings/Keepsake/onedrive-token.json"  # noqa: S105 - a path, not a secret
+ONEDRIVE_TOKEN = "$HOME/homebrew/settings/Haversack/onedrive-token.json"  # noqa: S105 - a path, not a secret
 
 
 def git_ignored(root: str = ROOT) -> set[str]:
@@ -89,7 +89,7 @@ def remote_command(pytest_args: list[str], onedrive: bool = False) -> str:
     args = pytest_args or (["-m", "onedrive", "-s"] if onedrive else list(DEFAULT_ARGS))
     command = ["sh", "-c", shlex.quote(REMOTE_SCRIPT), "keepsake-test", *(shlex.quote(a) for a in args)]
     if onedrive:
-        # Uses the token Keepsake's own sign-in stored on the device; it never leaves the device.
+        # Uses the token Haversack's own sign-in stored on the device; it never leaves the device.
         command.insert(0, f'KEEPSAKE_ONEDRIVE_TOKEN_FILE="{ONEDRIVE_TOKEN}"')
     return " ".join(command)
 

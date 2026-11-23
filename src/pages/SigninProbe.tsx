@@ -4,7 +4,7 @@ import { recordProbeEvent, signinProbe } from "../backend";
 import { JsonBlock } from "./JsonBlock";
 
 // The Gaming Mode sign-in probe (ADR-0044): which providers allow sign-in in Steam's browser,
-// and whether that browser can reach Keepsake's loopback redirect. Outcomes go to the
+// and whether that browser can reach Haversack's loopback redirect. Outcomes go to the
 // diagnostics export, so the next change can set the Gaming Mode defaults from them.
 
 const PAGES = [
@@ -26,9 +26,9 @@ export function SigninProbe() {
     <div>
       <Field
         label="Sign-in browser test"
-        description="Checks which sign-ins work in Steam's browser on this device. Nothing is signed in to Keepsake. Run the three steps, then export diagnostics."
+        description="Checks which sign-ins work in Steam's browser on this device. Nothing is signed in to Haversack. Run the three steps, then export diagnostics."
       />
-      <Field label="1. Loopback" description="Opens a test page that Keepsake serves on this device. When it says you're signed in, come back and check." childrenLayout="below">
+      <Field label="1. Loopback" description="Opens a test page that Haversack serves on this device. When it says you're signed in, come back and check." childrenLayout="below">
         <Focusable style={{ display: "flex", gap: 8 }}>
           <DialogButton
             style={{ width: "auto" }}

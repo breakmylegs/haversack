@@ -5,7 +5,7 @@ import { qamShortcuts, QamShortcuts, setSetting, Shortcut } from "../backend";
 import { plainError } from "../format";
 
 // Settings, Quick menu (layout v3 addendum, ADR-0073): choose and order the shortcuts in
-// Keepsake's quick access menu panel. Up and Down move with the controller. Open Keepsake is
+// Haversack's quick access menu panel. Up and Down move with the controller. Open Haversack is
 // always there. Each change is saved at once and the panel follows straight away.
 
 const KIND_WORDS: Record<Shortcut["kind"], string> = { page: "Opens a page", action: "Runs here", status: "Status line" };
@@ -35,7 +35,7 @@ export function ShortcutsEditor() {
       await setSetting("qamShortcuts", [...next, ...hidden]);
       await load();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -50,7 +50,7 @@ export function ShortcutsEditor() {
     <>
       <Field
         label="Quick menu shortcuts"
-        description="Choose what Keepsake's panel in the quick access menu shows, in order. Open Keepsake is always there."
+        description="Choose what Haversack's panel in the quick access menu shows, in order. Open Haversack is always there."
       />
       {chosen.map((id, index) => {
         const s = offered.get(id) as Shortcut;

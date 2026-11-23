@@ -16,6 +16,7 @@ import {
   takeStartupNotice,
   UpdateStatus,
   replicationAnswer,
+  RenameStatus,
 } from "./backend";
 import { agoText, BACKEND_LABELS, HEALTH_COLOURS, HEALTH_LABELS, newerText, plainError, SYNC_LABELS } from "./format";
 import { startLifecycle } from "./lifecycle";
@@ -33,6 +34,8 @@ import { openWhatsNew } from "./pages/WhatsNewModal";
 import { KeepsakeRoute, LegacyRedirect } from "./pages/KeepsakeRoute";
 import { legacyRoutes } from "./sidebar";
 import { SetupWizard } from "./pages/SetupWizard";
+import { RenameCard } from "./pages/RenameCard";
+import { onRename, renameState, watchRename } from "./rename";
 import { openSection, ROUTE_PATH, SectionId, SETUP_PATH } from "./routes";
 
 function openRoute(path: string) {
@@ -43,6 +46,21 @@ function openRoute(path: string) {
 function storeText(s: QamSummary): string {
   if (s.store === "local") return "Test store on this device";
   return s.signedIn ? BACKEND_LABELS[s.store] : `${BACKEND_LABELS[s.store]}, not set up`;
+}
+
+// Until the backend has started (ADR-0089: held while the old Keepsake is installed), only the card shows.
+function Root() {
+  const [rename, setRename] = useState<RenameStatus | null>(renameState());
+  useEffect(() => onRename(setRename), []);
+  if (rename?.started) return <Content />;
+  if (rename) return <RenameCard status={rename} />;
+  return (
+    <PanelSection title="Haversack">
+      <PanelSectionRow>
+        <div style={{ fontSize: 12 }}>Starting</div>
+      </PanelSectionRow>
+    </PanelSection>
+  );
 }
 
 function Content() {
@@ -92,10 +110,10 @@ function Content() {
       const result = await syncNow();
       const body = result.ok
         ? `Checked ${result.games ?? 0} games.`
-        : "Keepsake is busy with another job. Try again in a moment.";
-      toaster.toast({ title: "Keepsake", body });
+        : "Haversack is busy with another job. Try again in a moment.";
+      toaster.toast({ title: "Haversack", body });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Sync failed: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Sync failed: ${plainError(err)}` });
     } finally {
       setSyncing(false);
       void refresh();
@@ -105,7 +123,7 @@ function Content() {
   // Layout v3 (ADR-0073): one screen. Now playing, moving games, at most three things that need
   // attention, then the status line and the two buttons. Nothing deeper.
   const attention: { key: string; text: string; open: () => void }[] = [];
-  if (summary && !summary.setupComplete) attention.push({ key: "setup", text: "Set up Keepsake", open: () => openRoute(SETUP_PATH) });
+  if (summary && !summary.setupComplete) attention.push({ key: "setup", text: "Set up Haversack", open: () => openRoute(SETUP_PATH) });
   if (safeMode) attention.push({ key: "safe", text: "Safe mode: settings come from a newer version. Please update.", open: () => openSection("settings", "updates") });
   for (const problem of summary?.problems ?? []) attention.push({ key: `p-${problem}`, text: `Check: ${problem}`, open: () => openSection("diagnostics", "health") });
   for (const n of summary?.newer ?? []) attention.push({ key: `n-${n.key}`, text: `${n.name}: ${newerText(n)}`, open: () => openSection("saves", "games") });
@@ -113,16 +131,16 @@ function Content() {
     attention.push({ key: "update", text: `Update available: v${update.latest.version}`, open: () => openSection("settings", "updates") });
   }
 
-  // The chosen shortcuts, in the user's order (layout v3 addendum, ADR-0073); Open Keepsake is always last.
+  // The chosen shortcuts, in the user's order (layout v3 addendum, ADR-0073); Open Haversack is always last.
   const runAction = async (s: Shortcut) => {
     if (s.id === "sync-now") return runSync();
     setRunning(s.id);
     try {
       const r = await runShortcut(s.id);
-      toaster.toast({ title: "Keepsake", body: r.message });
+      toaster.toast({ title: "Haversack", body: r.message });
       if (r.open) openSection(r.open[0] as SectionId, r.open[1]);
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setRunning(null);
       void refresh();
@@ -192,7 +210,7 @@ function Content() {
           <AdvisorQam onOpen={() => openSection("play", "advisor")} />
         </PanelSection>
       )}
-      <PanelSection title="Keepsake">
+      <PanelSection title="Haversack">
         <BatteryPanel compact />
         {attention.slice(0, 3).map((a) => (
           <PanelSectionRow key={a.key}>
@@ -218,7 +236,7 @@ function Content() {
         {(shortcuts?.shown ?? []).map((s) => shortcutItem(s))}
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={() => openSection(summary?.currentGame ? "play" : "saves")}>
-            Open Keepsake
+            Open Haversack
           </ButtonItem>
         </PanelSectionRow>
       </PanelSection>
@@ -230,10 +248,10 @@ async function announce() {
   try {
     const notice = await takeStartupNotice();
     if (notice?.notes) openWhatsNew(notice.to, notice.notes);
-    else if (notice) toaster.toast({ title: "Keepsake", body: `Updated to v${notice.to}` });
+    else if (notice) toaster.toast({ title: "Haversack", body: `Updated to v${notice.to}` });
     const update = await checkForUpdates(false);
     if (update.notify && update.latest) {
-      toaster.toast({ title: "Keepsake", body: `Update available: v${update.latest.version}` });
+      toaster.toast({ title: "Haversack", body: `Update available: v${update.latest.version}` });
     }
   } catch {
     // Backend not ready yet; the panel shows the state when opened.
@@ -249,19 +267,21 @@ export default definePlugin(() => {
   }
   routerHook.addRoute(ROUTE_PATH, KeepsakeRoute);
   routerHook.addRoute(SETUP_PATH, SetupWizard);
-  const stopProbes = startProbes();
-  const stopLifecycle = startLifecycle();
-  const stopSteamOps = startSteamOps();
-  const stopRemoteCopies = startRemoteCopies();
-  const stopLibraryBadges = startLibraryBadges();
+  // The background services start once the backend has started, never while it is held (ADR-0089).
+  let stops: (() => void)[] | null = null;
+  const stopWatch = watchRename(() => {
+    if (stops) return;
+    stops = [startProbes(), startLifecycle(), startSteamOps(), startRemoteCopies(), startLibraryBadges()];
+    void announce();
+  });
   // Messages from the backend, such as "Recovered missed exit backup for <game>".
   const toastListener = addEventListener<[string]>("keepsake_toast", (body) =>
-    toaster.toast({ title: "Keepsake", body }),
+    toaster.toast({ title: "Haversack", body }),
   );
   // A device asks to pair (ADR-0070): Accept or Decline here, or, while a game runs, only a notification.
   const pairListener = addEventListener<[{ id: string; name: string; address: string }]>("keepsake_pair_request", (request) => {
     if (SteamUIStore?.MainRunningAppID) {
-      toaster.toast({ title: "Keepsake", body: `${request.name} wants to pair. Answer it in Keepsake, Devices, after your game.` });
+      toaster.toast({ title: "Haversack", body: `${request.name} wants to pair. Answer it in Haversack, Devices, after your game.` });
       return;
     }
     showModal(
@@ -275,19 +295,14 @@ export default definePlugin(() => {
       />,
     );
   });
-  void announce();
-
   return {
-    name: "Keepsake",
-    titleView: <div className={staticClasses.Title}>Keepsake</div>,
-    content: <Content />,
+    name: "Haversack",
+    titleView: <div className={staticClasses.Title}>Haversack</div>,
+    content: <Root />,
     icon: <FaSave />,
     onDismount() {
-      stopProbes();
-      stopLifecycle();
-      stopSteamOps();
-      stopRemoteCopies();
-      stopLibraryBadges();
+      stopWatch();
+      for (const stop of stops ?? []) stop();
       removeEventListener("keepsake_toast", toastListener);
       removeEventListener("keepsake_pair_request", pairListener);
       for (const old of legacy) routerHook.removeRoute(old.path);

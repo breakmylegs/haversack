@@ -44,7 +44,7 @@ export function SetupWizard() {
         setSettings(s);
         setName(s.deviceName);
       })
-      .catch((err) => toaster.toast({ title: "Keepsake", body: `Could not load settings: ${plainError(err)}` }));
+      .catch((err) => toaster.toast({ title: "Haversack", body: `Could not load settings: ${plainError(err)}` }));
   }, []);
 
   const work = async (task: () => Promise<void>) => {
@@ -52,7 +52,7 @@ export function SetupWizard() {
     try {
       await task();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -126,7 +126,7 @@ export function SetupWizard() {
           onClick={() =>
             void work(async () => {
               const result = await finishSetup(chosen);
-              toaster.toast({ title: "Keepsake", body: `Setup finished. Syncing ${result.enabled} games.` });
+              toaster.toast({ title: "Haversack", body: `Setup finished. Syncing ${result.enabled} games.` });
               leave();
             })
           }
@@ -154,7 +154,7 @@ export function SetupWizard() {
     <div
       style={{ marginTop: 40, padding: `0 24px ${FOOTER_CLEARANCE}px`, height: "calc(100% - 40px)", overflowY: "auto", boxSizing: "border-box" }}
     >
-      <Field label={`Set up Keepsake: step ${step + 1} of ${STEPS.length}, ${STEPS[step]}`} />
+      <Field label={`Set up Haversack: step ${step + 1} of ${STEPS.length}, ${STEPS[step]}`} />
       {nav}
 
       {step === 0 && (
@@ -167,7 +167,7 @@ export function SetupWizard() {
 
       {step === 1 && settings && (
         <>
-          <Field description="OneDrive is recommended: press Sign in, then on your phone scan the QR code or enter the code, and allow Keepsake access to Apps/Keepsake only. You can stay on the test store and sign in later, but saves then stay on this device." />
+          <Field description="OneDrive is recommended: press Sign in, then on your phone scan the QR code or enter the code, and allow access to Apps/Keepsake only (Microsoft shows the registered name, Keepsake). You can stay on the test store and sign in later, but saves then stay on this device." />
           <CloudSection settings={settings} onSettings={setSettings} />
         </>
       )}
@@ -255,7 +255,7 @@ export function SetupWizard() {
       {step === 6 && (
         <Field
           label={`Turn on sync for ${chosen.length} games`}
-          description="Keepsake then checks the cloud before each launch and saves after each exit. A first sync starts now."
+          description="Haversack then checks the cloud before each launch and saves after each exit. A first sync starts now."
         />
       )}
 

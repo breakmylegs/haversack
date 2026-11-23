@@ -11,16 +11,16 @@ export function askApproveMatch(gameKey: string, gameName: string, candidate: Ca
   showModal(
     <ConfirmModal
       strTitle="Use this match?"
-      strDescription={`${gameName} will sync as ${label}. If both devices have different saves, Keepsake asks you which to keep before anything is replaced.`}
+      strDescription={`${gameName} will sync as ${label}. If both devices have different saves, Haversack asks you which to keep before anything is replaced.`}
       strOKButtonText="Approve"
       strCancelButtonText="Not yet"
       onOK={() =>
         void approveMatch(gameKey)
           .then(() => {
-            toaster.toast({ title: "Keepsake", body: `${gameName} now syncs as ${label}.` });
+            toaster.toast({ title: "Haversack", body: `${gameName} now syncs as ${label}.` });
             onChanged();
           })
-          .catch((err) => toaster.toast({ title: "Keepsake", body: `Not changed: ${plainError(err)}` }))
+          .catch((err) => toaster.toast({ title: "Haversack", body: `Not changed: ${plainError(err)}` }))
       }
     />,
   );

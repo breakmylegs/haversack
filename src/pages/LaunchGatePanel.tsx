@@ -21,7 +21,7 @@ export function LaunchGatePanel({ gameKey, appid, mode, onMode }: { gameKey: str
     showModal(
       <ConfirmModal
         strTitle="Use the strict launch gate?"
-        strDescription="Keepsake will add its gate in front of this game's launch command and keep your existing launch options. Turning it off puts your original launch options back exactly."
+        strDescription="Haversack will add its gate in front of this game's launch command and keep your existing launch options. Turning it off puts your original launch options back exactly."
         strOKButtonText="Use strict gate"
         strCancelButtonText="Cancel"
         onOK={async () => {
@@ -29,9 +29,9 @@ export function LaunchGatePanel({ gameKey, appid, mode, onMode }: { gameKey: str
             const result = await strictWrap(gameKey, currentLaunchOptions(appid));
             SteamClient.Apps.SetAppLaunchOptions(result.appid, result.options);
             onMode("strict");
-            toaster.toast({ title: "Keepsake", body: "Strict launch gate on." });
+            toaster.toast({ title: "Haversack", body: "Strict launch gate on." });
           } catch (err) {
-            toaster.toast({ title: "Keepsake", body: `Not changed: ${plainError(err)}` });
+            toaster.toast({ title: "Haversack", body: `Not changed: ${plainError(err)}` });
           }
         }}
       />,
@@ -52,7 +52,7 @@ export function LaunchGatePanel({ gameKey, appid, mode, onMode }: { gameKey: str
       }
       onMode(next);
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not changed: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Not changed: ${plainError(err)}` });
     }
   };
 

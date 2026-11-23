@@ -145,7 +145,7 @@ def merge(text: str, fragment: str | None, managed: Iterable[str], now: float) -
     incoming = parse(fragment).sections if fragment else ()
     for section in incoming:
         if not _under(section.key, managed):
-            raise RegistryError(f"the fragment holds a key Keepsake does not manage: {section.raw_key}")
+            raise RegistryError(f"the fragment holds a key Haversack does not manage: {section.raw_key}")
     kept = [s for s in target.sections if not _under(s.key, managed)]
     lines = list(target.preamble)
     for section in kept:
@@ -182,7 +182,7 @@ def _read(path: str) -> str:
     try:
         return data.decode("utf-8")
     except UnicodeDecodeError as exc:
-        raise RegistryError("the registry file is not text Keepsake can read") from exc
+        raise RegistryError("the registry file is not text Haversack can read") from exc
 
 
 def read_text(path: str) -> str:
@@ -213,7 +213,7 @@ def apply_text(
         return {"status": "unchanged"}
     parse(new_text)
     if _read(reg_path) != original:
-        raise RegistryError("the registry file changed while Keepsake was merging; nothing was written")
+        raise RegistryError("the registry file changed while Haversack was merging; nothing was written")
     os.makedirs(backup_dir, exist_ok=True)
     backup = os.path.join(backup_dir, f"{stamp}-{os.path.basename(reg_path)}")
     _write_synced(backup, original)
@@ -257,7 +257,7 @@ def verify_merge(original: str, merged: str, fragment: str | None, managed: Iter
     if after.preamble[: len(before.preamble)] != before.preamble:
         raise RegistryError("the merge changed the registry file header")
     if _others(before, managed) != _others(after, managed):
-        raise RegistryError("the merge would change keys Keepsake does not manage")
+        raise RegistryError("the merge would change keys Haversack does not manage")
     wanted = [s.canonical() for s in parse(fragment).sections] if fragment else []
     if wanted != [s.canonical() for s in after.sections if _under(s.key, managed)]:
         raise RegistryError("the merged keys do not match the snapshot")

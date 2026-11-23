@@ -34,10 +34,10 @@ export function IdentityPanel({
   const apply = async (work: () => Promise<GameConfig>, done: string) => {
     try {
       await work();
-      toaster.toast({ title: "Keepsake", body: done });
+      toaster.toast({ title: "Haversack", body: done });
       onChanged();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not changed: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Not changed: ${plainError(err)}` });
     }
   };
 
@@ -50,7 +50,7 @@ export function IdentityPanel({
         />
       )}
       {suggestions.length > 0 && (
-        <Field label="Same game on another device?" description="Keepsake compared program files, install folders and save folders." />
+        <Field label="Same game on another device?" description="Haversack compared program files, install folders and save folders." />
       )}
       {suggestions.map((s) => (
         <Field key={s.gameKey} label={`${s.title ?? s.gameKey} (score ${s.score})`} description={evidence(s)} childrenLayout="below">

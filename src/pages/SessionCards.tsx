@@ -34,7 +34,7 @@ export function SessionCards({ sessions }: { sessions?: AdvisorSessions }) {
   if (!sessions) return null;
   const last = sessions.last;
   if (!last) {
-    return <Field label="Last session" description="Play this game for a few minutes and quit: Keepsake measures how it ran on this device." />;
+    return <Field label="Last session" description="Play this game for a few minutes and quit: Haversack measures how it ran on this device." />;
   }
   const details = [
     `CPU ${n(last.cpu?.busyAvg, "%") ?? "?"} at ${n(last.cpu?.mhzAvg, " MHz") ?? "?"}, GPU ${n(last.gpu?.busyAvg, "%") ?? "?"} at ${n(last.gpu?.mhzAvg, " MHz") ?? "?"}`,

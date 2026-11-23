@@ -1,4 +1,4 @@
-/* Keepsake desktop interface. Follows the system light or dark setting. */
+/* Haversack desktop interface. Follows the system light or dark setting. */
 :root {
   color-scheme: light dark;
   --bg: #f6f7f9;

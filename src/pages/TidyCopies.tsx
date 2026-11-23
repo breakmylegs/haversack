@@ -23,11 +23,11 @@ function TidyModal({ status, closeModal, onDone }: { status: RemoteCopiesStatus;
     setBusy(true);
     try {
       const r = await tidyCopies([...ticked]);
-      toaster.toast({ title: "Keepsake", body: `Hiding ${r.queued} games in Steam. Undo tidy-up shows them again.` });
+      toaster.toast({ title: "Haversack", body: `Hiding ${r.queued} games in Steam. Undo tidy-up shows them again.` });
       onDone();
       closeModal?.();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -36,7 +36,7 @@ function TidyModal({ status, closeModal, onDone }: { status: RemoteCopiesStatus;
     <ModalRoot onCancel={closeModal} closeModal={closeModal}>
       <Field
         label="Tidy up games you can stream from another device"
-        description="Steam Remote Play lists the games on your other devices here, with Stream instead of Play. Hiding them puts them in Steam's Hidden collection; nothing is deleted. Steam may share hidden games across your devices: if a game on another device is hidden by this, Keepsake there offers to show it again."
+        description="Steam Remote Play lists the games on your other devices here, with Stream instead of Play. Hiding them puts them in Steam's Hidden collection; nothing is deleted. Steam may share hidden games across your devices: if a game on another device is hidden by this, Haversack there offers to show it again."
       />
       {certain.length === 0 && <Field label="Nothing to hide" />}
       {certain.map((c) => (
@@ -104,7 +104,7 @@ export function TidyCopies({ onChange }: { onChange?: () => void }) {
             style={{ width: "auto" }}
             onClick={() =>
               void unhideLocal(g.appid)
-                .then(() => toaster.toast({ title: "Keepsake", body: `${g.name} shows again in your library.` }))
+                .then(() => toaster.toast({ title: "Haversack", body: `${g.name} shows again in your library.` }))
                 .then(done)
             }
           >
@@ -117,7 +117,7 @@ export function TidyCopies({ onChange }: { onChange?: () => void }) {
         description={
           status.reportAt === null
             ? "Steam has not reported its library yet."
-            : `${certain.length} games in your library are installed on another device and offer Stream (Steam Remote Play)${hidden ? `, ${hidden} hidden by a tidy-up` : ""}. Keepsake never treats them as games on this device. To see only what is installed here, use Steam's Installed tab, or switch off Remote Play in Steam's settings.`
+            : `${certain.length} games in your library are installed on another device and offer Stream (Steam Remote Play)${hidden ? `, ${hidden} hidden by a tidy-up` : ""}. Haversack never treats them as games on this device. To see only what is installed here, use Steam's Installed tab, or switch off Remote Play in Steam's settings.`
         }
         childrenLayout="inline"
       >
@@ -136,7 +136,7 @@ export function TidyCopies({ onChange }: { onChange?: () => void }) {
               style={{ width: "auto" }}
               onClick={() =>
                 void undoTidy()
-                  .then((r) => toaster.toast({ title: "Keepsake", body: `Showing ${r.queued} games again.` }))
+                  .then((r) => toaster.toast({ title: "Haversack", body: `Showing ${r.queued} games again.` }))
                   .then(done)
               }
             >
@@ -147,7 +147,7 @@ export function TidyCopies({ onChange }: { onChange?: () => void }) {
       </Field>
       <ToggleField
         label="Show games you can stream from another device"
-        description="Lists them here. Keepsake leaves them out of the Games list, save sync, Send to, Replication and Advisor."
+        description="Lists them here. Haversack leaves them out of the Games list, save sync, Send to, Replication and Advisor."
         checked={show}
         onChange={setShow}
       />

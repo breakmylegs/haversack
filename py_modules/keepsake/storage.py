@@ -167,7 +167,7 @@ def delete_old_prefix(old: str, prefix: str) -> int:
     """Delete a prefix a reset moved aside. Only ever a folder named after the game's own prefix."""
     expected = os.path.normpath(prefix) + RESET_SUFFIX
     if not os.path.normpath(old).startswith(expected) or not os.path.isdir(old):
-        raise StorageError("that is not a prefix Keepsake moved aside")
+        raise StorageError("that is not a prefix Haversack moved aside")
     freed = folder_size(old)["bytes"]
     shutil.rmtree(old)
     return int(freed)

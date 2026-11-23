@@ -32,7 +32,7 @@ class HelperMissing(HelperError):
 
 class HelperVersion(HelperError):
     def __init__(self, helper: str) -> None:
-        super().__init__(f"the helper is version {helper}; update it to match Keepsake")
+        super().__init__(f"the helper is version {helper}; update it to match Haversack")
         self.helper = helper
 
 
@@ -68,14 +68,14 @@ class HelperClient:
             with open(os.path.join(self.run_dir, "token"), encoding="ascii") as handle:
                 return handle.read(128).strip()
         except OSError as exc:
-            raise HelperMissing("the Keepsake Helper is not running") from exc
+            raise HelperMissing("the Haversack Helper is not running") from exc
 
     def call(self, job: str, timeout: float = TIMEOUT, **args: Any) -> dict[str, Any]:
         request = json.dumps({"token": self._token(), "version": self.version, "job": job, "args": args}).encode()
         try:
             sock = self.connect(os.path.join(self.run_dir, "helper.sock"), timeout)
         except OSError as exc:
-            raise HelperMissing("the Keepsake Helper is not running") from exc
+            raise HelperMissing("the Haversack Helper is not running") from exc
         try:
             sock.sendall(struct.pack(">I", len(request)) + request)
             head = self._exact(sock, 4)

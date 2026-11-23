@@ -101,7 +101,7 @@ def test_uninstall_removes_the_program_and_start_up_but_never_settings(tmp_path)
 
 
 def test_bad_packages_and_decky_are_refused(tmp_path):
-    with pytest.raises(pcinstall.InstallError, match="not a Keepsake package"):
+    with pytest.raises(pcinstall.InstallError, match="not a Haversack package"):
         pcinstall.install(str(tmp_path), "windows", {"LOCALAPPDATA": str(tmp_path / "L")}, registry=FakeRegistry())
     bad = tmp_path / "bad"
     bad.mkdir()

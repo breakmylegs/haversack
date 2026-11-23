@@ -98,7 +98,7 @@ class ProfileStore:
         games = self._load()
         if profile:
             if str(int(appid)) not in games and len(games) >= MAX_GAMES:
-                raise ProfileError(f"Keepsake keeps up to {MAX_GAMES} game profiles; forget one first")
+                raise ProfileError(f"Haversack keeps up to {MAX_GAMES} game profiles; forget one first")
             games[str(int(appid))] = clean_profile(profile)
         else:
             games.pop(str(int(appid)), None)
@@ -191,7 +191,7 @@ class Performance:
         """
         tools = self.tools()
         if tools:
-            raise ProfileError(f"{', '.join(tools)} manages performance on this device; Keepsake only shows it")
+            raise ProfileError(f"{', '.join(tools)} manages performance on this device; Haversack only shows it")
         profile = clean_profile(profile)
         current = self.manager.read()
         mode = profile.get("mode")
@@ -252,7 +252,7 @@ class Performance:
         changed = [k for k, v in self.applied.items() if now.get(k) != v]
         if changed:
             self.stopped = (
-                "another app (probably Steam's own performance settings) changed it; Keepsake leaves it alone"
+                "another app (probably Steam's own performance settings) changed it; Haversack leaves it alone"
             )
             self.applied = {k: v for k, v in self.applied.items() if k not in changed}
             self.before = {k: v for k, v in self.before.items() if k not in changed}

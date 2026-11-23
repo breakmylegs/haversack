@@ -23,11 +23,11 @@ export function ExportSection() {
     try {
       const result = await exportSnapshots(folder, scope);
       toaster.toast({
-        title: "Keepsake",
+        title: "Haversack",
         body: `Exported ${result.snapshots} snapshots of ${result.games} games to ${result.folder}.`,
       });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not exported: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Not exported: ${plainError(err)}` });
     } finally {
       setBusy(false);
     }

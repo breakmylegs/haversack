@@ -108,8 +108,8 @@ function stopModal(t: GameTransfer, after: () => void) {
       strCancelButtonText="Cancel"
       onOK={() =>
         void replicationStopGame(t.id)
-          .then(() => toaster.toast({ title: "Keepsake", body: `${t.title} stopped and removed.` }))
-          .catch((err) => toaster.toast({ title: "Keepsake", body: plainError(err) }))
+          .then(() => toaster.toast({ title: "Haversack", body: `${t.title} stopped and removed.` }))
+          .catch((err) => toaster.toast({ title: "Haversack", body: plainError(err) }))
           .finally(after)
       }
     />,
@@ -142,7 +142,7 @@ export function GameTransfersSection() {
                 style={{ width: "auto" }}
                 onClick={() =>
                   void replicationClearGame(t.id)
-                    .catch((err) => toaster.toast({ title: "Keepsake", body: plainError(err) }))
+                    .catch((err) => toaster.toast({ title: "Haversack", body: plainError(err) }))
                     .finally(() => void refresh())
                 }
               >
@@ -188,7 +188,7 @@ export function PeerGames({ peerId, peerName }: { peerId: string; peerName: stri
     try {
       setGames(await replicationPeerGames(peerId));
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -197,13 +197,13 @@ export function PeerGames({ peerId, peerName }: { peerId: string; peerName: stri
     showModal(
       <ConfirmModal
         strTitle={`Get ${game.title} from ${peerName}?`}
-        strDescription="Keepsake checks there is space here, then copies the game, its prefix and, if this device lacks it, its compatibility tool, and adds it to Steam with its artwork and launch options. Nothing here is replaced."
+        strDescription="Haversack checks there is space here, then copies the game, its prefix and, if this device lacks it, its compatibility tool, and adds it to Steam with its artwork and launch options. Nothing here is replaced."
         strOKButtonText="Get this game"
         strCancelButtonText="Cancel"
         onOK={() =>
           void replicationGetGame(peerId, game.id, game.title)
-            .then(() => toaster.toast({ title: "Keepsake", body: `${game.title} is coming from ${peerName}.` }))
-            .catch((err) => toaster.toast({ title: "Keepsake", body: plainError(err) }))
+            .then(() => toaster.toast({ title: "Haversack", body: `${game.title} is coming from ${peerName}.` }))
+            .catch((err) => toaster.toast({ title: "Haversack", body: plainError(err) }))
         }
       />,
     );

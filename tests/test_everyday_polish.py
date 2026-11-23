@@ -282,6 +282,6 @@ def test_both_packages_ship_the_changelog(tmp_path, monkeypatch):
     make_repo(repo)
     monkeypatch.setattr(package, "ROOT", str(repo))
     with zipfile.ZipFile(package.build(str(tmp_path / "out"))) as archive:
-        assert "Keepsake/CHANGELOG.md" in archive.namelist()
+        assert "Haversack/CHANGELOG.md" in archive.namelist()
     with zipfile.ZipFile(package.build_desktop(str(tmp_path / "out2"))) as archive:
         assert "Keepsake-desktop/CHANGELOG.md" in archive.namelist()

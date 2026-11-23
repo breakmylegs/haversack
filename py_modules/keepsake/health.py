@@ -155,9 +155,9 @@ def run(facts: Mapping[str, Any]) -> list[dict[str, Any]]:
     checks.append(
         _check(
             "played-without",
-            "Played without Keepsake running",
+            "Played without Haversack running",
             WARN if unseen else OK,
-            "Steam recorded a play Keepsake did not see. The idle pass saves the result." if unseen else "None.",
+            "Steam recorded a play Haversack did not see. The idle pass saves the result." if unseen else "None.",
             unseen,
         )
     )
@@ -172,7 +172,7 @@ def _integrity(scrub: Mapping[str, Any], now: float) -> dict[str, Any]:
     """The cloud integrity check (ADR-0050): snapshots whose files are damaged or missing."""
     last = float(scrub.get("lastRun") or 0)
     if not last:
-        return _check("integrity", "Cloud integrity", INFO, "Not checked yet. Keepsake checks once a week.")
+        return _check("integrity", "Cloud integrity", INFO, "Not checked yet. Haversack checks once a week.")
     damaged = [
         f"{game.get('name', key)}: {len(game.get('bad', [])) + len(game.get('missing', []))} snapshots"
         for key, game in sorted((scrub.get("games") or {}).items())
@@ -201,7 +201,7 @@ def _python_modules(modules: Mapping[str, Any], store: str) -> dict[str, Any]:
     if modules.get("sqlite3") is False:
         missing.append("sqlite3 (needed for the Installer and the module state)")
     if not missing:
-        return _check("python-modules", label, OK, "Everything Keepsake uses is present.")
+        return _check("python-modules", label, OK, "Everything Haversack uses is present.")
     if store in ("webdav", "s3") and modules.get("xml") is False:
         return _check(
             "python-modules",
@@ -243,10 +243,10 @@ def _ludusavi(found: Mapping[str, Any], syncing: bool) -> dict[str, Any]:
             "ludusavi",
             label,
             WARN,
-            "decky-ludusavi is installed and active. Turn off its automatic sync for games Keepsake syncs, "
+            "decky-ludusavi is installed and active. Turn off its automatic sync for games Haversack syncs, "
             "or the two will overwrite each other's work.",
         )
-    return _check("ludusavi", label, INFO, "Installed. No games are synced by Keepsake yet.")
+    return _check("ludusavi", label, INFO, "Installed. No games are synced by Haversack yet.")
 
 
 def detect_decky_plugin(decky_home: str | None, needle: str) -> dict[str, Any]:

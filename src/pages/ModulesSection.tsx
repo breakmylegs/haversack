@@ -19,9 +19,9 @@ export function ModulesSection({ locked }: { locked: boolean }) {
     setBusy(true);
     try {
       setStatus(await work());
-      toaster.toast({ title: "Keepsake", body: done });
+      toaster.toast({ title: "Haversack", body: done });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not changed: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Not changed: ${plainError(err)}` });
     } finally {
       setBusy(false);
     }
@@ -29,7 +29,7 @@ export function ModulesSection({ locked }: { locked: boolean }) {
 
   return (
     <div>
-      <Field label="Modules" description="Keepsake is made of modules. Each says what it writes, and a module that is off runs nothing." />
+      <Field label="Modules" description="Haversack is made of modules. Each says what it writes, and a module that is off runs nothing." />
       {(status?.modules ?? []).map((m) => {
         const worst = m.health.some((c) => c.status === "fail") ? "fail" : m.health.some((c) => c.status === "warn") ? "warn" : "ok";
         const state = !m.available
@@ -64,7 +64,7 @@ export function ModulesSection({ locked }: { locked: boolean }) {
         <Field label="State database unavailable" description="Modules that need it stay off. Saves is not affected." />
       )}
       {status && status.steamOpsPending > 0 && (
-        <Field label={`${status.steamOpsPending} Steam changes waiting`} description="They are applied while Keepsake runs in Gaming Mode." />
+        <Field label={`${status.steamOpsPending} Steam changes waiting`} description="They are applied while Haversack runs in Gaming Mode." />
       )}
     </div>
   );

@@ -13,7 +13,7 @@ import {
 import { plainError } from "../format";
 import { handOff, handOffAvailable, reasonText } from "../update";
 
-// Reconnect help's root jobs (R23, ADR-0083), through the separate Keepsake Helper plugin.
+// Reconnect help's root jobs (R23, ADR-0083), through the separate Haversack Helper plugin.
 // Every step that restarts Bluetooth or lowers its security asks twice.
 
 const toast = (body: string): void => {
@@ -37,15 +37,15 @@ export function HelperCard({ s, reload }: { s: ReconnectStatus; reload: () => vo
       reload();
     }
   };
-  if (h?.ready) return <Field label="Keepsake Helper" description={`Ready (version ${h.version}). It runs as root and does only the jobs below.`} />;
+  if (h?.ready) return <Field label="Haversack Helper" description={`Ready (version ${h.version}). It runs as root and does only the jobs below.`} />;
   const update = h?.problem === "version";
   return (
     <Field
-      label="Keepsake Helper"
+      label="Haversack Helper"
       description={
         update
-          ? `The helper is version ${h?.helper}; it must match Keepsake. Update it.`
-          : "Cable pairing, the SSP gate and the Bluetooth capture need root. They run in a small separate plugin, signed with Keepsake's release key and locked to this version, so Keepsake itself never runs as root. Decky asks you to confirm the install."
+          ? `The helper is version ${h?.helper}; it must match Haversack. Update it.`
+          : "Cable pairing, the SSP gate and the Bluetooth capture need root. They run in a small separate plugin, signed with Haversack's release key and locked to this version, so Haversack itself never runs as root. Decky asks you to confirm the install."
       }
     >
       <DialogButton disabled={busy} onClick={() => void install()}>
@@ -176,7 +176,7 @@ export function SspGateCard({ s, reload }: { s: ReconnectStatus; reload: () => v
       {step === 1 && (
         <Field
           label="Read this first"
-          description="The SSP gate lowers Bluetooth security for the whole adapter, for every device, not just this controller. While it is on, new pairings use the older PIN method and Bluetooth's Secure Connections protection is lost. SSP goes back on while pairing, when you switch the gate off, and if Keepsake stops."
+          description="The SSP gate lowers Bluetooth security for the whole adapter, for every device, not just this controller. While it is on, new pairings use the older PIN method and Bluetooth's Secure Connections protection is lost. SSP goes back on while pairing, when you switch the gate off, and if Haversack stops."
         >
           <DialogButton onClick={() => setStep(2)}>Continue</DialogButton>
         </Field>

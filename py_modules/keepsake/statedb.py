@@ -63,7 +63,7 @@ class StateDB:
         with self._lock:
             current = self.version(module)
             if current > len(steps):
-                raise StateError(f"{module} state was written by a newer Keepsake (version {current})")
+                raise StateError(f"{module} state was written by a newer Haversack (version {current})")
             for number in range(current + 1, len(steps) + 1):
                 self._conn.execute("BEGIN")
                 try:

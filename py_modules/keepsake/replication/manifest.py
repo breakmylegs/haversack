@@ -127,7 +127,7 @@ def root_hash(manifest: dict[str, Any]) -> str:
 def validate(manifest: Any, expected_root: str, windows: bool = False) -> dict[str, Any]:
     """A received manifest, checked against the root hash the user agreed to receive."""
     if not isinstance(manifest, dict) or manifest.get("version") != VERSION or manifest.get("chunk") != CHUNK:
-        raise ManifestError("the manifest is not one this Keepsake understands; update both devices")
+        raise ManifestError("the manifest is not one this Haversack understands; update both devices")
     entries = manifest.get("entries")
     if not isinstance(entries, list) or len(entries) > MAX_ENTRIES:
         raise ManifestError("the manifest is not valid")

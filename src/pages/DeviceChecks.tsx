@@ -29,7 +29,7 @@ export function DeviceChecks() {
       const outcome = await deviceCheckRun(id);
       setResults((prev) => ({ ...prev, [id]: outcome }));
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(null);
     }
@@ -41,7 +41,7 @@ export function DeviceChecks() {
       const s = await deviceChecksRunAll();
       setResults(Object.fromEntries(s.results.map((r) => [r.id, r])));
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(null);
     }
@@ -51,7 +51,7 @@ export function DeviceChecks() {
     try {
       setExported(await deviceChecksExport());
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     }
   };
 

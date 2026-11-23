@@ -25,7 +25,7 @@ export function SendPanel({ gameKey, gameName }: { gameKey: string; gameName: st
       <ConfirmModal
         strTitle={`Send ${gameName} to ${peer.name}?`}
         strDescription={
-          "Keepsake checks that device has space, then copies the game, its Proton prefix, its compatibility tool " +
+          "Haversack checks that device has space, then copies the game, its Proton prefix, its compatibility tool " +
           "and its artwork there, and adds it to Steam. It starts by itself; either device can stop and remove it. " +
           "If Saves syncs this game, the newest saves go first."
         }
@@ -38,9 +38,9 @@ export function SendPanel({ gameKey, gameName }: { gameKey: string; gameName: st
             const dropped = result.droppedOptions.length
               ? ` These launch options stay on this device: ${result.droppedOptions.join(" ")}.`
               : "";
-            toaster.toast({ title: "Keepsake", body: `Preparing ${result.title} for ${peer.name}.${dropped}` });
+            toaster.toast({ title: "Haversack", body: `Preparing ${result.title} for ${peer.name}.${dropped}` });
           } catch (err) {
-            toaster.toast({ title: "Keepsake", body: plainError(err) });
+            toaster.toast({ title: "Haversack", body: plainError(err) });
           } finally {
             setBusy(false);
           }

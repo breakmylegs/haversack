@@ -28,7 +28,7 @@ function summary(results: ImportResult[]): string {
   const parts = [
     `${count("published")} imported`,
     count("already-imported") ? `${count("already-imported")} already imported` : "",
-    count("nothing-to-import") ? `${count("nothing-to-import")} with no save files Keepsake knows` : "",
+    count("nothing-to-import") ? `${count("nothing-to-import")} with no save files Haversack knows` : "",
     count("error") ? `${count("error")} failed` : "",
   ].filter(Boolean);
   return parts.join(", ");
@@ -50,7 +50,7 @@ export function ImportPage() {
     const listener = addEventListener<[ImportAllStatus]>(IMPORT_EVENT, (status) => {
       apply(status);
       if (!status.running && status.total) {
-        toaster.toast({ title: "Keepsake", body: `${status.cancelled ? "Import stopped" : "Import finished"}: ${batchSummary(status)}.` });
+        toaster.toast({ title: "Haversack", body: `${status.cancelled ? "Import stopped" : "Import finished"}: ${batchSummary(status)}.` });
       }
     });
     ludusaviImportStatus()
@@ -73,7 +73,7 @@ export function ImportPage() {
         onOK={() =>
           void ludusaviImportAll(root, mode)
             .then(setBatch)
-            .catch((err) => toaster.toast({ title: "Keepsake", body: `Import not started: ${plainError(err)}` }))
+            .catch((err) => toaster.toast({ title: "Haversack", body: `Import not started: ${plainError(err)}` }))
         }
       />,
     );
@@ -85,7 +85,7 @@ export function ImportPage() {
       setRoot(found.root);
       setGames(found.games);
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Could not read the folder: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Could not read the folder: ${plainError(err)}` });
     } finally {
       setBusy(false);
     }
@@ -96,7 +96,7 @@ export function ImportPage() {
       const picked = await openFilePicker(FOLDER, root.startsWith("/") ? root : "/home", false, true);
       await scan(picked.realpath || picked.path);
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `No folder chosen: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `No folder chosen: ${plainError(err)}` });
     }
   };
 
@@ -114,7 +114,7 @@ export function ImportPage() {
             setResults((r) => ({ ...r, [game.folder]: outcome.results }));
             toaster.toast({ title: game.name, body: summary(outcome.results) });
           } catch (err) {
-            toaster.toast({ title: "Keepsake", body: `Import failed: ${plainError(err)}` });
+            toaster.toast({ title: "Haversack", body: `Import failed: ${plainError(err)}` });
           } finally {
             setBusy(false);
           }

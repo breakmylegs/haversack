@@ -1,18 +1,37 @@
 # Thin Decky entry point. All logic lives in py_modules/keepsake.
+import asyncio
 from typing import Any
 
 import decky
 
 from keepsake.app import KeepsakeApp
 from keepsake.paths import PluginPaths
+from keepsake.rename import Gate
 
 
 class Plugin:
     app: KeepsakeApp
 
     async def _main(self) -> None:
+        self.gate = Gate(PluginPaths.from_env().settings_dir)
+        await self._start()
+
+    async def _start(self) -> None:
+        # Haversack starts nothing while the old Keepsake is installed, and copies its data first (ADR-0089).
+        if hasattr(self, "app") or not await asyncio.to_thread(self.gate.ready):
+            if self.gate.error:
+                decky.logger.error("Moving Keepsake's data failed: %s", self.gate.error)
+            return
         self.app = KeepsakeApp(PluginPaths.from_env(), emit=decky.emit)
         await self.app.start()
+
+    async def rename_status(self) -> dict[str, Any]:
+        return self.gate.status(hasattr(self, "app"))
+
+    async def rename_finish(self) -> dict[str, Any]:
+        """After the user removed the old plugin: copy its data and start."""
+        await self._start()
+        return self.gate.status(hasattr(self, "app"))
 
     async def _unload(self) -> None:
         if hasattr(self, "app"):

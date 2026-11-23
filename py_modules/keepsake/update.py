@@ -22,7 +22,8 @@ from .fsutil import atomic_write_json, read_json
 from .net import Fetcher, NetError, check_url
 
 REPO = "breakmylegs/keepsake"
-PLUGIN_NAME = "Keepsake"
+# Haversack from v0.51.0 (ADR-0089). Releases before it carry only Keepsake zips, so they are never offered.
+PLUGIN_NAME = "Haversack"
 RELEASES_URL = f"https://api.github.com/repos/{REPO}/releases?per_page=30"
 STATE_FILE = "update-state.json"
 CHECK_INTERVAL = 24 * 60 * 60
@@ -122,7 +123,7 @@ def desktop_zip_name(version: str) -> str:
     return f"{PLUGIN_NAME}-desktop-v{version}.zip"
 
 
-HELPER_NAME = "Keepsake Helper"
+HELPER_NAME = "Haversack Helper"
 
 
 def helper_zip_name(version: str) -> str:

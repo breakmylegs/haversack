@@ -22,7 +22,7 @@ export function SettingsPage({ part = "general" }: { part?: SettingsPart }) {
         setSettings(s);
         setName(s.deviceName);
       })
-      .catch((err) => toaster.toast({ title: "Keepsake", body: `Could not load settings: ${plainError(err)}` }));
+      .catch((err) => toaster.toast({ title: "Haversack", body: `Could not load settings: ${plainError(err)}` }));
   }, []);
 
   const save = async (key: string, value: unknown, done: string) => {
@@ -30,9 +30,9 @@ export function SettingsPage({ part = "general" }: { part?: SettingsPart }) {
       const updated = await setSetting(key, value);
       setSettings(updated);
       setName(updated.deviceName);
-      toaster.toast({ title: "Keepsake", body: done });
+      toaster.toast({ title: "Haversack", body: done });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Could not save: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Could not save: ${plainError(err)}` });
     }
   };
 
@@ -40,7 +40,7 @@ export function SettingsPage({ part = "general" }: { part?: SettingsPart }) {
   const safeMode = settings?.readOnly && (
     <Field
       label="Read-only safe mode"
-      description="These settings were written by a newer Keepsake. Nothing can be changed until you update to that version or later."
+      description="These settings were written by a newer Haversack. Nothing can be changed until you update to that version or later."
     />
   );
 
@@ -130,7 +130,7 @@ export function SettingsPage({ part = "general" }: { part?: SettingsPart }) {
       />
       <SliderField
         label="Background sync every (minutes)"
-        description="How often Keepsake downloads newer cloud saves ahead of time and saves changes made outside a game session."
+        description="How often Haversack downloads newer cloud saves ahead of time and saves changes made outside a game session."
         value={settings?.idleSyncMinutes ?? 30}
         min={10}
         max={240}
@@ -154,14 +154,14 @@ export function SettingsPage({ part = "general" }: { part?: SettingsPart }) {
       />
       <DropdownItem
         label="When saves differ"
-        description="Ask me: you choose every time (the default). Take the newest: Keepsake keeps the newer version by itself when exactly two versions differ, their times are far enough apart and no clock looks wrong; the other version stays in History with Undo."
+        description="Ask me: you choose every time (the default). Take the newest: Haversack keeps the newer version by itself when exactly two versions differ, their times are far enough apart and no clock looks wrong; the other version stays in History with Undo."
         rgOptions={[
           { data: "ask", label: "Ask me" },
           { data: "newest", label: "Take the newest" },
         ]}
         selectedOption={settings?.conflictPolicy ?? "ask"}
         disabled={locked}
-        onChange={(o) => void save("conflictPolicy", o.data, o.data === "newest" ? "Keepsake now takes the newest save when it can be sure." : "Keepsake asks you whenever saves differ.")}
+        onChange={(o) => void save("conflictPolicy", o.data, o.data === "newest" ? "Haversack now takes the newest save when it can be sure." : "Haversack asks you whenever saves differ.")}
       />
       <TidyCopies />
       <ToggleField

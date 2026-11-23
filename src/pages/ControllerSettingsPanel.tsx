@@ -5,8 +5,8 @@ import { ControllerSettingsStatus, controllerSettingsForget, controllerSettingsS
 import { plainError } from "../format";
 
 // Device, Controllers (R24, ADR-0086): the Legion controllers' own settings and the stick lights,
-// changed through the Keepsake Helper and the kernel's hid-lenovo-go driver. Each change is applied
-// at once; "Keep" makes Keepsake apply it again whenever the controller comes back.
+// changed through the Haversack Helper and the kernel's hid-lenovo-go driver. Each change is applied
+// at once; "Keep" makes Haversack apply it again whenever the controller comes back.
 
 const toast = (body: string): void => {
   toaster.toast({ title: "Controllers", body });
@@ -51,8 +51,8 @@ export function ControllerSettingsPanel() {
   }, []);
   if (!s || s.off) return null;
   if (!s.present) return <Field label="Changing the controllers" description="Needs the Legion controllers on the kernel's hid-lenovo-go driver (kernel 7.1 and later, and on the Legion Go the 2025 controller firmware)." />;
-  if (!s.helper.ready) return <Field label="Changing the controllers" description="Needs the Keepsake Helper: install it from Device, Reconnect help." />;
-  if (s.tools.hhd) return <Field label="Changing the controllers" description="Handheld Daemon manages the controllers here, so Keepsake only shows their settings." />;
+  if (!s.helper.ready) return <Field label="Changing the controllers" description="Needs the Haversack Helper: install it from Device, Reconnect help." />;
+  if (s.tools.hhd) return <Field label="Changing the controllers" description="Handheld Daemon manages the controllers here, so Haversack only shows their settings." />;
   const current = s.current ?? {};
   const allowed = new Set(s.allowed);
   const apply = async (values: Record<string, unknown>) => {
@@ -73,7 +73,7 @@ export function ControllerSettingsPanel() {
         description={
           s.tools.inputplumber
             ? "Applied at once. InputPlumber manages the button chords and touchpad haptics here, so those are left to it."
-            : "Applied at once, through the Keepsake Helper."
+            : "Applied at once, through the Haversack Helper."
         }
       />
       <ToggleField label="Keep my changes" description="Apply them again whenever the controller reconnects or the device wakes." checked={keep} onChange={setKeep} />

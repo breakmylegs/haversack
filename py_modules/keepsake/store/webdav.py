@@ -174,4 +174,4 @@ class WebDavStore(Store):
             self.put_new(key, b'{"probe":true}')
         except AlreadyExistsError:
             return {"ok": True}
-        raise StoreError("this WebDAV server ignores create-only writes (If-None-Match), so Keepsake cannot use it")
+        raise StoreError("this WebDAV server ignores create-only writes (If-None-Match), so Haversack cannot use it")

@@ -271,7 +271,7 @@ def test_the_summary_is_short_and_names_each_check():
     results = [{"id": "link", "status": "pass", "found": "The encrypted link works."}]
     text = dc.summary("0.26.0-beta.1", results, "Test handheld model")
     assert text.splitlines() == [
-        "Keepsake 0.26.0-beta.1 device checks, Test handheld model",
+        "Haversack 0.26.0-beta.1 device checks, Test handheld model",
         "link: OK The encrypted link works.",
     ]
 
@@ -289,7 +289,7 @@ def test_the_app_exports_one_redacted_file(make_app, monkeypatch):  # noqa: F811
             outcome = await app.device_check_run("battery")
             assert outcome["id"] == "battery" and outcome["status"] in dc.STATUSES
             exported = await app.device_checks_export()
-            assert exported["summary"].startswith("Keepsake 0.9.0 device checks")
+            assert exported["summary"].startswith("Haversack 0.9.0 device checks")
             path = os.path.join(app.paths.settings_dir, exported["file"])
             text = open(path, encoding="utf-8").read()
             assert "Secret Test Name" not in text and "Secret Test Name" not in exported["summary"]

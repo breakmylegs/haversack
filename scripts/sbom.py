@@ -127,7 +127,7 @@ def build(root: str = ROOT) -> dict[str, Any]:
             "component": {
                 "type": "application",
                 "bom-ref": f"keepsake@{version}",
-                "name": "Keepsake",
+                "name": "Haversack",
                 "version": version,
                 "licenses": [{"license": {"id": "BSD-3-Clause"}}],
             }

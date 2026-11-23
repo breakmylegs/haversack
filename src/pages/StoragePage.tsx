@@ -33,7 +33,7 @@ export function StoragePage() {
       setRows(result.games);
       setNotMeasured(result.notMeasured);
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
     }
@@ -49,9 +49,9 @@ export function StoragePage() {
         onOK={async () => {
           setBusy(true);
           try {
-            toaster.toast({ title: "Keepsake", body: await work() });
+            toaster.toast({ title: "Haversack", body: await work() });
           } catch (err) {
-            toaster.toast({ title: "Keepsake", body: plainError(err) });
+            toaster.toast({ title: "Haversack", body: plainError(err) });
           } finally {
             setBusy(false);
             await measure();
@@ -75,7 +75,7 @@ export function StoragePage() {
       {(rows ?? []).map((row) => (
         <Field key={row.key} label={`${row.name}: ${size(row.totalBytes)}`} description={breakdown(row)} childrenLayout="below">
           {row.reset?.stage === "waiting" && (
-            <Field description="Prefix reset: start the game once and quit it at the title screen. Keepsake then puts your saves back." />
+            <Field description="Prefix reset: start the game once and quit it at the title screen. Haversack then puts your saves back." />
           )}
           {row.reset?.stage === "restored" && (
             <Field description="Prefix reset finished and your saves are back. The old prefix is kept until you delete it." />
@@ -104,7 +104,7 @@ export function StoragePage() {
                 onClick={() =>
                   act(
                     "Reset the prefix and keep the saves?",
-                    "Use this when a game will not start because its Proton prefix is broken. Keepsake keeps a copy of the saves, then moves the prefix aside; nothing is deleted. Start the game once afterwards and quit at the title screen: Steam builds a fresh prefix, and Keepsake puts the saves back.",
+                    "Use this when a game will not start because its Proton prefix is broken. Haversack keeps a copy of the saves, then moves the prefix aside; nothing is deleted. Start the game once afterwards and quit at the title screen: Steam builds a fresh prefix, and Haversack puts the saves back.",
                     "Reset",
                     async () => (await resetPrefix(row.key), "Prefix moved aside. Start the game once, then quit."),
                   )

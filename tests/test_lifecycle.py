@@ -296,7 +296,7 @@ def test_played_without_keepsake_warns_once_and_saves(h, monkeypatch):
     monkeypatch.setattr(h.app, "discover_games", discover)
     first = h.run(h.app.idle_pass())
     second = h.run(h.app.idle_pass())
-    toasts = [e for e in h.events if "played while Keepsake was not running" in str(e)]
+    toasts = [e for e in h.events if "played while Haversack was not running" in str(e)]
     assert len(toasts) == 1
     assert first[0]["push"] == "published" and first[0]["playedWithoutKeepsake"] is True
     assert second[0]["push"] == "no-change"

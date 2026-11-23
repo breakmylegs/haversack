@@ -88,7 +88,7 @@ def repoint(
     """
     for link in links:
         if not os.path.islink(link) or os.readlink(link) != targets.get(link):
-            raise CdromError("the disc drive was changed outside Keepsake; swap the disc by hand")
+            raise CdromError("the disc drive was changed outside Haversack; swap the disc by hand")
     new: dict[str, str] = {}
     for link in links:
         target = new_target_for(link)

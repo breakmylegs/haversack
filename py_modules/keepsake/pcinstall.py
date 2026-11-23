@@ -32,7 +32,7 @@ RUN_VALUE = "Keepsake"
 KEEP_VERSIONS = 2  # the current one and the previous one, for a rollback
 _VERSION_CHARS = set("0123456789.-abcdefghijklmnopqrstuvwxyz")
 
-LAUNCHER_TEXT = '''"""Starts the installed Keepsake version (written by Keepsake's installer, ADR-0038)."""
+LAUNCHER_TEXT = '''"""Starts the installed Haversack version (written by Haversack's installer, ADR-0038)."""
 import json
 import os
 import sys
@@ -66,7 +66,7 @@ def package_version(package_dir: str) -> str:
         with open(os.path.join(package_dir, "VERSION"), encoding="utf-8") as handle:
             text = handle.read().strip()
     except OSError as exc:
-        raise InstallError("this folder is not a Keepsake package (no VERSION file)") from exc
+        raise InstallError("this folder is not a Haversack package (no VERSION file)") from exc
     if not text or len(text) > 40 or set(text) - _VERSION_CHARS or text.startswith("."):
         raise InstallError("the package's VERSION is not valid")
     return text
@@ -100,7 +100,7 @@ def install(
     ``entries=False`` (self-update) leaves the start-up and menu entries as the user set them.
     """
     if host not in ("windows", "linux-desktop"):
-        raise InstallError("on a Decky device Keepsake is installed through Decky, not this installer")
+        raise InstallError("on a Decky device Haversack is installed through Decky, not this installer")
     version = package_version(package_dir)
     root = app_root(host, env)
     os.makedirs(root, exist_ok=True)
@@ -135,7 +135,7 @@ def _prune(root: str, keep: set[str | None]) -> list[str]:
 
 def _desktop_entry(command: str, comment: str) -> str:
     return (
-        "[Desktop Entry]\nType=Application\nName=Keepsake\n"
+        "[Desktop Entry]\nType=Application\nName=Haversack\n"
         f"Comment={comment}\nExec={command}\nTerminal=false\nCategories=Game;Utility;\n"
     )
 
@@ -163,7 +163,7 @@ def _start_entries(
         start = os.path.join(config, "autostart", "keepsake.desktop")
         os.makedirs(os.path.dirname(start), exist_ok=True)
         with open(start, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(_desktop_entry(f'"{python}" "{launcher}" --background', "Starts Keepsake when you sign in"))
+            handle.write(_desktop_entry(f'"{python}" "{launcher}" --background', "Starts Haversack when you sign in"))
         written.append(start)
     return written
 
@@ -213,13 +213,13 @@ def main(package_dir: str, argv: list[str]) -> int:
         if "--uninstall" in argv:
             for item in uninstall(host):
                 print(f"Removed {item}")
-            print("Keepsake is removed. Your settings and saves are kept.")
+            print("Haversack is removed. Your settings and saves are kept.")
             return 0
         result = install(package_dir, host, autostart="--no-autostart" not in argv)
     except (InstallError, OSError) as exc:
-        print(f"Keepsake could not be installed: {exc}", file=sys.stderr)
+        print(f"Haversack could not be installed: {exc}", file=sys.stderr)
         return 1
-    print(f"Keepsake {result['version']} is installed in {result['folder']}.")
+    print(f"Haversack {result['version']} is installed in {result['folder']}.")
     if "--no-start" not in argv:
         subprocess.Popen([pythonw(sys.executable), result["launcher"]], close_fds=True)
     return 0

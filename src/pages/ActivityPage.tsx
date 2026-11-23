@@ -4,7 +4,7 @@ import { FaExclamationTriangle, FaInfoCircle } from "react-icons/fa";
 import { activity, ActivityEntry } from "../backend";
 import { isoText, STATUS } from "../format";
 
-// What Keepsake did, newest first, in plain words (ADR-0048). The detailed log stays in Logs.
+// What Haversack did, newest first, in plain words (ADR-0048). The detailed log stays in Logs.
 export function ActivityPage() {
   const [entries, setEntries] = useState<ActivityEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);

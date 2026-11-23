@@ -57,7 +57,7 @@ export function EmulatorsPanel() {
                 `${s.emulators.length} emulator${s.emulators.length === 1 ? "" : "s"}`,
                 `${s.games.length} game${s.games.length === 1 ? "" : "s"}`,
               ].join(", ")
-            : "No emulator setup was found. Keepsake looks for EmuDeck, RetroDECK and the common standalone emulators."
+            : "No emulator setup was found. Haversack looks for EmuDeck, RetroDECK and the common standalone emulators."
         }
       />
       {s.emulators.map((e) => (
@@ -66,7 +66,7 @@ export function EmulatorsPanel() {
       {secrets.length > 0 && (
         <Field
           label="Firmware, BIOS and keys"
-          description={`${secrets.map(([k, n]) => `${n} for ${k}`).join(", ")}. Counted only: Keepsake never reads them.`}
+          description={`${secrets.map(([k, n]) => `${n} for ${k}`).join(", ")}. Counted only: Haversack never reads them.`}
         />
       )}
       {peers.length === 0 ? (

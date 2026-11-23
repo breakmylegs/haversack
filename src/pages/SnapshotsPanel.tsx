@@ -43,7 +43,7 @@ export function SnapshotsPanel({ gameKey, gameName }: { gameKey: string; gameNam
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const pathOf = (c: RestoreChange) => `${c.root}/${c.rel}`;
 
-  // Which save locations hold each snapshot, and the version Keepsake took by itself (ADR-0080).
+  // Which save locations hold each snapshot, and the version Haversack took by itself (ADR-0080).
   const [locations, setLocations] = useState<Record<string, string[]>>({});
   const [newest, setNewest] = useState<NewestChoice | null>(null);
   const refresh = async () => {
@@ -56,7 +56,7 @@ export function SnapshotsPanel({ gameKey, gameName }: { gameKey: string; gameNam
     try {
       setListing(await listSnapshots(gameKey));
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Could not list snapshots: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Could not list snapshots: ${plainError(err)}` });
     }
   };
 
@@ -67,9 +67,9 @@ export function SnapshotsPanel({ gameKey, gameName }: { gameKey: string; gameNam
   const act = async (work: () => Promise<string>) => {
     setBusy(true);
     try {
-      toaster.toast({ title: "Keepsake", body: await work() });
+      toaster.toast({ title: "Haversack", body: await work() });
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: plainError(err) });
+      toaster.toast({ title: "Haversack", body: plainError(err) });
     } finally {
       setBusy(false);
       await refresh();
@@ -103,7 +103,7 @@ export function SnapshotsPanel({ gameKey, gameName }: { gameKey: string; gameNam
       />
       {newest?.replaced && (
         <Field
-          label="Keepsake took the newer save"
+          label="Haversack took the newer save"
           description={`It kept ${newest.choice === "use-cloud" ? `the version from ${newest.device ?? "your other device"}` : "this device's version"}, which was newer. The other version is pinned below. Undo brings it back (your current files are saved first).`}
           childrenLayout="below"
         >

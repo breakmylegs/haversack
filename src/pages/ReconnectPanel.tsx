@@ -154,7 +154,7 @@ export function ReconnectPanel() {
               />
               <ToggleField
                 label="Pair and commit"
-                description="When you pair this controller, Keepsake connects to it at once so that the controller saves the pairing. It acts once per pairing and never when the controller is already connected."
+                description="When you pair this controller, Haversack connects to it at once so that the controller saves the pairing. It acts once per pairing and never when the controller is already connected."
                 checked={d.commit}
                 disabled={busy !== null}
                 onChange={(on) => void run("option", () => reconnectSetOption(d.adapter, d.mac, "commit", on))}
@@ -162,7 +162,7 @@ export function ReconnectPanel() {
               {(d.modalias ?? "").toUpperCase().includes("V054C") && (
                 <ToggleField
                   label="Full report mode"
-                  description="Some DualShock 4 clones send reduced reports until asked. Keepsake asks each time this controller connects."
+                  description="Some DualShock 4 clones send reduced reports until asked. Haversack asks each time this controller connects."
                   checked={d.fullMode}
                   disabled={busy !== null}
                   onChange={(on) => void run("option", () => reconnectSetOption(d.adapter, d.mac, "fullMode", on))}
@@ -230,7 +230,7 @@ export function ReconnectPanel() {
               {s.helper?.ready ? (
                 <CablePairing d={d} cableReady={Boolean(s.cableReady)} reload={() => void load()} />
               ) : (
-                <Field label="Cable pairing" description="Needs the Keepsake Helper (above)." />
+                <Field label="Cable pairing" description="Needs the Haversack Helper (above)." />
               )}
             </>
           )}

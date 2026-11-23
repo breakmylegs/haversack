@@ -63,11 +63,11 @@ function ConflictModal({ gameKey, onDone, closeModal }: { gameKey: string; onDon
     setBusy(true);
     try {
       await resolveConflict(gameKey, choice, head);
-      toaster.toast({ title: "Keepsake", body: "Conflict resolved. The save you did not choose is kept and pinned." });
+      toaster.toast({ title: "Haversack", body: "Conflict resolved. The save you did not choose is kept and pinned." });
       closeModal?.();
       onDone();
     } catch (err) {
-      toaster.toast({ title: "Keepsake", body: `Not resolved: ${plainError(err)}` });
+      toaster.toast({ title: "Haversack", body: `Not resolved: ${plainError(err)}` });
       setArmed(null);
       setBusy(false);
     }

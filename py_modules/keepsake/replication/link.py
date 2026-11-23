@@ -328,7 +328,7 @@ async def pair_as_initiator(
             port,
             client_context(PAIR_IDENTITY, PAIR_KEY),
             f"{host}:{port} did not take the request: switch on Let other devices reach this one there, "
-            "update Keepsake on both, or wait two minutes and try again",
+            "update Haversack on both, or wait two minutes and try again",
         )
         binding = checked_session(writer)
         await send_frame(
@@ -532,7 +532,7 @@ class Listener:
         try:
             request = await expect(reader, "pair-request")
             if request.get("v") != PAIR_PROTOCOL:
-                raise LinkError("the other device runs a different Keepsake version; update both")
+                raise LinkError("the other device runs a different Haversack version; update both")
             peer_id = check_device_id(request.get("deviceId"))
             if peer_id == self.me.device_id:
                 raise LinkError("a device cannot pair with itself")

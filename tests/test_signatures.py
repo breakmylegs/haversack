@@ -70,7 +70,7 @@ def signature_text(data, seed=SEED, key_id=KEY_ID, prehash=True, trusted="timest
     )
 
 
-SUMS = b"ab" * 32 + b"  Keepsake-v1.0.0.zip\n"
+SUMS = b"ab" * 32 + b"  Haversack-v1.0.0.zip\n"
 
 
 @pytest.mark.parametrize("prehash", [True, False])
@@ -81,7 +81,7 @@ def test_minisign_verifies_both_algorithms(prehash):
 def test_minisign_refuses_changed_data_key_or_comment():
     good = signature_text(SUMS)
     with pytest.raises(minisign.MinisignError, match="does not match"):
-        minisign.verify(public_text(), good, SUMS + b"evil  Keepsake-v9.zip\n")
+        minisign.verify(public_text(), good, SUMS + b"evil  Haversack-v9.zip\n")
     with pytest.raises(minisign.MinisignError, match="different key"):
         minisign.verify(public_text(key_id=b"\x09" * 8), good, SUMS)
     other_seed = bytes(range(1, 33))
@@ -102,7 +102,7 @@ def test_minisign_refuses_changed_data_key_or_comment():
 
 def release_payload(signed=True):
     assets = [
-        {"name": "Keepsake-v1.0.0.zip", "browser_download_url": "https://github.com/r/v1.0.0/zip"},
+        {"name": "Haversack-v1.0.0.zip", "browser_download_url": "https://github.com/r/v1.0.0/zip"},
         {"name": "SHA256SUMS", "browser_download_url": "https://github.com/r/v1.0.0/sums"},
     ]
     if signed:

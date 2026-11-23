@@ -408,3 +408,12 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 | # | Fact | Status | Source |
 |---|---|---|---|
 | A153 | PCGamingWiki's Cargo API needs a MediaWiki bot login (`meta=tokens` then `action=login`) with the Cargo grant since August 2026, uses tables `Game` and `Video`, and blocks an IP for a minute after a 429 | from Tuning Advisor's register; unverified from Keepsake until a real bot login is tried | Tuning Advisor |
+
+## Keepsake becomes Haversack (ADR-0089)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A241 | Decky's `_install`, given an artifact as `dev` under the name "Keepsake", decides "already installed" from that name, then reads the real name ("Haversack") from the zip's `plugin.json`; its uninstall of "Haversack" fails on a missing folder and is swallowed, so Keepsake stays installed and Haversack is unzipped beside it, not added to `pluginOrder` | verified in source (`backend/decky_loader/browser.py`, main at a1bb3f74d3); unverified on a device until step 50 | Decky Loader source |
+| A242 | Decky's quick menu shows plugins missing from `pluginOrder` (index -1 sorts them first), so Haversack appears at the top | verified in source (`frontend/src/components/PluginView.tsx`) | Decky Loader source |
+| A243 | The frontend route `utilities/uninstall_plugin(name)` stops the plugin's backend with `uninstall=True` (running `_uninstall`), removes it from Decky's lists and deletes only its code folder; settings, data and logs stay | verified in source (`utilities.py`, `browser.py`) | Decky Loader source |
+| A244 | Renaming an Entra app registration does not rename an existing OneDrive app folder, and a new sign-in after a rename may use a new folder | unverified, so the registration keeps the name "Keepsake" (fail closed) | Microsoft Graph documentation does not state it |
