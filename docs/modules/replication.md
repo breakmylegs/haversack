@@ -7,7 +7,7 @@ Device-to-device replication of non-Steam games, then ongoing install sync. Byte
 | Flag default | Off. The listener is a separate switch, also off |
 | Spec | `docs/build-prompt-v2.md` sections 4 (P10, P14, P15, P17, P19), 6, 7.4 and 8.2; research sections 2, 4.2, 4.4, 4.6, 4.7 and 4.10 with the supersessions in spec section 11 |
 | ADRs | 0012, 0014, 0015, 0016, 0018, 0045 (hard requirements), 0054 (link and pairing), 0056 (discovery, addresses, Wake-on-LAN, pages), 0057 (transfer engine), 0058 (streams, sources, sleep, battery, protocol freeze), 0059 (send a game), 0060 (ongoing sync) |
-| Code | `py_modules/keepsake/replication/`: `policy.py`, `link.py`, `peers.py`, `service.py`, `discovery.py`, `netinfo.py`, `manifest.py`, `source.py`, `transfer.py`, `jobs.py`, `sleepguard.py`, `sendgame.py`, `offers.py`, `ongoing.py`; `src/pages/ReplicationPage.tsx`; the desktop Devices page; `docs/protocol.md` |
+| Code | `py_modules/keepsake/replication/`: `policy.py`, `link.py`, `peers.py`, `service.py`, `discovery.py`, `netinfo.py`, `manifest.py`, `source.py`, `transfer.py`, `jobs.py`, `sleepguard.py`, `sendgame.py`, `offers.py`, `ongoing.py`; `src/pages/ReplicationPage.tsx`, `src/pages/GamesList.tsx`; `docs/protocol.md` |
 | Slices | 17a (link and pairing, built), 17b (discovery, Wake-on-LAN, pages, built), 18 (transfer engine, built; protocol frozen), 19 (send a game: 19a built, 19b pages next), 20 (ongoing sync: 20a built, 20b controls next; minor release), then R7 (direct save sync). Slice 16's measurements are tuning input, not a gate |
 
 ## Hard requirements (Peter, 17 November 2026; ADR-0045)
@@ -60,22 +60,21 @@ Device-to-device replication of non-Steam games, then ongoing install sync. Byte
   - **Promote:** staging, full verification against the root hash, then an atomic promote. Replaced files are held until the job completes, so a failure rolls back.
   - **Controls:** Pause, Resume, "Stop and remove" and a bandwidth cap.
 - **Send a game.**
-  1. A Saves source checkpoint.
-  2. The offer, then the target preflight (space, names, case, lock, not running).
-  3. A pull to staging.
-  4. Steam registration through the Steam Operations Executor (ADR-0015).
-  5. Promote: the prefix into `compatdata/<new appid>` and the install files into the mapped root.
-  6. Discovery re-keys the `gameKey`, and Keepsake offers to copy a missing compatibility tool.
+  1. The offer, then the target preflight (space, names, case, lock, not running). The first copy carries the whole prefix, saves included (ADR-0098).
+  2. A pull to staging.
+  3. Steam registration through the Steam Operations Executor (ADR-0015).
+  4. Promote: the prefix into `compatdata/<new appid>` and the install files into the mapped root.
+  5. Discovery re-keys the `gameKey`, and Keepsake offers to copy a missing compatibility tool.
 - **Ongoing sync.** A per-game policy of Off, Manual (the default) or Auto. Change scans run on `game_exited` and in the idle loop. When both sides have changed, Keepsake shows the user and does nothing until they choose.
 
 ## What it writes (spec section 6.3)
 
-User-registered library roots; `compatdata/<appid>` for replicated games only; `grid` artwork as a fallback; `compatibilitytools.d/<tool>` after the user confirms; staging folders and job journals. Every write passes the central path validator. **Never** a Saves-managed path, or a manifest path tagged `save` after the initial copy (P14). Never anything in a cloud store (ADR-0045).
+User-registered library roots; `compatdata/<appid>` for replicated games only; `grid` artwork as a fallback; `compatibilitytools.d/<tool>` after the user confirms; staging folders and job journals. Every write passes the central path validator. **Never** a manifest path tagged `save` or `config` after the initial copy (P14, kept after the strip, ADR-0098). Never anything in a cloud store (ADR-0045).
 
 ## Exclusions
 
 - **Always:** `steamapps/shadercache/<appid>`, DXVK and VKD3D caches, Temp folders, crash dumps and logs.
-- **Always, for ongoing sync:** every Saves-managed path.
+- **Always, for ongoing sync:** every save and config path the Ludusavi manifest lists for the game (`_replication_keep`).
 - **By default:** paths tagged `config`, because the screens differ. Each game can opt in for the initial copy only.
 
 ## Safety

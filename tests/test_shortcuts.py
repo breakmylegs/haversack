@@ -15,14 +15,14 @@ from keepsake.paths import PluginPaths
 from keepsake.settings import SettingsError, SettingsStore
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ALL_ON = {"saves": True, "advisor": True, "replication": True, "installer": True, "device": True}
+ALL_ON = {"replication": True, "installer": True}
 
 
 def test_registry_is_well_formed_and_defaults_exist() -> None:
     shortcuts.check_registry()
     ids = {e["id"] for e in shortcuts.REGISTRY}
     assert set(shortcuts.DEFAULT) <= ids
-    assert shortcuts.DEFAULT == ["sync-now", "status-transfers", "status-conflicts", "status-reconnect"]
+    assert shortcuts.DEFAULT == ["status-transfers", "send-current", "page-install"]
     with pytest.raises(ValueError):
         shortcuts.check_registry([*shortcuts.REGISTRY, dict(shortcuts.REGISTRY[0])])  # a repeated ID
 
@@ -37,28 +37,28 @@ def test_page_targets_are_sidebar_pages() -> None:
     for i, (at, sid) in enumerate(starts):
         segment = body[at : starts[i + 1][0] if i + 1 < len(starts) else len(body)]
         pages |= {(sid, page) for page in re.findall(r'\{ id: "([a-z-]+)", title:', segment)}
-    assert ("device", "fans") in pages and ("device", "storage") in pages and ("device", "controllers") in pages
-    assert len({sid for sid, _ in pages}) == 7  # the redesign's seven sections (ADR-0095)
+    assert ("install", "install") in pages and ("games-devices", "moving") in pages
+    assert len({sid for sid, _ in pages}) == 4  # the strip's four sections (ADR-0098)
     for entry in shortcuts.REGISTRY:
         if entry["kind"] == "page":
             assert tuple(entry["open"]) in pages, entry["id"]
 
 
 def test_available_hides_modules_that_are_off_and_missing_features() -> None:
-    offered = {e["id"] for e in shortcuts.available({"saves": True}, [])}
-    assert "sync-now" in offered and "page-settings" in offered  # Core is always on
-    assert "status-transfers" not in offered and "page-fans" not in offered
+    offered = {e["id"] for e in shortcuts.available({"installer": True}, [])}
+    assert "page-install" in offered and "page-settings" in offered  # Core is always on
+    assert "status-transfers" not in offered and "send-current" not in offered
     assert "check-updates" not in offered  # needs the "updates" feature
-    assert "check-updates" in {e["id"] for e in shortcuts.available({"saves": True}, ["updates"])}
-    assert "next-mode" not in {e["id"] for e in shortcuts.available(ALL_ON, [])}
+    assert "check-updates" in {e["id"] for e in shortcuts.available({"installer": True}, ["updates"])}
+    assert "page-install" not in {e["id"] for e in shortcuts.available({"replication": True}, [])}
 
 
 def test_shown_keeps_order_drops_unavailable_and_uses_defaults() -> None:
     offered = shortcuts.available(ALL_ON, ["updates"])
     assert [e["id"] for e in shortcuts.shown(None, offered)] == shortcuts.DEFAULT
-    chosen = ["page-fans", "future-thing", "sync-now"]
-    assert [e["id"] for e in shortcuts.shown(chosen, offered)] == ["page-fans", "sync-now"]
-    assert [e["id"] for e in shortcuts.shown(chosen, shortcuts.available({"saves": True}, []))] == ["sync-now"]
+    chosen = ["send-current", "sync-now", "page-install"]  # sync-now went in the strip: kept, not shown
+    assert [e["id"] for e in shortcuts.shown(chosen, offered)] == ["send-current", "page-install"]
+    assert [e["id"] for e in shortcuts.shown(chosen, shortcuts.available({"installer": True}, []))] == ["page-install"]
     assert shortcuts.shown([], offered) == []
 
 

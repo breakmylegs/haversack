@@ -1,10 +1,5 @@
-// Slice 1 probes: record what the Steam client actually reports, so ADR-0001
-// is based on real payloads rather than guesses. Every listener is wrapped so a
+// Read-only facts about the Steam client and Decky for Diagnostics. Every read is wrapped so a
 // missing or renamed client API never breaks the plugin.
-import { recordProbeEvent } from "./backend";
-
-type Unregister = () => void;
-
 // Copy primitive own properties only. Steam client objects are large and can
 // hold cycles, so never serialise them whole.
 export function primitiveSnapshot(value: unknown, maxKeys = 80): Record<string, unknown> | null {
@@ -38,73 +33,6 @@ export function runningAppDetails(): Record<string, unknown> {
   } catch (err) {
     return { error: String(err) };
   }
-}
-
-function appOverview(appId: number): Record<string, unknown> | null {
-  try {
-    return primitiveSnapshot(appStore?.GetAppOverviewByAppID(appId));
-  } catch {
-    return null;
-  }
-}
-
-function record(kind: string, payload: unknown): void {
-  recordProbeEvent(kind, payload).catch(() => undefined);
-}
-
-function tryRegister(name: string, register: () => { unregister: () => void } | undefined): Unregister | null {
-  try {
-    const handle = register();
-    if (!handle) {
-      record("probe-unavailable", { name });
-      return null;
-    }
-    return () => handle.unregister();
-  } catch (err) {
-    record("probe-unavailable", { name, error: String(err) });
-    return null;
-  }
-}
-
-export function startProbes(): Unregister {
-  const handles: (Unregister | null)[] = [
-    tryRegister("GameSessions.RegisterForAppLifetimeNotifications", () =>
-      SteamClient.GameSessions.RegisterForAppLifetimeNotifications((n) => {
-        record("app-lifetime", {
-          notification: primitiveSnapshot(n),
-          overview: appOverview(n.unAppID),
-          running: runningAppDetails(),
-        });
-      }),
-    ),
-    tryRegister("Apps.RegisterForGameActionStart", () =>
-      SteamClient.Apps.RegisterForGameActionStart((gameActionId, appId, action, launchSource) => {
-        record("game-action-start", {
-          gameActionId,
-          appId,
-          appIdType: typeof appId,
-          action,
-          launchSource,
-          overview: appOverview(Number(appId)),
-        });
-      }),
-    ),
-    tryRegister("System.RegisterForOnSuspendRequest", () =>
-      SteamClient.System.RegisterForOnSuspendRequest(() => record("suspend-request", {})),
-    ),
-    tryRegister("System.RegisterForOnResumeFromSuspend", () =>
-      SteamClient.System.RegisterForOnResumeFromSuspend(() => record("resume-from-suspend", {})),
-    ),
-  ];
-  return () => {
-    for (const unregister of handles) {
-      try {
-        unregister?.();
-      } catch {
-        // Ignore: the client may already have dropped the listener.
-      }
-    }
-  };
 }
 
 // Which install or update hand-off routes are visible to a plugin. Read only:

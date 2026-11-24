@@ -4,6 +4,24 @@ All notable changes to Haversack (called Keepsake until v0.51.0) are listed here
 
 ## [Unreleased]
 
+### Removed
+
+- **Haversack now does two things: it installs games and it moves them between your handhelds.** Everything else is gone:
+  - save sync, with the cloud stores and sign-in, conflicts, history, snapshots, import and export, and the launch gate;
+  - Advisor;
+  - the desktop app and the tray;
+  - PC support: the Linux and Windows PC package gets no more updates;
+  - the device pages: power, fans, battery, controllers, reconnect help, storage, SD cards, uninstall, launch option presets, pause and Looks;
+  - Haversack Helper.
+- **Nothing of yours was deleted.** Your save snapshots stay in your cloud storage, and your settings, sign-ins and history stay on each device. To use them again, install **version 0.60.0** from Settings, Updates (or from the Releases page), and everything is where you left it.
+
+### Changed
+
+- **Games and devices, Games** lists this device's non-Steam games. Choose one to send it to your other handheld, keep it in step, or find its artwork.
+- **Replication is on from the start.** Nothing on your network can reach the device until you switch on **Let other devices reach this one**.
+- **Saves when you send a game:** the first copy includes the game's saves, so you carry on where you left off. Updates never replace a save or settings file on either handheld. **Settings, General, Game database** shows the save-location list this uses.
+- The menu has four sections: Install, Games and devices, Settings and Diagnostics. Old links open the nearest page left.
+
 ## [0.60.0]
 
 > **Not yet tested on a device.** Published on the stable channel before the device run, at the owner's request. Report anything that misbehaves on the Releases page.

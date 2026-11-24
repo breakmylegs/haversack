@@ -17,7 +17,7 @@ export function SendPanel({ gameKey, gameName }: { gameKey: string; gameName: st
 
   if (!peers) return null;
   if (peers.length === 0) {
-    return <Field label="Send to another device" description="Pair a device in Devices first." />;
+    return <Field label="Send to another device" description="Pair a device in Other devices first." />;
   }
 
   const send = (peer: PairedDevice) =>
@@ -26,8 +26,8 @@ export function SendPanel({ gameKey, gameName }: { gameKey: string; gameName: st
         strTitle={`Send ${gameName} to ${peer.name}?`}
         strDescription={
           "Haversack checks that device has space, then copies the game, its Proton prefix, its compatibility tool " +
-          "and its artwork there, and adds it to Steam. It starts by itself; either device can stop and remove it. " +
-          "If Saves syncs this game, the newest saves go first."
+          "and its artwork there, and adds it to Steam. The game's saves go with this first copy; later updates never " +
+          "replace them. It starts by itself; either device can stop and remove it."
         }
         strOKButtonText="Send"
         strCancelButtonText="Cancel"

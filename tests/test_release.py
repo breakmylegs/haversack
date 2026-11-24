@@ -2,7 +2,6 @@ import hashlib
 import json
 import os
 import sys
-import zipfile
 
 import pytest
 
@@ -56,9 +55,6 @@ def repo(tmp_path, monkeypatch):
     root.mkdir()
     make_repo(root, version="0.2.1", changelog=CHANGELOG)
     (root / "package.json").write_text('{\n  "name": "keepsake",\n  "version": "0.2.1",\n  "x": 1\n}\n')
-    # Synthetic stand-ins for the built-in Google secrets (ADR-0055), too short to look like real ones.
-    secrets = {"googleClientSecret": "GOCSPX-test-tv", "googleDesktopClientSecret": "GOCSPX-test-desk"}
-    (root / "py_modules" / "keepsake" / "client_secrets.json").write_text(json.dumps(secrets))
     monkeypatch.setattr(package, "ROOT", str(root))
     monkeypatch.setattr(release, "ROOT", str(root))
     monkeypatch.delenv("KEEPSAKE_MINISIGN_KEY", raising=False)
@@ -137,19 +133,14 @@ def test_publish_dry_run_builds_assets_without_git_changes(repo):
     zip_path = os.path.join(out_dir, "Haversack-v0.2.1.zip")
     with open(zip_path, "rb") as handle:
         digest = hashlib.sha256(handle.read()).hexdigest()
-    with open(os.path.join(out_dir, "Haversack-desktop-v0.2.1.zip"), "rb") as handle:
-        desktop = hashlib.sha256(handle.read()).hexdigest()
-    with open(os.path.join(out_dir, "Haversack-helper-v0.2.1.zip"), "rb") as handle:
-        helper = hashlib.sha256(handle.read()).hexdigest()
     with open(os.path.join(out_dir, "Haversack-v0.2.1.sbom.cdx.json"), "rb") as handle:
         sbom_bytes = handle.read()
     with open(os.path.join(out_dir, "SHA256SUMS"), encoding="utf-8") as handle:
         assert handle.read() == (
-            f"{digest}  Haversack-v0.2.1.zip\n{digest}  Haversack.zip\n{desktop}  Haversack-desktop-v0.2.1.zip\n"
-            f"{helper}  Haversack-helper-v0.2.1.zip\n"
+            f"{digest}  Haversack-v0.2.1.zip\n{digest}  Haversack.zip\n"
             f"{hashlib.sha256(sbom_bytes).hexdigest()}  Haversack-v0.2.1.sbom.cdx.json\n"
             # The same bytes under Keepsake's names, so installed Keepsakes update (ADR-0089).
-            f"{digest}  Keepsake-v0.2.1.zip\n{digest}  Keepsake.zip\n{desktop}  Keepsake-desktop-v0.2.1.zip\n"
+            f"{digest}  Keepsake-v0.2.1.zip\n{digest}  Keepsake.zip\n"
         )
     sbom = json.loads(sbom_bytes)
     assert sbom["metadata"]["component"]["version"] == "0.2.1"
@@ -197,37 +188,16 @@ def test_both_test_flags_rejected(repo):
         release.publish(device_tested=True, dry_run=False, runner=FakeRunner(), check=lambda: 0, accept_untested=True)
 
 
-@pytest.mark.parametrize(
-    ("content", "message"),
-    [
-        (None, "is missing"),
-        ("not json", "not valid JSON"),
-        ('{"googleClientSecret": "GOCSPX-test-tv"}', "googleDesktopClientSecret"),
-        ('{"googleClientSecret": "x", "googleDesktopClientSecret": "GOCSPX-test-desk"}', "googleClientSecret"),
-    ],
-)
-def test_publish_refuses_without_the_google_client_secrets(repo, content, message, capsys):
-    path = repo / "py_modules" / "keepsake" / "client_secrets.json"
-    if content is None:
-        path.unlink()
-    else:
-        path.write_text(content)
+def test_publish_needs_no_client_secrets_and_ships_only_the_plugin(repo):
+    """The strip (ADR-0098): no cloud sign-in secrets, no PC package and no helper."""
     runner = FakeRunner()
-    with pytest.raises(release.ReleaseError, match=message):
-        release.publish(device_tested=True, dry_run=False, runner=runner, check=lambda: 0)
-    assert not runner.commands(("git", "tag", "-a"))
-    release.publish(device_tested=False, dry_run=True, runner=FakeRunner(), check=lambda: 0)  # a dry run warns
-    assert message in capsys.readouterr().err
-
-
-def test_the_secrets_file_ships_in_both_packages(repo):
-    out_dir = release.publish(device_tested=False, dry_run=True, runner=FakeRunner(), check=lambda: 0)
-    for name, inner in (
-        ("Haversack-v0.2.1.zip", "Haversack/py_modules/keepsake/client_secrets.json"),
-        ("Haversack-desktop-v0.2.1.zip", "Keepsake-desktop/py_modules/keepsake/client_secrets.json"),
-    ):
-        with zipfile.ZipFile(os.path.join(out_dir, name)) as archive:
-            assert json.loads(archive.read(inner))["googleDesktopClientSecret"] == "GOCSPX-test-desk"
+    out_dir = release.publish(device_tested=True, dry_run=False, runner=runner, check=lambda: 0)
+    assert sorted(n for n in os.listdir(out_dir) if n.endswith(".zip")) == [
+        "Haversack-v0.2.1.zip",
+        "Haversack.zip",
+        "Keepsake-v0.2.1.zip",
+        "Keepsake.zip",
+    ]
 
 
 def test_publish_requires_device_tests(repo):
@@ -266,9 +236,8 @@ def test_publish_tags_pushes_and_creates_release(repo):
     assert "--prerelease" not in create
     assert any(arg.endswith("Haversack-v0.2.1.zip") for arg in create)
     assert any(os.path.basename(arg) == "Haversack.zip" for arg in create)  # the stable "latest" asset
-    assert any(os.path.basename(arg) == "Haversack-desktop-v0.2.1.zip" for arg in create)  # the PC package
     # Installed Keepsakes (v0.25.0's updater included) find their usual names (ADR-0089).
-    for old in ("Keepsake-v0.2.1.zip", "Keepsake.zip", "Keepsake-desktop-v0.2.1.zip"):
+    for old in ("Keepsake-v0.2.1.zip", "Keepsake.zip"):
         assert any(os.path.basename(arg) == old for arg in create)
     assert any(arg.endswith("SHA256SUMS") for arg in create)
     # Tag before release, release last.

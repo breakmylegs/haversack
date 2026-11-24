@@ -121,8 +121,8 @@ def build_assets(out_dir: str, version: str, notes: str) -> list[str]:
     Two zips with the same bytes are published: ``Haversack-v<version>.zip``,
     which the in-plugin updater and the reproducible-build check use, and
     ``Haversack.zip``, so a first install can always use the same URL. Copies
-    under the old names (``Keepsake-v<version>.zip``, ``Keepsake.zip`` and the PC
-    package's ``Keepsake-desktop-v<version>.zip``) serve installed Keepsakes.
+    under the old names (``Keepsake-v<version>.zip`` and ``Keepsake.zip``) serve
+    installed Keepsakes. The PC package and the root helper went in the strip (ADR-0098).
     ``SHA256SUMS`` lists every name, so its signature covers them all.
     """
     if os.path.isdir(out_dir):
@@ -136,25 +136,16 @@ def build_assets(out_dir: str, version: str, notes: str) -> list[str]:
     shutil.copyfile(zip_path, stable_path)
     with open(zip_path, "rb") as handle:
         digest = hashlib.sha256(handle.read()).hexdigest()
-    # The PC package (ADR-0038, P5): the same core and the desktop interface, under the same signature.
-    desktop_path = package.build_desktop(out_dir)
-    with open(desktop_path, "rb") as handle:
-        desktop_digest = hashlib.sha256(handle.read()).hexdigest()
-    # The root helper (ADR-0083), version-locked, under the same signature.
-    helper_path = package.build_helper(out_dir)
-    with open(helper_path, "rb") as handle:
-        helper_digest = hashlib.sha256(handle.read()).hexdigest()
     # The software bill of materials (ADR-0050), under the same signature.
     sbom_path = sbom.write(os.path.join(out_dir, sbom.asset_name(package.plugin_name(), version)), ROOT)
     with open(sbom_path, "rb") as handle:
         sbom_digest = hashlib.sha256(handle.read()).hexdigest()
-    names = {expected, stable_zip_name(), os.path.basename(desktop_path)}
+    names = {expected, stable_zip_name()}
     old = [
         (source, name, d)
         for source, name, d in (
             (zip_path, f"{OLD_NAME}-v{version}.zip", digest),
             (zip_path, f"{OLD_NAME}.zip", digest),
-            (desktop_path, f"{OLD_NAME}-desktop-v{version}.zip", desktop_digest),
         )
         if name not in names
     ]
@@ -165,13 +156,12 @@ def build_assets(out_dir: str, version: str, notes: str) -> list[str]:
     sums_path = os.path.join(out_dir, SUMS_NAME)
     with open(sums_path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(
-            f"{digest}  {expected}\n{digest}  {stable_zip_name()}\n{desktop_digest}  {os.path.basename(desktop_path)}\n"
-            f"{helper_digest}  {os.path.basename(helper_path)}\n{sbom_digest}  {os.path.basename(sbom_path)}\n"
+            f"{digest}  {expected}\n{digest}  {stable_zip_name()}\n{sbom_digest}  {os.path.basename(sbom_path)}\n"
         )
         handle.writelines(f"{d}  {name}\n" for _, name, d in old)
     with open(os.path.join(out_dir, "notes.md"), "w", encoding="utf-8", newline="\n") as handle:
         handle.write(notes)
-    return [zip_path, stable_path, desktop_path, helper_path, sbom_path, *old_paths, sums_path]
+    return [zip_path, stable_path, sbom_path, *old_paths, sums_path]
 
 
 def pinned_key() -> str:
@@ -290,11 +280,6 @@ def publish(
             or runner(["git", "ls-remote", "--tags", "origin", tag]).strip()
         ):
             raise ReleaseError(f"tag {tag} already exists")
-    problem = package.client_secrets_problem()
-    if problem and not dry_run:
-        raise ReleaseError(problem)
-    if problem:
-        print(f"warning: {problem}", file=sys.stderr)
     if check is not None and check() != 0:
         raise ReleaseError("scripts/check.py failed")
     out_dir = os.path.join(ROOT, "out", "release", tag)

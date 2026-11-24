@@ -1,16 +1,13 @@
 """The user guide checks and the screenshot harness (ADR-0046)."""
 
-import json
 import os
 import struct
 import sys
-import urllib.request
 import zlib
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 
 import check_docs
-import docs_screenshots
 
 
 def png(chunks=()):
@@ -67,35 +64,3 @@ def test_sample_data_must_use_synthetic_app_ids():
         "sample data: steam:440 is not a synthetic app ID",
         "sample data: shortcut:7:12345 is not a synthetic app ID",
     ]
-
-
-def test_the_harness_serves_only_sample_data_through_the_real_api():
-    api, server, loop = docs_screenshots.start()
-    try:
-
-        def call(name, *args):
-            request = urllib.request.Request(
-                f"http://127.0.0.1:{api.port}/api/call/{name}",
-                data=json.dumps({"args": list(args)}).encode(),
-                headers={"Content-Type": "application/json", "X-Keepsake-Token": api.token},
-                method="POST",
-            )
-            with urllib.request.urlopen(request, timeout=10) as response:
-                return json.loads(response.read())["result"]
-
-        games = call("match_games")
-        assert [g["name"] for g in games] == ["Example Quest", "Sample Racer", "Demo Tactics", "Placeholder Odyssey"]
-        assert call("pc_update_status")["installed"] is True
-        assert call("qam_summary")["deviceName"] == "Living room PC"
-        assert len(api.token) >= 20  # the desktop page accepts only tokens of 20 characters or more
-    finally:
-        server.shutdown()
-        server.server_close()
-        loop.call_soon_threadsafe(loop.stop)
-
-
-def test_every_page_the_harness_captures_is_a_desktop_page():
-    with open(os.path.join(docs_screenshots.ROOT, "desktop", "src", "main.ts"), encoding="utf-8") as handle:
-        source = handle.read()
-    for page in docs_screenshots.PAGES:
-        assert f'id: "{page}"' in source

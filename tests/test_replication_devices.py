@@ -332,7 +332,8 @@ def test_calls_fail_plainly_while_the_module_is_off(make_app):
         app = make_app("a")
         await app.start()
         try:
-            assert app.registry.running("replication") is False  # off by default
+            assert app.registry.running("replication") is True  # on by default since the strip (ADR-0098)
+            await app.set_module_enabled("replication", False)
             with pytest.raises(ValueError, match="Replication is off"):
                 await app.replication_status()
         finally:

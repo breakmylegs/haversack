@@ -146,3 +146,44 @@ def write_fake_proc(
         handle.write(cmdline.replace(" ", "\x00").encode("utf-8"))
     with open(os.path.join(base, "environ"), "wb") as handle:
         handle.write(b"\x00".join(f"{k}={v}".encode() for k, v in (env or {}).items()))
+
+
+MANIFEST = '---\nExample Quest:\n  files:\n    "<winLocalAppData>/ExampleQuest":\n      tags:\n        - save\n'
+
+
+class Device:
+    """One simulated handheld with one non-Steam shortcut, "Example Quest", in its own prefix.
+
+    Two devices give the shortcut different app IDs, as Steam does (ADR-0011).
+    """
+
+    def __init__(self, tmp_path, name, appid):
+        from keepsake.app import KeepsakeApp
+        from keepsake.paths import PluginPaths
+
+        base = tmp_path / name
+        home = base / "home"
+        home.mkdir(parents=True)
+        root = make_fake_steam(
+            home, users={"7": [shortcut_entry(appid - 2**32, "Example Quest", "/g.exe")]}, prefixes=[(None, appid)]
+        )
+        self.key = f"shortcut:7:{appid}"
+        prefix = root / "steamapps/compatdata" / str(appid) / "pfx"
+        self.saves = prefix / "drive_c/users/steamuser/AppData/Local/ExampleQuest"
+        self.saves.mkdir(parents=True)
+        self.events: list[tuple[str, tuple[Any, ...]]] = []
+
+        async def emit(event, *args):
+            self.events.append((event, args))
+
+        paths = PluginPaths(*(str(base / n) for n in ("settings", "runtime", "logs", "plugin")))
+        self.app = KeepsakeApp(
+            paths, emit=emit, proc_root=str(base / "proc"), version="0.9.0", home=str(home), auto_refresh_manifest=False
+        )
+        manifest_file = base / "manifest.yaml"
+        manifest_file.write_text(MANIFEST)
+        self.app.manifest.import_file(str(manifest_file))
+        self.app.settings.set("deviceName", f"Handheld {name.upper()}")
+
+    def toasts(self):
+        return [args[0] for event, args in self.events if event == "keepsake_toast"]

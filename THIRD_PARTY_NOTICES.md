@@ -4,7 +4,7 @@ Haversack (called Keepsake until v0.51.0) includes or uses the following third-p
 
 ## Logo and icons
 
-The logo (`assets/logo.svg`, `assets/logo.png`) and the tray icon are original artwork drawn for Haversack in November 2026, a satchel on teal. They contain no third-party artwork, fonts or icon sets, and are under the project's BSD-3-Clause licence. The status colours follow the Okabe-Ito palette (Okabe and Ito, "Color Universal Design", 2008), which is a published colour set, not artwork.
+The logo (`assets/logo.svg`, `assets/logo.png`) is original artwork drawn for Haversack in November 2026, a satchel on teal. They contain no third-party artwork, fonts or icon sets, and are under the project's BSD-3-Clause licence. The status colours follow the Okabe-Ito palette (Okabe and Ito, "Color Universal Design", 2008), which is a published colour set, not artwork.
 
 ## qrcode-generator (bundled in dist/index.js)
 
@@ -55,24 +55,8 @@ Licensed under the BSD 2-Clause licence:
 
 ## Ludusavi Manifest (downloaded at run time, not bundled)
 
-Save location data comes from the Ludusavi Manifest, https://github.com/mtkennerly/ludusavi-manifest, compiled from PCGamingWiki.
+Save location data, used to keep saves out of game updates, comes from the Ludusavi Manifest, https://github.com/mtkennerly/ludusavi-manifest, compiled from PCGamingWiki.
 
 Copyright (c) 2020 Matthew T. Kennerly (mtkennerly)
 
 Licensed under the MIT licence, with the same terms as above.
-
-## Are We Anti-Cheat Yet (downloaded at run time; status wording included in the Advisor)
-
-Anti-cheat status comes from Are We Anti-Cheat Yet, https://github.com/AreWeAntiCheatYet/AreWeAntiCheatYet. The Advisor downloads its `games.json` at run time and uses the project's own wording for each status.
-
-Copyright © 2021 Starz0r, Curve
-
-Licensed under the MIT licence, with the same terms as above.
-
-## ProtonDB (Haversack's index, downloaded at run time when switched on, not bundled)
-
-Contains information from ProtonDB, made available under the Open Database License (ODbL) 1.0, https://opendatacommons.org/licenses/odbl/1-0/. Individual contents are under the Database Contents License (DbCL) 1.0. Source: the monthly dumps at https://github.com/bdefore/protondb-data. Keepsake's index (the `protondb-index` release) is a derived database, shared under the ODbL; `scripts/protondb_index.py` builds it.
-
-## Deck Verified (fetched at run time, not bundled)
-
-Community reports come from Deck Verified by DeckSettings, https://deckverified.games. The report data is GPL-3.0. Haversack shows it with a link to each report and caches it on the device only. No report data is part of Keepsake.

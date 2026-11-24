@@ -17,14 +17,11 @@ from typing import Any
 from .bus import EventBus, Handler
 from .log import log_event
 
+# The strip (ADR-0098): Haversack installs games and moves them between your devices. Both are on;
+# Replication's network listener stays off until the user switches it on (P17).
 DEFAULT_FLAGS = {
-    "saves": True,
-    "advisor": True,
-    "replication": False,
+    "replication": True,
     "installer": True,
-    "desktop": True,
-    "device": True,
-    "looks": False,  # writes outside the earlier allowlist, so the user switches it on (ADR-0091)
 }
 
 

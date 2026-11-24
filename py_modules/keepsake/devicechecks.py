@@ -573,64 +573,6 @@ async def check_network_iso(ctx: Context) -> dict[str, Any]:
     )
 
 
-async def check_desktop_app(ctx: Context) -> dict[str, Any]:
-    """Desktop app ready (ADR-0068): both entries for this version, the tray's python3, and a session bus."""
-    probe = ctx.probes.get("desktop-app")
-    if probe is None:
-        return result("skip", "Switch on the Desktop module in Settings, Modules, then run it again.")
-    found = await probe()
-    problems = [f"{name}: {', '.join(issues)}" for name, issues in found["entries"].items() if issues]
-    if not found["python3"]:
-        problems.append("python3 is missing, so the tray cannot run")
-    if not found["sessionBus"]:
-        problems.append("no desktop session bus was found (normal in Gaming Mode: run this in Desktop Mode)")
-    details = {
-        "entries": not any(found["entries"].values()),
-        "python3": found["python3"],
-        "sessionBus": found["sessionBus"],
-        "page": found["page"],
-    }
-    if not problems and found["page"]:
-        return result(
-            "pass",
-            "Both Desktop Mode entries are there for this version; python3 and the session bus are ready.",
-            **details,
-        )
-    status = "warn" if found["python3"] and not any(found["entries"].values()) else "fail"
-    return result(status, "; ".join(problems) or "The Desktop Mode page is not running.", **details)
-
-
-async def check_session_sources(ctx: Context) -> dict[str, Any]:
-    """Session stats sources (ADR-0069): which readings this handheld gives the Advisor's session record."""
-    probe = ctx.probes.get("session-sources")
-    if probe is None:
-        return result("skip", "Switch on the Advisor module, then run it again.")
-    found = await probe()
-    labels = {
-        "frameRate": "frame rate",
-        "socketPower": "APU power",
-        "cpuPower": "CPU power",
-        "gpuPower": "GPU power",
-        "battery": "battery",
-        "temperatures": "temperatures",
-        "load": "GPU load",
-    }
-    have = [labels[k] for k in labels if found.get(k)]
-    missing = [labels[k] for k in labels if not found.get(k)]
-    text = f"Available: {', '.join(have) or 'nothing'}." + (f" Not available: {', '.join(missing)}." if missing else "")
-    if not found.get("frameRate"):
-        text += (
-            " The frame rate comes from Steam's performance overlay while a game runs: play a game for a minute, "
-            "then run this again."
-        )
-        if found.get("mangohudConfig"):
-            text += " MangoHud's own logs are also read when it logs."
-    details = {k: bool(found.get(k)) for k in labels}
-    if not found.get("socketPower") and not found.get("battery"):
-        return result("fail", text, **details)
-    return result("pass" if found.get("frameRate") else "warn", text, **details)
-
-
 async def check_see_other(ctx: Context) -> dict[str, Any]:
     """The other handheld can be seen (ADR-0070): any Keepsake device answers Find devices, paired or not."""
     if ctx.links is None:
@@ -650,206 +592,6 @@ async def check_see_other(ctx: Context) -> dict[str, Any]:
     )
 
 
-async def check_device_readings(ctx: Context) -> dict[str, Any]:
-    """Device readings (R21 stage 1): which sensors, fans, modes and BIOS details this device exposes."""
-    probe = ctx.probes.get("device-readings")
-    if probe is None:
-        return result("skip", "This build cannot read the device's sensors.")
-    found = await probe()
-    chips = found.get("chips") or []
-    temps = sum(len(c.get("temps", [])) for c in chips)
-    fans = [f for c in chips for f in c.get("fans", [])]
-    profile = found.get("profile") or {}
-    bios = found.get("bios") or {}
-    names = [str(c.get("name")) for c in chips]
-    details = {
-        "chips": names,
-        "temps": temps,
-        "fans": len(fans),
-        "profile": profile.get("current"),
-        "choices": profile.get("choices"),
-        "bios": bios.get("version"),
-        "chargeLimit": (found.get("battery") or {}).get("chargeLimit"),
-        "cpu": found.get("cpu"),
-    }
-    parts = [f"{temps} temperature sensors on {', '.join(names) or 'no chip'}"]
-    parts.append(
-        f"{len(fans)} fan reading{'s' if len(fans) != 1 else ''}" + (f" ({fans[0]['value']:.0f} RPM)" if fans else "")
-    )
-    parts.append(
-        f"mode {profile['current']} of {', '.join(profile.get('choices') or [])}"
-        if profile
-        else "no firmware mode exposed"
-    )
-    parts.append(f"BIOS {bios['version']}" if bios.get("version") else "no BIOS version")
-    if not temps:
-        return result("fail", "No temperature sensor could be read: " + "; ".join(parts) + ".", **details)
-    if not fans or not profile:
-        return result(
-            "warn",
-            "; ".join(parts) + ". Fan or mode control needs these; see docs/research/legion-control.md.",
-            **details,
-        )
-    return result("pass", "; ".join(parts) + ".", **details)
-
-
-async def check_performance_control(ctx: Context) -> dict[str, Any]:
-    """Performance control (R21 stage 2): steamos-manager reachable, what it offers, and a write read back."""
-    probe = ctx.probes.get("performance-control")
-    if probe is None:
-        return result("skip", "Switch on Device in Settings, Modules.")
-    found = await probe()
-    if not found.get("reachable"):
-        return result("fail", f"steamos-manager could not be reached: {found.get('error')}", reachable=False)
-    current = found.get("current") or {}
-    tdp, profile = current.get("tdp"), current.get("profile")
-    details = {
-        "tdp": tdp,
-        "profile": profile,
-        "boost": current.get("boost"),
-        "chargeLimit": current.get("chargeLimit"),
-        "writeBack": found.get("writeBack"),
-        "tools": found.get("tools"),
-    }
-    parts = []
-    if tdp:
-        parts.append(f"TDP {tdp['value']} W ({tdp['min']} to {tdp['max']} W)")
-    if profile:
-        parts.append(f"mode {profile['current']} of {', '.join(profile['available'])}")
-    if current.get("boost") is not None:
-        parts.append(f"CPU boost {'on' if current['boost'] else 'off'}")
-    if current.get("chargeLimit"):
-        parts.append(f"charge limit {current['chargeLimit']['value']}")
-    if found.get("writeError"):
-        return result(
-            "fail", "; ".join(parts) + f". A write that changes nothing failed: {found['writeError']}", **details
-        )
-    if not tdp and not profile:
-        return result("warn", "steamos-manager runs but offers no TDP or mode here.", **details)
-    if found.get("tools"):
-        return result(
-            "warn",
-            "; ".join(parts) + f". {', '.join(found['tools'])} manages performance, so Haversack only shows it.",
-            **details,
-        )
-    return result("pass", "; ".join(parts) + f". Written and read back: {found.get('writeBack')}.", **details)
-
-
-async def check_charge_limit(ctx: Context) -> dict[str, Any]:
-    """Battery charge limit (R21 stage 4): who controls the 80 percent limit here, and its state."""
-    probe = ctx.probes.get("charge-limit")
-    if probe is None:
-        return result("skip", "Switch on Device in Settings, Modules.")
-    found = await probe()
-    firmware = found.get("firmware") or {}
-    details = {
-        "control": found.get("control"),
-        "limited": found.get("limited"),
-        "level": found.get("level"),
-        "chargeTypes": firmware.get("chargeTypes"),
-        "threshold": firmware.get("threshold"),
-    }
-    state = {True: "on", False: "off", None: "unknown"}[found.get("limited")]
-    if found.get("control") == "steamos-manager":
-        return result("pass", f"Haversack can set it through steamos-manager; the limit is {state}.", **details)
-    if firmware.get("chargeTypes") or firmware.get("threshold") is not None:
-        return result(
-            "warn",
-            f"The kernel shows the limit ({state}), but steamos-manager does not offer it here, "
-            "so Haversack only shows it. " + str(found.get("where") or ""),
-            **details,
-        )
-    return result("fail", "Neither steamos-manager nor the kernel shows a charge limit on this device.", **details)
-
-
-async def check_controllers(ctx: Context) -> dict[str, Any]:
-    """Controllers (R21 stage 5): what the kernel shows of the Legion controllers, to plan their controls."""
-    probe = ctx.probes.get("controllers")
-    if probe is None:
-        return result("skip", "This build cannot read the controllers.")
-    found = await probe()
-    pads = found.get("controllers") or []
-    cells = found.get("batteries") or []
-    rings = found.get("rings")
-    details = {
-        "controllers": [p.get("id") for p in pads],
-        "settings": sorted({k for p in pads for k in (p.get("settings") or {})}),
-        "batteries": len(cells),
-        "rings": sorted(rings) if rings else None,
-        "tools": found.get("tools"),
-    }
-    parts = [
-        f"{len(pads)} controller{'s' if len(pads) != 1 else ''} on the hid-lenovo-go driver",
-        f"{len(cells)} controller batter{'ies' if len(cells) != 1 else 'y'}",
-        "RGB rings shown" if rings else "no RGB rings shown",
-    ]
-    if found.get("tools"):
-        parts.append(f"managed by {', '.join(found['tools'])}")
-    if not pads and not cells and not rings:
-        return result(
-            "warn",
-            "; ".join(parts) + ". This kernel shows nothing of the controllers (hid-lenovo-go needs 7.1).",
-            **details,
-        )
-    return result("pass", "; ".join(parts) + ".", **details)
-
-
-async def check_bios(ctx: Context) -> dict[str, Any]:
-    """BIOS check (R21 stage 6): known Legion Go BIOS problems for this version."""
-    probe = ctx.probes.get("bios")
-    if probe is None:
-        return result("skip", "This build cannot read the BIOS version.")
-    found = await probe()
-    details = {
-        "version": found.get("version"),
-        "date": found.get("date"),
-        "known": found.get("known"),
-        "notes": found.get("notes"),
-    }
-    if not found.get("version"):
-        return result("warn", "The BIOS version could not be read.", **details)
-    if not found.get("known"):
-        return result(
-            "pass", f"BIOS {found['version']}: Haversack knows of no problems with this model's BIOS.", **details
-        )
-    text = " ".join(found.get("notes") or []) or "No known problems."
-    return result(
-        found.get("level", "pass") if found.get("level") != "ok" else "pass",
-        f"BIOS {found['version']}. {text}",
-        **details,
-    )
-
-
-TRAY_LIMIT_MS = 200.0
-
-
-async def check_tray_responsive(ctx: Context) -> dict[str, Any]:
-    """Desktop tray responsive (v0.30.1): the tray's D-Bus replies and the page's get_status, each under 200 ms."""
-    probe = ctx.probes.get("tray-responsive")
-    if probe is None:
-        return result("skip", "Run this in Desktop Mode, with the Desktop module on.")
-    found = await probe()
-    details = {k: found.get(k) for k in ("trayMs", "statusMs", "tray", "page")}
-    if not found.get("tray") and found.get("statusMs") is None:
-        return result("skip", "No Haversack tray is running here: run this in Desktop Mode.", **details)
-    slow = []
-    if found.get("trayMs") is not None and found["trayMs"] > TRAY_LIMIT_MS:
-        slow.append(f"the tray took {found['trayMs']:.0f} ms to answer")
-    if found.get("statusMs") is not None and found["statusMs"] > TRAY_LIMIT_MS:
-        slow.append(f"the plugin took {found['statusMs']:.0f} ms to give its status")
-    for key, what in (("trayError", "the tray did not answer"), ("statusError", "the plugin's page did not answer")):
-        if found.get(key):
-            slow.append(f"{what} ({found[key]})")
-    parts = []
-    if found.get("trayMs") is not None:
-        parts.append(f"tray {found['trayMs']:.0f} ms")
-    if found.get("statusMs") is not None:
-        parts.append(f"status {found['statusMs']:.0f} ms")
-    if slow:
-        return result("fail", "; ".join(slow) + ".", **details)
-    return result("pass", f"Answering quickly: {', '.join(parts)}.", **details)
-
-
 _SPEED_BLOCK = b""
 
 
@@ -863,31 +605,6 @@ async def serve_speed(_session: Any, message: dict[str, Any]) -> Any:
         _SPEED_BLOCK = os.urandom(1024 * 1024)
     whole, rest = divmod(size, len(_SPEED_BLOCK))
     return {"size": size}, _SPEED_BLOCK * whole + _SPEED_BLOCK[:rest]
-
-
-async def check_reconnect_help(ctx: Context) -> dict[str, Any]:
-    """Controller reconnect help (R22, ADR-0082): BlueZ reachable as the user, the journal readable,
-    and each helped device's last outcome. Counts and masked addresses only."""
-    probe = ctx.probes.get("reconnect-help")
-    if probe is None:
-        return result("skip", "This build has no controller reconnect help.")
-    found = await probe()
-    if not found.get("available"):
-        return result("fail", f"Bluetooth could not be read: {found.get('problem') or 'unknown'}.", **found)
-    helped = found.get("helped") or []
-    parts = [
-        f"{found.get('paired', 0)} paired device{'s' if found.get('paired') != 1 else ''}"
-        f" ({found.get('classic', 0)} Bluetooth Classic) on {found.get('adapters', 0)} adapter"
-        f"{'s' if found.get('adapters') != 1 else ''}",
-        f"help on for {len(helped)}",
-        "watcher running" if found.get("watcher") else "watcher not running",
-        "journal readable" if found.get("journal") == "read" else f"journal not readable ({found.get('journal')})",
-    ]
-    outcomes = [h.get("outcome") for h in helped if h.get("outcome")]
-    if outcomes:
-        parts.append("last outcomes " + ", ".join(outcomes))
-    status = "pass" if found.get("watcher") and found.get("journal") == "read" else "warn"
-    return result(status, "; ".join(parts) + ".", **found)
 
 
 async def check_emulator_setup(ctx: Context) -> dict[str, Any]:
@@ -907,37 +624,6 @@ async def check_emulator_setup(ctx: Context) -> dict[str, Any]:
         f"key and firmware files: {sum(found['secrets'].values())}",
     ]
     status = "pass" if found["setups"] or found["emulators"] else "warn"
-    return result(status, "; ".join(parts) + ".", **found)
-
-
-async def check_fan_control(ctx: Context) -> dict[str, Any]:
-    """Fan control (R24, ADR-0085): the model, firmware, readings, the routes there are, and other fan tools."""
-    probe = ctx.probes.get("fan-control")
-    if probe is None:
-        return result("skip", "This build has no fan control.")
-    found = await probe()
-    if found.get("off"):
-        return result("skip", "Device controls are off.")
-    parts = [
-        f"model {found.get('model') or 'not a Legion Go'}",
-        f"temperature {found.get('temperature')} °C" if found.get("temperature") is not None else "no temperature",
-        f"fan {found.get('rpm')} RPM" if found.get("rpm") is not None else "fan speed not read",
-    ]
-    firmware = found.get("firmware") or {}
-    if firmware:
-        checked = "validated" if found.get("validated") else "not validated"
-        parts.append(f"BIOS {firmware.get('bios')} EC {firmware.get('ec')} ({checked})")
-    if found.get("model") == "go1":
-        parts.append(
-            "full fan speed " + ("offered" if found.get("fullSpeedAttribute") else "not offered by this kernel")
-        )
-    parts.append("acpi_call " + ("present" if found.get("acpiCall") else "absent"))
-    others = [*(found.get("conflicts") or []), *(found.get("tools") or [])]
-    if others:
-        parts.append("other fan control: " + ", ".join(others))
-    if not (found.get("helper") or {}).get("ready"):
-        return result("warn", "; ".join(parts) + ". The Haversack Helper is not ready.", **found)
-    status = "pass" if found.get("model") and not others and found.get("rpm") is not None else "warn"
     return result(status, "; ".join(parts) + ".", **found)
 
 
@@ -968,17 +654,7 @@ CHECKS = [
     ),
     Check("smb-find", "Find shares on my network", "one", "A206", check_smb_find),
     Check("network-iso", "Network ISO in place", "one", "A158, network_mount_probe.py --loop-test", check_network_iso),
-    Check("desktop-app", "Desktop app ready", "one", "A208, A209", check_desktop_app),
-    Check("session-sources", "Session stats sources", "one", "A211, A212", check_session_sources),
-    Check("tray-responsive", "Desktop tray responsive", "one", "v0.30.1", check_tray_responsive),
-    Check("device-readings", "Device readings", "one", "ADR-0074", check_device_readings),
-    Check("performance-control", "Performance control", "one", "ADR-0076", check_performance_control),
-    Check("charge-limit", "Battery charge limit", "one", "ADR-0077", check_charge_limit),
-    Check("controllers", "Controllers", "one", "ADR-0078", check_controllers),
-    Check("reconnect-help", "Controller reconnect help", "one", "ADR-0082, A225 to A228", check_reconnect_help),
-    Check("fan-control", "Fan control", "one", "ADR-0085, A236 to A238", check_fan_control),
     Check("emulator-setup", "Emulator setup", "both", "ADR-0087", check_emulator_setup),
-    Check("bios", "BIOS check", "one", "ADR-0079", check_bios),
 ]
 BY_ID = {c.id: c for c in CHECKS}
 

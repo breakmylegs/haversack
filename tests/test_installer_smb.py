@@ -8,11 +8,10 @@ from typing import ClassVar
 
 import pytest
 
+from helpers import Device
 from keepsake.installer import remote, smbshare, udisks
 from keepsake.installer.remote import Cancelled, RemoteError
 from keepsake.installer.smbshare import Share
-from keepsake.store import LocalFolderStore
-from test_app_ux import Device
 from test_installer import FakeUdisks, env  # noqa: F401 (the fixture)
 
 DATA = bytes(range(256)) * 40_000  # about 10 MiB: three chunks
@@ -252,7 +251,7 @@ def test_locations_accept_smb(tmp_path):
 @pytest.fixture
 def device(env, tmp_path):  # noqa: F811
     installer, *_ = env
-    a = Device(tmp_path / "dev", "a", 4171510507, LocalFolderStore(str(tmp_path / "cloud")))
+    a = Device(tmp_path / "dev", "a", 4171510507)
     a.app.installer = installer
     disc = (tmp_path / "DISC").as_posix()
     os.makedirs(disc, exist_ok=True)

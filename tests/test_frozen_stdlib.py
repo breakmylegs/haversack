@@ -57,7 +57,6 @@ net.fetch = net.fetch_to_file = net.request = refuse  # before keepsake.app bind
 
 import main  # noqa: E402  (the bug: this import failed with "No module named 'xml.etree'")
 from keepsake import diagnostics  # noqa: E402
-from keepsake.store import StoreError  # noqa: E402
 
 
 async def go():
@@ -65,21 +64,12 @@ async def go():
     await plugin._main()
     app = plugin.app
     status = await app.get_status()
-    checks = {c["id"]: c for c in await app._health(False)}
     modules = diagnostics.environment()["modules"]
-    try:
-        app._webdav()
-        webdav = "no error"
-    except StoreError as exc:
-        webdav = str(exc)
     await plugin._unload()
     return {
         "version": status.get("version"),
-        "pythonModules": checks["python-modules"],
         "xml": modules["xml"]["available"],
         "tomllib": modules["tomllib"]["available"],
-        "webdav": webdav,
-        "store": app.settings.get("snapshotStore"),
     }
 
 
@@ -118,29 +108,5 @@ def test_the_backend_starts_without_xml_tomllib_or_resource(tmp_path):
     assert result.returncode == 0, result.stderr[-3000:]
     line = next(x for x in result.stdout.splitlines() if x.startswith("RESULT "))
     found = json.loads(line[len("RESULT ") :])
+    assert found["version"]
     assert found["xml"] is False and found["tomllib"] is False  # diagnostics report them in plain terms
-    assert found["pythonModules"]["status"] == "warn"
-    assert found["pythonModules"]["items"] == ["xml (needed for WebDAV and S3)"]
-    assert "WebDAV and S3 are not supported by this Decky build" in found["webdav"]
-    assert found["store"] == "local"  # save sync with the local store, OneDrive or Google Drive is unaffected
-
-
-def test_webdav_and_s3_listing_fail_clearly_without_xml(monkeypatch):
-    import builtins
-
-    from keepsake.store import StoreError, httpcall
-
-    real_import = builtins.__import__
-
-    def no_xml(name, *args, **kwargs):
-        if name.startswith("xml"):
-            raise ModuleNotFoundError("No module named 'xml'", name=name)
-        return real_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", no_xml)
-    try:
-        httpcall.parse_xml(b"<a/>", "WebDAV server")
-    except StoreError as exc:
-        assert str(exc) == httpcall.XML_MISSING
-    else:
-        raise AssertionError("parse_xml must raise StoreError without xml")

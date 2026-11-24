@@ -1,15 +1,14 @@
 {
   "name": "keepsake",
   "version": "0.60.0",
-  "description": "Decky Loader plugin that syncs PC game saves between SteamOS and Bazzite handhelds through cloud storage, from Gaming Mode.",
+  "description": "Decky Loader plugin that installs non-Steam games and moves them between SteamOS and Bazzite handhelds, from Gaming Mode.",
   "type": "module",
   "packageManager": "pnpm@9.15.9",
   "scripts": {
     "build": "rollup -c",
     "watch": "rollup -c -w",
     "typecheck": "tsc --noEmit",
-    "build:desktop": "tsc -p tsconfig.desktop.json",
-    "lint": "eslint src desktop/src",
+    "lint": "eslint src",
     "package": "python scripts/package.py",
     "deploy:device": "python scripts/deploy.py",
     "test:device": "python scripts/test_on_device.py",
@@ -26,7 +25,7 @@
     "decky",
     "plugin",
     "steam-deck",
-    "save-sync"
+    "non-steam-games"
   ],
   "author": "breakmylegs",
   "license": "BSD-3-Clause",

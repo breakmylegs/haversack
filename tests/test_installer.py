@@ -6,12 +6,11 @@ import os
 
 import pytest
 
+from helpers import Device
 from keepsake.installer import files, udisks
 from keepsake.installer.service import Installer, InstallerError, windows_path
 from keepsake.statedb import StateDB
 from keepsake.steamops import SteamOps
-from keepsake.store import LocalFolderStore
-from test_app_ux import Device
 
 
 class FakeUdisks:
@@ -202,8 +201,8 @@ def test_refusals(env, tmp_path):
         installer.cancel(job["id"])
 
 
-def test_app_routes_an_unsynced_exit_and_op_results_to_the_installer(tmp_path):
-    a = Device(tmp_path, "a", 4171510507, LocalFolderStore(str(tmp_path / "cloud")))
+def test_app_routes_a_game_exit_and_op_results_to_the_installer(tmp_path):
+    a = Device(tmp_path, "a", 4171510507)
     source = tmp_path / "a" / "home" / "gog"  # inside the device home, as a download would be
     write(str(source / "setup.exe"))
 
@@ -223,8 +222,8 @@ def test_app_routes_an_unsynced_exit_and_op_results_to_the_installer(tmp_path):
     status, after_add, handled, after_exit = asyncio.run(go())
     assert status["running"] is True and status["libraryRoot"].endswith("/Games")
     assert after_add["jobs"][0]["state"] == "run-installer" and after_add["jobs"][0]["appid"] == 3000000077
-    assert handled == {"handled": 0}  # Saves does not sync it ...
-    assert after_exit["jobs"][0]["state"] == "choose-game"  # ... but the Installer heard it close
+    assert handled == {"handled": 1}  # passed on for every game (ADR-0098) ...
+    assert after_exit["jobs"][0]["state"] == "choose-game"  # ... so the Installer heard it close
     assert ("keepsake_toast", ("Folder Game: choose the game's program in Haversack, Installer.",)) in a.events
 
 
@@ -548,11 +547,11 @@ def test_artwork_key_and_ops_validation(tmp_path):
     db.close()
 
 
-def test_app_announces_the_installed_game_and_hands_off_to_saves(tmp_path, monkeypatch):
+def test_app_announces_the_installed_game_and_hands_off_to_games(tmp_path, monkeypatch):
     from keepsake.installer import artwork
 
     monkeypatch.setattr(artwork, "IMAGE_HOST_APPROVED", True)
-    a = Device(tmp_path, "a", 4171510507, LocalFolderStore(str(tmp_path / "cloud")))
+    a = Device(tmp_path, "a", 4171510507)
     source = tmp_path / "a" / "home" / "gog"  # inside the device home, as a download would be
     write(str(source / "setup.exe"))
     heard = []
@@ -588,7 +587,7 @@ def test_app_announces_the_installed_game_and_hands_off_to_saves(tmp_path, monke
     handoff, health = asyncio.run(go())
     # Announced once, when the retarget finished.
     assert heard == [{"event": "game_installed", "gameKey": None, "appid": 4171510507, "title": "Folder Game"}]
-    assert handoff == {"key": a.key, "replication": False}
+    assert handoff == {"key": a.key, "replication": True}  # Moving games is on by default (ADR-0098)
     assert ("keepsake_toast", ("Folder Game is installed. Start it from your library.",)) in a.events
     installer = next(m for m in health["modules"] if m["name"] == "installer")
     assert {c["id"] for c in installer["health"]} >= {"udisksctl", "installer-discs", "installer-shortcuts"}

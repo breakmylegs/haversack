@@ -91,7 +91,7 @@ export function ReplicationPage({ part = "devices" }: { part?: "moving" | "devic
         <GameTransfersSection />
         <OffersSection />
         <TransfersSection />
-        <Field description="Send a game from its page in Saves, Games, or get one from another device in Other devices." />
+        <Field description="Send a game from Games, or get one from another device in Other devices." />
       </div>
     );
   }

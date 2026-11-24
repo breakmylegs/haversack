@@ -1,18 +1,16 @@
 # Replication: your devices
 
-Replication links your own devices directly: handhelds, Linux PCs and Windows PCs. It pairs them, then sends non-Steam games between them: a game you set up on one handheld appears on the other, playable, with the same Proton version, artwork and launch options.
+Replication links your own handhelds directly. It pairs them, then sends non-Steam games between them: a game you set up on one handheld appears on the other, playable, with the same Proton version, artwork and launch options.
 
 ```mermaid
 flowchart LR
     A[Handheld A] -- "direct, encrypted, uncompressed" --> B[Handheld B]
-    A -- "direct" --> P[PC]
-    B -- "direct" --> P
     A -. "never" .-> C[(Cloud storage)]
 ```
 
 ## Switch it on
 
-1. Open Haversack, then **Settings**, then **Modules**, and switch on **Replication**. **Games and devices** then has **Moving games** and **Other devices**. On a PC, it is the **Moving games and devices** page.
+1. Replication is on from the start. If you switched it off, open **Settings**, **Modules** and switch on **Replication**. **Games and devices** has **Moving games** and **Other devices**.
 2. On **Other devices**, switch on **Let other devices reach this one**. Until you do, nothing on your network can connect to this device.
 
 Do this on each device you want to link. You need no SSH, keys or accounts.
@@ -29,24 +27,23 @@ Pairing is trust both ways. When it finishes, the device you started from can be
 
 The code is new each time and only works for that attempt. A device that keeps getting it wrong, or keeps asking, is locked out for ten minutes.
 
-Each device you pair is linked to every other one you pair, so a group such as two handhelds and a PC works.
+Each device you pair is linked to every other one you pair, so a group of three handhelds works.
 
 ## Paired devices
 
 - **Check** connects and shows the round trip. Over a VPN it says when the link looks slow, which can mean the VPN is relaying it.
-- **Wake** sends a Wake-on-LAN signal. It usually wakes a PC on a cable. A handheld asleep on Wi-Fi usually cannot be woken this way.
+- **Wake** sends a Wake-on-LAN signal. A handheld asleep on Wi-Fi usually cannot be woken this way, but one on a dock's cable often can.
 - **Remove** forgets a device. It can no longer connect until you pair it again.
 
 ## Send a game
 
-1. On the device that has the game, open it in **Saves**, **Games** and press **Send to <device>**.
+1. On the device that has the game, open it in **Games and devices**, **Games** and press **Send to <device>**.
    - Haversack first asks the other device whether the game fits, and stops at once if it does not, for example "Legion Go 2 doesn't have enough space: needs 41.2 GiB, has 12.0 GiB free".
    - It then checks every file, which takes a few minutes for a large game.
-   - If Saves syncs the game, the newest saves go first.
 2. The other device starts copying by itself, with a toast. There is nothing to accept.
    - If that device lacks the game's compatibility tool (a GE-Proton version, for example), Haversack copies it too. Steam finds a copied tool after a restart.
    - Launch options that only make sense on the first device, such as a mounted disc, stay behind, and Haversack lists them.
-3. Haversack copies the game, adds it to Steam with the same name, program, launch options, Proton version and artwork, and says when it is ready. If Saves synced the game, it carries on with the same saves, with no conflict.
+3. Haversack copies the game, adds it to Steam with the same name, program, launch options, Proton version and artwork, and says when it is ready. The first copy includes the game's saves, so you carry on where you left off.
 
 ## Get a game from another device
 
@@ -58,8 +55,7 @@ Each device you pair is linked to every other one you pair, so a group such as t
 
 Every game on its way, in either direction, has a bar on both devices:
 - under **Moving games**;
-- as a short line in the quick access menu;
-- in the desktop app's table.
+- as a short line in the quick access menu.
 
 Each bar shows the percentage done, GiB done of the total, the speed, the time left and the stage:
 - Checking space;
@@ -90,13 +86,11 @@ Once a game has been sent, each device knows the other has it. When it changes o
 - If the game changed on both devices, Haversack changes nothing and asks you. **Take theirs** replaces this device's copy with the other's, and **Keep mine** keeps it.
 - **Stop update** stops an update part way. The game stays exactly as it was.
 
-Your saves and settings on each device are never replaced by an update, whichever you choose. Saves looks after them.
+Your saves and settings on each device are never replaced by an update, whichever you choose. Haversack finds them from the Ludusavi game database and leaves them out of every update.
 
 ## Firewalls
 
-Haversack never changes your firewall. **Diagnostics**, **Health** says what to allow, if anything: TCP 47110 and UDP 5353.
-- On Windows, allow Python on private networks when Windows asks.
-- On Bazzite, the default settings already allow it.
+Haversack never changes your firewall. **Diagnostics**, **Device checks** says what to allow, if anything: TCP 47110 and UDP 5353. On Bazzite, the default settings already allow it.
 
 ## Promises
 
@@ -107,7 +101,7 @@ Haversack never changes your firewall. **Diagnostics**, **Health** says what to 
 - **Stop means clean.** **Stop and remove**, which asks you first, deletes everything the transfer made: partial files, the shortcut, the prefix and any tool copy. Your existing install is never touched.
 - **Room to spare.** Haversack checks there is enough free space before anything is read or copied, and keeps the device awake while it copies.
 - **Honest speed.** Both devices show the speed, time left and progress, and say plainly when a link looks slow.
-- **Saves stay with Saves.** Replication never touches save files. Haversack's save sync looks after them.
+- **Saves copied once.** The first copy of a game includes its saves. After that, no update ever replaces a save or settings file on either device.
 
 ## Emulators
 

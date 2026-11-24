@@ -4,15 +4,13 @@ import asyncio
 
 import pytest
 
-from helpers import make_fake_steam, shortcut_entry
+from helpers import Device, make_fake_steam, shortcut_entry
 from keepsake import discovery
 from keepsake.bus import EventBus
 from keepsake.locks import GameLocks
 from keepsake.modules import Module, ModuleRegistry
 from keepsake.statedb import StateDB, StateError
 from keepsake.steamops import CLAIM_TIMEOUT, SteamOps, SteamOpsError
-from keepsake.store import LocalFolderStore
-from test_app_ux import Device
 
 
 def run(coro):
@@ -202,53 +200,56 @@ def test_steam_ops_queue(tmp_path):
 # Through the app
 
 
-def test_a_failing_module_leaves_saves_working(tmp_path):
-    a = Device(tmp_path, "a", 4171510507, LocalFolderStore(str(tmp_path / "cloud")))
+def test_a_failing_module_leaves_the_others_working(tmp_path):
+    a = Device(tmp_path, "a", 4171510507)
     flaky = Probe(fail_start=True)
     a.app.registry.register(flaky.module("flaky"))
-    a.app.settings.set("moduleFlags", {})
 
     async def go():
-        a.app.registry.flags = lambda: {"flaky": True}
+        a.app.registry.flags = lambda: {"flaky": True, "replication": True, "installer": True}
         await a.app.start()
-        await a.app.update_game_config(a.key, {"enabled": True})
-        (a.saves / "slot.sav").write_bytes(b"progress")
-        pushed = await a.app.sync_push(a.key)
         status = await a.app.modules_status()
         await a.app.stop()
-        return pushed, status
+        return status
 
-    pushed, status = run(go())
+    status = run(go())
     by_name = {m["name"]: m for m in status["modules"]}
-    assert pushed["status"] == "published"
-    assert by_name["flaky"]["failed"] and by_name["saves"]["running"]
+    assert by_name["flaky"]["failed"]
+    assert by_name["replication"]["running"] and by_name["installer"]["running"]
     assert status["stateDatabase"] is True
-    assert {m["name"] for m in status["modules"] if not m["available"]} == {"desktop"}  # Replication: ADR-0056
+    assert set(by_name) == {"flaky", "replication", "installer"}  # the strip: two modules (ADR-0098)
 
 
-def test_lifecycle_events_reach_subscribers_and_saves_can_be_switched_off(tmp_path):
-    a = Device(tmp_path, "a", 4171510507, LocalFolderStore(str(tmp_path / "cloud")))
+def test_game_start_and_exit_reach_subscribers_for_every_game(tmp_path):
+    """Steam's events are passed on for any game, linked or not, with the app ID normalised (ADR-0098)."""
+    a = Device(tmp_path, "a", 4171510507)
     listener = Probe()
     a.app.bus.subscribe("game_exited", "test", listener.on_exit)
+    started = []
+
+    async def on_start(payload):
+        started.append(payload)
+
+    a.app.bus.subscribe("game_started", "test", on_start)
 
     async def go():
-        await a.app.update_game_config(a.key, {"enabled": True})
-        (a.saves / "slot.sav").write_bytes(b"progress")
-        game = await a.app._game(a.key)
-        exited = await a.app._exit(game)
-        handled_on = await a.app.on_game_event("exit", 4171510507)
-        await a.app.set_module_enabled("saves", False)
-        handled_off = await a.app.on_game_event("exit", 4171510507)
-        return exited, handled_on, handled_off
+        signed = 4171510507 - 2**32  # the same shortcut, as a signed 32-bit ID
+        return (
+            await a.app.on_game_event("exit", 4171510507),
+            await a.app.on_game_event("start", signed),
+            await a.app.on_game_event("suspend", 4171510507),
+            await a.app.on_game_event("exit", "not a number"),
+        )
 
-    exited, handled_on, handled_off = run(go())
-    assert exited["status"] == "published"
-    assert listener.events == [{"event": "game_exited", "gameKey": "example-quest", "appid": 4171510507}]
-    assert handled_on == {"handled": 1} and handled_off == {"handled": 0}
+    exited, began, other, bad = run(go())
+    assert listener.events == [{"event": "game_exited", "gameKey": None, "appid": 4171510507}]
+    assert started == [{"event": "game_started", "gameKey": None, "appid": 4171510507}]
+    assert exited == began == {"handled": 1}
+    assert other == bad == {"handled": 0}
 
 
 def test_steam_probe_queues_an_operation_and_events_the_frontend(tmp_path):
-    a = Device(tmp_path, "a", 4171510507, LocalFolderStore(str(tmp_path / "cloud")))
+    a = Device(tmp_path, "a", 4171510507)
 
     async def go():
         await a.app.start()

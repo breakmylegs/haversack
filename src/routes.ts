@@ -3,7 +3,7 @@ import { Navigation } from "@decky/ui";
 import { navlog } from "./navlog";
 import { SectionId, firstPage, pagePath, resolve, sectionPath } from "./routeData";
 
-export { LEGACY, ROUTE_PATH, SETUP_PATH, pagePath, sectionPath } from "./routeData";
+export { LEGACY, ROUTE_PATH, pagePath, sectionPath } from "./routeData";
 export type { SectionId } from "./routeData";
 
 // The last sub-page used in each section, while Haversack is loaded. Not saved: a fresh start opens

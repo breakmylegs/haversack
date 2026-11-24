@@ -1,4 +1,4 @@
-# Releasing Keepsake
+# Releasing Haversack
 
 There is no CI (ADR-0004) and `main` only accepts pull requests (ADR-0005), so a release is two local steps. You need `gh` signed in, Python, pnpm and SSH access to a device.
 
@@ -29,31 +29,10 @@ A pinned key that is lost locks every installed device out of in-place updates. 
 2. Run `python scripts/signing.py restore E:\keepsake-signing` and type the passphrase when asked. It re-seals the passphrase for this laptop's account, locks the folder and runs a signing check.
 3. Run `python scripts/signing.py status`. The public key must match `release_key.py`.
 
-## Once: the Google sign-in secrets (ADR-0055)
-
-The built-in Google clients' secrets ship in the release packages but are never committed. They live in the git-ignored file `py_modules/keepsake/client_secrets.json`, and `publish` refuses to run without it. To recreate it on another laptop:
-
-1. Sign in to https://console.cloud.google.com with the Keepsake Google account, and open the `Keepsake` project.
-2. Open **Google Auth Platform**, then **Clients**. For each client, open it and copy its secret. If the secret is no longer shown, use **Add secret**.
-3. Create the file with exactly these two names:
-   ```json
-   {
-     "googleClientSecret": "<secret of the TVs and Limited Input client>",
-     "googleDesktopClientSecret": "<secret of the Desktop app client>"
-   }
-   ```
-4. Run `git status`. The file must not be listed.
-
 ## Each release
 
 1. Add a section to `CHANGELOG.md` for the new version, for example `## [0.2.1]`, with the notes. It becomes the release notes.
-   - **User guide (ADR-0046).** Regenerate the screenshots and check the guide. Commit any changed images and pages in the same pull request as the changelog:
-     ```
-     npx -y pnpm@9.15.9 run build:desktop
-     python scripts/docs_screenshots.py
-     python scripts/check_docs.py
-     ```
-   - **Page updates.** Update the pages in `docs/user/` for anything the release changes for users.
+   - **User guide (ADR-0046).** Update the pages in `docs/user/` for anything the release changes for users, rebuild the Help with `python scripts/help.py`, and check with `python scripts/check_docs.py`. Commit them in the same pull request as the changelog.
 2. On an up-to-date `main` with a clean tree:
 
    ```
@@ -75,37 +54,29 @@ The built-in Google clients' secrets ship in the release packages but are never 
    pnpm release publish --device-tested
    ```
 
-   This runs `pnpm run check`, builds `Keepsake-v0.2.1.zip` deterministically, copies it byte for byte to `Keepsake.zip`, writes `SHA256SUMS` with a line for each name, signs it with the laptop's key (checked with the plugin's own verifier against the pinned key), creates and pushes the tag `v0.2.1`, and creates the GitHub Release with both zips, `SHA256SUMS`, the signature and the changelog notes.
+   This runs `pnpm run check`, builds `Haversack-v0.2.1.zip` deterministically, copies it byte for byte to `Haversack.zip` and, for installs from before the rename, to `Keepsake-v0.2.1.zip` and `Keepsake.zip`, writes `SHA256SUMS` with a line for each name, signs it with the laptop's key (checked with the plugin's own verifier against the pinned key), creates and pushes the tag `v0.2.1`, and creates the GitHub Release with the zips, `SHA256SUMS`, the signature and the changelog notes.
 
 ## Release assets and the install URL
 
 | Asset | Used by |
 |---|---|
-| `Keepsake-v<version>.zip` | The in-plugin updater and the rebuild check below |
-| `Keepsake.zip` | First install: `https://github.com/breakmylegs/haversack/releases/latest/download/Keepsake.zip` |
-| `Keepsake-desktop-v<version>.zip` | The PC package for Windows and Linux PCs (ADR-0042) |
-| `Keepsake-v<version>.sbom.cdx.json` | The software bill of materials: every shipped third-party component (ADR-0050) |
+| `Haversack-v<version>.zip` | The in-plugin updater and the rebuild check below |
+| `Haversack.zip` | First install: `https://github.com/breakmylegs/haversack/releases/latest/download/Haversack.zip` |
+| `Keepsake-v<version>.zip`, `Keepsake.zip` | The same bytes, for installs from before the rename (ADR-0089) |
+| `Haversack-v<version>.sbom.cdx.json` | The software bill of materials: every shipped third-party component (ADR-0050) |
 | `SHA256SUMS` | Every asset above, one line each, so one signature covers them all |
 
-First install on a new device: Decky, Settings, Developer, Install Plugin from URL, then paste the URL above. After that, updates come through Keepsake's Updates page.
+First install on a new device: Decky, Settings, Developer, Install Plugin from URL, then paste the URL above. After that, updates come through Haversack's Updates page. Since 0.61.0 (ADR-0098) there is no PC package and no helper; PCs on the old PC package stay on 0.60.0.
 
-GitHub's `/releases/latest/` redirect skips drafts and pre-releases, so that URL always gives the newest stable release. Do not rename or drop either zip: the updater only looks for the versioned name, and the install URL only works while every stable release has `Keepsake.zip`.
+GitHub's `/releases/latest/` redirect skips drafts and pre-releases, so that URL always gives the newest stable release. Do not rename or drop either zip: the updater only looks for the versioned name, and the install URL only works while every stable release has `Haversack.zip` (and `Keepsake.zip` for old installs).
 
 Use `pnpm release publish --dry-run` to build the assets into `out/release/` without tagging or publishing.
 
 If you choose to publish without running the device tests, use `pnpm release publish --accept-untested` instead of `--device-tested`. The release notes then state that the device tests were not run.
 
-## The ProtonDB index (monthly, separate from plugin releases)
+## The ProtonDB index
 
-Advisor's optional ProtonDB source reads the `protondb-index.json.gz` asset of the rolling release `protondb-index` (ADR-0035). Refresh it after ProtonDB publishes a new monthly dump (usually on the 1st or 2nd):
-
-1. Find the newest dump: `gh api repos/bdefore/protondb-data/contents/reports --jq ".[].name"`.
-2. Download it into its own empty folder, for example `tmp/pdb-dl/reports_nov1_2026.tar.gz` (about 70 MB). Keep the file name; the build reads the dump name from it.
-3. Build: `python -I scripts/protondb_index.py build tmp/pdb-dl/reports_nov1_2026.tar.gz --out tmp/pdb-out`. It refuses a cut-off dump and an index over 30 MB.
-4. Publish: `python scripts/protondb_index.py publish tmp/pdb-out/protondb-index.json.gz`. It replaces the asset in the same release, keeps the ODbL notes, and never marks the release latest, so the install URL above keeps serving the plugin.
-5. Delete the download and the build folder.
-
-The `protondb-index` tag is not a `v*` tag. The updater ignores it, and `v*` tag protection does not apply (ADR-0005).
+Advisor, which read the `protondb-index` release, was removed in 0.61.0 (ADR-0098). The release and `scripts/protondb_index.py` stay on the `full` branch; nothing refreshes it now. Delete the release only by Peter's choice.
 
 ## Pre-releases
 
@@ -118,7 +89,7 @@ Use a version like `0.3.0-beta.1`. It is published as a GitHub pre-release and o
 - **Notes:** the item's changelog lines, with a plain statement at the top that it has not been tested on a device yet. Publish with `--accept-untested`, so the notes also say the device tests were not run.
 - **After publishing, check:**
   - the release is GitHub's "latest";
-  - the first-install link (`/releases/latest/download/Keepsake.zip`) serves it;
+  - the first-install links (`/releases/latest/download/Haversack.zip` and `Keepsake.zip`) serve it;
   - v0.25.0's updater offers it on the stable channel, and its signature checks out.
 - **Earlier betas** (0.27.0-beta.1 and -beta.2) stay published; the next stable release supersedes them.
 - This holds until Peter says otherwise.

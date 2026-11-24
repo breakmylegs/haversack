@@ -154,9 +154,8 @@ def logical_roots(
             else:
                 roots[name] = os.path.join(str(wine), *parts)
     elif platform_of(game) == "windows":
-        from . import hosts
-
-        folders = hosts.windows_roots() if known is None else known
+        # Windows hosts went with the strip (ADR-0098): only the folders a caller passes in are used.
+        folders = known or {}
         for name in WIN_ROOTS:
             folder = folders.get(name)
             roots[name] = os.path.realpath(folder) if folder else None

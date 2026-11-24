@@ -8,7 +8,6 @@ import {
   installerCancel,
   installerCreateShortcut,
   installerFinishedInstalling,
-  installerHandoff,
   installerRemoveShortcut,
   installerRetarget,
   installerStart,
@@ -18,7 +17,6 @@ import {
   InstallJob,
   saveSteamGridDbKey,
   setSetting,
-  updateGameConfig,
 } from "../backend";
 import { openSection } from "../routes";
 import { StreamArtSection } from "./StreamArtSection";
@@ -110,12 +108,8 @@ export function InstallerPage() {
     }
   };
 
-  const syncSaves = (job: InstallJob) =>
-    act(async () => {
-      const { key } = await installerHandoff(job.id);
-      await updateGameConfig(key, { enabled: true });
-      openSection("saves", "games");
-    }, `Save sync switched on for ${job.title}. Check its match in Games.`);
+  // A finished game can go to your other handheld from Games and devices, Games (the strip, ADR-0098).
+  const openInGames = () => openSection("games-devices", "games");
 
   const findArtwork = (job: InstallJob) =>
     act(async () => {
@@ -275,8 +269,8 @@ export function InstallerPage() {
             ))}
           {job.state === "done" && (
             <Focusable style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void syncSaves(job)}>
-                Sync this game's saves
+              <DialogButton style={{ width: "auto" }} onClick={openInGames}>
+                Open in Games
               </DialogButton>
               {status?.artwork && status.artworkKey && !job.artwork && (
                 <DialogButton style={{ width: "auto" }} disabled={busy} onClick={() => void findArtwork(job)}>

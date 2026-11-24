@@ -15,7 +15,6 @@ from typing import Any
 
 from .fsutil import atomic_write_json, read_json
 from .resolve import ALL_ROOTS
-from .safepath import PathEscapeError, is_within
 
 GAMES_FILE = "games.json"
 MAX_ALIASES = 10
@@ -128,27 +127,6 @@ def validate(config: dict[str, Any]) -> dict[str, Any]:
         raise GameConfigError("a game's save locations are a list of known locations, or all of them")
     out["locations"] = list(dict.fromkeys(locations)) if locations is not None else None
     return out
-
-
-def custom_path_from_absolute(path: str, roots: dict[str, str | None]) -> dict[str, str]:
-    """Express a folder picked in the file picker as ``{root, rel}``.
-
-    The most specific root containing the folder wins. Folders outside every
-    root of the game are refused (write allowlist, build prompt section 8).
-    """
-    real = os.path.realpath(path)
-    best: tuple[int, str, str] | None = None
-    for name, root in roots.items():
-        if not root or not os.path.isdir(root):
-            continue
-        real_root = os.path.realpath(root)
-        if is_within(real_root, real) and real != real_root:
-            rel = os.path.relpath(real, real_root).replace(os.sep, "/")
-            if best is None or len(real_root) > best[0]:
-                best = (len(real_root), name, rel)
-    if best is None:
-        raise PathEscapeError("that folder is not inside any of this game's save roots")
-    return {"root": best[1], "rel": validate_rel_glob(best[2])}
 
 
 class GameConfigStore:

@@ -23,23 +23,11 @@ def make_repo(root, version="1.2.3", changelog=None, plugin_extra=None):
     (root / "py_modules" / "keepsake" / "__pycache__").mkdir(parents=True)
     (root / "py_modules" / "keepsake" / "__init__.py").write_text("")
     (root / "py_modules" / "keepsake" / "__pycache__" / "a.pyc").write_text("")
-    (root / "bin").mkdir()
-    (root / "bin" / "keepsake-gate").write_bytes(b'#!/bin/sh\r\nexec "$@"\r\n')  # CRLF as Windows might write it
     for name in ("main.py", "LICENSE", "README.md", "THIRD_PARTY_NOTICES.md"):
         (root / name).write_text(name)
     (root / "package.json").write_text(json.dumps({"version": version}))
     (root / "plugin.json").write_text(json.dumps({"name": "Haversack", **(plugin_extra or {})}))
     (root / "CHANGELOG.md").write_text(changelog if changelog is not None else f"# Changelog\n\n## [{version}]\n")
-    # The PC package's inputs (ADR-0038, P5).
-    (root / "desktop" / "dist").mkdir(parents=True)
-    for name in ("index.html", "app.css", "install.pyw"):
-        (root / "desktop" / name).write_text(name)
-    (root / "desktop" / "dist" / "main.js").write_text("export {};")
-    icon = root / "assets" / "icons" / "hicolor" / "256x256" / "apps"
-    icon.mkdir(parents=True)
-    (icon / "keepsake-tray.png").write_bytes(b"png")  # the tray's icon (ADR-0068)
-    (root / "docs").mkdir()
-    (root / "docs" / "pc-host.md").write_text("pc")
     # The vendored libraries' manifest, which the SBOM reads (ADR-0050).
     (root / "py_modules" / "keepsake" / "_vendor").mkdir()
     (root / "py_modules" / "keepsake" / "_vendor" / "MANIFEST.json").write_text(
@@ -80,42 +68,22 @@ def test_package_layout_modes_and_determinism(tmp_path, monkeypatch):
         assert all(n.startswith("Haversack/") for n in names)
         # Decky finds the plugin by a plugin.json exactly one folder deep.
         assert [n for n in names if n.endswith("/plugin.json") and n.count("/") == 1] == ["Haversack/plugin.json"]
-        gate = archive.getinfo("Haversack/bin/keepsake-gate")
-        assert (gate.external_attr >> 16) & 0o777 == 0o755
-        assert archive.read("Haversack/bin/keepsake-gate") == b'#!/bin/sh\nexec "$@"\n'
         assert (archive.getinfo("Haversack/main.py").external_attr >> 16) & 0o777 == 0o644
-        # Desktop Mode: the plugin serves the desktop interface and ships the tray's icon (ADR-0068).
-        for shipped in ("desktop/index.html", "desktop/app.css", "desktop/dist/main.js"):
-            assert f"Haversack/{shipped}" in names
-        assert "Haversack/assets/icons/hicolor/256x256/apps/keepsake-tray.png" in names
-        assert "Haversack/desktop/install.pyw" not in names  # the PC installer stays in the PC package
+        # The strip (ADR-0098): no desktop interface, no helper scripts.
+        assert not any(n.startswith(("Haversack/desktop/", "Haversack/bin/", "Haversack/assets/")) for n in names)
 
 
-def test_the_pc_package_is_deterministic_and_holds_the_core_and_the_desktop_ui(tmp_path, monkeypatch):
+def test_a_client_secrets_file_left_in_a_checkout_never_ships(tmp_path, monkeypatch):
+    """The cloud sign-in went in the strip (ADR-0098); its git-ignored secrets file must not reach the zip."""
     repo = tmp_path / "repo"
     repo.mkdir()
     make_repo(repo)
+    (repo / "py_modules" / "keepsake" / "client_secrets.json").write_text("{}")
     monkeypatch.setattr(package, "ROOT", str(repo))
-    first = package.build_desktop(str(tmp_path / "out1"))
-    second = package.build_desktop(str(tmp_path / "out2"))
-    assert os.path.basename(first) == "Haversack-desktop-v1.2.3.zip"
-    with open(first, "rb") as a, open(second, "rb") as b:
-        assert a.read() == b.read()
-    with zipfile.ZipFile(first) as archive:
-        names = set(archive.namelist())
-        assert archive.read("Keepsake-desktop/VERSION") == b"1.2.3\n"
-    assert {
-        "Keepsake-desktop/install.pyw",
-        "Keepsake-desktop/desktop/index.html",
-        "Keepsake-desktop/desktop/dist/main.js",
-        "Keepsake-desktop/py_modules/keepsake/__init__.py",
-        "Keepsake-desktop/README-PC.md",
-        "Keepsake-desktop/LICENSE",
-    } <= names
-    assert not any("__pycache__" in n or n.endswith(".pyc") for n in names)
-    (repo / "desktop" / "dist" / "main.js").unlink()
-    with pytest.raises(SystemExit, match="build:desktop"):
-        package.build_desktop(str(tmp_path / "out3"))
+    with zipfile.ZipFile(package.build(str(tmp_path / "out"))) as archive:
+        names = archive.namelist()
+    assert "Haversack/py_modules/keepsake/__init__.py" in names
+    assert not any(n.endswith("client_secrets.json") for n in names)
 
 
 def test_package_requires_build(tmp_path, monkeypatch):
