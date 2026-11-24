@@ -9,8 +9,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
-import functools
-import json
 import logging
 import os
 import re
@@ -19,76 +17,27 @@ import shutil
 import sys
 import threading
 import time
-import uuid
-import zipfile
-from collections.abc import Callable, Coroutine, Mapping
+from collections.abc import Callable, Coroutine
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, ClassVar
 from urllib.parse import urlsplit
 
 from . import (
-    activity,
-    clients,
-    configrev,
     devicechecks,
-    devices,
     diagnostics,
-    directsync,
     discovery,
-    hardware,
-    health,
-    hosts,
-    identity,
-    launchers,
-    launchopts,
-    lifecycle,
+    leftovers,
     manifest,
     net,
-    newest,
-    ordering,
-    pcwatch,
-    playtime,
     power,
-    procs,
-    registry,
     remotecopies,
     resolve,
-    restore,
-    retention,
-    sdcards,
     shortcuts,
-    steamcloud,
-    storage,
-    uninstall,
 )
-from .advisor import anticheat, current, deckverified, sessions
-from .advisor import compat as advisor_compat
-from .advisor.pcgw import PcgwClient
-from .advisor.service import Advisor, AdvisorError
-from .auth import GOOGLE, AuthError, DeviceCodeFlow, TokenManager, TokenStore
 from .backends import BackendConfigError, CredentialStore
 from .bus import EventBus
-from .desktop import dbus as desktop_dbus
-from .desktop import entries as desktop_entries
-from .device import battery as device_battery
-from .device import bios as device_bios
-from .device import controllers as device_controllers
-from .device.bluez import BlueZError
-from .device.controller_settings import ControllerSettings
-from .device.controller_settings import SettingsError as ControllerSettingsError
-from .device.controller_settings import others as controller_tools
-from .device.fans import Fans, FanSettingsError, FanStore, fan_tools
-from .device.helper import HelperClient, HelperError
-from .device.performance import Performance, ProfileError, ProfileStore, clean_profile, other_tools
-from .device.powerlimits import PowerLimits
-from .device.reconnect_service import ReconnectService
-from .device.steamos import ManagerError, SteamOSManager
-from .engine import SnapshotEngine
-from .freeze import PAUSE_CEILING_SECONDS, PAUSED_FILE, Freezer
 from .fsutil import atomic_write_json, read_json
-from .gameconfig import DEFAULT as GAME_DEFAULTS
-from .gameconfig import GameConfigStore, custom_path_from_absolute
-from .importers import ludusavi
+from .gameconfig import GameConfigStore
 from .installer import artwork, inplace, lanfind, netfuse, remote, smbshare, udisks, webdav
 from .installer import files as installer_files
 from .installer.artwork import SteamGridDB
@@ -97,12 +46,7 @@ from .installer.service import health_checks as installer_health_checks
 from .jobs import JobTracker
 from .locks import GameLocks
 from .log import log_event, setup_logging, tail
-from .looks import animations as looks_animations
-from .looks import lookplan
-from .looks import themes as looks_themes
-from .loopback_auth import BrowserProbe, LoopbackFlow
 from .modules import Module, ModuleRegistry
-from .newest import NewestChoices
 from .paths import PluginPaths
 from .procs import find_game_processes
 from .replication import activity as replication_activity
@@ -121,23 +65,10 @@ from .replication.sendgame import sizes as send_sizes
 from .replication.service import Links, ReplicationError, parse_address
 from .replication.service import health_checks as replication_health_checks
 from .replication.source import Shares
-from .resolve import ALL_ROOTS
-from .safepath import PathEscapeError, validate_relative
 from .settings import MODULE_NAMES as SETTINGS_MODULE_NAMES
-from .settings import SNAPSHOT_STORES, SettingsStore
-from .snapshot import SnapshotError, content_hash, scan_entries
+from .settings import SettingsStore
 from .statedb import StateDB, StateError, open_db
-from .statedb import sqlite_available as statedb_sqlite_available
 from .steamops import SteamOps
-from .store import AlreadyExistsError, LocalFolderStore, Store, StoreError, httpcall
-from .store.gdrive import GoogleDriveStore
-from .store.graph import GraphStore
-from .store.multi import LocationState as MultiStoreState
-from .store.multi import MultiStore
-from .store.multi import game_of as multi_game_of
-from .store.s3 import S3Store
-from .store.webdav import WebDavStore
-from .sync import GameContext, SyncEngine
 from .update import Updater, startup_notice
 
 EmitFn = Callable[..., Coroutine[Any, Any, None]]
@@ -187,56 +118,12 @@ def navigation_record(record: Any) -> dict[str, Any]:
     return {"summary": summary, "events": events}
 
 
-IDENTITY_CACHE_SECONDS = 600
-HISTORY_MAX = 200
-CONFIG_STATE_FILE = "config-revisions.json"
-TOAST_SIGNIN = "{name} sign-in needs attention. Open Haversack, Settings, to sign in again."
-BACKEND_NAMES = {
-    "local": "Test store on this device",
-    "onedrive": "OneDrive",
-    "gdrive": "Google Drive",
-    "webdav": "WebDAV",
-    "s3": "S3",
-    "direct": "Directly between my devices",
-}
-IMPORT_STAGING = "import-staging"
-UNRESOLVED_METHODS = ("none", "ambiguous", "no-save-data", "no-manifest")
-
-FREEZE_TEST_MIN = 1
-FREEZE_TEST_MAX = 10
-SIMULATED_JOB_MAX = 120
-IDLE_EVENT = "keepsake_idle"
 MANIFEST_PROGRESS_EVENT = "keepsake_manifest_progress"
-ADVISOR_EVENT = "keepsake_advisor"
-IMPORT_PROGRESS_EVENT = "keepsake_import_progress"
 REPLICATION_EVENT = "keepsake_replication"
-DEVICE_EVENT = "keepsake_device"
-RECONNECT_EVENT = "keepsake_reconnect"
 SHORTCUTS_EVENT = "keepsake_shortcuts"
-MODE_WORDS = {"low-power": "Quiet", "balanced": "Balanced", "performance": "Performance", "custom": "Custom"}
-SYNC_RESULT = {
-    "published": "saved to the cloud",
-    "unchanged": "already up to date",
-    "conflict": "save conflict, open Haversack",
-    "published-fork": "save conflict, open Haversack",
-    "quarantined": "a suspicious save was kept here",
-}
-DEVICE_WATCH_SECONDS = 5.0  # after applying a profile, look once more for another app setting its own value
 PAIR_REQUEST_EVENT = "keepsake_pair_request"  # a device asks to pair (ADR-0070)
 MANIFEST_PROGRESS_SECONDS = 0.5
 RETARGET_KINDS = ("set-shortcut-name", "set-shortcut-exe", "set-shortcut-start-dir", "set-launch-options")
-
-
-def import_verdict(results: list[dict[str, Any]], error: str | None) -> str:
-    """One game's outcome in an import of every game: failed, imported, already imported or nothing to import."""
-    statuses = {r.get("status") for r in results}
-    if error or "error" in statuses:
-        return "failed"
-    if "published" in statuses:
-        return "imported"
-    if statuses == {"already-imported"}:
-        return "already-imported"
-    return "nothing-to-import"
 
 
 async def _no_emit(event: str, *args: Any) -> None:
@@ -248,6 +135,14 @@ SCAN_WAIT = 20.0  # seconds a game scan may take before the last list is used
 PROGRESS_SECONDS = 1.0  # how often a receiving device reports progress to the sender
 PULL_TOKEN_SECONDS = 900.0  # a listed game can be asked for for 15 minutes
 PULL_LIST_MAX = 200
+
+
+def normalise_appid(value: Any) -> int:
+    """Accept a signed or unsigned 32-bit app ID, or a 64-bit shortcut game ID; return the unsigned app ID."""
+    number = int(value)
+    if number >= 2**32:
+        number >>= 32  # 64-bit game ID: (appid << 32) | 0x02000000
+    return number & 0xFFFFFFFF
 
 
 def capital(text: str) -> str:
@@ -267,98 +162,6 @@ def low_priority() -> None:
     which the standard library does not offer; the kernel's scheduler still favours interactive work."""
     with contextlib.suppress(AttributeError, OSError):
         os.setpriority(os.PRIO_PROCESS, threading.get_native_id(), 10)  # type: ignore[attr-defined, unused-ignore]
-
-
-AUTO_PULL_KINDS = ("heroic", "lutris", "bottles", "emulator")
-AUTO_SYNC_METHODS = ("steam-id", "title", "manual")  # matches with known save locations (ADR-0063)
-SCRUB_FILE = "integrity.json"
-SCRUB_INTERVAL = 7 * 24 * 3600
-EXPORT_README = """Haversack export
-
-Each folder holds one game. Each zip is one snapshot of that game's save files, named by
-date and snapshot id, and checked against Haversack's records when it was exported.
-
-Inside a zip, files sit under neutral folder names rather than paths from one device:
-  winLocalAppData  Windows %LOCALAPPDATA% (in a Proton prefix: AppData/Local)
-  winAppData       Windows %APPDATA% (AppData/Roaming)
-  winLocalAppDataLow  AppData/LocalLow
-  winDocuments     Documents
-  winSavedGames    Saved Games
-  winPublic        C:/Users/Public
-  winProgramData   C:/ProgramData
-  base             the game's install folder
-  home, xdgConfig, xdgData  Linux home, ~/.config and ~/.local/share
-  steamUserdata    the game's folder in Steam's userdata
-  registry         the game's registry keys, as a user.reg fragment
-To use a save elsewhere, copy the files from that folder to the same place for the game.
-
-index.json lists every snapshot, its game, device, time and files.
-"""
-WINDOWS_NAME_CHARS = set('<>:"/\\|?*')
-
-
-def export_folder(folder: Any) -> str:
-    """The folder an export goes into: an existing, absolute, writable folder the user chose."""
-    path = str(folder or "").strip()
-    if not path or not os.path.isabs(path) or "\x00" in path:
-        raise ValueError("choose a folder to export to")
-    path = os.path.realpath(path)
-    if not os.path.isdir(path):
-        raise ValueError("that folder does not exist")
-    if not os.access(path, os.W_OK):
-        raise ValueError("Haversack cannot write to that folder")
-    return path
-
-
-def safe_name(name: Any) -> str:
-    """A folder name that works on FAT, exFAT, NTFS and ext4: no reserved characters, no trailing dot."""
-    text = "".join("_" if ch in WINDOWS_NAME_CHARS or ord(ch) < 32 else ch for ch in str(name)).strip(" .")
-    return text[:80] or "Unnamed game"
-
-
-def _new_folder(parent: str, name: str) -> str:
-    """Create a new folder ``name`` in ``parent``, numbered if one already exists; never reuses one."""
-    for attempt in range(1, 100):
-        path = os.path.join(parent, name if attempt == 1 else f"{name} ({attempt})")
-        try:
-            os.makedirs(path)
-            return path
-        except FileExistsError:
-            continue
-    raise ValueError("too many exports in that folder this minute")
-
-
-def _write_new(path: str, text: str) -> None:
-    with open(path, "x", encoding="utf-8", newline="\n") as handle:  # never overwrites
-        handle.write(text)
-
-
-CHECKPOINT_LABEL_MAX = 60
-
-
-def checkpoint_label(label: Any) -> str:
-    """A checkpoint's name: one line of plain text, 1 to 60 characters (ADR-0048)."""
-    text = " ".join(str(label).split())
-    if not text or len(text) > CHECKPOINT_LABEL_MAX or any(ord(ch) < 32 for ch in text):
-        raise ValueError(f"give the checkpoint a name of 1 to {CHECKPOINT_LABEL_MAX} characters")
-    return text
-
-
-def restore_paths(paths: Any) -> set[tuple[str, str]]:
-    """``root/rel`` strings from a restore preview, checked: a known root and a safe relative path."""
-    if not isinstance(paths, list) or not paths or len(paths) > 10_000:
-        raise ValueError("choose at least one file to restore")
-    chosen: set[tuple[str, str]] = set()
-    for item in paths:
-        root, _, rel = str(item).partition("/")
-        if root not in ALL_ROOTS or not rel:
-            raise ValueError(f"not a file from this snapshot: {item}")
-        try:
-            validate_relative(rel)
-        except PathEscapeError as exc:
-            raise ValueError(f"not a file from this snapshot: {item}") from exc
-        chosen.add((root, rel))
-    return chosen
 
 
 WHATS_NEW_MAX = 4000
@@ -395,8 +198,6 @@ def _read_bytes(path: str) -> bytes:
 
 
 class KeepsakeApp:
-    UNINSTALL_OP_TIMEOUT = 300.0  # seconds to wait for Steam to remove a shortcut before giving up (nothing deleted)
-
     def __init__(
         self,
         paths: PluginPaths,
@@ -407,27 +208,10 @@ class KeepsakeApp:
         home: str | None = None,
         download: manifest.Downloader = net.fetch_to_file,
         auto_refresh_manifest: bool = True,
-        transport: net.Transport = net.request,
-        graph_base_url: str | None = None,
-        google_transport: net.Transport = net.google_request,
-        google_api: tuple[str, str] | None = None,
-        endpoint_transport: Callable[[str], net.Transport] = net.endpoint_transport,
-        host: str = "decky",
     ) -> None:
-        # Which host runs this core (ADR-0038). Decky's main.py keeps the default; keepsake.host passes its own.
-        self.host = host if host in hosts.HOSTS else "decky"
-        self._graph_base_url = graph_base_url
-        self._google_transport = google_transport
-        self._google_api = google_api  # tests point this at a fake Drive
-        self._endpoint_transport = endpoint_transport
-        self.credentials = CredentialStore(paths.settings_dir)
-        self.google_tokens = TokenManager(
-            TokenStore(paths.settings_dir, GOOGLE.token_file),
-            lambda: clients.google_client(self.credentials.load("gdrive"))[0],
-            transport=google_transport,
-            provider=GOOGLE,
-            client_secret=lambda client_id: clients.google_secret_for(client_id, self.credentials.load("gdrive")),
-        )
+        # Haversack installs games and moves them between handhelds (the strip, ADR-0098): Decky only.
+        self.host = "decky"
+        self.credentials = CredentialStore(paths.settings_dir)  # the SteamGridDB key and network passwords
         self.paths = paths
         self.home = home
         self._games: dict[str, Any] | None = None
@@ -437,12 +221,12 @@ class KeepsakeApp:
         self._scan_future: asyncio.Future[dict[str, Any]] | None = None
         self._scan_slow = False
         self.remote_copies = remotecopies.RemoteCopies(paths.runtime_dir)
+        # The Ludusavi manifest tells Replication where a game keeps its saves, so updates never replace
+        # the other device's saves (ADR-0072).
         self.manifest = manifest.ManifestStore(paths.runtime_dir, download=download)
         self.game_configs = GameConfigStore(paths.settings_dir)
         self._auto_refresh_manifest = auto_refresh_manifest
         self._manifest_lock = asyncio.Lock()
-        self._import_all: dict[str, Any] = {"running": False, "done": 0, "total": 0, "games": {}, "summary": {}}
-        self._import_cancel = False
         self.net_locations = remote.LocationStore(paths.settings_dir, self.credentials)
         self._net: dict[str, Any] = {"running": False}
         self._net_cancel = False
@@ -455,53 +239,23 @@ class KeepsakeApp:
         self._netfuse_mount: Callable[[str, netfuse.Handler], netfuse.Mount] = netfuse.Mount
         self._udisks_runner: udisks.Runner = udisks.run
         self._net_resolve: remote.Resolver = remote._resolve
-        self._pc_processes: Callable[[], list[str]] = pcwatch.list_processes  # PC hosts only; tests use a fake
         self._manifest_progress: dict[str, Any] = {"stage": "idle", "running": False}
         self._background: list[asyncio.Task[Any]] = []
-        self.token_store = TokenStore(paths.settings_dir)
-        self.tokens = TokenManager(
-            self.token_store,
-            lambda: clients.onedrive_client_id(self.settings.get("onedriveClientId")),
-            transport=transport,
-        )
-        self._transport = transport
-        self._signin: DeviceCodeFlow | LoopbackFlow | None = None
-        self._signin_probe: BrowserProbe | None = None
-        # Browser sign-ins the user moved away from (to the phone): their tabs are told when it worked.
-        self._signin_lingering: list[LoopbackFlow] = []
-        self._launching: set[str] = set()
-        self._identity_cache: tuple[float, list[dict[str, Any]]] | None = None
-        self._auth_lock = asyncio.Lock()
         self.emit = emit or _no_emit
         self.proc_root = proc_root
         self.version = version or os.environ.get("DECKY_PLUGIN_VERSION") or "0.0.0"
         paths.ensure()
         setup_logging(paths.log_dir)
         self.settings = SettingsStore(paths.settings_dir)
-        self.freezer = Freezer(paths.runtime_dir, proc_root=proc_root)
-        # A pause the user asked for (R29 stage 3, ADR-0094): its own record and an hour's watchdog.
-        self.pauser = Freezer(
-            paths.runtime_dir,
-            proc_root=proc_root,
-            ceiling=PAUSE_CEILING_SECONDS,
-            state_file=PAUSED_FILE,
-            max_ceiling=PAUSE_CEILING_SECONDS,
-            on_watchdog=self._pause_watchdog,
-        )
-        self._paused: dict[str, Any] | None = None
-        self.jobs = JobTracker(on_idle=self._on_idle)
+        self.jobs = JobTracker()
         self.updater = Updater(paths.runtime_dir, self.version, fetch)
-        self._fetch = fetch  # Advisor's sources use the same injected fetcher, so tests never reach the network
-        self._freeze_lock = asyncio.Lock()
+        self._fetch = fetch
         self._update_lock = asyncio.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._notice: dict[str, Any] | None = None
-        self._signin_warned = False
         # v2 Core (slice 13, ADR-0012, ADR-0024): lifecycle bus, per-game locks, module registry, state database.
         self.bus = EventBus()
         self.locks = GameLocks()
-        self._uninstall_job: dict[str, Any] | None = None
-        self._uninstall_cancel = False
         self._op_waiters: dict[int, asyncio.Future[tuple[bool, dict[str, Any]]]] = {}
         self.registry = ModuleRegistry(self.bus, lambda: dict(self.settings.get("moduleFlags")))
         self.db: StateDB | None = None
@@ -509,89 +263,13 @@ class KeepsakeApp:
         self._register_modules()
 
     def _register_modules(self) -> None:
-        async def saves_health() -> list[dict[str, Any]]:
-            return await self._health(probe=False)
-
-        self.registry.register(
-            Module(
-                "saves",
-                "Saves",
-                "Keeps game saves in step between your devices through the cloud.",
-                "Save files of the games you choose, their registry keys if you allow it, and Haversack's own "
-                "settings.",
-                health=saves_health,
-            )
-        )
-        self.advisor: Advisor | None = None
-        self.session_recorder = sessions.Recorder(
-            sessions.SessionStore(os.path.join(self.paths.runtime_dir, "advisor-cache", "sessions"))
-        )
-
-        async def advisor_start() -> None:
-            home = discovery.real_home(self.home)
-            advisor = Advisor(
-                self.paths.settings_dir,
-                os.path.join(self.paths.runtime_dir, "advisor-cache"),
-                os.environ.get("DECKY_HOME") or os.path.join(home, "homebrew"),
-                home,
-                os.environ.get("DECKY_USER") or os.path.basename(home.rstrip("/")),
-                self._advisor_map_game,
-                fetch_reports=lambda appid, name: deckverified.fetch(appid, name, self._fetch),
-                anticheat_fetch=lambda: anticheat.download(self._fetch),
-                installed_tools=lambda: advisor_compat.installed_ge_proton(discovery.steam_roots(self.home, self.host)),
-                ai_key=lambda provider: str(self.credentials.load(provider)["apiKey"]),
-                pcgw_client=self._pcgw_client,
-            )
-            await asyncio.to_thread(advisor.detect)
-            self.advisor = advisor
-
-        async def advisor_stop() -> None:
-            await asyncio.to_thread(self.session_recorder.stop_sampling)
-            self.advisor = None
-
-        async def advisor_load(advisor: Advisor, appid: int) -> None:
-            try:
-                await asyncio.to_thread(advisor.set_game, appid)
-            except Exception as exc:  # noqa: BLE001 - advice must never disturb the game or Saves
-                log_event(logging.WARNING, "advisor.load_failed", "Advisor could not load the game", error=str(exc))
-                return
-            await self.emit(ADVISOR_EVENT)
-
-        async def advisor_game_started(payload: dict[str, Any]) -> None:
-            # The running game, from the lifecycle bus (spec 8.1). Saves publishes this inside its launch
-            # gate, so the work runs as a task and the handler returns at once: advice never delays a game.
-            if self.advisor is not None:
-                self._background.append(asyncio.create_task(advisor_load(self.advisor, int(payload["appid"]))))
-                self._background.append(asyncio.create_task(self._session_start(self.advisor, int(payload["appid"]))))
-
-        async def advisor_game_exited(payload: dict[str, Any]) -> None:
-            if self.advisor is not None:
-                self._background.append(asyncio.create_task(self._session_finish(int(payload["appid"]))))
-
-        async def advisor_health() -> list[dict[str, Any]]:
-            return self.advisor.health() if self.advisor else []
-
-        self.registry.register(
-            Module(
-                "advisor",
-                "Advisor",
-                "Recommends settings for the game you play, from your device and community reports.",
-                "Nothing outside its own settings and cache. It only recommends; you copy or apply advice yourself.",
-                start=advisor_start,
-                stop=advisor_stop,
-                health=advisor_health,
-                listeners={"game_started": advisor_game_started, "game_exited": advisor_game_exited},
-                # Its advice is built on handheld power and screen profiles: off by default on PCs (ADR-0038).
-                default=None if self.host == "decky" else False,
-            )
-        )
+        # The two parts left after the strip (ADR-0098): moving games between devices, and installing them.
         self.links: Links | None = None
         self.transfers: Transfers | None = None
         self.incoming: Incoming | None = None
         self.outgoing: Outgoing | None = None
         self.game_links: GameLinks | None = None
         self._sending: dict[str, dict[str, Any]] = {}  # games being prepared to send, by game key
-        self._newest_running: set[str] = set()  # games being settled by "Take the newest" (ADR-0080)
         self._send_tasks: dict[str, asyncio.Task[None]] = {}
         self._pulling: dict[str, dict[str, Any]] = {}  # games asked for from another device, by pull token
         self._pull_tokens: dict[str, dict[str, Any]] = {}  # this device's games listed to a peer, by token
@@ -603,7 +281,6 @@ class KeepsakeApp:
         self.dev_root = "/dev"
         self.power_root = "/"  # where /sys/class/power_supply is read (tests point it elsewhere)
         self._games_running: set[int] = set()
-        self._direct_last: dict[str, Any] | None = None
         self._device_results: dict[str, dict[str, Any]] = {}
         self.replication_port = replication_link.DEFAULT_PORT
 
@@ -650,11 +327,6 @@ class KeepsakeApp:
                 on_change=self._replication_changed,
                 on_offer=self._replication_offer_arrived,
                 on_state=self._replication_offer_state,
-                kinds={
-                    lookplan.KIND: lookplan.Handler(
-                        self._homebrew, self.paths.runtime_dir, lambda: self.registry.enabled("looks")
-                    )
-                },
             )
             self.game_links = GameLinks(os.path.join(self.paths.runtime_dir, "replication-games.json"))
             restored = await asyncio.to_thread(self.outgoing.restore)
@@ -670,13 +342,10 @@ class KeepsakeApp:
                     "pull-check": self._serve_pull_check,
                     "pull": self._serve_pull,
                     "pull-state": self._replication_pull_news,
-                    **directsync.handlers(self._direct_store, on_changed=self._direct_peer_changed),
                     "speed": devicechecks.serve_speed,  # the other side of the link speed check (ADR-0062)
                     # R26 stage 2 (ADR-0087 addendum): emulator games between paired devices
                     "emu-summary": self._serve_emu_summary,
                     "emu-offer": self.incoming.handle_emu_offer,
-                    # R29 stage 1b (ADR-0092): themes, sound packs and videos between paired devices
-                    lookplan.Handler.request: self.incoming.kind_handler(lookplan.KIND),
                 }
             )
             if restored:
@@ -733,30 +402,6 @@ class KeepsakeApp:
                 stop=replication_stop,
                 health=replication_health,
                 listeners={"game_started": replication_game_started, "game_exited": replication_game_exited},
-            )
-        )
-        self._desktop_server: Any = None
-        self._desktop_emit: Any = None
-
-        async def desktop_start() -> None:
-            await asyncio.to_thread(self._desktop_up)
-
-        async def desktop_stop() -> None:
-            await asyncio.to_thread(self._desktop_down)
-
-        async def desktop_health() -> list[dict[str, Any]]:
-            return await asyncio.to_thread(self._desktop_health)
-
-        self.registry.register(
-            Module(
-                "desktop",
-                "Desktop",
-                "Haversack in Desktop Mode: starts with your desktop, in the system tray. Click the icon to open it.",
-                "A Desktop Mode start-up entry and app-menu entry, and a page on 127.0.0.1 only this device can open.",
-                start=desktop_start,
-                stop=desktop_stop,
-                health=desktop_health,
-                available=self.host == "decky" and os.name == "posix",
             )
         )
         self.installer: Installer | None = None
@@ -827,464 +472,15 @@ class KeepsakeApp:
                 stop=installer_stop,
                 health=installer_health,
                 listeners={"game_exited": installer_exit},
-                # It creates Steam shortcuts through SteamClient, which only Decky reaches (P15, ADR-0038).
-                available=self.host == "decky",
-                unavailable_reason=None
-                if self.host == "decky"
-                else "The Installer needs Decky: it creates the game's Steam shortcut through Steam itself.",
             )
         )
-        self.performance: Performance | None = None
-        self.reconnect: ReconnectService | None = None
-        self.fans: Fans | None = None
-        self.controller_settings: ControllerSettings | None = None
-        self._device_game: int | None = None
         self._navigation_record: dict[str, Any] | None = None
-        self._register_device()
-
-    def _register_device(self) -> None:
-        """The device controls (R21, ADR-0075 and ADR-0076): performance profiles through steamos-manager."""
-
-        async def device_start() -> None:
-            store = ProfileStore(os.path.join(self.paths.settings_dir, "device-profiles.json"))
-            home = discovery.real_home(self.home)
-            self.performance = Performance(
-                store,
-                self._steamos(),
-                lambda: other_tools(home, self.proc_root),
-                self._device_limits,
-                PowerLimits(HelperClient(self.version), self.sys_root),
-            )
-            loop = asyncio.get_running_loop()
-
-            def reconnect_notify() -> None:
-                # From the watcher's thread: the event is sent on the loop.
-                loop.call_soon_threadsafe(lambda: self._background.append(loop.create_task(self.emit(RECONNECT_EVENT))))
-
-            self.reconnect = ReconnectService(
-                self.paths.settings_dir,
-                self.sys_root,
-                self.dev_root,
-                notify=reconnect_notify,
-                version=self.version,
-                # bluetoothd is never restarted under a running game (ADR-0083).
-                busy=lambda: "a game is running" if self._device_game is not None else None,
-            )
-            self.reconnect.start()
-            # Fan control (ADR-0085): the loop runs only while a profile or full speed is switched on.
-            self.fans = Fans(
-                FanStore(os.path.join(self.paths.settings_dir, "fan-profiles.json")),
-                HelperClient(self.version),
-                lambda: fan_tools(home, self.proc_root),
-                self.sys_root,
-            )
-            self.fans.start()
-            # The controllers' own settings and lights (ADR-0086): kept settings come back after a reconnect.
-            self.controller_settings = ControllerSettings(
-                os.path.join(self.paths.settings_dir, "controller-settings.json"),
-                HelperClient(self.version),
-                lambda: controller_tools(home, self.proc_root),
-                self.sys_root,
-            )
-            self.controller_settings.start()
-
-        async def device_stop() -> None:
-            await self._pause_release("module")  # a paused game never outlives the Device module
-            settings, self.controller_settings = self.controller_settings, None
-            if settings is not None:
-                await asyncio.to_thread(settings.stop)
-            fans, self.fans = self.fans, None
-            if fans is not None:
-                await asyncio.to_thread(fans.stop)  # the fan goes back to the firmware
-            reconnect, self.reconnect = self.reconnect, None
-            if reconnect is not None:
-                await asyncio.to_thread(reconnect.stop)
-            performance, self.performance = self.performance, None
-            if performance is not None:
-                await asyncio.to_thread(performance.restore)  # put back what Keepsake set
-
-        async def device_game_started(payload: dict[str, Any]) -> None:
-            self._device_game = int(payload["appid"])
-            if self.fans is not None:
-                self.fans.game = self._device_game
-            # As a task: a profile never delays a game's launch.
-            if self.performance is not None:
-                self._background.append(asyncio.create_task(self._device_apply(int(payload["appid"]))))
-
-        async def device_game_exited(payload: dict[str, Any]) -> None:
-            self._device_game = None
-            await self._pause_release("exit")
-            if self.fans is not None:
-                self.fans.game = None
-            if self.performance is not None:
-                await asyncio.to_thread(self.performance.game_exited)
-                self._device_changed()
-
-        async def device_health() -> list[dict[str, Any]]:
-            if self.performance is None:
-                return []
-            status = await asyncio.to_thread(self.performance.status)
-            if status["tools"]:
-                state, detail = (
-                    "warn",
-                    f"{', '.join(status['tools'])} manages performance here; Haversack only shows it.",
-                )
-            elif not status["available"]:
-                state, detail = "warn", f"Performance controls are not available: {status['problem']}"
-            else:
-                state, detail = "ok", "Performance modes and TDP are available through steamos-manager."
-            return [
-                {
-                    "id": "device-performance",
-                    "label": "Performance controls",
-                    "status": state,
-                    "detail": detail,
-                    "items": [],
-                }
-            ]
-
-        self.registry.register(
-            Module(
-                "device",
-                "Device",
-                "This handheld's performance modes, TDP and CPU boost, per game, through Valve's steamos-manager.",
-                "Nothing on disk but its own profiles file. Device settings change only through steamos-manager, "
-                "and what Haversack changed is put back when the game exits.",
-                start=device_start,
-                stop=device_stop,
-                health=device_health,
-                listeners={"game_started": device_game_started, "game_exited": device_game_exited},
-                available=self.host != "windows",
-                unavailable_reason=None if self.host != "windows" else "Device controls are for Linux handhelds.",
-            )
-        )
-        self.registry.register(
-            Module(
-                "looks",
-                "Looks",
-                "Boot and suspend animations from your own WebM files, and what CSS Loader and Audio Loader have "
-                "installed (ADR-0091).",
-                "Only Steam's three animation files in config/uioverrides/movies, after keeping any video that was "
-                "there first, and its own record of what it wrote. Themes and sounds are only read.",
-                available=self.host != "windows",
-                unavailable_reason=None if self.host != "windows" else "Steam for Windows has no boot animations.",
-            )
-        )
-
-    def _steamos(self) -> SteamOSManager:
-        return SteamOSManager()
-
-    def _device_limits(self) -> dict[str, int]:
-        facts = devices.read_facts(self.power_root)
-        profile, _how = devices.resolve(devices.load_profiles(), facts)
-        tdp = profile.get("tdp_w") or {}
-        return {k: int(v) for k, v in tdp.items() if k in ("min", "max") and isinstance(v, (int, float))}
-
-    def _device_changed(self) -> None:
-        try:
-            asyncio.get_running_loop().create_task(self.emit(DEVICE_EVENT))
-        except RuntimeError:
-            pass
-
-    def _performance(self) -> Performance:
-        if self.performance is None:
-            raise ValueError("Device controls are off; switch them on in Settings, Modules")
-        return self.performance
-
-    async def _device_apply(self, appid: int) -> None:
-        performance = self.performance
-        if performance is None:
-            return
-        applied = await asyncio.to_thread(performance.game_started, appid)
-        self._device_changed()
-        if applied:
-            # Something else may set its own value at launch (Steam's per-game settings): look once more.
-            await asyncio.sleep(DEVICE_WATCH_SECONDS)
-            stopped = await asyncio.to_thread(performance.watch)
-            if stopped:
-                await self.emit("keepsake_toast", f"Performance profile: {stopped}.")
-            self._device_changed()
-
-    async def device_performance(self) -> dict[str, Any]:
-        """The performance controls' state: what the device offers, current values, the running game's profile."""
-        if self.performance is None:
-            return {
-                "available": False,
-                "problem": "Device controls are off; switch them on in Settings, Modules",
-                "off": True,
-            }
-        return await asyncio.to_thread(self.performance.status)
-
-    async def device_apply(self, values: dict[str, Any], save_for: int | None = None) -> dict[str, Any]:
-        """Change the mode, TDP or boost now (a user action); with ``save_for``, also keep it for that game."""
-        performance = self._performance()
-        try:
-            await asyncio.to_thread(performance.apply, values if isinstance(values, dict) else {})
-            if save_for:
-                saved = {**(performance.store.get(int(save_for)) or {}), **clean_profile(values)}
-                await asyncio.to_thread(performance.store.set, int(save_for), saved)
-        except (ProfileError, ManagerError) as exc:
-            raise ValueError(str(exc)) from exc
-        log_event(logging.INFO, "device.applied", "Performance settings changed", saved=bool(save_for))
-        self._device_changed()
-        return await asyncio.to_thread(performance.status)
-
-    async def device_forget(self, appid: int) -> dict[str, Any]:
-        """Forget a game's profile. What is set now stays until the game exits."""
-        performance = self._performance()
-        await asyncio.to_thread(performance.store.set, int(appid), None)
-        self._device_changed()
-        return await asyncio.to_thread(performance.status)
 
     # Looks (R29 stage 1, ADR-0091)
-    def _homebrew(self) -> str:
-        return os.path.join(discovery.real_home(self.home), "homebrew")
-
-    def _animations(self) -> looks_animations.Animations:
-        home = discovery.real_home(self.home)
-        roots = discovery.steam_roots(self.home, self.host)
-        sources = [
-            ("Haversack", os.path.join(self.paths.runtime_dir, "looks", "animations")),
-            ("Animation Changer", os.path.join(self._homebrew(), "data", "Animation Changer", "animations")),
-            ("Videos", os.path.join(home, "Videos")),
-            ("Downloads", os.path.join(home, "Downloads")),
-        ]
-        steam = roots[0] if roots else os.path.join(home, ".steam", "steam")
-        return looks_animations.Animations(steam, self.paths.runtime_dir, sources)
-
-    def _looks_on(self) -> None:
-        if not self.registry.enabled("looks"):
-            raise ValueError("Looks is off; switch it on in Settings, Modules")
-
-    async def looks_status(self) -> dict[str, Any]:
-        """The three animations, the WebM files to choose from, and the theme plugins' themes and sounds."""
-
-        def read() -> dict[str, Any]:
-            found = looks_themes.summary(self._homebrew())
-            blocked = "Animation Changer" if found["plugins"]["animations"] else None
-            anims = self._animations()
-            sendable = lookplan.available(self._homebrew(), anims)
-            return {
-                "enabled": self.registry.enabled("looks"),
-                "animations": anims.status(blocked),
-                "choices": anims.choices(),
-                "sendable": {part: len(names) for part, names in sendable.items()},
-                **found,
-            }
-
-        return await asyncio.to_thread(read)
-
-    async def looks_set_animation(self, kind: str, choice: str) -> dict[str, Any]:
-        """Use one of the user's WebM files as Steam's boot or suspend video (a user action)."""
-        self._looks_on()
-        if looks_themes.installed_plugins(self._homebrew())["animations"]:
-            raise ValueError("Animation Changer manages the animations here, so Haversack changes nothing")
-        try:
-            return await asyncio.to_thread(self._animations().apply, kind, choice)
-        except looks_animations.AnimationError as exc:
-            raise ValueError(str(exc)) from exc
-
-    async def looks_reset_animation(self, kind: str) -> dict[str, Any]:
-        """Put Steam's own video, or the one that was there first, back."""
-        self._looks_on()
-        if looks_themes.installed_plugins(self._homebrew())["animations"]:
-            raise ValueError("Animation Changer manages the animations here, so Haversack changes nothing")
-        try:
-            return await asyncio.to_thread(self._animations().reset, kind)
-        except looks_animations.AnimationError as exc:
-            raise ValueError(str(exc)) from exc
-
-    async def looks_send(self, peer_id: str, parts: list[str]) -> dict[str, Any]:
-        """Send themes, sound packs or the videos Haversack set to a paired device (R29 stage 1b, ADR-0092)."""
-        self._looks_on()
-        if not self.registry.enabled("replication"):
-            raise ValueError("Replication is off; switch it on in Settings, Modules")
-        try:
-            plan = await asyncio.to_thread(lookplan.plan, self._homebrew(), self._animations(), list(parts))
-        except lookplan.LookPlanError as exc:
-            raise ValueError(str(exc)) from exc
-        name = self._peer_name(peer_id)
-        what = lookplan.describe({part: {"members": members} for part, (_root, members) in plan.items()})
-        extra = {"from": {"name": self.settings.get("deviceName") or ""}}
-
-        async def send() -> None:
-            try:
-                wire = await asyncio.to_thread(
-                    self._outgoing().prepare_parts, lookplan.KIND, f"Looks: {what}", plan, str(peer_id), extra
-                )
-                connection = await self._replication_connect_for(str(peer_id))()
-                try:
-                    reply = await connection.request({"type": lookplan.Handler.request, "offer": wire})
-                finally:
-                    await connection.close()
-                if reply.get("type") == "error":
-                    message = str(reply.get("reason") or reply.get("message") or "")
-                    if "unknown" in message.lower():
-                        message = f"{capital(name)} needs Haversack 0.55 or later to take looks"
-                    raise ValueError(message or "the other device refused it")
-                await self.emit("keepsake_toast", f"{capital(what)} on the way to {name}.")
-            except Exception as exc:  # noqa: BLE001 - reported to the user, never left hanging
-                log_event(
-                    logging.WARNING, "replication.looks_offer_failed", "Looks not offered", error=type(exc).__name__
-                )
-                await self.emit("keepsake_toast", f"Looks were not sent: {exc}")
-
-        self._background.append(asyncio.create_task(send()))
-        log_event(logging.INFO, "replication.looks_offer", "Looks offered", parts=sorted(plan))
-        return {"sending": what}
 
     # Pause the running game (R29 stage 3, ADR-0094)
-    def _pause_watchdog(self, resumed: list[int]) -> None:
-        """The hour is up: the watchdog has already resumed the game; tell the user (from its thread)."""
-        self._paused = None
-        loop = self._loop
-        if loop is not None and not loop.is_closed():
-            loop.call_soon_threadsafe(
-                lambda: self._background.append(
-                    loop.create_task(
-                        self.emit("keepsake_toast", "Your game was paused for an hour, so it is running again.")
-                    )
-                )
-            )
-
-    async def _pause_release(self, reason: str) -> None:
-        if self._paused is not None or self.pauser.recorded():
-            await asyncio.to_thread(self.pauser.resume_all, reason if reason != "user" else "normal")
-        self._paused = None
-
-    async def game_pause_status(self) -> dict[str, Any]:
-        paused = self._paused
-        return {
-            "available": self.registry.enabled("device"),
-            "game": self._device_game,
-            "paused": paused is not None,
-            "since": paused["since"] if paused else None,
-            "limitMinutes": int(PAUSE_CEILING_SECONDS // 60),
-        }
-
-    async def game_pause(self) -> dict[str, Any]:
-        """User action: stop the running game's processes until Resume, at most an hour (P11's watchdog)."""
-        if not self.registry.enabled("device"):
-            raise ValueError("Device controls are off; switch them on in Settings, Modules")
-        appid = self._device_game
-        if appid is None:
-            raise ValueError("no game is running")
-        if self._paused is not None:
-            return await self.game_pause_status()
-        if self._freeze_lock.locked():
-            raise ValueError("Haversack is checking this game's saves; try again in a moment")
-        procs = await asyncio.to_thread(find_game_processes, int(appid), None, self.proc_root)
-        if not procs:
-            raise ValueError("the game's processes were not found")
-        stopped = await asyncio.to_thread(self.pauser.freeze, procs)
-        if not stopped:
-            await asyncio.to_thread(self.pauser.resume_all, "normal")
-            raise ValueError("the game could not be paused")
-        self._paused = {"appid": int(appid), "since": int(time.time())}
-        log_event(logging.INFO, "pause.paused", "Game paused by the user", processes=len(stopped))
-        return await self.game_pause_status()
-
-    async def game_resume(self) -> dict[str, Any]:
-        """User action: let the paused game run again."""
-        await self._pause_release("user")
-        log_event(logging.INFO, "pause.resumed", "Game resumed by the user")
-        return await self.game_pause_status()
-
-    async def device_battery(self) -> dict[str, Any]:
-        """The 80 percent charge limit (R21 stage 4, ADR-0077): who controls it here, and its state."""
-        return await asyncio.to_thread(device_battery.status, self._steamos(), self.sys_root)
-
-    async def device_set_charge_limit(self, on: bool) -> dict[str, Any]:
-        """Turn the 80 percent limit on or off (a user action), through steamos-manager only."""
-        if self.performance is None:
-            raise ValueError("Device controls are off; switch them on in Settings, Modules")
-        try:
-            result = await asyncio.to_thread(device_battery.set_limit, self._steamos(), bool(on), self.sys_root)
-        except ManagerError as exc:
-            raise ValueError(str(exc)) from exc
-        log_event(logging.INFO, "device.charge_limit", "Charge limit changed", on=bool(on))
-        self._device_changed()
-        return result
-
-    async def device_controllers(self) -> dict[str, Any]:
-        """The controllers as the kernel shows them (R21 stage 5, ADR-0078). Read-only."""
-        return await asyncio.to_thread(device_controllers.status, self.sys_root, self.proc_root)
 
     # Controller reconnect help (R22, ADR-0082): every action is gated on the user's rule for that device.
-
-    def _reconnect(self) -> ReconnectService:
-        if self.reconnect is None:
-            raise ValueError("Device controls are off; switch them on in Settings, Modules")
-        return self.reconnect
-
-    async def reconnect_status(self) -> dict[str, Any]:
-        if self.reconnect is None:
-            return {
-                "available": False,
-                "problem": "Device controls are off; switch them on in Settings, Modules",
-                "off": True,
-            }
-        return await self.reconnect.status()
-
-    async def reconnect_set_help(self, adapter: str, mac: str, on: bool, label: str = "") -> dict[str, Any]:
-        return await self._reconnect().set_help(adapter, mac, bool(on), str(label or ""))
-
-    async def reconnect_set_option(self, adapter: str, mac: str, option: str, on: bool) -> dict[str, Any]:
-        return await self._reconnect().set_option(adapter, mac, str(option), bool(on))
-
-    async def reconnect_set_dry_run(self, on: bool) -> dict[str, Any]:
-        return await self._reconnect().set_dry_run(bool(on))
-
-    async def reconnect_dismiss(self, adapter: str, mac: str) -> dict[str, Any]:
-        return await self._reconnect().dismiss(adapter, mac)
-
-    async def reconnect_assist(self, adapter: str, mac: str) -> dict[str, Any]:
-        try:
-            return await self._reconnect().assist(adapter, mac)
-        except BlueZError as exc:
-            raise ValueError(str(exc)) from exc
-
-    async def reconnect_read_usb(self, adapter: str, mac: str) -> dict[str, Any]:
-        try:
-            return await self._reconnect().read_usb(adapter, mac)
-        except BlueZError as exc:
-            raise ValueError(str(exc)) from exc
-
-    async def reconnect_diagnose(self, adapter: str, mac: str) -> dict[str, Any]:
-        try:
-            return await self._reconnect().diagnose(adapter, mac)
-        except BlueZError as exc:
-            raise ValueError(str(exc)) from exc
-
-    async def reconnect_export(self, adapter: str, mac: str, redact_adapter: bool = True) -> dict[str, Any]:
-        found = await self._reconnect().export(adapter, mac, bool(redact_adapter))
-        return {"file": found["file"], "where": devicechecks.tilde(found["path"], discovery.real_home(self.home))}
-
-    async def reconnect_cable_pair(self, adapter: str, mac: str, order: str = "same") -> dict[str, Any]:
-        return await self._reconnect().cable_pair(adapter, mac, str(order))
-
-    async def reconnect_cable_restore(self, adapter: str, mac: str) -> dict[str, Any]:
-        return await self._reconnect().cable_restore(adapter, mac)
-
-    async def reconnect_set_ssp_gate(self, on: bool, adapter: str = "", confirm: str = "") -> dict[str, Any]:
-        return await self._reconnect().set_ssp_gate(bool(on), adapter, str(confirm or ""))
-
-    async def reconnect_ssp_confirm(self) -> dict[str, Any]:
-        return await self._reconnect().ssp_confirm_power_cycle()
-
-    async def helper_prepare(self) -> dict[str, Any]:
-        """Verify the Keepsake Helper of this exact version for Decky's installer (ADR-0083)."""
-        installed = self.reconnect is not None and self.reconnect.helper.installed()
-        async with self._update_lock:
-            await asyncio.to_thread(self.updater.check, str(self.settings.get("updateChannel")), False)
-            result = await asyncio.to_thread(self.updater.prepare_helper, f"v{self.version}", installed)
-            if result.get("reason") == "unknown-release":
-                await asyncio.to_thread(self.updater.check, str(self.settings.get("updateChannel")), True)
-                result = await asyncio.to_thread(self.updater.prepare_helper, f"v{self.version}", installed)
-        log_event(
-            logging.INFO, "helper.prepare", "Prepared helper hand-off", ok=result.get("ok"), reason=result.get("reason")
-        )
-        return result
 
     # Emulator games (R26 stage 1, ADR-0087): read-only
 
@@ -1374,238 +570,13 @@ class KeepsakeApp:
         )
         return {"ok": True, "parts": sorted(plan.roots)}
 
-    async def _emulator_probe(self) -> dict[str, Any]:
-        found = await self.emulator_setup()
-        if found.get("off"):
-            return {"off": True}
-        return {
-            "setups": found["setups"],
-            "emulators": [{"name": e["name"], "type": e["type"]} for e in found["emulators"]],
-            "perSystem": found["perSystem"],
-            "secrets": found["secrets"],
-        }
-
     # The controllers' own settings and stick lights (R24, ADR-0086)
 
-    async def controller_settings_status(self) -> dict[str, Any]:
-        if self.controller_settings is None:
-            return {"off": True, "problem": "Device controls are off; switch them on in Settings, Modules"}
-        return await asyncio.to_thread(self.controller_settings.status)
-
-    async def controller_settings_set(self, values: dict[str, Any], keep: bool = False) -> dict[str, Any]:
-        if self.controller_settings is None:
-            raise ValueError("Device controls are off; switch them on in Settings, Modules")
-        settings = self.controller_settings
-        try:
-            await asyncio.to_thread(settings.set, values, bool(keep))
-        except ControllerSettingsError as exc:
-            raise ValueError(str(exc)) from exc
-        log_event(
-            logging.INFO, "controller.settings", "Controller settings changed", count=len(values or {}), kept=bool(keep)
-        )
-        return await self.controller_settings_status()
-
-    async def controller_settings_forget(self) -> dict[str, Any]:
-        if self.controller_settings is None:
-            raise ValueError("Device controls are off; switch them on in Settings, Modules")
-        await asyncio.to_thread(self.controller_settings.forget)
-        return await self.controller_settings_status()
-
     # Fan control (R24, ADR-0085)
-
-    def _fans(self) -> Fans:
-        if self.fans is None:
-            raise ValueError("Device controls are off; switch them on in Settings, Modules")
-        return self.fans
-
-    async def fans_status(self) -> dict[str, Any]:
-        if self.fans is None:
-            return {"off": True, "problem": "Device controls are off; switch them on in Settings, Modules"}
-        found = await asyncio.to_thread(self.fans.status)
-        return {**found, "game": self._device_game}
-
-    async def _fans_call(self, work: Any) -> dict[str, Any]:
-        try:
-            await asyncio.to_thread(work)
-        except FanSettingsError as exc:
-            raise ValueError(str(exc)) from exc
-        self._device_changed()
-        return await self.fans_status()
-
-    async def fans_set_options(self, options: dict[str, Any]) -> dict[str, Any]:
-        fans = self._fans()
-        opts = options if isinstance(options, dict) else {}
-        if opts.get("unlocked") is True and opts.get("confirm") != "I understand":
-            raise ValueError("confirm the warning first")
-        log_event(
-            logging.INFO,
-            "fans.options",
-            "Fan options changed",
-            **{k: bool(v) for k, v in opts.items() if k != "confirm"},
-        )
-        return await self._fans_call(
-            lambda: fans.set_options(
-                smooth=opts.get("smooth"),
-                unlocked=opts.get("unlocked"),
-                enabled=opts.get("enabled"),
-                full_speed=opts.get("fullSpeed"),
-            )
-        )
-
-    async def fans_save_profile(self, name: str, points: list[Any], make_default: bool = False) -> dict[str, Any]:
-        fans = self._fans()
-        return await self._fans_call(lambda: fans.save_profile(name, points, bool(make_default)))
-
-    async def fans_delete_profile(self, name: str) -> dict[str, Any]:
-        fans = self._fans()
-        return await self._fans_call(lambda: fans.delete_profile(str(name)))
-
-    async def fans_assign(self, kind: str, key: str, name: str | None) -> dict[str, Any]:
-        fans = self._fans()
-        return await self._fans_call(lambda: fans.assign(str(kind), str(key), name))
-
-    async def fans_hand_back(self) -> dict[str, Any]:
-        """Switch fan control off and give the fan back to the firmware now."""
-        fans = self._fans()
-
-        def work() -> None:
-            fans.set_options(enabled=False, full_speed=False)
-            fans.release()
-
-        log_event(logging.INFO, "fans.hand_back", "Fan handed back to the firmware")
-        return await self._fans_call(work)
-
-    async def fans_selftest(self) -> dict[str, Any]:
-        """The Go 2 fan test for a BIOS and EC pair that is not on the validated list (about 15 seconds)."""
-        fans = self._fans()
-        if self._device_game is not None:
-            raise ValueError("not while a game is running")
-        try:
-            result = await asyncio.to_thread(lambda: fans.helper.call("fan.selftest", timeout=40.0))
-        except HelperError as exc:
-            raise ValueError(str(exc)) from exc
-        log_event(logging.INFO, "fans.selftest", "Fan test run", passed=bool(result.get("passed")))
-        return {**result, "status": await self.fans_status()}
-
-    async def _fans_probe(self) -> dict[str, Any]:
-        if self.fans is None:
-            return {"off": True}
-        found = await asyncio.to_thread(self.fans.status)
-        device = found.get("device") or {}
-        return {
-            "helper": found["helper"],
-            "model": device.get("model"),
-            "firmware": device.get("firmware"),
-            "validated": device.get("validated"),
-            "rpm": device.get("rpm"),
-            "temperature": found.get("temperature"),
-            "conflicts": device.get("conflicts"),
-            "tools": found.get("tools"),
-            "acpiCall": device.get("acpiCall"),
-            "fullSpeedAttribute": device.get("fullSpeedAttribute"),
-            "enabled": found["settings"]["enabled"],
-            "problem": found.get("problem") or device.get("problem"),
-        }
-
-    async def _reconnect_probe(self) -> dict[str, Any]:
-        if self.reconnect is None:
-            return {"available": False, "problem": "Device controls are off"}
-        return await self.reconnect.probe()
-
-    async def device_extras(self) -> dict[str, Any]:
-        """Stage 6 (ADR-0079): Wi-Fi power saving where steamos-manager offers it, and the BIOS check."""
-        manager = self._steamos()
-
-        def read() -> dict[str, Any]:
-            try:
-                wifi = manager.read().get("wifiPowerSaving")
-            except ManagerError:
-                wifi = None
-            return {"wifiPowerSaving": wifi, "bios": device_bios.check(self.sys_root)}
-
-        return await asyncio.to_thread(read)
-
-    async def device_set_wifi_power_saving(self, on: bool) -> dict[str, Any]:
-        """Turn Wi-Fi power saving on or off (a user action), through steamos-manager only."""
-        if self.performance is None:
-            raise ValueError("Device controls are off; switch them on in Settings, Modules")
-        try:
-            await asyncio.to_thread(self._steamos().set_wifi_power_saving, bool(on))
-        except ManagerError as exc:
-            raise ValueError(str(exc)) from exc
-        log_event(logging.INFO, "device.wifi_power", "Wi-Fi power saving changed", on=bool(on))
-        self._device_changed()
-        return await self.device_extras()
-
-    async def _bios_probe(self) -> dict[str, Any]:
-        return await asyncio.to_thread(device_bios.check, self.sys_root)
-
-    async def _charge_probe(self) -> dict[str, Any]:
-        return await self.device_battery()
-
-    async def _performance_probe(self) -> dict[str, Any]:
-        """The Device check: what steamos-manager offers here, and a write that changes nothing, read back."""
-        manager = self._steamos()
-
-        def probe() -> dict[str, Any]:
-            try:
-                current = manager.read()
-            except ManagerError as exc:
-                return {"reachable": False, "error": str(exc)}
-            out: dict[str, Any] = {"reachable": True, "current": current, "writeBack": None}
-            try:
-                if current.get("tdp"):
-                    manager.set_tdp(current["tdp"]["value"])  # the same value: nothing changes
-                    out["writeBack"] = "tdp"
-                elif current.get("profile"):
-                    manager.set_profile(current["profile"]["current"])
-                    out["writeBack"] = "mode"
-            except ManagerError as exc:
-                out["writeError"] = str(exc)
-            out["tools"] = other_tools(discovery.real_home(self.home), self.proc_root)
-            return out
-
-        return await asyncio.to_thread(probe)
 
     def _library_root(self) -> str:
         configured = str(self.settings.get("libraryRoot") or "").strip()
         return configured or os.path.join(discovery.real_home(self.home), "Games").replace(os.sep, "/")
-
-    def _pcgw_client(self) -> PcgwClient | None:
-        """The user's own PCGamingWiki bot login, or None until it is entered."""
-        if not self.credentials.configured("pcgw"):
-            return None
-        c = self.credentials.load("pcgw")
-        user_agent = f"Keepsake/{self.version} (+https://github.com/breakmylegs/haversack)"
-        return PcgwClient(str(c["username"]), str(c["password"]), user_agent)
-
-    def _advisor_map_game(self, appid: int) -> dict[str, Any]:
-        """For Advisor (worker thread): a game's name and, for a shortcut, the Steam app ID of its manifest entry."""
-        games = (self._games or discovery.discover(self.home, self.host))["games"]
-        # A streaming entry (ADR-0064) is not in shortcuts.vdf, so its app ID finds nothing here.
-        game = next((g for g in games if g["appid"] == appid), None)
-        if game is None and self._games is not None:
-            # Installed since the last scan, perhaps: look once more before giving up.
-            game = next((g for g in discovery.discover(self.home, self.host)["games"] if g["appid"] == appid), None)
-        if game is None:
-            return {"name": "", "kind": "unknown"}  # not in the Games list: general advice only, nothing looked up
-        out: dict[str, Any] = {
-            "name": game["name"],
-            "kind": game["kind"],
-            "launchOptions": game.get("launch_options") or "",
-            "compatTool": game.get("compat_tool") or "",
-        }
-        if game["kind"] == "steam":
-            out["steamAppid"] = appid
-            return out
-        index = self.manifest.load()
-        match = manifest.match_game(index, game, self.game_configs.get(game["key"]))
-        title = match.get("title")
-        record = (index or {}).get("games", {}).get(title) if title else None
-        out["manifestTitle"] = title
-        if isinstance(record, dict) and isinstance(record.get("s"), int):
-            out["steamAppid"] = record["s"]
-        return out
 
     def _prefix_for(self, appid: int) -> str | None:
         for root in discovery.steam_roots(self.home, self.host):
@@ -1616,45 +587,26 @@ class KeepsakeApp:
 
     async def start(self) -> None:
         self._loop = asyncio.get_running_loop()
-        # Crash recovery for principle 11: release anything a previous run left frozen.
-        if self.freezer.recorded():
-            resumed = await asyncio.to_thread(self.freezer.resume_all, "startup")
-            log_event(logging.WARNING, "freeze.startup_release", "Released processes left frozen", count=len(resumed))
-        if self.pauser.recorded():
-            resumed = await asyncio.to_thread(self.pauser.resume_all, "startup")
-            log_event(logging.WARNING, "pause.startup_release", "Resumed a game left paused", count=len(resumed))
-        # Principle 3: finish or undo any restore a crash interrupted, before anything else touches saves.
-        try:
-            for outcome in await asyncio.to_thread(restore.recover, self.paths.runtime_dir):
-                log_event(logging.WARNING, "restore.recovered", "Recovered an interrupted restore", **outcome)
-        except restore.RestoreError as exc:
-            log_event(logging.ERROR, "restore.recover_failed", str(exc))
         self._notice = await asyncio.to_thread(startup_notice, self.paths.runtime_dir, self.version)
         if self._notice:
             log_event(logging.INFO, "update.applied", "Running a new version", **self._notice)
         if self.settings.read_only:
             log_event(logging.WARNING, "settings.safe_mode", "Settings were written by a newer version; read-only")
-        elif not self.settings.get("setupComplete") and self.game_configs.any_enabled():
-            # Upgraded from a version without the setup wizard: games are already set up.
-            self.settings.set("setupComplete", True)
+        # Earlier, larger versions wrote Desktop Mode entries for a tray that is gone (ADR-0098).
+        removed = await asyncio.to_thread(leftovers.remove_desktop_entries, discovery.real_home(self.home))
+        if removed:
+            log_event(logging.INFO, "leftovers.desktop_entries", "Old Desktop Mode entries removed", count=len(removed))
         log_event(logging.INFO, "app.start", "Haversack backend started", version=self.version)
         try:
             self.db = await asyncio.to_thread(open_db, self.paths.runtime_dir)
             self.steam_ops = SteamOps(self.db) if self.db else None
-        except (StateError, OSError) as exc:  # modules needing state stay off; Saves is unaffected (P13)
+        except (StateError, OSError) as exc:  # modules needing state stay off (P13)
             log_event(logging.ERROR, "state.unavailable", "State database unavailable", error=str(exc))
             self.db, self.steam_ops = None, None
         await self.registry.start_all()
         if self._auto_refresh_manifest:
-            # Weekly refresh in the background; never blocks start-up.
+            # Weekly refresh in the background; never blocks start-up. Replication needs it to protect saves.
             self._background.append(asyncio.create_task(self.refresh_manifest(False)))
-            # Idle sync, whose first pass (a minute after start) also recovers missed exit pushes.
-            self._background.append(asyncio.create_task(self._idle_loop()))
-
-    def _on_idle(self) -> None:
-        loop = self._loop
-        if loop is not None and not loop.is_closed():
-            loop.call_soon_threadsafe(lambda: loop.create_task(self.emit(IDLE_EVENT)))
 
     # Status and updates
 
@@ -1704,13 +656,8 @@ class KeepsakeApp:
     # Discovery
 
     def _scan_all(self) -> dict[str, Any]:
-        """Disk thread: Steam's libraries, then the other launchers (a slow or absent disk only slows this)."""
-        found = discovery.discover(self.home, self.host)
-        if self.host != "windows" and self.settings.get("otherLaunchers"):
-            others = launchers.discover_all(discovery.real_home(self.home))
-            found = {**found, "games": [*found["games"], *others]}
-            self._emulator_defaults(others)
-        return found
+        """Disk thread: Steam's libraries and shortcuts (a slow or absent disk only slows this)."""
+        return discovery.discover(self.home, self.host)
 
     async def _scan(self) -> dict[str, Any]:
         """One scan at a time, on the low-priority disk threads, bounded in time (v0.30.1).
@@ -1747,43 +694,6 @@ class KeepsakeApp:
         # streaming entries are not in shortcuts.vdf, so they never reach this list.
         games = await asyncio.to_thread(self.remote_copies.apply, self._games["games"])
         return {**self._games, "games": games, "mismatches": mismatches}
-
-    def _emulator_defaults(self, games: list[dict[str, Any]]) -> None:
-        """An emulator found for the first time gets its save folders and a game key shared by every device.
-
-        Written once, off by default; the user can change them like any game's settings (ADR-0051).
-        """
-        for game in games:
-            if game.get("kind") != launchers.EMULATOR_KIND or self.game_configs.get(game["key"]).get("gameKey"):
-                continue
-            self.game_configs.update(
-                game["key"],
-                {
-                    "gameKey": launchers.emulator_game_key(game),
-                    "gameKeySource": "auto",
-                    "customPaths": list(game.get("emulator_paths") or []),
-                },
-            )
-
-    async def check_running_prefix(self, key: str) -> dict[str, Any]:
-        """Cross-check a running game's ``STEAM_COMPAT_DATA_PATH`` with its discovered prefix."""
-        games = (await self.discover_games())["games"]
-        game = next((g for g in games if g["key"] == key), None)
-        if game is None:
-            return {"status": "unknown", "reason": "unknown-game"}
-        procs = await asyncio.to_thread(find_game_processes, int(game["appid"]), game["prefix"], self.proc_root)
-        observed = [p.env["STEAM_COMPAT_DATA_PATH"] for p in procs if p.env.get("STEAM_COMPAT_DATA_PATH")]
-        result = discovery.cross_check(game["prefix"], observed)
-        await asyncio.to_thread(discovery.record_cross_check, self.paths.runtime_dir, key, result, game["prefix"])
-        if result["status"] == "mismatch":
-            log_event(
-                logging.WARNING,
-                "discovery.prefix_mismatch",
-                "Running prefix differs; sync blocked",
-                key=key,
-                reason=result.get("reason"),
-            )
-        return result
 
     # Manifest, matching and preview
 
@@ -1835,193 +745,9 @@ class KeepsakeApp:
             raise ValueError("unknown game; rescan the games list")
         return dict(game)
 
-    async def match_games(self) -> list[dict[str, Any]]:
-        """Every discovered game with its match, applying strong cross-device matches (ADR-0011)."""
-        games = (await self.discover_games())["games"]
-        index = await asyncio.to_thread(self.manifest.load)
-        states = self._sync().state.games()
-        out = []
-        auto_enabled: list[str] = []
-        for game in games:
-            config = self.game_configs.get(game["key"])
-            match = manifest.match_game(index, game, config)
-            proposal = None
-            if match["method"] in UNRESOLVED_METHODS and game["kind"] == "shortcut":
-                applied = await self._apply_identity_match(game, games, index)
-                if applied:
-                    match = manifest.match_game(index, game, self.game_configs.get(game["key"]))
-                else:
-                    proposal = self._proposals().get("open", {}).get(game["key"])
-            elif game["key"] in self._proposals().get("open", {}):
-                self._clear_proposal(game["key"])  # resolved some other way
-            config = self.game_configs.get(game["key"])
-            if self._auto_sync_candidate(game, match, config, proposal):
-                config = await self.update_game_config(game["key"], {"enabled": True, "enabledSource": "auto"})
-                auto_enabled.append(game["name"])
-            state = states.get(match.get("gameKey") or "") or {}
-            out.append(
-                {
-                    "key": game["key"],
-                    "name": game["name"],
-                    "kind": game["kind"],
-                    **match,
-                    "proposal": proposal,
-                    "enabled": bool(config.get("enabled")),
-                    "sync": status_word(state) if config.get("enabled") else "off",
-                    "newer": newer_save(state) if config.get("enabled") else None,
-                    "steamCloud": self._steam_cloud(game),
-                    "enabledSource": config.get("enabledSource"),
-                    "hasRegistry": bool(
-                        index and match.get("title") and index["games"].get(match["title"], {}).get("r")
-                    ),
-                }
-            )
-        if auto_enabled:
-            count = len(auto_enabled)
-            log_event(logging.INFO, "steamcloud.auto_enable", "Synced Steam games without Steam Cloud", count=count)
-            names = ", ".join(auto_enabled[:3]) + (f" and {count - 3} more" if count > 3 else "")
-            await self.emit(
-                "keepsake_toast",
-                f"Now syncing {names}: Steam does not back up their saves. Turn any off in Haversack's Games list.",
-            )
-        # Games needing attention first, then by name (Peter, 16 November 2026).
-        mismatched = await asyncio.to_thread(discovery.load_mismatches, self.paths.runtime_dir)
-        return ordering.order(out, mismatched)
-
-    def _steam_cloud(self, game: dict[str, Any]) -> str | None:
-        """Steam Cloud state for Steam apps when detection is on (slice 11), else None."""
-        if game["kind"] != "steam" or not self.settings.get("steamCloudDetection"):
-            return None
-        return steamcloud.cloud_state(
-            game.get("steam_root"), game.get("default_user"), int(game["appid"]), int(game.get("last_played") or 0)
-        )
-
-    def _auto_sync_candidate(
-        self, game: dict[str, Any], match: dict[str, Any], config: dict[str, Any], proposal: Any
-    ) -> bool:
-        """A played Steam game with no Steam Cloud saves and known save locations, never switched by anyone.
-
-        Steam games whose saves Steam Cloud keeps stay off until the user turns them on (ADR-0063).
-        Only Steam games have a Steam Cloud state, so ``_steam_cloud`` also limits this to them.
-        """
-        return bool(
-            self.settings.get("steamAutoSync")
-            and self.registry.enabled("saves")
-            and not config.get("enabled")
-            and config.get("enabledSource") is None
-            and proposal is None
-            and match.get("gameKey")
-            and match.get("method") in AUTO_SYNC_METHODS
-            and self._steam_cloud(game) == steamcloud.NO_CLOUD
-        )
-
-    async def enable_steam_without_cloud(self) -> dict[str, Any]:
-        """Turn on sync for every matched Steam app that has been played and has no Steam Cloud saves."""
-        if not self.settings.get("steamCloudDetection"):
-            raise ValueError("Steam Cloud detection is off in Settings")
-        enabled = []
-        for game, config, gk in await self._matched():
-            if gk and not config.get("enabled") and self._steam_cloud(game) == steamcloud.NO_CLOUD:
-                await self.update_game_config(game["key"], {"enabled": True})
-                enabled.append(game["name"])
-        log_event(logging.INFO, "steamcloud.bulk_enable", "Enabled Steam games without Steam Cloud", count=len(enabled))
-        return {"enabled": enabled}
-
     # Suspend snapshots (slice 11, ADR-0022)
 
     # Play sessions (ADR-0069): measured while a game runs, read only, summaries kept for the Advisor
-
-    async def _session_start(self, advisor: Advisor, appid: int) -> None:
-        def settings_in_force() -> dict[str, Any]:
-            games = (self._games or {"games": []})["games"]
-            game: dict[str, Any] = next((g for g in games if g.get("appid") == appid), {})
-            now = current.read(advisor.selected(), advisor.detected, advisor.decky_home, advisor.user_home, appid)
-            display = advisor.device.get("display") or {}
-            return {
-                "device": f"{advisor.device.get('vendor', '')} {advisor.device.get('model', '')}".strip(),
-                "display": {k: display.get(k) for k in ("width", "height", "refresh_hz") if display.get(k)},
-                "settings": {
-                    "tdp": (now.get("power") or {}).get("tdp"),
-                    "tdpTool": (now.get("power") or {}).get("tool"),
-                    "frameCap": None,  # Steam's frame limit is not readable yet (A213)
-                    "protonVersion": game.get("compat_tool"),
-                    "launchOptions": game.get("launch_options") or "",  # kept on this device; never sent to AI
-                    "frameGen": (now.get("framegen") or {}).get("tool"),
-                    "upscaler": None,
-                },
-            }
-
-        try:
-            extra = await asyncio.to_thread(settings_in_force)
-        except Exception as exc:  # noqa: BLE001 - measuring must never disturb the game or Saves
-            log_event(logging.WARNING, "sessions.start_failed", "Session not recorded", error=type(exc).__name__)
-            return
-        recorder = self.session_recorder
-        recorder.sys_root, recorder.proc_root = self.sys_root, self.proc_root  # the app's roots (tests use fakes)
-        await asyncio.to_thread(recorder.start, appid, extra)
-
-    async def _session_finish(self, appid: int) -> None:
-        home = discovery.real_home(self.home)
-        folders = sessions.mangohud_folders(home)
-
-        def frames(since: float, until: float) -> list[float]:
-            return sessions.mangohud_frametimes(folders, since, until)
-
-        summary = await asyncio.to_thread(self.session_recorder.finish, appid, frames)
-        if summary is not None:
-            log_event(logging.INFO, "sessions.kept", "Play session recorded", seconds=summary["seconds"])
-            await self.emit(ADVISOR_EVENT)
-
-    async def advisor_perf_sample(self, diagnostic_b64: str) -> dict[str, Any]:
-        """Steam's performance diagnostic entries from the frontend, at most once a second (ADR-0069)."""
-        try:
-            raw = base64.b64decode(str(diagnostic_b64)[:65536], validate=True)
-        except ValueError:
-            return {"ok": False}
-        fps, frametime = sessions.steam_fps(raw)
-        self.session_recorder.feed_fps(fps, frametime)
-        return {"ok": True, "fps": fps}
-
-    async def _session_sources_probe(self) -> dict[str, Any]:
-        sample = await asyncio.to_thread(sessions.read_sample, self.sys_root, self.proc_root)
-        found: dict[str, Any] = sessions.sources(sample, self.session_recorder.fps_seen)
-        home = discovery.real_home(self.home)
-        found["mangohudConfig"] = os.path.isfile(os.path.join(home, ".config", "MangoHud", "MangoHud.conf"))
-        return found
-
-    async def on_resume(self) -> dict[str, Any]:
-        """The device woke: session sampling carries on (ADR-0069); the game's profile is applied again (ADR-0076)."""
-        self.session_recorder.paused.clear()
-        if self.performance is not None:
-            await asyncio.to_thread(self.performance.resumed)
-            self._device_changed()
-        return {"ok": True}
-
-    async def on_suspend(self) -> dict[str, Any]:
-        """The device is about to sleep: snapshot running synced games as provisional snapshots."""
-        self.session_recorder.paused.set()  # no sampling while asleep (ADR-0069)
-        if not self.settings.get("suspendSnapshots") or not self.registry.enabled("saves"):
-            return {"started": 0}
-        states = self._sync().state.games()
-        started = 0
-        for game, config, gk in await self._matched():
-            if config.get("enabled") and gk and (states.get(gk) or {}).get("sessionOpen"):
-                self._background.append(asyncio.create_task(self._suspend_snapshot(game)))
-                started += 1
-        return {"started": started}
-
-    async def _suspend_snapshot(self, game: dict[str, Any]) -> dict[str, Any]:
-        try:
-            ctx = await self._sync_context(game["key"], running=lambda: True)  # never restore here
-            with self.jobs.job("sync"):
-                result = await asyncio.to_thread(self._sync().provisional, ctx)
-        except (ValueError, SnapshotError, StoreError) as exc:
-            log_event(
-                logging.WARNING, "suspend.snapshot_failed", "Suspend snapshot skipped", key=game["key"], error=str(exc)
-            )
-            return {"status": "error", "error": str(exc)}
-        log_event(logging.INFO, "suspend.snapshot", "Suspend snapshot", key=game["key"], status=result.get("status"))
-        return result
 
     # Match proposals: likely but uncertain matches wait for the user's approval.
 
@@ -2040,115 +766,6 @@ class KeepsakeApp:
         data.setdefault("open", {}).pop(key, None)
         self._save_proposals(data)
 
-    async def _raise_proposal(self, game: dict[str, Any], found: dict[str, Any]) -> None:
-        data = self._proposals()
-        open_proposals = data.setdefault("open", {})
-        previous = open_proposals.get(game["key"], {})
-        is_new = previous.get("candidate", {}).get("gameKey") != found["candidate"]["gameKey"]
-        open_proposals[game["key"]] = {
-            **found,
-            "raised": previous.get("raised", time.time()) if not is_new else time.time(),
-        }
-        self._save_proposals(data)
-        if is_new:
-            label = found["candidate"].get("title") or found["candidate"]["gameKey"]
-            await self.emit(
-                "keepsake_toast",
-                f"{game['name']} looks like {label}. Open Haversack to approve or choose another match.",
-            )
-            log_event(
-                logging.INFO,
-                "identity.proposed",
-                "Proposed a match for approval",
-                gameKey=found["candidate"]["gameKey"],
-                score=found["candidate"]["score"],
-            )
-
-    async def approve_match(self, key: str) -> dict[str, Any]:
-        """Accept the proposed match."""
-        found = self._proposals().get("open", {}).get(key)
-        if not found:
-            raise ValueError("there is no match waiting for approval")
-        candidate = found["candidate"]
-        index = await asyncio.to_thread(self.manifest.load)
-        title = candidate.get("title") if index and candidate.get("title") in index.get("games", {}) else None
-        config = await self.set_game_key(key, candidate["gameKey"], title)
-        self._clear_proposal(key)
-        return config
-
-    async def reject_match(self, key: str) -> dict[str, Any]:
-        """'Not this game': never propose this candidate for this game again."""
-        data = self._proposals()
-        found = data.setdefault("open", {}).pop(key, None)
-        if found:
-            rejected = data.setdefault("rejected", {}).setdefault(key, [])
-            if found["candidate"]["gameKey"] not in rejected:
-                rejected.append(found["candidate"]["gameKey"])
-        self._save_proposals(data)
-        return {"ok": True}
-
-    async def _identities(self) -> list[dict[str, Any]]:
-        now = time.monotonic()
-        if self._identity_cache and now - self._identity_cache[0] < IDENTITY_CACHE_SECONDS:
-            return self._identity_cache[1]
-        try:
-            records = await asyncio.to_thread(identity.cloud_identities, self._store())
-        except StoreError:
-            records = []  # offline or signed out: match with the manifest only
-        self._identity_cache = (now, records)
-        return records
-
-    async def identity_candidates(self, game: dict[str, Any], index: dict[str, Any] | None) -> list[dict[str, Any]]:
-        records = await self._identities()
-        device_id = str(self.settings.get("deviceId"))
-
-        def ranked() -> list[dict[str, Any]]:
-            # On a disk thread: roots and probes touch the game's folders, which may be on a slow disk.
-            roots = resolve.logical_roots(game, home=self.home)
-            windows_paths = resolve.platform_of(game) in resolve.WINDOWS_PLATFORMS  # case-insensitive names
-            probe = identity.probe_for(roots, lambda root: windows_paths and root in resolve.WIN_ROOTS, resolve.expand)
-            return identity.candidates(identity.local_hints(game), index, records, probe, device_id)
-
-        return await asyncio.get_running_loop().run_in_executor(self._disk, ranked)
-
-    def _taken_keys(self, games: list[dict[str, Any]], index: dict[str, Any] | None, except_key: str) -> set[str]:
-        taken = set()
-        for other in games:
-            if other["key"] != except_key:
-                key = manifest.match_game(index, other, self.game_configs.get(other["key"])).get("gameKey")
-                if key:
-                    taken.add(key)
-        return taken
-
-    async def _apply_identity_match(
-        self, game: dict[str, Any], games: list[dict[str, Any]], index: dict[str, Any] | None
-    ) -> bool:
-        ranked = await self.identity_candidates(game, index)
-        taken = self._taken_keys(games, index, game["key"])
-        choice = identity.automatic_choice(ranked, taken)
-        if choice is None:
-            # Not certain: if a match is likely, ask the user instead of guessing.
-            rejected = set(self._proposals().get("rejected", {}).get(game["key"], []))
-            found = identity.proposal(ranked, taken, rejected)
-            if found:
-                await self._raise_proposal(game, found)
-            elif game["key"] in self._proposals().get("open", {}):
-                self._clear_proposal(game["key"])
-            return False
-        changes: dict[str, Any] = {"gameKey": choice["gameKey"], "gameKeySource": "auto"}
-        if choice.get("title") and index and choice["title"] in index.get("games", {}):
-            changes["matchTitle"] = choice["title"]
-        await asyncio.to_thread(self.game_configs.update, game["key"], changes)
-        log_event(
-            logging.INFO,
-            "identity.auto_match",
-            "Matched a game to another device's copy",
-            gameKey=choice["gameKey"],
-            signals=choice["signals"],
-            score=choice["score"],
-        )
-        return True
-
     async def set_game_key(self, key: str, game_key_value: str | None, title: str | None = None) -> dict[str, Any]:
         """Use a suggested or new game key (or clear it). Chosen by the user, so any proposal is settled."""
         changes: dict[str, Any] = {"gameKey": game_key_value, "gameKeySource": "user" if game_key_value else None}
@@ -2159,36 +776,9 @@ class KeepsakeApp:
             self._clear_proposal(key)
         return config
 
-    async def new_game_key(self, key: str) -> dict[str, Any]:
-        """Give a game the manifest does not know its own key, from its name."""
-        game = await self._game(key)
-        return await self.set_game_key(key, manifest.game_key(str(game["name"])))
-
     async def search_titles(self, query: str) -> list[str]:
         index = await asyncio.to_thread(self.manifest.load)
         return manifest.search_titles(index, str(query)[:200]) if index else []
-
-    async def get_game(self, key: str) -> dict[str, Any]:
-        game = await self._game(key)
-        config = self.game_configs.get(key)
-        index = await asyncio.to_thread(self.manifest.load)
-        match = manifest.match_game(index, game, config)
-        suggestions: list[dict[str, Any]] = []
-        if game["kind"] == "shortcut" and (
-            match["method"] in UNRESOLVED_METHODS or config.get("gameKeySource") == "auto"
-        ):
-            suggestions = [c for c in await self.identity_candidates(game, index) if c["score"] >= 3][:5]
-        proposal = self._proposals().get("open", {}).get(key)
-        record = index["games"].get(match["title"]) if index and match.get("title") else None
-        return {
-            "game": game,
-            "config": config,
-            "match": match,
-            "suggestions": suggestions,
-            "proposal": proposal,
-            "hasRegistry": bool(record and record.get("r") and game.get("prefix")),
-            "steamCloud": self._steam_cloud(game),
-        }
 
     async def update_game_config(self, key: str, changes: dict[str, Any]) -> dict[str, Any]:
         await self._game(key)
@@ -2196,235 +786,11 @@ class KeepsakeApp:
             index = await asyncio.to_thread(self.manifest.load)
             if not index or changes["matchTitle"] not in index.get("games", {}):
                 raise ValueError("that title is not in the manifest")
-        changes = dict(changes)
-        if "enabled" in changes:
-            changes.setdefault("enabledSource", "user")  # automatic switching on never overrides this (ADR-0063)
-        config = await asyncio.to_thread(self.game_configs.update, key, changes)
+        config = await asyncio.to_thread(self.game_configs.update, key, dict(changes))
         log_event(logging.INFO, "game.config", "Game settings changed", key=key, fields=sorted(changes))
-        if config.get("enabled") and (changes.get("enabled") or set(changes) & set(configrev.SHARED_FIELDS)):
-            game_key = await self._game_key_of(key)
-            if game_key:
-                if changes.get("enabled"):
-                    await self._sync_config(key, game_key)  # pick up settings another device shared
-                else:
-                    await self._publish_config(key, game_key)
-                config = self.game_configs.get(key)
         return config
 
-    async def add_custom_path(self, key: str, absolute_path: str) -> dict[str, Any]:
-        """Add a folder chosen in the file picker, as a path relative to one of the game's roots."""
-        game = await self._game(key)
-        entry = custom_path_from_absolute(str(absolute_path), resolve.logical_roots(game, home=self.home))
-        config = self.game_configs.get(key)
-        return await self.update_game_config(key, {"customPaths": [*config["customPaths"], entry]})
-
-    async def preview_game(self, key: str) -> dict[str, Any]:
-        game = await self._game(key)
-        config = self.game_configs.get(key)
-        index = await asyncio.to_thread(self.manifest.load)
-        match = manifest.match_game(index, game, config)
-        title = match.get("title")
-        record = index["games"].get(title) if index and title else None
-        result = await asyncio.to_thread(resolve.preview, game, title, record, config, self.home)
-        return {**result, "match": match, "gameKey": match.get("gameKey")}
-
-    # Cloud sign-in: OneDrive (slice 6) and Google Drive (slice 10); WebDAV and S3 use saved settings
-
-    def _token_manager(self, backend: str) -> TokenManager:
-        return self.google_tokens if backend == "gdrive" else self.tokens
-
-    async def cloud_status(self) -> dict[str, Any]:
-        store = str(self.settings.get("snapshotStore"))
-        if store in ("webdav", "s3"):
-            configured = self.credentials.configured(store)
-            client_set, signed_in, problem = configured, configured, None
-        elif store == "direct":
-            # No account: "signed in" means a paired device to sync with (ADR-0061).
-            paired = bool(self.links and self.links.store.list())
-            client_set, signed_in = True, paired
-            problem = (
-                None if paired else "Switch on Replication in Settings, Modules, and pair your other device in Devices."
-            )
-        else:
-            manager = self._token_manager(store)
-            client_set = bool(
-                clients.google_client(self.credentials.load("gdrive"))[0]
-                if store == "gdrive"
-                else clients.onedrive_client_id(self.settings.get("onedriveClientId"))
-            )
-            signed_in = await asyncio.to_thread(manager.signed_in)
-            problem = manager.last_error
-        onedrive_client = bool(clients.onedrive_client_id(self.settings.get("onedriveClientId")))
-        return {
-            "clientIdSet": client_set,
-            "signedIn": signed_in,
-            "signingIn": self._signin is not None,
-            "problem": problem,
-            "store": store,
-            "name": BACKEND_NAMES.get(store, store),
-            "onedriveSignedIn": await asyncio.to_thread(self.tokens.signed_in),
-            "googleSignedIn": await asyncio.to_thread(self.google_tokens.signed_in),
-            "direct": self._direct_last,
-            "directReady": bool(self.links and self.links.store.list()),
-            # ADR-0032: with a built-in client the sign-in screens need no client ID, and
-            # "Use my own client ID" moves under Advanced (shown open while one is saved).
-            "builtInClient": {"onedrive": clients.onedrive_builtin(), "gdrive": clients.google_builtin()},
-            # Which sign-in methods have a client (ADR-0044). Google needs a different client for each.
-            "methods": {
-                "onedrive": dict.fromkeys(("browser", "phone"), onedrive_client),
-                "gdrive": {
-                    "browser": clients.google_browser_builtin() or self.credentials.configured("gdrive"),
-                    "phone": clients.google_phone_builtin() or self.credentials.configured("gdrive"),
-                },
-            },
-            "ownClient": {
-                "onedrive": bool(self.settings.get("onedriveClientId")),
-                "gdrive": self.credentials.configured("gdrive"),
-            },
-        }
-
-    async def start_signin(self, backend: str = "onedrive", method: str = "phone") -> dict[str, Any]:
-        """Begin a sign-in. Only ever called from a user action (threat model T2).
-
-        ``method`` "browser" is the authorization code flow with a loopback redirect, for a
-        browser on this device (ADR-0044); "phone" is the device code flow with a QR code.
-        """
-        backend = "gdrive" if backend == "gdrive" else "onedrive"
-        async with self._auth_lock:
-            if self._signin is not None:
-                self._signin.cancelled.set()
-                if isinstance(self._signin, LoopbackFlow):
-                    self._signin_lingering = [*self._signin_lingering[-3:], self._signin]
-            flow: DeviceCodeFlow | LoopbackFlow
-            if method == "browser":
-                if backend == "gdrive":
-                    client_id, secret = clients.google_browser_client(self.credentials.load("gdrive"))
-                    flow = LoopbackFlow(
-                        client_id,
-                        self.google_tokens.store,
-                        transport=self._google_transport,
-                        provider=GOOGLE,
-                        client_secret=secret,
-                    )
-                else:
-                    flow = LoopbackFlow(
-                        clients.onedrive_client_id(self.settings.get("onedriveClientId")),
-                        self.token_store,
-                        transport=self._transport,
-                    )
-            elif backend == "gdrive":
-                client_id, secret = clients.google_client(self.credentials.load("gdrive"))
-                flow = DeviceCodeFlow(
-                    client_id,
-                    self.google_tokens.store,
-                    transport=self._google_transport,
-                    provider=GOOGLE,
-                    client_secret=secret,
-                )
-            else:
-                flow = DeviceCodeFlow(
-                    clients.onedrive_client_id(self.settings.get("onedriveClientId")),
-                    self.token_store,
-                    transport=self._transport,
-                )
-            shown = await asyncio.to_thread(flow.start)
-            self._signin = flow
-        log_event(logging.INFO, "auth.signin_started", "Sign-in started", backend=backend, method=method)
-        self._background.append(asyncio.create_task(self._finish_signin(flow, backend)))
-        return shown
-
-    async def _finish_signin(self, flow: DeviceCodeFlow | LoopbackFlow, backend: str = "onedrive") -> None:
-        try:
-            await asyncio.to_thread(flow.poll)
-        except AuthError as exc:
-            if self._signin is flow:
-                self._signin = None
-            log_event(logging.WARNING, "auth.signin_failed", "Sign-in did not complete", reason=exc.reason)
-            await self.emit("keepsake_signin", {"status": "failed", "reason": exc.reason})
-            return
-        if self._signin is flow:
-            self._signin = None
-        for moved in self._signin_lingering:
-            if moved is not flow:
-                moved.signed_in_elsewhere()  # its tab now says the phone sign-in worked (v0.30.2)
-        self._token_manager(backend).last_error = None
-        log_event(logging.INFO, "auth.signed_in", "Signed in", backend=backend)
-        registered = await self.register_device(self._gdrive() if backend == "gdrive" else self._graph())
-        method = "browser" if isinstance(flow, LoopbackFlow) else "phone"
-        await self.emit("keepsake_signin", {"status": "signed-in", "registered": registered, "method": method})
-
-    async def cancel_signin(self) -> dict[str, Any]:
-        if self._signin is not None:
-            self._signin.cancelled.set()
-            self._signin = None
-        return {"ok": True}
-
-    async def sign_out(self, backend: str = "onedrive") -> dict[str, Any]:
-        await self.cancel_signin()
-        manager = self._token_manager(backend)
-        await asyncio.to_thread(manager.store.clear)
-        log_event(logging.INFO, "auth.signed_out", "Signed out", backend=backend)
-        return {"ok": True}
-
-    def _graph(self) -> GraphStore:
-        if self._graph_base_url:  # tests point this at a fake Graph
-            return GraphStore(self.tokens, transport=self._transport, base_url=self._graph_base_url)
-        return GraphStore(self.tokens, transport=self._transport)
-
-    def _gdrive(self) -> GoogleDriveStore:
-        if self._google_api:  # tests point this at a fake Drive
-            api, upload = self._google_api
-            return GoogleDriveStore(self.google_tokens, transport=self._google_transport, api=api, upload=upload)
-        return GoogleDriveStore(self.google_tokens, transport=self._google_transport)
-
-    def _webdav(self) -> WebDavStore:
-        if not httpcall.xml_available():
-            raise StoreError(httpcall.XML_MISSING)
-        c = self.credentials.load("webdav")
-        if not self.credentials.configured("webdav"):
-            raise StoreError("enter the WebDAV address, user name and password first")
-        return WebDavStore(c["url"], c["username"], c["password"], transport=self._endpoint_transport(c["url"]))
-
-    def _s3(self) -> S3Store:
-        if not httpcall.xml_available():
-            raise StoreError(httpcall.XML_MISSING)
-        c = self.credentials.load("s3")
-        if not self.credentials.configured("s3"):
-            raise StoreError("enter the S3 endpoint, bucket and access key first")
-        path_style = bool(c["pathStyle"])
-        return S3Store(
-            c["endpoint"],
-            c["region"],
-            c["bucket"],
-            c["accessKey"],
-            c["secretKey"],
-            prefix=c["prefix"],
-            path_style=path_style,
-            transport=self._endpoint_transport(S3Store.origin_for(c["endpoint"], c["bucket"], path_style)),
-        )
-
-    async def test_cloud(self, backend: str | None = None) -> dict[str, Any]:
-        """Check the chosen backend. WebDAV and S3 must prove create-only writes (fail closed)."""
-        backend = backend or str(self.settings.get("snapshotStore"))
-        device_id = str(self.settings.get("deviceId"))
-        try:
-            store: Store
-            if backend == "webdav":
-                webdav = store = self._webdav()
-                await asyncio.to_thread(webdav.check, device_id)
-            elif backend == "s3":
-                s3 = store = self._s3()
-                await asyncio.to_thread(s3.check, device_id)
-            elif backend == "gdrive":
-                gdrive = store = self._gdrive()
-                await asyncio.to_thread(gdrive.check)
-            else:
-                folder = await asyncio.to_thread(self._graph().check)
-                return {"ok": True, "folder": folder.get("name")}
-        except StoreError as exc:
-            return {"ok": False, "error": str(exc)}
-        registered = await self.register_device(store)
-        return {"ok": True, "registered": registered}
+    # Credentials: the SteamGridDB key (Install's artwork) and network-location passwords
 
     async def backend_config(self, backend: str) -> dict[str, Any]:
         return self.credentials.public(str(backend))
@@ -2437,1001 +803,21 @@ class KeepsakeApp:
         log_event(logging.INFO, "backend.config", "Backend settings saved", backend=backend)
         return result
 
-    async def register_device(self, store: Store | None = None) -> bool:
-        """Write this device's registry entry once (``registry/devices/<deviceId>.json``)."""
-        settings = self.settings.all()
-        entry = {
-            "schemaVersion": 1,
-            "deviceId": settings["deviceId"],
-            "deviceName": settings["deviceName"],
-            "registered": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "pluginVersion": self.version,
-        }
-        key = f"registry/devices/{settings['deviceId']}.json"
-        target = store if store is not None else self._graph()
-        try:
-            await asyncio.to_thread(target.put_new, key, json.dumps(entry, sort_keys=True).encode())
-        except AlreadyExistsError:
-            return True
-        except StoreError as exc:
-            log_event(logging.WARNING, "registry.failed", "Could not register this device", error=str(exc))
-            return False
-        return True
-
-    # Snapshots against the local test store or the chosen cloud backend
-
-    # Save locations (ADR-0071): one, or several written together and read as one
-
-    def _locations(self) -> list[str]:
-        """The save locations in use. A list whose first entry is not snapshotStore was replaced by a later
-        single choice (an older page or the desktop app), so snapshotStore alone counts then."""
-        primary = str(self.settings.get("snapshotStore"))
-        listed = [str(v) for v in self.settings.get("snapshotStores") or []]
-        return listed if listed and listed[0] == primary else [primary]
-
-    def _location_state(self) -> MultiStoreState:
-        return MultiStoreState(os.path.join(self.paths.runtime_dir, "locations.json"))
-
-    def _store(self) -> Store:
-        names = self._locations()
-        if len(names) == 1:
-            return self._single_store(names[0])  # one location: exactly as before
-        chosen = self.game_configs.locations_by_game_key()
-
-        def route(key: str) -> list[str]:
-            game = multi_game_of(key)
-            return [n for n in chosen.get(game, names) if n in names] if game else names
-
-        cache = os.path.join(self.paths.runtime_dir, "locations-history")
-        return MultiStore({n: self._single_store(n) for n in names}, route, self._location_state(), cache)
-
-    def _single_store(self, backend: str) -> Store:
-        if backend == "onedrive":
-            return self._graph()
-        if backend == "gdrive":
-            return self._gdrive()
-        if backend == "webdav":
-            return self._webdav()
-        if backend == "s3":
-            return self._s3()
-        if backend == "direct":
-            return LocalFolderStore(self._direct_root())  # this device's own copy of the history (ADR-0061)
-        return LocalFolderStore(os.path.join(self.paths.runtime_dir, "local-test-store"))
-
-    def _engine(self) -> SnapshotEngine:
-        settings = self.settings.all()
-        return SnapshotEngine(
-            self._store(),
-            self.paths.runtime_dir,
-            self.paths.settings_dir,
-            device_id=str(settings["deviceId"]),
-            device_name=str(settings["deviceName"] or "Unnamed device"),
-            plugin_version=self.version,
-            settings=self.settings.all,
-        )
-
-    def _playtime(self) -> playtime.Recorder:
-        eng = self._engine()
-        return playtime.Recorder(self.paths.runtime_dir, self._store, eng.device_id, eng.seq.next)
-
-    async def game_playtime(self, key: str) -> dict[str, Any]:
-        """Time played across your devices, by device name (ADR-0049). Informational only (P4)."""
-        game_key = (await self._snapshot_context(key))["gameKey"]
-        eng = self._engine()
-        found = await asyncio.to_thread(playtime.totals, eng.store, game_key)
-        names = {
-            str(m.get("deviceId")): str(m.get("deviceName")) for m in await asyncio.to_thread(eng.list_metas, game_key)
-        }
-        names[eng.device_id] = str(self.settings.get("deviceName") or "This device")
-        return {
-            "totalSeconds": found["totalSeconds"],
-            "sessions": found["sessions"],
-            "byDevice": sorted(
-                ({"device": names.get(d, "Another device"), "seconds": s} for d, s in found["byDevice"].items()),
-                key=lambda item: -item["seconds"],
-            ),
-        }
-
-    def _bases(self) -> dict[str, str]:
-        data = read_json(os.path.join(self.paths.runtime_dir, "snapshot-bases.json"), default={})
-        return data if isinstance(data, dict) else {}
-
-    def _set_base(self, game_key: str, snap_id: str) -> None:
-        bases = self._bases()
-        bases[game_key] = snap_id
-        atomic_write_json(os.path.join(self.paths.runtime_dir, "snapshot-bases.json"), bases)
-
-    async def _snapshot_context(self, key: str) -> dict[str, Any]:
-        """Everything needed to snapshot or restore a game, failing closed when anything is uncertain."""
-        if self.settings.read_only:
-            raise ValueError("settings are in read-only safe mode; update Haversack first")
-        game = await self._game(key)
-        if discovery.sync_blocked(self.paths.runtime_dir, key):
-            raise ValueError("the running prefix did not match; snapshots are blocked for this game")
-        config = self.game_configs.get(key)
-        index = await asyncio.to_thread(self.manifest.load)
-        match = manifest.match_game(index, game, config)
-        if not match.get("gameKey"):
-            raise ValueError("match the game to a manifest entry or give it a game key first")
-        record = index["games"].get(match["title"]) if index and match.get("title") else None
-        if record is None and not config.get("customPaths"):
-            raise ValueError("no save folders are known for this game: match it or add custom folders")
-        scan = await asyncio.to_thread(resolve.preview, game, match["title"], record, config, self.home, 0, True)
-        if scan.get("truncated"):
-            raise ValueError("too many files to snapshot safely; add exclusions")
-        roots: dict[str, str | None] = dict(resolve.logical_roots(game, home=self.home))
-        files = dict(scan.get("files", {}))
-        reg_keys = self._registry_keys(game, record, config)
-        if reg_keys:
-            roots["registry"] = self._registry_dir(match["gameKey"])
-            exported = await asyncio.to_thread(self._export_registry, game, reg_keys, match["gameKey"])
-            if exported:
-                files["registry"] = exported
-        running = await asyncio.to_thread(self._game_running, game)
-        return {
-            "game": game,
-            "gameKey": match["gameKey"],
-            "files": files,
-            "roots": roots,
-            "running": running,
-            "registryKeys": reg_keys,
-        }
-
-    # Registry keys (slice 11, ADR-0022): exported into a fragment for snapshots, merged back after restores
-
-    def _registry_keys(self, game: dict[str, Any], record: dict[str, Any] | None, config: dict[str, Any]) -> list[str]:
-        if (
-            not self.settings.get("registrySync")
-            or not config.get("syncRegistry")
-            or not record
-            or not game.get("prefix")
-        ):
-            return []
-        keys = []
-        for entry in record.get("r", []):
-            path, tags = str(entry[0]), str(entry[1])
-            if "s" in tags or (config.get("includeConfig") and "c" in tags):
-                mapped = registry.hive_and_key(path)
-                if mapped and mapped[0] == "user.reg":
-                    keys.append(mapped[1])
-        return sorted(set(keys))
-
-    def _registry_dir(self, game_key: str) -> str:
-        path = os.path.join(self.paths.runtime_dir, "registry", game_key)
-        os.makedirs(path, exist_ok=True)
-        return path
-
-    @staticmethod
-    def _user_reg(game: dict[str, Any]) -> str:
-        return os.path.join(str(game["prefix"]), "pfx", "user.reg")
-
-    def _export_registry(self, game: dict[str, Any], keys: list[str], game_key: str) -> list[str]:
-        """Write the managed keys' fragment to Keepsake's staging folder. Fails closed on an unreadable file."""
-        target = os.path.join(self._registry_dir(game_key), "user.reg")
-        source = self._user_reg(game)
-        fragment = None
-        if os.path.isfile(source):
-            try:
-                fragment = registry.export(registry.read_text(source), keys)
-            except registry.RegistryError as exc:
-                raise SnapshotError(f"user.reg could not be read safely: {exc}") from exc
-        if fragment is None:
-            if os.path.exists(target):
-                os.unlink(target)
-            return []
-        current = None
-        if os.path.exists(target):
-            with open(target, encoding="utf-8") as handle:
-                current = handle.read()
-        if current != fragment:
-            with open(target, "w", encoding="utf-8", newline="") as handle:
-                handle.write(fragment)
-        return ["user.reg"]
-
-    def _merge_registry(self, game: dict[str, Any], keys: list[str], game_key: str) -> dict[str, str]:
-        """Apply a restored fragment to user.reg. A snapshot without registry keys changes nothing."""
-        fragment_path = os.path.join(self._registry_dir(game_key), "user.reg")
-        target = self._user_reg(game)
-        if not keys or not os.path.isfile(fragment_path) or not os.path.isfile(target):
-            return {"status": "skipped"}
-        if self._game_running(game):
-            raise SnapshotError("the game is running; registry keys are only written while it is closed")
-        with open(fragment_path, encoding="utf-8") as handle:
-            fragment = handle.read()
-        backups = os.path.join(self.paths.runtime_dir, "registry-backups", game_key)
-        result = registry.merge_file(target, fragment, keys, backups)
-        log_event(logging.INFO, "registry.merge", "Registry keys restored", gameKey=game_key, status=result["status"])
-        return result
-
-    async def _after_restore(self, ctx: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
-        if not ctx.get("registryKeys"):
-            return result
-        try:
-            merged = await asyncio.to_thread(self._merge_registry, ctx["game"], ctx["registryKeys"], ctx["gameKey"])
-        except (registry.RegistryError, SnapshotError, OSError) as exc:
-            log_event(logging.WARNING, "registry.merge_failed", "Registry keys not restored", error=str(exc))
-            await self.emit("keepsake_toast", f"Save files restored, but registry keys were left unchanged: {exc}")
-            return {**result, "registry": "failed"}
-        return {**result, "registry": merged["status"]}
-
-    async def snapshot_game(self, key: str, label: str | None = None) -> dict[str, Any]:
-        """Take a manual snapshot. With a ``label`` it is a checkpoint (ADR-0048): always a new
-        snapshot, even when nothing changed, pinned with that label so retention keeps it."""
-        name = checkpoint_label(label) if label is not None else None
-        ctx = await self._snapshot_context(key)
-        eng = self._engine()
-        with self.jobs.job("snapshot"):
-            base_id = self._bases().get(ctx["gameKey"])
-            base = await asyncio.to_thread(eng.get_meta, ctx["gameKey"], base_id) if base_id else None
-            result = await asyncio.to_thread(
-                eng.take, ctx["gameKey"], ctx["files"], ctx["roots"], "manual", base, force=name is not None
-            )
-            if name is not None and result["status"] == "published":
-                await asyncio.to_thread(eng.pin, ctx["gameKey"], result["snapId"], None, name)
-        if result["status"] == "published":
-            self._set_base(ctx["gameKey"], result["snapId"])
-        event = "snapshot.checkpoint" if name is not None else "snapshot.take"
-        log_event(logging.INFO, event, "Snapshot taken", gameKey=ctx["gameKey"], status=result["status"])
-        result.pop("meta", None)
-        return result
-
-    async def list_snapshots(self, key: str) -> dict[str, Any]:
-        game = await self._game(key)
-        index = await asyncio.to_thread(self.manifest.load)
-        match = manifest.match_game(index, game, self.game_configs.get(key))
-        game_key = match.get("gameKey")
-        if not game_key:
-            return {"snapshots": [], "quarantine": [], "prerestore": []}
-        eng = self._engine()
-        metas = await asyncio.to_thread(eng.list_metas, game_key)
-        pruned = await asyncio.to_thread(eng.pruned, game_key)
-        pin_records = await asyncio.to_thread(eng.pins, game_key)
-        pins = {p["snapId"] for p in pin_records}
-        labels = {p["snapId"]: str(p["label"]) for p in pin_records if isinstance(p.get("label"), str)}
-        base = self._bases().get(game_key)
-        summary = snap_summary
-        latest: dict[str, dict[str, Any]] = {}
-        for meta in metas:
-            device = str(meta.get("deviceId") or meta.get("deviceName"))
-            if device not in latest or meta["created"] > latest[device]["created"]:
-                latest[device] = meta
-
-        scrub = await asyncio.to_thread(read_json, os.path.join(self.paths.runtime_dir, SCRUB_FILE), {})
-        found = ((scrub.get("games") or {}).get(game_key) or {}) if isinstance(scrub, dict) else {}
-        return {
-            # Snapshots the integrity check found damaged or missing in the cloud (ADR-0050).
-            "damaged": sorted(set(found.get("bad") or []) | set(found.get("missing") or [])),
-            "lastByDevice": [
-                {"device": m.get("deviceName"), "created": m["created"], "kind": m["kind"], "snapId": m["snapId"]}
-                for m in sorted(latest.values(), key=lambda m: m["created"], reverse=True)
-            ],
-            "gameKey": game_key,
-            "snapshots": [
-                {
-                    **summary(m),
-                    "pinned": m["snapId"] in pins,
-                    "label": labels.get(m["snapId"]),
-                    "pruned": m["snapId"] in pruned,
-                    "base": m["snapId"] == base,
-                }
-                for m in reversed(metas)
-            ],
-            "quarantine": [
-                {**summary(r["meta"]), "reasons": r.get("reasons", [])} for r in eng.quarantine.list(game_key)
-            ],
-            "prerestore": [summary(r["meta"]) for r in eng.prerestore.list(game_key)],
-        }
-
-    async def restore_preview(self, key: str, snap_id: str) -> dict[str, Any]:
-        """Each file restoring ``snap_id`` would add, replace or remove here. Changes nothing (ADR-0048)."""
-        ctx = await self._snapshot_context(key)
-        changes = await asyncio.to_thread(
-            self._engine().restore_preview, ctx["gameKey"], str(snap_id), ctx["files"], ctx["roots"]
-        )
-        return {"snapId": str(snap_id), "changes": changes}
-
-    async def restore_snapshot(self, key: str, snap_id: str, paths: list[str] | None = None) -> dict[str, Any]:
-        """Restore a snapshot, or with ``paths`` (``root/rel`` as the preview lists them) only those files."""
-        only = None if paths is None else restore_paths(paths)
-        ctx = await self._snapshot_context(key)
-        eng = self._engine()
-        async with self.locks.hold(ctx["gameKey"], "saves"):
-            with self.jobs.job("restore"):
-                result = await asyncio.to_thread(
-                    functools.partial(
-                        eng.restore, ctx["gameKey"], str(snap_id), ctx["files"], ctx["roots"], ctx["running"], only=only
-                    )
-                )
-                result = await self._after_restore(ctx, result)
-        if only is None:
-            self._set_base(ctx["gameKey"], str(snap_id))  # a partial restore leaves a mix, so the base stays
-        log_event(
-            logging.INFO, "snapshot.restore", "Snapshot restored", gameKey=ctx["gameKey"], status=result["status"]
-        )
-        return result
-
-    async def undo_restore(self, key: str, prerestore_id: str) -> dict[str, Any]:
-        ctx = await self._snapshot_context(key)
-        eng = self._engine()
-        async with self.locks.hold(ctx["gameKey"], "saves"):
-            with self.jobs.job("restore"):
-                result = await asyncio.to_thread(
-                    eng.restore_prerestore,
-                    ctx["gameKey"],
-                    str(prerestore_id),
-                    ctx["files"],
-                    ctx["roots"],
-                    ctx["running"],
-                )
-                result = await self._after_restore(ctx, result)
-        log_event(logging.INFO, "snapshot.undo", "Restore undone", gameKey=ctx["gameKey"], status=result["status"])
-        return result
-
-    async def pin_snapshot(self, key: str, snap_id: str) -> dict[str, Any]:
-        game_key = (await self._snapshot_context(key))["gameKey"]
-        await asyncio.to_thread(self._engine().pin, game_key, str(snap_id))
-        return {"ok": True}
-
-    async def release_quarantine(self, key: str, snap_id: str, confirmed: bool) -> dict[str, Any]:
-        game_key = (await self._snapshot_context(key))["gameKey"]
-        with self.jobs.job("snapshot"):
-            result = await asyncio.to_thread(
-                self._engine().release_quarantined, game_key, str(snap_id), bool(confirmed)
-            )
-        if result["status"] == "published":
-            self._set_base(game_key, str(snap_id))
-        state = self._sync().state
-        if result["status"] == "published" and state.get(game_key).get("quarantined") == str(snap_id):
-            state.update(game_key, quarantined=None)
-        log_event(
-            logging.WARNING,
-            "snapshot.release",
-            "Quarantined snapshot released",
-            gameKey=game_key,
-            status=result["status"],
-        )
-        return result
-
-    async def run_retention(self, key: str) -> dict[str, Any]:
-        game_key = (await self._snapshot_context(key))["gameKey"]
-        with self.jobs.job("retention"):
-            result = await asyncio.to_thread(self._engine().apply_retention, game_key, set(self._bases().values()))
-        log_event(
-            logging.INFO, "snapshot.retention", "Retention applied", gameKey=game_key, pruned=len(result["prune"])
-        )
-        return {"pruned": result["prune"], "kept": len(result["keep"]), "orphansDeleted": result["orphansDeleted"]}
-
-    # Sync (slice 7). Slice 8 calls pull and push from the launch gate and the exit event.
-
-    def _sync(self) -> SyncEngine:
-        return SyncEngine(self._engine(), self.paths.runtime_dir)
-
-    async def _sync_context(self, key: str, running: Callable[[], bool] | None = None) -> GameContext:
-        ctx = await self._snapshot_context(key)  # fails closed on mismatch, safe mode, no match
-        game = ctx["game"]
-        config = self.game_configs.get(key)
-        index = self.manifest.load() or {}
-        match = manifest.match_game(index, game, config)
-        record = index.get("games", {}).get(match["title"]) if match.get("title") else None
-
-        reg_keys = ctx["registryKeys"]
-
-        def files() -> dict[str, list[str]]:
-            scan = resolve.preview(game, match["title"], record, config, self.home, 0, True)
-            if scan.get("truncated"):
-                raise SnapshotError("too many files to sync safely; add exclusions")
-            found = dict(scan.get("files", {}))
-            if reg_keys:
-                exported = self._export_registry(game, reg_keys, ctx["gameKey"])
-                if exported:
-                    found["registry"] = exported
-            return found
-
-        def after_restore() -> None:
-            if reg_keys:
-                self._merge_registry(game, reg_keys, ctx["gameKey"])
-
-        def processes_running() -> bool:
-            return self._game_running(game)
-
-        def identity_record() -> dict[str, Any]:
-            return identity.identity_record(
-                ctx["gameKey"],
-                str(self.settings.get("deviceId")),
-                match.get("title"),
-                identity.local_hints(game),
-                identity.save_dirs({root: rels for root, rels in files().items() if root != "registry"}),
-            )
-
-        return GameContext(
-            ctx["gameKey"],
-            files=files,
-            roots=ctx["roots"],
-            running=running or processes_running,
-            identity=identity_record,
-            after_restore=after_restore,
-        )
-
-    # Lifecycle (slice 8): launch gate and exit push
-
-    def _sessions(self) -> dict[str, Any]:
-        data = read_json(os.path.join(self.paths.runtime_dir, "sessions.json"), default={})
-        return data if isinstance(data, dict) else {}
-
-    def _record_session(self, game_key: str, **changes: float) -> None:
-        sessions = self._sessions()
-        sessions[game_key] = {**sessions.get(game_key, {}), **changes}
-        atomic_write_json(os.path.join(self.paths.runtime_dir, "sessions.json"), sessions)
-
-    async def _games_for_appid(self, raw_id: Any) -> list[dict[str, Any]]:
-        appid = lifecycle.normalise_appid(raw_id)
-        games = (await self.discover_games())["games"]
-        return [g for g in games if g["appid"] == appid and self.game_configs.get(g["key"]).get("enabled")]
-
     async def on_game_event(self, kind: str, raw_id: Any) -> dict[str, Any]:
-        """Frontend lifetime events. Returns at once; the work runs as a task."""
+        """A game started or exited (from the frontend). Replication and Install listen (ADR-0098)."""
+        event = {"start": "game_started", "exit": "game_exited"}.get(kind)
         try:
-            games = await self._games_for_appid(raw_id)
-            appid = lifecycle.normalise_appid(raw_id)
+            appid = normalise_appid(raw_id)
         except (ValueError, TypeError):
             return {"handled": 0}
-        # A game waiting for its prefix reset to finish (ADR-0052): no launch gate and no exit
-        # save on the fresh, empty prefix; on exit the kept saves go back instead.
-        waiting = {
-            k
-            for k, r in storage.resets(self.paths.runtime_dir).items()
-            if r.get("stage") == "waiting" and r.get("appid") == appid
-        }
-        if waiting:
-            if kind == "exit":
-                for key in sorted(waiting):
-                    self._background.append(asyncio.create_task(self._finish_prefix_reset(key)))
-            games = [g for g in games if g["key"] not in waiting]
-        if not games:
-            # Apps Saves does not sync (an installer shortcut, or any game for Advisor) still reach other modules.
-            event = {"start": "game_started", "exit": "game_exited"}.get(kind)
-            if event:
-                await self.bus.publish(event, {"gameKey": None, "appid": lifecycle.normalise_appid(raw_id)})
-        if not self.registry.enabled("saves"):
-            return {"handled": 0}  # Saves switched off: no launch gate, no exit save
-        if self.host != "decky" and kind == "start":
-            # A PC host only learns of a game once it is running (ADR-0038): record it, never pull under it (P6).
-            for game in games:
-                self._background.append(asyncio.create_task(self._pc_started(game)))
-            return {"handled": len(games)}
-        for game in games:
-            if kind == "start" and game["key"] not in self._launching:
-                self._launching.add(game["key"])
-                self._background.append(asyncio.create_task(self._launch(game)))
-            elif kind == "exit":
-                self._background.append(asyncio.create_task(self._exit(game)))
-        return {"handled": len(games)}
-
-    async def _pc_started(self, game: dict[str, Any]) -> None:
-        try:
-            ctx = await self._sync_context(game["key"])
-        except (ValueError, SnapshotError) as exc:
-            log_event(logging.WARNING, "lifecycle.pc_start", "Game seen running, not synced", error=str(exc))
-            return
-        self._record_session(ctx.game_key, lastStart=time.time())
-        await self.bus.publish("game_started", {"gameKey": ctx.game_key, "appid": game["appid"]})
-
-    def _game_running(self, game: Mapping[str, Any]) -> bool:
-        """Whether the game runs now. Decky reads /proc; a PC host lists the user's processes (ADR-0038)."""
-        if game.get("kind") in (*launchers.LAUNCHER_KINDS, launchers.EMULATOR_KIND):
-            return procs.launcher_running(dict(game), self.proc_root)  # by Wine prefix or emulator (ADR-0051)
-        if self.host == "decky":
-            return bool(find_game_processes(int(game["appid"]), game.get("prefix"), self.proc_root))
-        return pcwatch.game_running(game, self._pc_processes(), discovery.real_home(self.home))
-
-    async def _launch(self, game: dict[str, Any]) -> dict[str, Any]:
-        key = game["key"]
-        mode = self.game_configs.get(key).get("launchGate", "freeze")
-        timeout = float(self.settings.get("launchPullTimeout"))
-        abort = lifecycle.Abort()
-        frozen = False
-        token: str | None = None
-        game_key: str | None = None
-        try:
-            ctx_probe = await self._sync_context(key)
-            game_key = ctx_probe.game_key
-            self._record_session(ctx_probe.game_key, lastStart=time.time())
-            await self.bus.publish("game_started", {"gameKey": game_key, "appid": game["appid"]})
-            gate_files = lifecycle.GateFiles(self.paths.runtime_dir)
-            if mode == "strict":
-                await asyncio.to_thread(gate_files.write_timeout, int(timeout))
-                found = await asyncio.to_thread(
-                    lifecycle.wait_for,
-                    lambda: gate_files.waiting_token(game["appid"]) is not None,
-                    lifecycle.FIND_PROCESS_SECONDS,
-                )
-                token = gate_files.waiting_token(game["appid"]) if found else None
-            procs = []
-            if token is None and mode != "off":
-                procs = await asyncio.to_thread(self._wait_for_processes, game)
-                if procs:
-                    stopped = await asyncio.to_thread(self.freezer.freeze, procs)
-                    frozen = bool(stopped)
-                    if frozen:
-                        await self.bus.publish("game_frozen", {"gameKey": game_key, "appid": game["appid"]})
-            if token is not None or frozen:
-                # Blocked in the gate script or frozen: safe to restore until the pull is abandoned.
-                running: Callable[[], bool] = abort.is_set
-            else:
-                running = lambda: True  # noqa: E731 - could not hold the game: never restore under it
-            await self._direct_exchange(timeout / 2)  # direct sync: fetch the other device's newest first
-            ctx = await self._sync_context(key, running=running)
-            async with self.locks.hold(ctx.game_key, "saves"):
-                with self.jobs.job("sync"):
-                    try:
-                        result = await asyncio.wait_for(asyncio.to_thread(self._sync().pull, ctx), timeout)
-                    except TimeoutError:
-                        abort.set()
-                        self._sync().state.update(ctx.game_key, pending=True)
-                        await self.emit("keepsake_toast", lifecycle.TOAST_TIMEOUT)
-                        result = {"action": "launch", "pending": True, "reason": "timeout"}
-            await self._announce_pull(game, result)
-            log_event(
-                logging.INFO,
-                "lifecycle.launch",
-                "Launch check finished",
-                gameKey=ctx.game_key,
-                mode=mode,
-                frozen=frozen,
-                strict=token is not None,
-                action=result.get("action"),
-                reason=result.get("reason"),
-            )
-            return result
-        except (ValueError, SnapshotError, StoreError) as exc:
-            log_event(logging.WARNING, "lifecycle.launch_skipped", "Launch check skipped", key=key, error=str(exc))
-            return {"action": "launch", "error": str(exc)}
-        finally:
-            if frozen:
-                await asyncio.to_thread(self.freezer.resume_all, "normal")
-            if token is not None:
-                await asyncio.to_thread(lifecycle.GateFiles(self.paths.runtime_dir).release, game["appid"], token)
-            self._launching.discard(key)
-            if game_key and (frozen or token is not None):
-                await self.bus.publish("game_released", {"gameKey": game_key, "appid": game["appid"]})
-
-    def _wait_for_processes(self, game: dict[str, Any]) -> list[Any]:
-        found: list[Any] = []
-
-        def check() -> bool:
-            nonlocal found
-            found = find_game_processes(int(game["appid"]), game.get("prefix"), self.proc_root)
-            return bool(found)
-
-        lifecycle.wait_for(check, lifecycle.FIND_PROCESS_SECONDS)
-        return found
-
-    async def _announce_pull(self, game: dict[str, Any], result: dict[str, Any]) -> None:
-        suspended = result.get("suspended")
-        if suspended:
-            # Never adopted without the user: they choose to restore it from History.
-            await self.emit(
-                "keepsake_toast",
-                f"{suspended.get('device') or 'Another device'} went to sleep while playing {game['name']}. "
-                "Its unsaved progress is in History as a suspend snapshot.",
-            )
-        if result.get("action") == "conflict":
-            await self._conflict_raised(game)
-        elif result.get("reason") == "cloud-newer-game-running":
-            await self.emit("keepsake_toast", lifecycle.TOAST_CLOUD_NEWER)
-
-    async def _exit(self, game: dict[str, Any]) -> dict[str, Any]:
-        key = game["key"]
-        try:
-            gone = await asyncio.to_thread(
-                lifecycle.wait_for,
-                lambda: not self._game_running(game),
-                lifecycle.EXIT_WAIT_SECONDS,
-            )
-            if not gone:
-                log_event(
-                    logging.WARNING, "lifecycle.exit_waiting", "Game still running; the idle pass will save it", key=key
-                )
-                return {"status": "deferred"}
-            ctx = await self._sync_context(key)
-            await self.bus.publish("game_exited", {"gameKey": ctx.game_key, "appid": game["appid"]})
-            async with self.locks.hold(ctx.game_key, "saves"):
-                with self.jobs.job("sync"):
-                    result = await asyncio.to_thread(self._sync().push, ctx)
-            self._direct_pushed()
-            session = self._sessions().get(ctx.game_key, {})
-            now = time.time()
-            self._record_session(ctx.game_key, lastEnd=now)
-            start = float(session.get("lastStart") or 0)
-            if start > float(session.get("lastEnd") or 0):
-                await self._record_playtime(ctx.game_key, start, now)
-        except (ValueError, SnapshotError, StoreError) as exc:
-            log_event(logging.WARNING, "lifecycle.exit_failed", "Exit save failed", key=key, error=str(exc))
-            return {"status": "error", "error": str(exc)}
-        status = result.get("status")
-        if status == "published" and self.settings.get("toastOnSync"):
-            await self.emit("keepsake_toast", f"Saved {game['name']} to the cloud.")
-        elif status == "published-fork":
-            await self._conflict_raised(game)
-        elif status == "quarantined":
-            await self.emit(
-                "keepsake_toast", f"{game['name']}: a suspicious save was kept on this device, not uploaded."
-            )
-        log_event(logging.INFO, "lifecycle.exit", "Exit save finished", key=key, status=status)
-        return result
-
-    async def _record_playtime(self, game_key: str, start: float, end: float) -> None:
-        try:
-            await asyncio.to_thread(self._playtime().record, game_key, start, end)
-        except (OSError, StoreError, SnapshotError) as exc:
-            log_event(logging.INFO, "playtime.failed", "Playtime not recorded", error=str(exc))
-
-    # Strict wrapper: the frontend reads and writes launch options; the backend keeps the originals.
-
-    # Launch option presets (R29 stage 5, ADR-0097)
-    def _launch_editable(self, key: str) -> None:
-        if self.game_configs.get(key).get("launchGate", "freeze") == "strict":
-            raise ValueError("this game uses the strict launch gate; turn it off first, then change its launch options")
-
-    async def launch_presets(self, key: str, current_options: str) -> dict[str, Any]:
-        """The presets and which are on, for the launch options Steam has now (read by the page)."""
-        game = await self._game(key)
-        original = await asyncio.to_thread(launchopts.Originals(self.paths.runtime_dir).get, int(game["appid"]))
-        found = launchopts.status(str(current_options), original)
-        strict = self.game_configs.get(key).get("launchGate", "freeze") == "strict"
-        return {**found, "appid": int(game["appid"]), "strict": strict}
-
-    async def launch_apply(self, key: str, current_options: str, presets: list[str]) -> dict[str, Any]:
-        """User action: the launch options with exactly ``presets`` on. The page sets them through Steam
-        and reads them back; the options as they were are kept first (P15)."""
-        self._launch_editable(key)
-        game = await self._game(key)
-        try:
-            options = launchopts.compose(str(current_options), [str(p) for p in presets])
-        except launchopts.LaunchError as exc:
-            raise ValueError(str(exc)) from exc
-        await asyncio.to_thread(
-            launchopts.Originals(self.paths.runtime_dir).keep, int(game["appid"]), str(current_options)
-        )
-        log_event(logging.INFO, "launch.presets", "Launch option presets changed", presets=sorted(presets))
-        return {"appid": int(game["appid"]), "options": options}
-
-    async def launch_restore(self, key: str) -> dict[str, Any]:
-        """User action: the launch options as they were before Haversack first changed them."""
-        self._launch_editable(key)
-        game = await self._game(key)
-        store = launchopts.Originals(self.paths.runtime_dir)
-        original = await asyncio.to_thread(store.get, int(game["appid"]))
-        if original is None:
-            raise ValueError("Haversack has not changed this game's launch options")
-        await asyncio.to_thread(store.forget, int(game["appid"]))
-        return {"appid": int(game["appid"]), "options": original}
-
-    async def strict_wrap(self, key: str, current_options: str) -> dict[str, Any]:
-        game = await self._game(key)
-        store = lifecycle.LaunchOptionsStore(self.paths.runtime_dir)
-        await asyncio.to_thread(store.save_original, game["appid"], str(current_options))
-        await self.update_game_config(key, {"launchGate": "strict"})
-        return {
-            "appid": game["appid"],
-            "options": lifecycle.wrap_launch_options(str(current_options), self.paths.plugin_dir),
-        }
-
-    async def strict_unwrap(self, key: str, mode: str = "freeze") -> dict[str, Any]:
-        game = await self._game(key)
-        store = lifecycle.LaunchOptionsStore(self.paths.runtime_dir)
-        original = await asyncio.to_thread(store.original, game["appid"])
-        if original is None:
-            raise ValueError("no saved launch options for this game")
-        await asyncio.to_thread(store.forget, game["appid"])
-        await self.update_game_config(key, {"launchGate": mode})
-        return {"appid": game["appid"], "options": original}
-
-    async def sync_pull(self, key: str) -> dict[str, Any]:
-        ctx = await self._sync_context(key)
-        async with self.locks.hold(ctx.game_key, "saves"):
-            with self.jobs.job("sync"):
-                result = await asyncio.to_thread(self._sync().pull, ctx)
-        log_event(
-            logging.INFO,
-            "sync.pull",
-            "Checked the cloud before play",
-            gameKey=ctx.game_key,
-            action=result.get("action"),
-            reason=result.get("reason"),
-        )
-        if result.get("action") == "conflict" and self.settings.get("conflictPolicy") == "newest":
-            await self._conflict_raised(await self._game(key))
-        return result
-
-    async def bring_newer(self, key: str) -> dict[str, Any]:
-        """The "Get it now" button: bring in the newer save from another device, outside a launch (ADR-0049)."""
-        ctx = await self._sync_context(key)
-        async with self.locks.hold(ctx.game_key, "saves"):
-            with self.jobs.job("sync"):
-                result = await asyncio.to_thread(self._sync().fetch_newer, ctx)
-        log_event(
-            logging.INFO, "sync.pull", "Brought in a newer save", gameKey=ctx.game_key, action=result.get("action")
-        )
-        return result
-
-    async def sync_push(self, key: str) -> dict[str, Any]:
-        ctx = await self._sync_context(key)
-        async with self.locks.hold(ctx.game_key, "saves"):
-            with self.jobs.job("sync"):
-                result = await asyncio.to_thread(self._sync().push, ctx)
-        self._direct_pushed()
-        log_event(
-            logging.INFO,
-            "sync.push",
-            "Saved to the cloud after play",
-            gameKey=ctx.game_key,
-            status=result.get("status"),
-        )
-        if result.get("status") in ("conflict", "published-fork") and self.settings.get("conflictPolicy") == "newest":
-            await self._conflict_raised(await self._game(key))
-        return result
-
-    async def _conflict_raised(self, game: dict[str, Any]) -> None:
-        """A conflict appeared. With "When saves differ" set to "Take the newest", settle it by time
-        (ADR-0080); otherwise ask, as always."""
-        if self.settings.get("conflictPolicy") != "newest":
-            await self.emit("keepsake_toast", f"Save conflict for {game['name']}. Open Haversack to choose.")
-            return
-        key = str(game["key"])
-        if key in self._newest_running:
-            return
-        self._newest_running.add(key)
-
-        async def settle() -> None:
-            try:
-                await self.take_newest(key)
-            finally:
-                self._newest_running.discard(key)
-
-        self._background.append(asyncio.create_task(settle()))
-
-    async def take_newest(self, key: str) -> dict[str, Any]:
-        """Settle an open conflict by taking the newer version, if time can be trusted (ADR-0080).
-
-        Through the same resolution as the user's choice: this device's files are kept pinned, a
-        pre-restore snapshot comes first, and the other version stays pinned in History. Undo
-        brings the replaced version back.
-        """
-        game = await self._game(key)
-        details = await self.conflict_details(key)
-        if not details.get("conflict"):
-            return {"status": "no-conflict"}
-        decision = newest.decide(details.get("sides") or [], time.time())
-        if decision["choice"] is None:
-            await self.emit(
-                "keepsake_toast", f"Save conflict for {game['name']}: {decision['reason']}. Open Haversack."
-            )
-            return {"status": "asked", **decision}
-        try:
-            result = await self.resolve_conflict(key, decision["choice"], decision["head"])
-        except (SnapshotError, StoreError, ValueError) as exc:
-            # The game is running, say: the conflict stays, and the next exit or idle pass tries again.
-            log_event(logging.INFO, "sync.newest_waits", "Newest save not taken yet", key=key, error=str(exc))
-            return {"status": "waiting", "error": str(exc)}
-        loser = result.get("keptLocal") if decision["choice"] == "use-cloud" else self._other_head(details, result)
-        record = {
-            "choice": decision["choice"],
-            "used": result.get("used") or result.get("merge"),
-            "replaced": loser,
-            "device": decision.get("device"),
-            "margin": decision.get("margin"),
-            "at": time.time(),
-        }
-        await asyncio.to_thread(self._newest_store().record, key, record)
-        newer = "the other device's" if decision["choice"] == "use-cloud" else "this device's"
-        who = f" from {decision['device']}" if decision["choice"] == "use-cloud" and decision.get("device") else ""
-        await self.emit(
-            "keepsake_toast",
-            f"{game['name']}: kept {newer} newer save{who} ({newest.margin_text(decision.get('margin'))}). "
-            "The other one is in History; Undo brings it back.",
-        )
-        log_event(logging.WARNING, "sync.newest", "Took the newest save", key=key, choice=decision["choice"])
-        return {"status": "taken", **record}
-
-    @staticmethod
-    def _other_head(details: dict[str, Any], result: dict[str, Any]) -> str | None:
-        heads = [s.get("snapId") for s in details.get("sides") or [] if s.get("side") == "cloud"]
-        return heads[0] if heads else None
-
-    def _newest_store(self) -> NewestChoices:
-        return NewestChoices(os.path.join(self.paths.runtime_dir, "newest-choices.json"))
-
-    async def newest_choice(self, key: str) -> dict[str, Any] | None:
-        """The last version Keepsake took by itself for this game, for the Undo card (ADR-0080)."""
-        return await asyncio.to_thread(self._newest_store().get, str(key))
-
-    async def undo_newest(self, key: str) -> dict[str, Any]:
-        """Bring back the version Keepsake replaced: an ordinary restore from History (reversible too)."""
-        record = await asyncio.to_thread(self._newest_store().get, str(key))
-        if not record or not record.get("replaced"):
-            raise ValueError("there is nothing to undo for this game")
-        result = await self.restore_snapshot(key, str(record["replaced"]))
-        await asyncio.to_thread(self._newest_store().clear, str(key))
-        log_event(logging.WARNING, "sync.newest_undone", "Newest save undone", key=key)
-        return result
-
-    async def snapshot_locations(self, key: str) -> dict[str, list[str]]:
-        """For History: which save locations hold each snapshot, when there are several (ADR-0080)."""
-        store = self._store()
-        if not isinstance(store, MultiStore):
-            return {}
-        ctx = await self._snapshot_context(key)
-        prefix = f"games/{ctx['gameKey']}/snapshots/"
-        try:
-            listing = await asyncio.to_thread(store.listing, prefix)
-        except StoreError:
-            return {}
-        found: dict[str, list[str]] = {}
-        for name, objects in listing.items():
-            for object_key in objects:
-                snap = object_key.rsplit("/", 1)[-1].removesuffix(".json")
-                found.setdefault(snap, []).append(name)
-        return found
-
-    async def resolve_conflict(self, key: str, choice: str, head: str | None = None) -> dict[str, Any]:
-        ctx = await self._sync_context(key)
-        async with self.locks.hold(ctx.game_key, "saves"):
-            with self.jobs.job("sync"):
-                result = await asyncio.to_thread(self._sync().resolve, ctx, str(choice), head)
-        log_event(logging.WARNING, "sync.resolve", "Conflict resolved", gameKey=ctx.game_key, choice=choice)
-        return result
-
-    async def sync_status(self, key: str) -> dict[str, Any]:
-        try:
-            ctx = await self._sync_context(key)
-        except ValueError as exc:
-            return {"available": False, "reason": str(exc)}
-        return {"available": True, "gameKey": ctx.game_key, **self._sync().status(ctx.game_key)}
-
-    async def locations_status(self) -> dict[str, Any]:
-        """Each save location with its last success, problem, objects still to copy and space used."""
-        state = await asyncio.to_thread(self._location_state().load)
-        return {
-            "locations": [{"id": n, **(state.get(n) or {})} for n in self._locations()],
-            "available": list(SNAPSHOT_STORES),
-        }
-
-    async def add_location(self, backend: str) -> dict[str, Any]:
-        """Add a save location; every snapshot goes there too from now on, and the history is copied over."""
-        backend = str(backend)
-        if backend not in SNAPSHOT_STORES:
-            raise ValueError("unknown save location")
-        names = self._locations()
-        if backend in names:
-            return await self.locations_status()
-        if backend not in ("local", "direct"):
-            checked = await self.test_cloud(backend)
-            if not checked.get("ok"):
-                raise ValueError(
-                    f"{BACKEND_NAMES.get(backend, backend)} did not pass the check: {checked.get('error')}"
-                )
-        self.settings.set("snapshotStores", [*names, backend])
-        log_event(logging.INFO, "locations.added", "Save location added", location=backend)
-        self._background.append(asyncio.create_task(self._catch_up()))
-        return await self.locations_status()
-
-    async def remove_location(self, backend: str) -> dict[str, Any]:
-        """Stop using a save location. Nothing stored there is deleted."""
-        names = [n for n in self._locations() if n != str(backend)]
-        if not names:
-            raise ValueError("keep at least one save location")
-        self.settings.set("snapshotStore", names[0])
-        self.settings.set("snapshotStores", names)
-        log_event(logging.INFO, "locations.removed", "Save location removed", location=str(backend))
-        return await self.locations_status()
-
-    async def set_game_locations(self, key: str, names: list[str] | None) -> dict[str, Any]:
-        """The save locations one game uses; None means all of them."""
-        if names is not None and not set(names) <= set(self._locations()):
-            raise ValueError("choose from the save locations in use")
-        return await self.update_game_config(key, {"locations": names})
-
-    async def _catch_up(self) -> dict[str, int]:
-        """Copy to each location what another one has and it lacks (bounded per pass)."""
-        store = self._store()
-        if not isinstance(store, MultiStore):
-            return {}
-        try:
-            copied = await asyncio.to_thread(store.catch_up)
-        except StoreError as exc:
-            log_event(logging.INFO, "locations.catch_up_skipped", "Save locations not caught up", error=str(exc))
-            return {}
-        if any(copied.values()):
-            log_event(logging.INFO, "locations.caught_up", "Save locations caught up", copied=sum(copied.values()))
-        return copied
-
-    async def idle_pass(self) -> list[dict[str, Any]]:
-        """Prefetch and push for every enabled game with no open session (section 9)."""
-        await self._direct_exchange()
-        await self._catch_up()
-        outcomes = []
-        for game in (await self.discover_games())["games"]:
-            if not self.game_configs.get(game["key"]).get("enabled"):
-                continue
-            try:
-                ctx = await self._sync_context(game["key"])
-                async with self.locks.hold(ctx.game_key, "saves"):
-                    with self.jobs.job("sync"):
-                        sync = self._sync()
-                        recovered = await asyncio.to_thread(sync.recover_session, ctx)
-                        outcome = await asyncio.to_thread(sync.idle, ctx)
-                        state = sync.state.get(ctx.game_key)
-                        if game["kind"] in AUTO_PULL_KINDS and (newer_save(state) or not state.get("base")):
-                            # Keepsake cannot see these games start, so a newer save from another device (or
-                            # the first copy, on a device that never synced it) is brought in here, by the
-                            # launch decision table: only if nothing changed here and the game is not running;
-                            # anything else is a conflict for the user (P1, P6; ADR-0051).
-                            pulled = await asyncio.to_thread(sync.fetch_newer, ctx)
-                            outcome = {**outcome, "pulled": pulled.get("action")}
-                if recovered:
-                    await self.emit("keepsake_toast", f"Recovered missed exit backup for {game['name']}")
-                session = self._sessions().get(ctx.game_key, {})
-                if lifecycle.played_without_keepsake(int(game.get("last_played") or 0), session.get("lastStart")):
-                    # Section 10: Steam saw a play Keepsake missed; the push above saved it. Warn once per play.
-                    if session.get("warnedFor") != game.get("last_played"):
-                        self._record_session(ctx.game_key, warnedFor=float(game.get("last_played") or 0))
-                        await self.emit(
-                            "keepsake_toast", f"{game['name']} was played while Haversack was not running. Saved now."
-                        )
-                    outcome = {**outcome, "playedWithoutKeepsake": True}
-                if outcome.get("status") == "conflict" or outcome.get("push") == "published-fork":
-                    await self._conflict_raised(game)
-                elif outcome.get("push") == "quarantined":
-                    await self.emit(
-                        "keepsake_toast", f"{game['name']}: a suspicious save was kept on this device, not uploaded."
-                    )
-                try:
-                    outcome = {**outcome, "config": await self._sync_config(game["key"], ctx.game_key)}
-                except StoreError:
-                    pass  # shared settings wait for the next pass
-                outcomes.append({"key": game["key"], **outcome})
-            except (ValueError, SnapshotError, StoreError) as exc:
-                outcomes.append({"key": game["key"], "status": "error", "error": str(exc)})
-        try:
-            await asyncio.to_thread(self._playtime().flush)  # sessions recorded while offline
-        except (OSError, StoreError, SnapshotError):
-            pass
-        await self._weekly_scrub()
-        await self._warn_signin()
-        log_event(logging.INFO, "sync.idle", "Idle pass finished", games=len(outcomes))
-        return outcomes
-
-    async def _warn_signin(self) -> None:
-        """Toast once when OneDrive sign-in stops working; again only after it has recovered."""
-        store = str(self.settings.get("snapshotStore"))
-        problem = store in ("onedrive", "gdrive") and bool(self._token_manager(store).last_error)
-        if problem and not self._signin_warned:
-            await self.emit("keepsake_toast", TOAST_SIGNIN.format(name=BACKEND_NAMES[store]))
-        self._signin_warned = problem
-
-    async def _idle_loop(self) -> None:
-        delay = 60.0
-        while True:
-            await asyncio.sleep(delay)
-            delay = float(self.settings.get("idleSyncMinutes")) * 60
-            if self.jobs.busy_reason() is None and self.registry.enabled("saves"):
-                try:
-                    await self.idle_pass()
-                except Exception:  # noqa: BLE001 - the loop must survive any single failure
-                    log_event(logging.ERROR, "sync.idle_failed", "Idle pass failed")
-
-    # Gaming Mode UX (slice 9): views across games, setup wizard, health and shared game settings
-
-    async def _matched(self) -> list[tuple[dict[str, Any], dict[str, Any], str | None]]:
-        """``(game, config, gameKey)`` for every discovered game, from local data only."""
-        games = (await self.discover_games())["games"]
-        index = await asyncio.to_thread(self.manifest.load)
-        out = []
-        for game in games:
-            config = self.game_configs.get(game["key"])
-            out.append((game, config, manifest.match_game(index, game, config).get("gameKey")))
-        return out
+        # An update waits while any game runs (build prompt section 12).
+        if kind == "start":
+            self.jobs.open_session(str(appid))
+        elif kind == "exit":
+            self.jobs.close_session(str(appid))
+        if event:
+            await self.bus.publish(event, {"gameKey": None, "appid": appid})
+        return {"handled": 1 if event else 0}
 
     async def _game_key_of(self, key: str) -> str | None:
         game = await self._game(key)
@@ -3439,877 +825,19 @@ class KeepsakeApp:
         found = manifest.match_game(index, game, self.game_configs.get(key)).get("gameKey")
         return str(found) if found else None
 
-    async def qam_summary(self) -> dict[str, Any]:
-        """Everything the Quick Access Menu shows, without network calls."""
-        states = self._sync().state.games()
-        enabled = [(g, gk) for g, c, gk in await self._matched() if c.get("enabled") and gk]
-        last = max(
-            (
-                max(float(s.get("lastPush") or 0), float(s.get("lastPull") or 0))
-                for s in states.values()
-                if isinstance(s, dict)
-            ),
-            default=0.0,
-        )
-        current = None
-        for game, gk in enabled:
-            state = states.get(gk) or {}
-            if state.get("sessionOpen"):
-                current = {"key": game["key"], "name": game["name"], "status": status_word(state)}
-                break
-        newer = [
-            {"key": game["key"], "name": game["name"], **found}
-            for game, gk in enabled
-            if (found := newer_save(states.get(gk) or {}))
-        ]
-        cloud = await self.cloud_status()
-        checks = await self._health(probe=False)
-        return {
-            "store": cloud["store"],
-            "signedIn": cloud["signedIn"],
-            "deviceName": self.settings.get("deviceName"),
-            "lastSync": last or None,
-            "health": health.summary(checks),
-            "problems": [c["label"] for c in checks if c["status"] in (health.WARN, health.FAIL)],
-            "conflicts": sum(1 for _, gk in enabled if (states.get(gk) or {}).get("conflict")),
-            "enabledGames": len(enabled),
-            "currentGame": current,
-            "newer": newer[:3],  # "Newer save from <device>" before you play (ADR-0049)
-            "setupComplete": bool(self.settings.get("setupComplete")),
-            "tipsDismissed": bool(self.settings.get("tipsDismissed")),
-            "busy": self.jobs.busy_reason(),
-        }
-
-    async def sync_now(self) -> dict[str, Any]:
-        """The "Sync now" button: run the idle pass at once."""
-        if self.jobs.busy_reason() is not None:
-            return {"ok": False, "reason": "busy"}
-        outcomes = await self.idle_pass()
-        counts: dict[str, int] = {}
-        for outcome in outcomes:
-            status = str(outcome.get("status"))
-            counts[status] = counts.get(status, 0) + 1
-        return {"ok": True, "games": len(outcomes), "counts": counts}
-
-    async def list_conflicts(self) -> list[dict[str, Any]]:
-        states = self._sync().state.games()
-        out = []
-        for game, _config, gk in await self._matched():
-            conflict = (states.get(gk) or {}).get("conflict") if gk else None
-            if conflict:
-                out.append({"key": game["key"], "name": game["name"], "gameKey": gk, "conflict": conflict})
-        return out
-
-    async def conflict_details(self, key: str) -> dict[str, Any]:
-        game = await self._game(key)
-        ctx = await self._sync_context(key)
-        details = await asyncio.to_thread(self._sync().conflict_details, ctx)
-        for side in details.get("sides") or []:
-            if side["side"] == "local":
-                side["device"] = self.settings.get("deviceName") or "This device"
-        return {"key": key, "name": game["name"], "gameKey": ctx.game_key, **details}
-
-    async def recent_history(self, limit: int = 50) -> dict[str, Any]:
-        """Recent snapshots across synced games, newest first, including quarantined ones."""
-        states = self._sync().state.games()
-        bases = self._bases()
-        eng = self._engine()
-        items: list[dict[str, Any]] = []
-        errors: list[str] = []
-        seen: set[str] = set()
-        for game, config, gk in await self._matched():
-            if not gk or gk in seen or not (config.get("enabled") or gk in states or gk in bases):
-                continue
-            seen.add(gk)
-            try:
-                metas = await asyncio.to_thread(eng.list_metas, gk)
-                pins = {p["snapId"] for p in await asyncio.to_thread(eng.pins, gk)}
-                pruned = await asyncio.to_thread(eng.pruned, gk)
-            except StoreError as exc:
-                errors.append(f"{game['name']}: {exc}")
-                continue
-            base = (states.get(gk) or {}).get("base") or bases.get(gk)
-            owner = {"key": game["key"], "name": game["name"], "gameKey": gk}
-            for meta in metas:
-                items.append(
-                    {
-                        **snap_summary(meta),
-                        **owner,
-                        "pinned": meta["snapId"] in pins,
-                        "pruned": meta["snapId"] in pruned,
-                        "base": meta["snapId"] == base,
-                        "quarantined": False,
-                    }
-                )
-            for record in eng.quarantine.list(gk):
-                items.append(
-                    {**snap_summary(record["meta"]), **owner, "quarantined": True, "reasons": record.get("reasons", [])}
-                )
-        items.sort(key=lambda i: (i["created"], i["snapId"]), reverse=True)
-        return {"snapshots": items[: max(1, min(int(limit), HISTORY_MAX))], "errors": errors}
-
-    async def plan_sync(self, keys: list[str]) -> list[dict[str, Any]]:
-        """Setup wizard dry run: what the first sync would do for each game. Changes nothing."""
-        out = []
-        for key in [str(k) for k in keys][:HISTORY_MAX]:
-            name = key
-            try:
-                name = (await self._game(key))["name"]
-                ctx = await self._sync_context(key)
-                plan = await asyncio.to_thread(self._sync().plan, ctx)
-            except (ValueError, SnapshotError, StoreError, OSError) as exc:
-                plan = {"action": "error", "reason": str(exc)}
-            out.append({"key": key, "name": name, **plan})
-        return out
-
-    async def finish_setup(self, keys: list[str]) -> dict[str, Any]:
-        """Setup wizard confirm: enable the chosen games, mark setup done and start the first sync."""
-        enabled = 0
-        for key in [str(k) for k in keys][:HISTORY_MAX]:
-            await self.update_game_config(key, {"enabled": True})
-            enabled += 1
-        self.settings.set("setupComplete", True)
-        log_event(logging.INFO, "setup.finished", "Setup wizard finished", games=enabled)
-        if enabled:
-            self._background.append(asyncio.create_task(self.sync_now()))
-        return {"ok": True, "enabled": enabled}
-
-    async def health_checks(self, probe: bool = True) -> dict[str, Any]:
-        checks = await self._health(probe=bool(probe))
-        return {"checks": checks, "summary": health.summary(checks)}
-
-    async def _health(self, probe: bool) -> list[dict[str, Any]]:
-        cloud: dict[str, Any] = dict(await self.cloud_status())
-        if probe and cloud["store"] != "local" and cloud["signedIn"]:
-            tested = await self.test_cloud()
-            cloud.update(reachable=tested["ok"], error=tested.get("error"))
-        states = self._sync().state.games()
-        sessions = self._sessions()
-        matched = await self._matched()
-        games = []
-        for game, config, gk in matched:
-            if not config.get("enabled") or not gk:
-                continue
-            state = states.get(gk) or {}
-            running = False
-            if state.get("sessionOpen"):
-                procs = await asyncio.to_thread(
-                    find_game_processes, int(game["appid"]), game.get("prefix"), self.proc_root
-                )
-                running = bool(procs)
-            games.append(
-                {
-                    "name": game["name"],
-                    "state": state,
-                    "running": running,
-                    "playedWithoutKeepsake": lifecycle.played_without_keepsake(
-                        int(game.get("last_played") or 0), sessions.get(gk, {}).get("lastStart")
-                    ),
-                }
-            )
-        names = {g["key"]: g["name"] for g, _c, _k in matched}
-        mismatches = await asyncio.to_thread(discovery.load_mismatches, self.paths.runtime_dir)
-        facts = {
-            "now": time.time(),
-            "cloud": cloud,
-            "games": games,
-            "mismatches": [names.get(k, "Unreadable mismatch record") for k in mismatches],
-            "manifest": await asyncio.to_thread(self.manifest.status),
-            "ludusavi": await asyncio.to_thread(health.detect_decky_plugin, os.environ.get("DECKY_HOME"), "ludusavi"),
-            "pythonModules": {"xml": httpcall.xml_available(), "sqlite3": statedb_sqlite_available()},
-            "store": self.settings.get("snapshotStore"),
-            "integrity": await asyncio.to_thread(read_json, os.path.join(self.paths.runtime_dir, SCRUB_FILE), {}),
-        }
-        return health.run(facts) + await asyncio.to_thread(self._desktop_leftovers)
-
     # Desktop (ADR-0068): the plugin serves the desktop interface on loopback and writes the tray's entries
-
-    def _desktop_up(self) -> None:
-        """Worker thread: serve the desktop interface on 127.0.0.1 and write the tray's entries for this version."""
-        from . import host as loopback
-
-        if self._desktop_server is None:
-            loop = self._loop
-            if loop is None:
-                raise RuntimeError("the backend has not started")
-            events = loopback.Events()
-            original = self.emit
-
-            async def both(event: str, *args: Any) -> None:
-                await original(event, *args)
-                await events.emit(event, *args)
-
-            ui_dir = os.path.join(self.paths.plugin_dir, "desktop")
-            api = loopback.Api(self, loop, secrets.token_urlsafe(32), events, loopback.PLACEHOLDER, ui_dir)
-            self._desktop_server = loopback.serve(api, loopback.DEFAULT_PORT)
-            self._desktop_emit = original
-            self.emit = both
-            state = os.path.join(self.paths.runtime_dir, loopback.STATE_FILE)
-            atomic_write_json(state, {"port": api.port, "token": api.token})
-            os.chmod(state, 0o600)
-        written = desktop_entries.install(
-            discovery.real_home(self.home), self.paths.plugin_dir, self.paths.runtime_dir, str(self.version)
-        )
-        log_event(logging.INFO, "desktop.up", "Desktop Mode entries ready", written=len(written))
-
-    def _desktop_down(self) -> None:
-        """Worker thread: stop the loopback page and remove the entries (switched off, or the plugin stopping)."""
-        from . import host as loopback
-
-        if self._desktop_server is not None:
-            self._desktop_server.shutdown()
-            self._desktop_server = None
-            self.emit = self._desktop_emit or self.emit
-            try:
-                os.unlink(os.path.join(self.paths.runtime_dir, loopback.STATE_FILE))  # no token left behind
-            except OSError:
-                pass
-
-    async def _tray_probe(self) -> dict[str, Any]:
-        """Desktop tray responsive (v0.30.1): how fast the tray answers D-Bus and the page answers get_status."""
-
-        def probe() -> dict[str, Any]:
-            uid = os.getuid() if hasattr(os, "getuid") else 0
-            out: dict[str, Any] = {
-                "trayMs": None,
-                "statusMs": None,
-                "tray": False,
-                "page": self._desktop_server is not None,
-            }
-            bus_path = f"/run/user/{uid}/bus"
-            if os.path.exists(bus_path):
-                try:
-                    conn = desktop_dbus.Connection(f"unix:path={bus_path}", timeout=1.0)
-                    try:
-                        names = conn.call(
-                            "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "ListNames"
-                        )[0]
-                        items = [n for n in names if str(n).startswith("org.kde.StatusNotifierItem-")]
-                        out["tray"] = bool(items)
-                        slowest = 0.0
-                        for name in items[:4]:
-                            started = time.perf_counter()
-                            conn.call(
-                                name,
-                                "/StatusNotifierItem",
-                                "org.freedesktop.DBus.Properties",
-                                "GetAll",
-                                "s",
-                                ["org.kde.StatusNotifierItem"],
-                            )
-                            slowest = max(slowest, time.perf_counter() - started)
-                        out["trayMs"] = round(slowest * 1000, 1) if items else None
-                    finally:
-                        conn.close()
-                except (desktop_dbus.DBusError, OSError) as exc:
-                    out["trayError"] = type(exc).__name__
-            state = read_json(os.path.join(self.paths.runtime_dir, "host.json"), default={})
-            if isinstance(state, dict) and state.get("port") and state.get("token"):
-                import urllib.request
-
-                request = urllib.request.Request(
-                    f"http://127.0.0.1:{int(state['port'])}/api/call/get_status",
-                    data=b'{"args": []}',
-                    headers={"Content-Type": "application/json", "X-Keepsake-Token": str(state["token"])},
-                    method="POST",
-                )
-                started = time.perf_counter()
-                try:
-                    with urllib.request.urlopen(request, timeout=2) as response:  # our own loopback page
-                        response.read(4096)
-                    out["statusMs"] = round((time.perf_counter() - started) * 1000, 1)
-                except OSError as exc:
-                    out["statusError"] = type(exc).__name__
-            return out
-
-        return await asyncio.to_thread(probe)
-
-    async def _desktop_probe(self) -> dict[str, Any]:
-        def probe() -> dict[str, Any]:
-            home = discovery.real_home(self.home)
-            uid = os.getuid() if hasattr(os, "getuid") else 0
-            return {
-                "entries": desktop_entries.check(home, self.paths.plugin_dir, str(self.version)),
-                "python3": bool(shutil.which("python3")),
-                "sessionBus": os.path.exists(f"/run/user/{uid}/bus"),
-                "page": self._desktop_server is not None,
-            }
-
-        return await asyncio.to_thread(probe)
-
-    def desktop_remove_entries(self) -> list[str]:
-        """The tray's entries go when Desktop is switched off and in Decky's uninstall (ADR-0068, T52)."""
-        return desktop_entries.remove(discovery.real_home(self.home))
-
-    def _desktop_health(self) -> list[dict[str, Any]]:
-        found = desktop_entries.check(discovery.real_home(self.home), self.paths.plugin_dir, str(self.version))
-        problems = [f"{k}: {', '.join(v)}" for k, v in found.items() if v]
-        return [
-            {
-                "id": "desktop-page",
-                "label": "Desktop Mode page",
-                "status": "ok" if self._desktop_server is not None else "warn",
-                "detail": "Served on 127.0.0.1 for the tray." if self._desktop_server else "Not running.",
-                "items": [],
-            },
-            {
-                "id": "desktop-entries",
-                "label": "Tray and app-menu entries",
-                "status": "warn" if problems else "ok",
-                "detail": "Both present, for this version." if not problems else "Rewritten at the next start.",
-                "items": problems,
-            },
-        ]
-
-    def _desktop_leftovers(self) -> list[dict[str, Any]]:
-        """T52: entries left behind while Desktop is off (they should have gone with it)."""
-        if self.registry.enabled("desktop") or self.host != "decky":
-            return []
-        left = [p for p in desktop_entries.paths(discovery.real_home(self.home)).values() if desktop_entries.ours(p)]
-        if not left:
-            return []
-        return [
-            {
-                "id": "desktop-leftovers",
-                "label": "Desktop Mode entries left behind",
-                "status": "warn",
-                "detail": "Desktop is off, but its tray entries are still there. Switch Desktop on and off again.",
-                "items": [devicechecks.tilde(p, discovery.real_home(self.home)) for p in left],
-            }
-        ]
 
     # Storage (R5, ADR-0052): disk use, shader cache, reset prefix and keep saves
 
-    def _saves_bytes(self, game: dict[str, Any]) -> int:
-        try:
-            config = self.game_configs.get(game["key"])
-            index = self.manifest.load()
-            match = manifest.match_game(index, game, config)
-            record = index["games"].get(match["title"]) if index and match.get("title") else None
-            if record is None and not config.get("customPaths"):
-                return 0
-            preview = resolve.preview(game, match.get("title"), record, config, self.home, 0, False)
-            return int(preview.get("totalBytes") or preview.get("bytes") or 0)
-        except (OSError, ValueError, KeyError):
-            return 0
-
-    async def sd_cards(self) -> list[dict[str, Any]]:
-        """Which games are on which SD card or drive, including cards not inserted (ADR-0096). Read only."""
-        roots = discovery.steam_roots(self.home, self.host)
-        games = (await self.discover_games())["games"]
-        shortcuts = [{"name": g.get("name"), "exe": g.get("exe")} for g in games if g.get("kind") == "shortcut"]
-        return await asyncio.to_thread(sdcards.SdCards(self.paths.runtime_dir).scan, roots, shortcuts)
-
-    async def storage_usage(self, key: str | None = None) -> dict[str, Any]:
-        """Disk use per game: install, prefix, shader cache and saves. Biggest first; stops after a minute."""
-        games = [g for g in (await self.discover_games())["games"] if key is None or g["key"] == key]
-        deadline = time.monotonic() + (storage.SIZE_SECONDS if key else 60.0)
-        rows, skipped = [], 0
-        for game in games:
-            if time.monotonic() > deadline:
-                skipped += 1
-                continue
-            saves = await asyncio.to_thread(self._saves_bytes, game)
-            left = max(1.0, min(storage.SIZE_SECONDS, deadline - time.monotonic()))
-            row = await asyncio.to_thread(storage.usage, game, saves, left, discovery.real_home(self.home))
-            row["reset"] = storage.resets(self.paths.runtime_dir).get(game["key"])
-            rows.append(row)
-        rows.sort(key=lambda r: -r["totalBytes"])
-        return {"games": rows, "notMeasured": skipped}
-
-    async def _storage_game(self, key: str) -> dict[str, Any]:
-        game = await self._game(key)
-        if await asyncio.to_thread(self._game_running, game):
-            raise ValueError("quit the game first")
-        return game
-
-    async def clear_shader_cache(self, key: str) -> dict[str, Any]:
-        """Remove the game's shader cache. Steam rebuilds it at the next launch (ADR-0052)."""
-        game = await self._storage_game(key)
-        try:
-            freed = await asyncio.to_thread(storage.clear_shader_cache, game)
-        except storage.StorageError as exc:
-            raise ValueError(str(exc)) from exc
-        log_event(logging.INFO, "storage.shader_cache", "Shader cache cleared", key=key, freed=freed)
-        return {"ok": True, "freed": freed}
-
-    async def reset_prefix(self, key: str) -> dict[str, Any]:
-        """Move the game's Proton prefix aside after keeping a verified copy of its saves (ADR-0052)."""
-        if key in storage.resets(self.paths.runtime_dir):
-            raise ValueError("a reset is already waiting for this game")
-        game = await self._storage_game(key)
-        if game.get("exe_inside_prefix"):
-            raise ValueError("this game is installed inside its prefix, so resetting it would remove the game")
-        prefix = storage.compat_prefix(game)
-        if prefix is None:
-            raise ValueError("only a game in its own Steam Proton prefix can be reset")
-        ctx = await self._snapshot_context(key)
-        if ctx["running"]:
-            raise ValueError("quit the game first")
-        folder = os.path.join(self.paths.runtime_dir, "prefix-resets")
-        await asyncio.to_thread(os.makedirs, folder, exist_ok=True)
-        blob = os.path.join(folder, f"{uuid.uuid4().hex[:12]}.zip")
-        eng = self._engine()
-        async with self.locks.hold(ctx["gameKey"], "saves"):
-            with self.jobs.job("snapshot"):
-                try:
-                    meta = await asyncio.to_thread(eng.keep_copy, ctx["gameKey"], ctx["files"], ctx["roots"], blob)
-                except BaseException:
-                    if os.path.exists(blob):
-                        os.unlink(blob)  # never leave a half-made or unverified copy behind
-                    raise
-                try:
-                    old = await asyncio.to_thread(storage.move_prefix_aside, prefix)
-                except (OSError, storage.StorageError) as exc:
-                    os.unlink(blob)
-                    raise ValueError(f"the prefix could not be moved: {exc}") from exc
-        record = {
-            "stage": "waiting",
-            "prefix": prefix,
-            "old": old,
-            "gameKey": ctx["gameKey"],
-            "blob": blob,
-            "meta": meta,
-            "started": time.time(),
-            "appid": game["appid"],
-        }
-        data = storage.resets(self.paths.runtime_dir)
-        data[key] = record
-        await asyncio.to_thread(storage.save_resets, self.paths.runtime_dir, data)
-        log_event(logging.WARNING, "storage.prefix_reset", "Prefix moved aside; saves kept", key=key)
-        return {"ok": True, "stage": "waiting"}
-
-    async def cancel_prefix_reset(self, key: str) -> dict[str, Any]:
-        """Put the old prefix back, before the saves were restored into a fresh one."""
-        record = storage.resets(self.paths.runtime_dir).get(key)
-        if not record or record.get("stage") != "waiting":
-            raise ValueError("there is no waiting reset for this game")
-        await self._storage_game(key)
-        try:
-            await asyncio.to_thread(storage.put_prefix_back, record["prefix"], record["old"])
-        except (OSError, storage.StorageError) as exc:
-            raise ValueError(f"the old prefix could not be put back: {exc}") from exc
-        await asyncio.to_thread(self._forget_reset, key)
-        log_event(logging.INFO, "storage.prefix_reset_cancelled", "Old prefix put back", key=key)
-        return {"ok": True}
-
-    async def delete_old_prefix(self, key: str) -> dict[str, Any]:
-        """Free the space of a prefix a finished reset moved aside."""
-        record = storage.resets(self.paths.runtime_dir).get(key)
-        if not record or record.get("stage") != "restored":
-            raise ValueError("the reset has not finished yet")
-        try:
-            freed = await asyncio.to_thread(storage.delete_old_prefix, record["old"], record["prefix"])
-        except (OSError, storage.StorageError) as exc:
-            raise ValueError(str(exc)) from exc
-        await asyncio.to_thread(self._forget_reset, key)
-        log_event(logging.INFO, "storage.old_prefix_deleted", "Old prefix deleted", key=key, freed=freed)
-        return {"ok": True, "freed": freed}
-
-    def _forget_reset(self, key: str) -> None:
-        data = storage.resets(self.paths.runtime_dir)
-        record = data.pop(key, None)
-        storage.save_resets(self.paths.runtime_dir, data)
-        if record and record.get("blob") and os.path.exists(record["blob"]):
-            os.unlink(record["blob"])
-
-    async def _finish_prefix_reset(self, key: str) -> dict[str, Any]:
-        """After the first launch on a fresh prefix: put the kept saves back (with a pre-restore snapshot)."""
-        record = storage.resets(self.paths.runtime_dir).get(key)
-        if not record or record.get("stage") != "waiting":
-            return {"status": "none"}
-        game = await self._game(key)
-        gone = await asyncio.to_thread(
-            lifecycle.wait_for, lambda: not self._game_running(game), lifecycle.EXIT_WAIT_SECONDS
-        )
-        if not gone or not os.path.isdir(os.path.join(record["prefix"], "pfx", "drive_c")):
-            return {"status": "waiting"}  # still running, or Proton has not built the new prefix yet
-        await self.discover_games(refresh=True)
-        ctx = await self._snapshot_context(key)
-        eng = self._engine()
-        async with self.locks.hold(record["gameKey"], "saves"):
-            with self.jobs.job("restore"):
-                result = await asyncio.to_thread(
-                    eng.restore_copy,
-                    record["gameKey"],
-                    record["blob"],
-                    record["meta"],
-                    ctx["files"],
-                    ctx["roots"],
-                    ctx["running"],
-                )
-        data = storage.resets(self.paths.runtime_dir)
-        data[key] = {**record, "stage": "restored", "restored": time.time()}
-        await asyncio.to_thread(storage.save_resets, self.paths.runtime_dir, data)
-        await self.emit("keepsake_toast", f"{game['name']}: your saves are back in the fresh prefix.")
-        log_event(logging.INFO, "storage.prefix_reset_done", "Saves put back after a prefix reset", key=key)
-        return {"status": "restored", **{k: v for k, v in result.items() if k in ("status", "prerestore")}}
-
     # Trust (R3, ADR-0050): cloud integrity and export
-
-    async def scrub_cloud(self, full: bool = False) -> dict[str, Any]:
-        """Verify the cloud snapshots of every synced game. Changes nothing.
-
-        The weekly check covers heads, pins and every device's base (what restores rely on);
-        ``full`` checks every snapshot whose files are kept.
-        """
-        eng = self._engine()
-        report: dict[str, Any] = {"lastRun": time.time(), "full": bool(full), "games": {}}
-        seen: set[str] = set()
-        with self.jobs.job("scrub"):
-            for game, config, gk in await self._matched():
-                if not gk or gk in seen or not config.get("enabled"):
-                    continue
-                seen.add(gk)
-                try:
-                    only: set[str] | None = None
-                    if not full:
-                        metas = await asyncio.to_thread(eng.list_metas, gk)
-                        pins = {p["snapId"] for p in await asyncio.to_thread(eng.pins, gk)}
-                        bases = set((await asyncio.to_thread(eng.cloud_bases, gk)).values())
-                        only = retention.heads(metas) | pins | bases
-                    result = await asyncio.to_thread(eng.scrub, gk, only)
-                except StoreError as exc:
-                    result = {"checked": 0, "bad": [], "missing": [], "error": str(exc)}
-                report["games"][gk] = {"name": game["name"], "key": game["key"], **result}
-        await asyncio.to_thread(atomic_write_json, os.path.join(self.paths.runtime_dir, SCRUB_FILE), report)
-        damaged = sum(len(g["bad"]) + len(g["missing"]) for g in report["games"].values())
-        log_event(
-            logging.WARNING if damaged else logging.INFO,
-            "integrity.scrub",
-            "Cloud integrity checked",
-            games=len(report["games"]),
-            damaged=damaged,
-        )
-        return report
-
-    async def _weekly_scrub(self) -> None:
-        last = float(
-            (await asyncio.to_thread(read_json, os.path.join(self.paths.runtime_dir, SCRUB_FILE), {})).get("lastRun")
-            or 0
-        )
-        if time.time() - last >= SCRUB_INTERVAL:
-            try:
-                await self.scrub_cloud(full=False)
-            except (StoreError, SnapshotError, OSError) as exc:
-                log_event(logging.INFO, "integrity.scrub_failed", "Integrity check skipped", error=str(exc))
-
-    async def repair_snapshot(self, key: str) -> dict[str, Any]:
-        """Repair after a damaged cloud copy: save a fresh snapshot of this device's files under a new id.
-
-        Write-once objects are never fixed in place (P2); the new snapshot becomes this device's base.
-        """
-        ctx = await self._snapshot_context(key)
-        eng = self._engine()
-        async with self.locks.hold(ctx["gameKey"], "saves"):
-            with self.jobs.job("snapshot"):
-                base_id = self._bases().get(ctx["gameKey"])
-                base = await asyncio.to_thread(eng.get_meta, ctx["gameKey"], base_id) if base_id else None
-                result = await asyncio.to_thread(
-                    functools.partial(
-                        eng.take,
-                        ctx["gameKey"],
-                        ctx["files"],
-                        ctx["roots"],
-                        "manual",
-                        base,
-                        force=True,
-                        flags=["repair"],
-                    )
-                )
-        if result["status"] == "published":
-            self._set_base(ctx["gameKey"], result["snapId"])
-        log_event(
-            logging.INFO, "snapshot.repair", "Fresh snapshot saved", gameKey=ctx["gameKey"], status=result["status"]
-        )
-        result.pop("meta", None)
-        return result
-
-    async def export_snapshots(self, folder: str, scope: str = "latest", key: str | None = None) -> dict[str, Any]:
-        """Export snapshots as plain zips to a folder the user chose (a USB drive, an SD card): no lock-in.
-
-        Creates ``Keepsake export <date>`` inside ``folder`` with one folder per game, each zip
-        verified against its metadata, an ``index.json`` and a ``README.txt``. Only new files are
-        written; nothing is ever overwritten. ``scope`` is ``latest`` or ``all``.
-        """
-        target_root = export_folder(folder)
-        if scope not in ("latest", "all"):
-            raise ValueError("choose the latest snapshot of each game, or all of them")
-        eng = self._engine()
-        chosen: list[tuple[dict[str, Any], str]] = []
-        seen: set[str] = set()
-        for game, config, gk in await self._matched():
-            if not gk or gk in seen or (key is None and not config.get("enabled")) or (key and game["key"] != key):
-                continue
-            seen.add(gk)
-            chosen.append((game, gk))
-        if not chosen:
-            raise ValueError("there is nothing to export: no synced game was found")
-        stamp = time.strftime("%Y-%m-%d %H%M", time.localtime())
-        out_dir = await asyncio.to_thread(_new_folder, target_root, f"Haversack export {stamp}")
-        index: list[dict[str, Any]] = []
-        with self.jobs.job("export"):
-            for game, gk in chosen:
-                metas = await asyncio.to_thread(eng.list_metas, gk)
-                pruned = await asyncio.to_thread(eng.pruned, gk)
-                kept = [m for m in metas if m["snapId"] not in pruned]
-                picked = kept[-1:] if scope == "latest" else kept
-                game_dir = os.path.join(out_dir, safe_name(game["name"]))
-                await asyncio.to_thread(os.makedirs, game_dir, exist_ok=True)
-                for meta in picked:
-                    name = f"{meta['created'][:10]} {meta['snapId']}.zip"
-                    await asyncio.to_thread(eng.download_verified, gk, meta["snapId"], os.path.join(game_dir, name))
-                    index.append(
-                        {
-                            "game": game["name"],
-                            "gameKey": gk,
-                            "snapId": meta["snapId"],
-                            "created": meta["created"],
-                            "device": meta.get("deviceName"),
-                            "zip": f"{safe_name(game['name'])}/{name}",
-                            "files": [f"{f['root']}/{f['rel']}" for f in meta["files"]],
-                        }
-                    )
-        await asyncio.to_thread(_write_new, os.path.join(out_dir, "index.json"), json.dumps(index, indent=2) + "\n")
-        await asyncio.to_thread(_write_new, os.path.join(out_dir, "README.txt"), EXPORT_README)
-        log_event(logging.INFO, "export.snapshots", "Snapshots exported", games=len(chosen), snapshots=len(index))
-        return {"ok": True, "folder": out_dir, "games": len(chosen), "snapshots": len(index)}
 
     # Shared game settings (config revisions in the cloud)
 
-    def _config_state(self) -> dict[str, Any]:
-        data = read_json(os.path.join(self.paths.runtime_dir, CONFIG_STATE_FILE), default={})
-        return data if isinstance(data, dict) else {}
-
-    def _update_config_state(self, game_key: str, **changes: Any) -> dict[str, Any]:
-        data = self._config_state()
-        record = {**(data.get(game_key) or {}), **changes}
-        data[game_key] = record
-        atomic_write_json(os.path.join(self.paths.runtime_dir, CONFIG_STATE_FILE), data)
-        return record
-
-    async def _publish_config(self, key: str, game_key: str) -> bool:
-        """Share this device's settings for a game. Left pending and retried by the idle pass if offline."""
-        based_on = self._config_state().get(game_key, {}).get("applied")
-        self._update_config_state(game_key, pending=True)
-        device_name = str(self.settings.get("deviceName") or "Unnamed device")
-        try:
-            name = await asyncio.to_thread(
-                configrev.publish,
-                self._store(),
-                game_key,
-                str(self.settings.get("deviceId")),
-                device_name,
-                self.game_configs.get(key),
-                based_on,
-            )
-        except StoreError as exc:
-            log_event(logging.INFO, "config.publish_pending", "Game settings will be shared later", error=str(exc))
-            return False
-        self._update_config_state(
-            game_key, applied=name, pending=False, appliedFrom=device_name, appliedAt=time.time(), concurrent=[]
-        )
-        log_event(logging.INFO, "config.published", "Shared game settings", gameKey=game_key)
-        return True
-
-    async def _sync_config(self, key: str, game_key: str) -> dict[str, Any]:
-        """Publish a pending local change, then apply the newest revision from any device."""
-        if self._config_state().get(game_key, {}).get("pending") and not await self._publish_config(key, game_key):
-            return {"applied": False, "pending": True}
-        revisions = await asyncio.to_thread(configrev.list_revisions, self._store(), game_key)
-        chosen = configrev.newest(revisions)
-        local = configrev.shared_part(self.game_configs.get(key))
-        if chosen is None:
-            if local != configrev.shared_part(GAME_DEFAULTS):
-                await self._publish_config(key, game_key)
-            return {"applied": False}
-        applied = False
-        if chosen["name"] != self._config_state().get(game_key, {}).get("applied") and local != chosen["config"]:
-            await asyncio.to_thread(self.game_configs.update, key, dict(chosen["config"]))
-            applied = True
-            log_event(logging.INFO, "config.applied", "Applied game settings from another device", gameKey=game_key)
-        self._update_config_state(
-            game_key,
-            applied=chosen["name"],
-            appliedFrom=chosen["deviceName"],
-            appliedAt=chosen["createdTs"],
-            concurrent=sorted({r["deviceName"] or r["deviceId"] for r in configrev.concurrent_with(revisions, chosen)}),
-        )
-        return {"applied": applied}
-
-    async def game_config_sync(self, key: str) -> dict[str, Any]:
-        """Where this game's shared settings came from, for the game page. No network."""
-        game_key = await self._game_key_of(key)
-        record = self._config_state().get(game_key or "", {})
-        return {
-            "gameKey": game_key,
-            "appliedFrom": record.get("appliedFrom"),
-            "appliedAt": record.get("appliedAt"),
-            "pending": bool(record.get("pending")),
-            "concurrent": list(record.get("concurrent") or []),
-        }
-
     # Ludusavi import (slice 10, ADR-0021)
-
-    async def ludusavi_scan(self, root: str) -> dict[str, Any]:
-        """Games in a Ludusavi backup folder on this device, each with a suggested game key."""
-        root = str(root).strip()
-        if root == "~" or root.startswith("~/"):
-            root = os.path.join(self.home or os.path.expanduser("~"), root[2:])
-        try:
-            games = await asyncio.to_thread(ludusavi.scan, root)
-        except ludusavi.LudusaviError as exc:
-            raise ValueError(str(exc)) from exc
-        index = await asyncio.to_thread(self.manifest.load)
-        local = {gk: game for game, _c, gk in await self._matched() if gk}
-        for entry in games:
-            name = entry["name"]
-            known = bool(index and name in index.get("games", {}))
-            suggested = manifest.game_key(name)
-            entry["gameKey"] = suggested
-            entry["inManifest"] = known
-            entry["localGame"] = local[suggested]["name"] if suggested in local else None
-        return {"root": root, "games": games}
-
-    async def ludusavi_import(self, root: str, folder: str, backup_ids: list[str], game_key: str) -> dict[str, Any]:
-        """Import chosen Ludusavi backups of one game as ``import`` snapshots. Never touches local saves."""
-        if not isinstance(game_key, str) or not re.match(r"^[a-z0-9][a-z0-9-]{0,99}$", game_key):
-            raise ValueError("choose a game key: lower-case letters, digits and hyphens")
-        game_folder = os.path.join(str(root), str(folder))
-        if os.sep in str(folder) or "/" in str(folder) or str(folder) in ("", ".", ".."):
-            raise ValueError("invalid game folder")
-        eng = self._engine()
-        results = []
-        with self.jobs.job("import"):
-            existing = {
-                (m["contentHash"], m["created"])
-                for m in await asyncio.to_thread(eng.list_metas, game_key)
-                if m.get("kind") == "import"
-            }
-            for backup_id in [str(b) for b in backup_ids][:HISTORY_MAX]:
-                staging = os.path.join(self.paths.runtime_dir, IMPORT_STAGING, uuid.uuid4().hex)
-                try:
-                    extracted = await asyncio.to_thread(ludusavi.extract, game_folder, backup_id, staging)
-                    if not extracted["files"]:
-                        results.append({"backup": backup_id, "status": "nothing-to-import", **_skips(extracted)})
-                        continue
-                    created = extracted["created"]
-                    entries = await asyncio.to_thread(scan_entries, extracted["files"], extracted["roots"])
-                    stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(created if created else time.time()))
-                    if (content_hash(entries), stamp) in existing:
-                        results.append({"backup": backup_id, "status": "already-imported", **_skips(extracted)})
-                        continue
-                    outcome = await asyncio.to_thread(
-                        eng.take,
-                        game_key,
-                        extracted["files"],
-                        extracted["roots"],
-                        "import",
-                        None,
-                        parents=[],
-                        force=True,
-                        gate=False,
-                        flags=["ludusavi"],
-                        created=created,
-                    )
-                    results.append(
-                        {
-                            "backup": backup_id,
-                            "status": outcome["status"],
-                            "snapId": outcome.get("snapId"),
-                            **_skips(extracted),
-                        }
-                    )
-                except (ludusavi.LudusaviError, SnapshotError, OSError, zipfile.BadZipFile) as exc:
-                    results.append({"backup": backup_id, "status": "error", "error": str(exc), "skipped": []})
-                except StoreError as exc:
-                    results.append({"backup": backup_id, "status": "error", "error": str(exc), "skipped": []})
-                    break  # the cloud is unreachable: stop rather than fail every backup
-                finally:
-                    await asyncio.to_thread(shutil.rmtree, staging, True)
-        log_event(
-            logging.INFO,
-            "import.ludusavi",
-            "Ludusavi import finished",
-            gameKey=game_key,
-            imported=sum(1 for r in results if r["status"] == "published"),
-            failed=sum(1 for r in results if r["status"] == "error"),
-        )
-        return {"gameKey": game_key, "results": results}
 
     # Modules and the Steam Operations Executor (slice 13)
 
     # Import every game at once (Peter, 16 November 2026)
-
-    def import_all_status(self) -> dict[str, Any]:
-        return dict(self._import_all)
-
-    async def ludusavi_import_all(self, root: str, mode: str) -> dict[str, Any]:
-        """Start importing the latest (or every) backup of every readable game, one game at a time, in the background.
-
-        Games not found on this device or not in the manifest are included: an import only adds History
-        snapshots under the game's key and never touches saves, so the backups are ready for a later install
-        or the other device. A failing game is recorded and the rest carry on; already-imported backups are
-        skipped, so running it again is safe. ``ludusavi_import_cancel`` stops between games.
-        """
-        if mode not in ("latest", "all"):
-            raise ValueError("choose the latest backup or all backups")
-        if self._import_all.get("running"):
-            raise ValueError("an import of every game is already running")
-        scanned = await self.ludusavi_scan(root)
-        games = [g for g in scanned["games"] if not g.get("error") and g.get("backups")]
-        self._import_all = {
-            "running": True,
-            "cancelled": False,
-            "mode": mode,
-            "done": 0,
-            "total": len(games),
-            "current": None,
-            "games": {},
-            "summary": {"imported": 0, "already-imported": 0, "nothing-to-import": 0, "failed": 0},
-        }
-        self._import_cancel = False
-        self._background.append(asyncio.create_task(self._run_import_all(scanned["root"], games, mode)))
-        return self.import_all_status()
-
-    async def _run_import_all(self, root: str, games: list[dict[str, Any]], mode: str) -> None:
-        state = self._import_all
-        try:
-            for game in games:
-                if self._import_cancel:
-                    state["cancelled"] = True
-                    break
-                state["current"] = game["name"]
-                await self.emit(IMPORT_PROGRESS_EVENT, self.import_all_status())
-                ids = (
-                    [b["id"] for b in game["backups"]][-1:] if mode == "latest" else [b["id"] for b in game["backups"]]
-                )
-                try:
-                    outcome = await self.ludusavi_import(root, game["folder"], ids, game["gameKey"])
-                    results = outcome["results"]
-                    error = next((r.get("error") for r in results if r["status"] == "error"), None)
-                except Exception as exc:  # noqa: BLE001 - one game failing must not stop the rest
-                    results, error = [], str(exc)
-                verdict = import_verdict(results, error)
-                state["games"][game["folder"]] = {
-                    "name": game["name"],
-                    "status": verdict,
-                    "error": error,
-                    "results": results,
-                }
-                state["summary"][verdict] += 1
-                state["done"] += 1
-        finally:
-            state["running"], state["current"] = False, None
-            log_event(logging.INFO, "import.ludusavi_all", "Import of every game finished", **state["summary"])
-            await self.emit(IMPORT_PROGRESS_EVENT, self.import_all_status())
-
-    async def ludusavi_import_cancel(self) -> dict[str, Any]:
-        self._import_cancel = True
-        return self.import_all_status()
-
-    async def ludusavi_import_status(self) -> dict[str, Any]:
-        return self.import_all_status()
 
     async def modules_status(self) -> dict[str, Any]:
         return {
@@ -4322,13 +850,11 @@ class KeepsakeApp:
     async def set_module_enabled(self, name: str, enabled: bool) -> dict[str, Any]:
         if name not in self.registry.modules:
             raise ValueError("unknown module")
-        flags = dict(self.settings.get("moduleFlags"))
+        # Flags of modules removed in the strip (ADR-0098) are dropped, or the whole setting would be refused.
+        flags = {k: v for k, v in dict(self.settings.get("moduleFlags")).items() if k in SETTINGS_MODULE_NAMES}
         flags[name] = bool(enabled)
         self.settings.set("moduleFlags", flags)
         await self.registry.apply_flags()
-        if name == "desktop" and not enabled:
-            removed = await asyncio.to_thread(self.desktop_remove_entries)  # switched off: the tray goes (ADR-0068)
-            log_event(logging.INFO, "desktop.removed", "Desktop Mode entries removed", removed=len(removed))
         log_event(logging.INFO, "module.flag", "Module switched", module=name, enabled=bool(enabled))
         return await self.modules_status()
 
@@ -4352,302 +878,10 @@ class KeepsakeApp:
     # Games you can stream from another device: Steam Remote Play's entries (ADR-0064)
 
     async def remote_copies_report(self, entries: Any) -> dict[str, Any]:
-        """The frontend's reading of Steam's library. Warns about local shortcuts hidden from elsewhere."""
-        outcome = await asyncio.to_thread(self.remote_copies.save_report, entries)
-        for found in outcome["newlyHidden"][:3]:
-            await self.emit(
-                "keepsake_toast",
-                f"{found['name']} was hidden in Steam, perhaps from your other device. "
-                "Open Haversack's Games page to show it again.",
-            )
-        outcome["tidied"] = 0
-        if self.settings.get("tidyAutomatically") and self.settings.get("streamTidyVerified"):
-            log = await asyncio.to_thread(self.remote_copies.tidy_log)
-            left = {int(k) for k, v in log["hidden"].items() if v.get("state") == "undone"}
-            fresh = [c["appid"] for c in await self._copies() if c["presence"] == discovery.REMOTE and not c["hidden"]]
-            fresh = [a for a in fresh if a not in left]  # a copy the user brought back stays
-            if fresh:
-                outcome["tidied"] = (await self.tidy_copies(fresh, automatic=True))["queued"]
-        return outcome
+        """The frontend's reading of Steam's library, for Install's artwork for streaming tiles (ADR-0081)."""
+        return await asyncio.to_thread(self.remote_copies.save_report, entries)
 
-    async def _copies(self) -> list[dict[str, Any]]:
-        games = (await self.discover_games())["games"]
-        return await asyncio.to_thread(self.remote_copies.copies, games)
-
-    async def remote_copies_status(self) -> dict[str, Any]:
-        """Every streaming entry, the tidy-up log, and whether Steam has reported yet."""
-        report = await asyncio.to_thread(self.remote_copies.report)
-        log = await asyncio.to_thread(self.remote_copies.tidy_log)
-        return {
-            "reportAt": report.get("at"),
-            "copies": await self._copies(),
-            "log": log["hidden"],
-            "automatic": bool(self.settings.get("tidyAutomatically")),
-            "tidyAvailable": bool(self.settings.get("streamTidyVerified")),  # off until A201 is verified
-            "newlyHidden": [
-                {"appid": e["appid"], "name": e["name"]}
-                for e in report["entries"]
-                if e["steam"] == discovery.LOCAL and e["hidden"]
-            ],
-        }
-
-    async def tidy_copies(self, appids: list[int], automatic: bool = False) -> dict[str, Any]:
-        """Hide the chosen streaming entries in Steam. Only entries Steam itself says are on another device."""
-        if not self.settings.get("streamTidyVerified"):
-            raise ValueError("hiding streaming entries is not available yet: it may hide the game on your other device")
-        if not isinstance(appids, list) or not appids:
-            raise ValueError("choose at least one game")
-        certain = {c["appid"]: c for c in await self._copies() if c["presence"] == discovery.REMOTE}
-        refused = [a for a in appids if a not in certain]
-        if refused and not automatic:
-            raise ValueError("some of those are not certainly streamed from another device, so nothing was changed")
-        queued = 0
-        for appid in [a for a in appids if a in certain]:
-            op_id = await asyncio.to_thread(
-                self._ops().enqueue, "core", "set-hidden", {"appid": int(appid), "hidden": True}
-            )
-            await asyncio.to_thread(self.remote_copies.record, int(appid), certain[appid]["name"], "pending", op_id)
-            queued += 1
-        if queued:
-            await self.emit("keepsake_steam_ops")
-        log_event(logging.INFO, "remotecopies.tidy", "Tidy-up queued", count=queued, automatic=automatic)
-        return {"queued": queued}
-
-    async def undo_tidy(self) -> dict[str, Any]:
-        """Show again everything a tidy-up hid, and remember not to hide those again by itself."""
-        log = await asyncio.to_thread(self.remote_copies.tidy_log)
-        queued = 0
-        for key, entry in log["hidden"].items():
-            if entry.get("state") in ("pending", "hidden", "came-back"):
-                op_id = await asyncio.to_thread(
-                    self._ops().enqueue, "core", "set-hidden", {"appid": int(key), "hidden": False}
-                )
-                await asyncio.to_thread(
-                    self.remote_copies.record, int(key), str(entry.get("name", "")), "undone", op_id
-                )
-                queued += 1
-        if queued:
-            await self.emit("keepsake_steam_ops")
-        log_event(logging.INFO, "remotecopies.undo", "Tidy-up undone", count=queued)
-        return {"queued": queued}
-
-    async def unhide_local(self, appid: int) -> dict[str, Any]:
-        """Show a hidden local shortcut again (the guard's one-press fix). Only shortcuts Steam says are local."""
-        verdict = (await asyncio.to_thread(self.remote_copies.steam_verdicts)).get(int(appid))
-        if not verdict or verdict["steam"] != discovery.LOCAL:
-            raise ValueError("that is not a shortcut on this device")
-        op_id = await asyncio.to_thread(
-            self._ops().enqueue, "core", "set-hidden", {"appid": int(appid), "hidden": False}
-        )
-        await self.emit("keepsake_steam_ops")
-        return {"id": op_id}
-
-    async def _remote_shortcuts_probe(self) -> dict[str, Any]:
-        games = (await self.discover_games())["games"]
-        copies = await asyncio.to_thread(self.remote_copies.copies, games)
-        log = await asyncio.to_thread(self.remote_copies.tidy_log)
-        found = remotecopies.check(copies, games, lambda key: bool(self.game_configs.get(key).get("enabled")), log)
-        return {**found, "reportAt": (await asyncio.to_thread(self.remote_copies.report)).get("at")}
-
-    # Uninstall (ADR-0065): Steam games through Steam's own uninstall; non-Steam games here, folder by folder
-
-    def _uninstall_places(self) -> uninstall.Places:
-        home = discovery.real_home(self.home)
-        roots = discovery.steam_roots(self.home, self.host)
-        libraries = [lib for root in roots for lib in discovery.library_folders(root)]
-        removable = []
-        try:
-            with open(os.path.join(self.proc_root, "self", "mounts"), encoding="utf-8", errors="replace") as handle:
-                for line in handle:
-                    parts = line.split()
-                    if len(parts) >= 2 and parts[1].startswith(("/run/media/", "/media/")):
-                        removable.append(parts[1].replace("\\040", " "))
-        except OSError:
-            pass
-        extra = [self.paths.settings_dir, self.paths.runtime_dir, self.paths.log_dir, self._library_root()]
-        return uninstall.Places(
-            home=home, libraries=libraries, steam_roots=roots, extra_protected=extra, removable=removable
-        )
-
-    @staticmethod
-    def _uninstall_others(game: dict[str, Any], games: list[dict[str, Any]]) -> list[str]:
-        """Every folder and file another game uses: the guards never delete around them."""
-        others: list[str] = []
-        for other in games:
-            if other["key"] == game["key"]:
-                continue
-            others += [str(p) for p in (other.get("base_dir"), other.get("exe"), other.get("prefix")) if p]
-            others += [str(p) for p in (other.get("wine_prefix"), other.get("start_dir")) if p]
-        return others
-
-    async def _uninstall_target(self, key: str) -> dict[str, Any]:
-        game = await self._game(key)
-        if game["kind"] not in ("shortcut", "steam"):
-            raise ValueError("only Steam games and non-Steam shortcuts can be uninstalled here")
-        if game["kind"] == "shortcut":
-            verdict = (await asyncio.to_thread(self.remote_copies.steam_verdicts)).get(int(game["appid"]), {})
-            if verdict.get("steam") == discovery.REMOTE:
-                raise ValueError("Steam says this game is installed on another device, so it is not uninstalled here")
-        prefix = game.get("prefix")
-        running = await asyncio.to_thread(find_game_processes, int(game["appid"]), prefix, self.proc_root)
-        if running:
-            raise ValueError("quit the game first")
-        return game
-
-    async def uninstall_plan(self, key: str) -> dict[str, Any]:
-        """What uninstalling would do, for the confirmation screen. Changes nothing."""
-        game = await self._uninstall_target(key)
-        config = self.game_configs.get(key)
-        game_key = await self._game_key_of(key)
-        synced = bool(config.get("enabled") and game_key)
-        base = {"key": key, "name": game["name"], "kind": game["kind"], "synced": synced, "gameKey": game_key}
-        if game["kind"] == "steam":
-            return {**base, "appid": int(game["appid"]), "folders": [], "kept": [], "steam": True}
-        games = (await self.discover_games())["games"]
-        found = await asyncio.to_thread(
-            uninstall.plan, game, self._uninstall_places(), self._uninstall_others(game, games)
-        )
-        return {**base, **found, "steam": False, "store": self.settings.get("snapshotStore")}
-
-    async def _final_backup(self, key: str) -> dict[str, Any]:
-        result = await self.sync_push(key)
-        if result.get("status") not in ("published", "published-fork", "no-change", "nothing-to-save"):
-            raise ValueError(
-                "the final backup could not be saved (the cloud or your other device is not reachable); "
-                "try again, or uninstall without a final backup"
-            )
-        return result
-
-    async def uninstall_steam(self, key: str, backup: bool = True) -> dict[str, Any]:
-        """Steam games: an optional final backup, then Steam's own uninstall wizard. Keepsake deletes nothing."""
-        plan_ = await self.uninstall_plan(key)
-        if not plan_["steam"]:
-            raise ValueError("this is not a Steam game")
-        backed_up = None
-        if backup and plan_["synced"]:
-            backed_up = await self._final_backup(key)
-        op_id = await asyncio.to_thread(self._ops().enqueue, "uninstall", "open-uninstall", {"appid": plan_["appid"]})
-        await self.emit("keepsake_steam_ops")
-        log_event(logging.INFO, "uninstall.steam", "Opened Steam's uninstall", appid=plan_["appid"])
-        return {"op": op_id, "backup": backed_up}
-
-    async def uninstall_start(self, key: str, skip_backup: bool = False) -> dict[str, Any]:
-        """Non-Steam games: start the uninstall in the background. Only after the confirmation screen."""
-        if self._uninstall_job and self._uninstall_job["state"] in uninstall.RUNNING:
-            raise ValueError("an uninstall is already running")
-        plan_ = await self.uninstall_plan(key)
-        if plan_["steam"]:
-            raise ValueError("Steam uninstalls its own games: use Uninstall in Steam")
-        self._uninstall_job = {
-            "key": key,
-            "name": plan_["name"],
-            "appid": plan_["appid"],
-            "state": "starting",
-            "folders": plan_["folders"],
-            "kept": plan_["kept"],
-            "done": 0,
-            "total": sum(f["size"] for f in plan_["folders"]),
-            "removed": [],
-            "error": None,
-            "backup": None,
-            "restoreFrom": None,
-        }
-        self._uninstall_cancel = False
-        task = asyncio.create_task(self._uninstall_run(plan_, bool(skip_backup)))
-        self._background.append(task)
-        return dict(self._uninstall_job)
-
-    async def uninstall_status(self) -> dict[str, Any] | None:
-        return dict(self._uninstall_job) if self._uninstall_job else None
-
-    async def uninstall_cancel(self) -> dict[str, Any] | None:
-        """Stop between files. What is already deleted stays deleted; the rest is kept."""
-        self._uninstall_cancel = True
-        return await self.uninstall_status()
-
-    def _uninstall_set(self, **changes: Any) -> None:
-        if self._uninstall_job is not None:
-            self._uninstall_job.update(changes)
-
-    async def _wait_op(self, op_id: int, timeout: float = 300.0) -> tuple[bool, dict[str, Any]]:
-        future: asyncio.Future[tuple[bool, dict[str, Any]]] = asyncio.get_running_loop().create_future()
-        self._op_waiters[op_id] = future
-        try:
-            return await asyncio.wait_for(future, timeout)
-        finally:
-            self._op_waiters.pop(op_id, None)
-
-    async def _uninstall_run(self, plan_: dict[str, Any], skip_backup: bool) -> None:
-        key, appid = plan_["key"], int(plan_["appid"])
-        try:
-            async with self.locks.hold(plan_.get("gameKey") or key, "uninstall"):
-                # 1. A final snapshot, so the saves can come back on any device.
-                if plan_["synced"] and not skip_backup:
-                    self._uninstall_set(state="backing-up")
-                    result = await self._final_backup(key)
-                    where = "your other devices" if self.settings.get("snapshotStore") == "direct" else "the cloud"
-                    self._uninstall_set(
-                        backup=result.get("snapId") or result.get("status"),
-                        restoreFrom=f"History of {plan_['name']} on any device that syncs with {where}",
-                    )
-                if self._uninstall_cancel:
-                    raise uninstall.Cancelled("cancelled before anything was removed")
-                # 2. The shortcut and its artwork, through Steam, read back (ADR-0015, ADR-0065).
-                self._uninstall_set(state="removing-shortcut")
-                op_id = await asyncio.to_thread(
-                    self._ops().enqueue, "uninstall", "remove-shortcut", {"appid": appid, "clearArtwork": True}
-                )
-                await self.emit("keepsake_steam_ops")
-                try:
-                    ok, result = await self._wait_op(op_id, self.UNINSTALL_OP_TIMEOUT)
-                except TimeoutError as exc:
-                    raise ValueError("Steam did not remove the shortcut; open Gaming Mode and try again") from exc
-                if not ok or result.get("readBack") is not None:
-                    raise ValueError("Steam still lists the shortcut, so nothing was deleted")
-                # 3. The prefix and the install folder, each checked again just before.
-                self._uninstall_set(state="deleting")
-                games = (await self.discover_games(refresh=True))["games"]
-                others = self._uninstall_others({"key": key}, games)
-                places = self._uninstall_places()
-                for item in plan_["folders"]:
-                    problem = await asyncio.to_thread(uninstall.recheck, item, appid, places, others)
-                    job = self._uninstall_job or {}
-                    if problem:
-                        self._uninstall_set(kept=[*job.get("kept", []), {"path": item["path"], "reason": problem}])
-                        continue
-                    start = int(job.get("done", 0))
-
-                    def progress(done: int, start: int = start) -> None:
-                        self._uninstall_set(done=start + done)
-
-                    removed = await asyncio.to_thread(
-                        uninstall.delete_tree, item["path"], lambda: self._uninstall_cancel, progress
-                    )
-                    job = self._uninstall_job or {}
-                    self._uninstall_set(done=start + removed, removed=[*job.get("removed", []), item["path"]])
-                # 4. Keepsake's own records of the game on this device.
-                self._uninstall_set(state="cleaning")
-                await asyncio.to_thread(self._uninstall_forget, key, appid)
-            self._uninstall_set(state="done")
-            log_event(logging.INFO, "uninstall.done", "Uninstalled a game", appid=appid)
-            await self.emit("keepsake_toast", f"{plan_['name']} is uninstalled.")
-        except uninstall.Cancelled as exc:
-            self._uninstall_set(state="cancelled", error=str(exc))
-            log_event(logging.WARNING, "uninstall.cancelled", "Uninstall stopped", appid=appid)
-        except (ValueError, OSError, StoreError, SnapshotError) as exc:
-            self._uninstall_set(state="failed", error=str(exc))
-            log_event(logging.ERROR, "uninstall.failed", "Uninstall failed", appid=appid, error=str(exc))
-
-    def _uninstall_forget(self, key: str, appid: int) -> None:
-        self.game_configs.remove(key)
-        self._clear_proposal(key)
-        if self.game_links:
-            found = self.game_links.for_appid(appid)
-            if found:
-                self.game_links.remove(found[0])
-        if self.installer:
-            self.installer.forget_appid(appid)
-        self._games = None  # the next scan no longer finds it
+    # Steam operations (ADR-0015): queued here, run by the frontend through the Steam client
 
     async def steam_ops_claim(self) -> dict[str, Any] | None:
         if self.steam_ops is None:
@@ -4699,55 +933,6 @@ class KeepsakeApp:
         return {"base64": base64.b64encode(data).decode("ascii")}
 
     # Advisor (slice 14, ADR-0028)
-
-    def _the_advisor(self) -> Advisor:
-        if self.advisor is None:
-            raise ValueError("the Advisor module is off; switch it on in Settings, Modules")
-        return self.advisor
-
-    async def advisor_view(self) -> dict[str, Any]:
-        if self.advisor is None:
-            return {"running": False}
-        view = await asyncio.to_thread(self.advisor.view)
-        return {"running": True, **view, "pcgwLogin": self.credentials.configured("pcgw")}
-
-    async def advisor_select_game(self, appid: int) -> dict[str, Any]:
-        """Advise on any game from the Games list, not only the running one."""
-        await asyncio.to_thread(self._the_advisor().set_game, int(appid))
-        return await self.advisor_view()
-
-    async def advisor_refresh(self) -> dict[str, Any]:
-        await asyncio.to_thread(self._the_advisor().load_reports, True)
-        return await self.advisor_view()
-
-    async def advisor_redetect(self) -> dict[str, Any]:
-        await asyncio.to_thread(self._the_advisor().detect)
-        return await self.advisor_view()
-
-    async def advisor_ai_models(self, provider: str) -> list[dict[str, str]]:
-        try:
-            return await asyncio.to_thread(self._the_advisor().list_models, str(provider))
-        except AdvisorError as exc:
-            raise ValueError(str(exc)) from exc
-
-    async def advisor_ai_generate(self) -> dict[str, Any]:
-        """Button only (P18): one request to the chosen provider with the minimal payload."""
-        result = await asyncio.to_thread(self._the_advisor().generate_ai)
-        log_event(
-            logging.INFO, "advisor.ai", "AI advice requested", provider=result["provider"], ok=result["error"] is None
-        )
-        return await self.advisor_view()
-
-    async def advisor_settings(self, values: dict[str, Any]) -> dict[str, Any]:
-        advisor = self._the_advisor()
-        try:
-            await asyncio.to_thread(advisor.save_settings, dict(values))
-        except AdvisorError as exc:
-            raise ValueError(str(exc)) from exc
-        reload = {"steamIdOverrides", "sourceDeckVerified", "sourceAntiCheat", "sourcePcgw", "sourceProtonDb"}
-        if advisor.game and set(values) & reload:
-            await asyncio.to_thread(advisor.set_game, int(advisor.game["appid"]))
-        return await self.advisor_view()
 
     # Replication: device links and pairing (slice 17, ADR-0054, ADR-0056)
 
@@ -4995,20 +1180,11 @@ class KeepsakeApp:
         self._replication_changed()
         config = self.game_configs.get(key)
         warning = None
-        if config.get("enabled"):
-            try:
-                pushed = await self.sync_push(str(key))
-            except Exception as exc:  # noqa: BLE001 - offline: warn and send what is here (spec step 1)
-                pushed, warning = (
-                    {},
-                    f"Saves could not be pushed first ({type(exc).__name__}); the copy has the saves on this device.",
-                )
-            if pushed.get("status") == "conflict":
-                raise ValueError("this game has a save conflict; resolve it in Haversack first, then send it")
         extra = {
             "from": {"name": str(self.settings.get("deviceName") or "Unnamed device")},
+            # The receiver uses the game key to find the game's saves and protect them on updates.
             "gameKey": config.get("gameKey"),
-            "savesEnabled": bool(config.get("enabled")),
+            "savesEnabled": False,  # save sync is gone (ADR-0098); older devices read this
             **({"pull": pull} if pull else {}),
         }
         state["warning"] = warning
@@ -5529,76 +1705,6 @@ class KeepsakeApp:
 
     # Direct save sync between paired devices, no cloud account (R7, ADR-0061)
 
-    def _direct_root(self) -> str:
-        return os.path.join(self.paths.runtime_dir, "direct-store")
-
-    def _direct_store(self) -> LocalFolderStore | None:
-        """This device's store, only while it syncs saves directly. Otherwise peers are refused."""
-        if "direct" not in self._locations():
-            return None
-        return LocalFolderStore(self._direct_root())
-
-    async def _direct_exchange(self, timeout: float = 60.0, only: str | None = None) -> dict[str, Any]:
-        """Fetch from each reachable paired device the save objects this one lacks. Never blocks a game:
-        an unreachable device is noted and play carries on with what is here (principle 5)."""
-        store = self._direct_store()
-        links = self.links
-        if store is None or links is None:
-            return {"peers": 0, "copied": 0, "unreachable": []}
-        summary: dict[str, Any] = {"peers": 0, "copied": 0, "removed": 0, "unreachable": []}
-        for peer in links.store.list():
-            if only and peer["id"] != only:
-                continue
-            try:
-                connection = await asyncio.wait_for(self._replication_connect_for(peer["id"])(), 10)
-                try:
-                    result = await asyncio.wait_for(directsync.exchange(store, connection), timeout)
-                finally:
-                    await connection.close()
-                summary["peers"] += 1
-                summary["copied"] += result["copied"]
-                summary["removed"] += result["removed"]
-            except (replication_link.LinkError, StoreError, TimeoutError, OSError) as exc:
-                summary["unreachable"].append(peer["name"])
-                log_event(
-                    logging.INFO, "direct.unreachable", "Direct save sync skipped a device", reason=type(exc).__name__
-                )
-        self._direct_last = summary | {"at": time.time()}
-        if summary["copied"]:
-            log_event(
-                logging.INFO, "direct.exchanged", "Saves fetched from your other devices", count=summary["copied"]
-            )
-        return summary
-
-    def _direct_pushed(self) -> None:
-        """After a push: tell paired devices there is something new, so they fetch it soon."""
-        if self._direct_store() is None or self.links is None:
-            return
-
-        async def tell() -> None:
-            for peer in self.links.store.list() if self.links else []:
-                try:
-                    connection = await asyncio.wait_for(self._replication_connect_for(peer["id"])(), 10)
-                    try:
-                        await directsync.tell_changed(connection)
-                    finally:
-                        await connection.close()
-                except (replication_link.LinkError, TimeoutError, OSError):
-                    pass  # it fetches at its next launch or idle pass
-
-        self._background.append(asyncio.create_task(tell()))
-
-    def _direct_peer_changed(self, peer_id: str) -> None:
-        self._background.append(asyncio.create_task(self._direct_exchange(only=peer_id or None)))
-
-    async def direct_sync_now(self) -> dict[str, Any]:
-        """Fetch saves from paired devices now (Cloud settings, Direct between my devices)."""
-        if self._direct_store() is None:
-            raise ValueError("choose Direct between my devices in Cloud settings first")
-        if self.links is None:
-            raise ValueError("switch on Replication in Settings, Modules, and pair your devices")
-        return await self._direct_exchange()
-
     # Keeping games in step (slice 20, ADR-0060)
 
     def _game_links(self) -> GameLinks:
@@ -5607,7 +1713,7 @@ class KeepsakeApp:
         return self.game_links
 
     def _replication_keep(self, game: dict[str, Any], scopes: dict[str, str]) -> dict[str, list[str]]:
-        """Every file Saves manages and every config file of the game, per share: never part of an update."""
+        """Every save and config file the manifest lists for the game, per share: never part of an update (ADR-0098)."""
         config = self.game_configs.get(game["key"])
         index = self.manifest.load()
         match = manifest.match_game(index, game, config)
@@ -5928,45 +2034,8 @@ class KeepsakeApp:
         await self.emit("keepsake_steam_ops")
         return {"queued": queued}
 
-    async def library_badge(self, appid: int) -> dict[str, Any] | None:
-        """The badge on a game's page in Steam's library (R18, ADR-0081): its saves, or where it streams from,
-        with Advisor's ProtonDB line under it when that source is on (R29 stage 2, ADR-0093)."""
-        if not self.settings.get("libraryBadges"):
-            return None
-        badge = await self._library_badge(int(appid))
-        line = None
-        if self.advisor is not None and int(appid) < 2**31:
-            line = await asyncio.to_thread(self.advisor.protondb_line, int(appid))
-        if line is None:
-            return badge
-        return {**badge, "detail": line} if badge else {"state": "info", "label": line}
-
-    async def _library_badge(self, appid: int) -> dict[str, Any] | None:
-        verdict = (await asyncio.to_thread(self.remote_copies.steam_verdicts)).get(appid)
-        if verdict and verdict.get("steam") == discovery.REMOTE:
-            devices = verdict.get("clients") or []
-            return {
-                "state": "streaming",
-                "label": f"Streams from {devices[0]}" if devices else "Streams from another device",
-            }
-        if not self.registry.enabled("saves"):
-            return None
-        states = self._sync().state.games()
-        for game, config, gk in await self._matched():
-            if int(game.get("appid") or 0) != appid:
-                continue
-            if not config.get("enabled") or not gk:
-                return {"state": "off", "label": "Saves: not synced by Haversack"}
-            state = states.get(gk) or {}
-            found = newer_save(state)
-            if found:
-                return {"state": "newer", "label": f"Saves: newer on {found.get('device') or 'another device'}"}
-            word = status_word(state)
-            return {"state": word, "label": BADGE_LABELS.get(word, "Saves: synced")}
-        return None
-
     async def installer_handoff(self, job_id: int) -> dict[str, Any]:
-        """The Games list key for a finished install, so the user can switch on save sync for it."""
+        """The Games list key for a finished install, so Install can open it in Games (ADR-0098)."""
         job = await self._installer_call("get", int(job_id))
         if job["state"] != "done":
             raise ValueError("the install has not finished")
@@ -6098,26 +2167,6 @@ class KeepsakeApp:
             raise ValueError(self._net_unexpected("browse that location", exc)) from exc
         folder = target if target.endswith("/") else target + "/"
         return {"url": webdav.to_dav(folder) if isinstance(session, webdav.DavSession) else folder, "entries": entries}
-
-    async def _network_iso_probe(self) -> dict[str, Any]:
-        """The Device check's findings (ADR-0067): in-place mounting here, and a loop test on a mounted share."""
-
-        def probe() -> dict[str, Any]:
-            found = inplace.find_network_iso(os.path.join(self.proc_root, "self", "mounts"))
-            out: dict[str, Any] = {
-                "udisks": udisks.available(),
-                "fusermount3": bool(shutil.which(netfuse.FUSERMOUNT)),
-                "devFuse": os.access("/dev/fuse", os.R_OK | os.W_OK),
-                "approved": netfuse.FUSERMOUNT_APPROVED,
-                "inPlace": self._netfuse_available(),
-                "iso": None,
-            }
-            if found and out["udisks"]:
-                path, fstype = found
-                out["iso"] = {"fstype": fstype, "error": inplace.loop_test(path, self._udisks_runner)}
-            return out
-
-        return await asyncio.to_thread(probe)
 
     async def installer_net_find_smb(self) -> dict[str, Any]:
         """User action: SMB servers answering on the local network (ADR-0066). Read only; nothing is mounted."""
@@ -6334,23 +2383,10 @@ class KeepsakeApp:
     async def steam_ops_list(self) -> list[dict[str, Any]]:
         return await asyncio.to_thread(self.steam_ops.list) if self.steam_ops else []
 
-    async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
-        """Diagnostics only: hold a fake sync job so the update guard can be tested."""
-        seconds = max(1, min(int(seconds), SIMULATED_JOB_MAX))
-        with self.jobs.job("simulated"):
-            log_event(logging.INFO, "jobs.simulated", "Simulated sync job started", seconds=seconds)
-            await asyncio.sleep(seconds)
-        return {"ok": True, "seconds": seconds}
-
     async def stop(self) -> None:
         for task in self._background:
             task.cancel()
         self._disk.shutdown(wait=False, cancel_futures=True)  # a scan held by a slow disk is left behind
-        for moved in self._signin_lingering:
-            moved.close()  # a lingering sign-in listener goes with the plugin
-        await asyncio.to_thread(self.freezer.resume_all, "unload")
-        await asyncio.to_thread(self.pauser.resume_all, "unload")
-        self._paused = None
         await self.registry.stop_all()
         if self.db is not None:
             self.db.close()
@@ -6365,33 +2401,20 @@ class KeepsakeApp:
     async def set_setting(self, key: str, value: Any) -> dict[str, Any]:
         result = self.settings.set(key, value)
         log_event(logging.INFO, "settings.changed", "Setting changed", key=key)
+        if key == "deviceName" and self.links is not None:
+            # Replication starts with the app now (ADR-0098), often before the device is named: the running
+            # link, listener and discovery share this identity, so a rename reaches the next hello at once.
+            self.links.me.name = str(self.settings.get("deviceName") or "Unnamed device")
         if key == "qamShortcuts":
             await self.emit(SHORTCUTS_EVENT)  # the quick access menu shows the change at once
         return result
 
     # Quick menu shortcuts (layout v3 addendum, ADR-0073)
 
-    def _shortcut_features(self) -> list[str]:
-        """Features some shortcuts need, as this device has them now."""
-        found = []
-        if self.host == "decky":
-            found.append("updates")
-        if self.performance is not None:
-            try:
-                current = self._steamos().read()
-            except ManagerError:
-                current = {}
-            if current.get("profile"):
-                found.append("performance")
-            if current.get("chargeLimit") is not None:
-                found.append("charge-limit")
-        return found
-
     async def qam_shortcuts(self) -> dict[str, Any]:
         """Every shortcut this device can show, the ones chosen (in order), and the defaults."""
         modules = {name: self.registry.enabled(name) for name in SETTINGS_MODULE_NAMES}
-        features = await asyncio.to_thread(self._shortcut_features)
-        offered = shortcuts.available(modules, features)
+        offered = shortcuts.available(modules, ["updates"])
         chosen = self.settings.get("qamShortcuts")
         return {
             "available": offered,
@@ -6406,15 +2429,7 @@ class KeepsakeApp:
         entry = offered.get(str(shortcut_id))
         if entry is None or entry["kind"] != "action":
             raise ValueError("that shortcut is not available here")
-        current = (await self.qam_summary()).get("currentGame")
         sid = entry["id"]
-        if sid == "sync-now":
-            r = await self.sync_now()
-            return {
-                "message": f"Checked {r.get('games', 0)} games."
-                if r.get("ok")
-                else "Haversack is busy; try again in a moment."
-            }
         if sid == "get-game":
             return {"message": "Choose Games on a device, then Get this game.", "open": ["games-devices", "devices"]}
         if sid == "run-device-checks":
@@ -6432,32 +2447,12 @@ class KeepsakeApp:
                 if r.get("updateAvailable")
                 else "Haversack is up to date."
             }
-        if sid == "next-mode":
-            status = await self.device_performance()
-            profile = (status.get("current") or {}).get("profile") or {}
-            modes = profile.get("available") or []
-            if not modes:
-                raise ValueError("this device offers no performance modes")
-            following = (
-                modes[(modes.index(profile.get("current")) + 1) % len(modes)]
-                if profile.get("current") in modes
-                else modes[0]
-            )
-            await self.device_apply({"mode": following}, status.get("game"))
-            return {"message": f"Performance mode: {MODE_WORDS.get(following, following)}."}
-        if sid == "charge-limit":
-            battery = await self.device_battery()
-            result = await self.device_set_charge_limit(not battery.get("limited"))
-            return {"message": "Charging stops at 80%." if result.get("limited") else "Charging to 100%."}
-        if current is None:
-            return {"message": "No synced game is running."}
-        if sid == "sync-current":
-            r = await self.sync_push(current["key"])
-            return {"message": f"{current['name']}: {SYNC_RESULT.get(str(r.get('status')), str(r.get('status')))}."}
-        if sid == "backup-current":
-            await self.snapshot_game(current["key"])
-            return {"message": f"{current['name']} backed up. It is in History."}
         if sid == "send-current":
+            running = sorted(self._games_running - {0})
+            games = (await self.discover_games())["games"]
+            current = next((g for g in games if running and g.get("appid") == running[-1]), None)
+            if current is None:
+                return {"message": "No game is running."}
             peers = self._links().store.list()
             if len(peers) != 1:
                 return {"message": "Choose the device on Other devices.", "open": ["games-devices", "devices"]}
@@ -6466,19 +2461,6 @@ class KeepsakeApp:
         raise ValueError("that shortcut is not available here")
 
     # Logs
-
-    async def activity(self, limit: int = 100) -> list[dict[str, Any]]:
-        """What Keepsake did, newest first, in plain words (ADR-0048)."""
-        records = await asyncio.to_thread(tail, self.paths.log_dir, 2000)
-        names: dict[str, str] = {}
-        try:
-            for game, _config, gk in await self._matched():
-                names[game["key"]] = game["name"]
-                if gk:
-                    names.setdefault(gk, game["name"])
-        except (OSError, ValueError, StoreError):
-            pass  # unnamed games are shown by their key
-        return activity.build(records, lambda key: names.get(key, key), max(1, min(int(limit), 500)))
 
     async def get_logs(self, limit: int = 200) -> list[dict[str, Any]]:
         return await asyncio.to_thread(tail, self.paths.log_dir, limit)
@@ -6499,23 +2481,6 @@ class KeepsakeApp:
         log_event(logging.INFO, "diagnostics.https_test", "HTTPS test finished", ok=result.get("ok"))
         return result
 
-    async def signin_probe(self, action: str = "start") -> dict[str, Any]:
-        """The Gaming Mode sign-in probe's loopback step (ADR-0044): "start" gives an address
-        for Steam's browser, "result" says whether the browser reached it. Only from a user action."""
-        if action == "start":
-            if self._signin_probe is not None:
-                self._signin_probe.close()
-            self._signin_probe = await asyncio.to_thread(BrowserProbe)
-            return {"url": self._signin_probe.url}
-        if self._signin_probe is None:
-            return {"arrived": False, "error": "not-started"}
-        result = self._signin_probe.result()
-        await asyncio.to_thread(diagnostics.record_probe_event, self.paths.runtime_dir, "signin-loopback", result)
-        return result
-
-    async def record_probe_event(self, kind: str, payload: Any) -> int:
-        return await asyncio.to_thread(diagnostics.record_probe_event, self.paths.runtime_dir, kind, payload)
-
     # Device checks: the device run inside the plugin (ADR-0062)
 
     def _device_context(self) -> devicechecks.Context:
@@ -6532,19 +2497,47 @@ class KeepsakeApp:
                 "remote-shortcuts": self._remote_shortcuts_probe,
                 "smb-find": lambda: asyncio.to_thread(lanfind.find_servers, 2.5, self._lan_sockets),
                 "network-iso": self._network_iso_probe,
-                "session-sources": self._session_sources_probe,
-                "tray-responsive": self._tray_probe,
-                "device-readings": self._readings_probe,
-                "performance-control": self._performance_probe,
-                "charge-limit": self._charge_probe,
-                "controllers": self.device_controllers,
-                "reconnect-help": self._reconnect_probe,
-                "fan-control": self._fans_probe,
                 "emulator-setup": self._emulator_probe,
-                "bios": self._bios_probe,
-                **({"desktop-app": self._desktop_probe} if self.registry.enabled("desktop") else {}),
             },
         )
+
+    async def _emulator_probe(self) -> dict[str, Any]:
+        found = await self.emulator_setup()
+        if found.get("off"):
+            return {"off": True}
+        return {
+            "setups": found["setups"],
+            "emulators": [{"name": e["name"], "type": e["type"]} for e in found["emulators"]],
+            "perSystem": found["perSystem"],
+            "secrets": found["secrets"],
+        }
+
+    async def _remote_shortcuts_probe(self) -> dict[str, Any]:
+        games = (await self.discover_games())["games"]
+        copies = await asyncio.to_thread(self.remote_copies.copies, games)
+        log = await asyncio.to_thread(self.remote_copies.tidy_log)
+        found = remotecopies.check(copies, games, lambda key: bool(self.game_configs.get(key).get("enabled")), log)
+        return {**found, "reportAt": (await asyncio.to_thread(self.remote_copies.report)).get("at")}
+
+    async def _network_iso_probe(self) -> dict[str, Any]:
+        """The Device check's findings (ADR-0067): in-place mounting here, and a loop test on a mounted share."""
+
+        def probe() -> dict[str, Any]:
+            found = inplace.find_network_iso(os.path.join(self.proc_root, "self", "mounts"))
+            out: dict[str, Any] = {
+                "udisks": udisks.available(),
+                "fusermount3": bool(shutil.which(netfuse.FUSERMOUNT)),
+                "devFuse": os.access("/dev/fuse", os.R_OK | os.W_OK),
+                "approved": netfuse.FUSERMOUNT_APPROVED,
+                "inPlace": self._netfuse_available(),
+                "iso": None,
+            }
+            if found and out["udisks"]:
+                path, fstype = found
+                out["iso"] = {"fstype": fstype, "error": inplace.loop_test(path, self._udisks_runner)}
+            return out
+
+        return await asyncio.to_thread(probe)
 
     async def device_checks(self) -> dict[str, Any]:
         return {
@@ -6565,40 +2558,6 @@ class KeepsakeApp:
         for check in devicechecks.CHECKS:
             await self.device_check_run(check.id)
         return await self.device_checks()
-
-    async def device_status(self) -> dict[str, Any]:
-        """This handheld, for Device's Status tab (layout v3, ADR-0073). Read-only, Core only.
-
-        The profile Keepsake detected from the model strings (never a serial number), battery and
-        charging. The device controls (R21) add their own tabs and readings.
-        """
-
-        def read() -> dict[str, Any]:
-            facts = devices.read_facts(self.power_root)
-            profile, how = devices.resolve(devices.load_profiles(), facts)
-            # A captured dump (tests) is read as Linux, as read_facts does; "/" is this device, on any system.
-            root = self.power_root
-            percent, mains = power.battery_state(root) if root == "/" else power.linux_battery_state(root)
-            return {
-                "model": str(profile.get("model") or "Unknown device"),
-                "vendor": str(profile.get("vendor") or ""),
-                "profile": str(profile.get("id") or "generic"),
-                "how": how,
-                "apu": str(profile.get("apu") or ""),
-                "tdp": dict(profile.get("tdp_w") or {}),
-                "display": dict(profile.get("display") or {}),
-                "facts": devices.public_facts(facts),
-                "battery": {"percent": percent, "mains": mains, "present": bool(facts.get("battery"))},
-            }
-
-        return await asyncio.to_thread(read)
-
-    async def device_readings(self) -> dict[str, Any]:
-        """Live readings for Device, Status (R21 stage 1, ADR-0074): every world-readable sensor. Read-only."""
-        return await asyncio.to_thread(hardware.read_status, self.sys_root)
-
-    async def _readings_probe(self) -> dict[str, Any]:
-        return await self.device_readings()
 
     async def device_checks_export(self) -> dict[str, Any]:
         """Save the results as one redacted file, and give a short summary for the screen and a QR code."""
@@ -6662,72 +2621,7 @@ class KeepsakeApp:
             self.paths.runtime_dir,
             self.paths.log_dir,
             frontend,
-            {
-                "freezer": self.freezer.status(),
-                "manifest": self.manifest.status(),
-                "health": await self._health(probe=False),
-            },
+            {"manifest": self.manifest.status()},
         )
         log_event(logging.INFO, "diagnostics.export", "Diagnostics exported", file=os.path.basename(path))
         return path
-
-    async def freeze_test(self, appid: int, seconds: int = 5) -> dict[str, Any]:
-        """Freeze the running game for a few seconds behind the watchdog."""
-        seconds = max(FREEZE_TEST_MIN, min(int(seconds), FREEZE_TEST_MAX))
-        if self._freeze_lock.locked():
-            return {"ok": False, "reason": "busy"}
-        async with self._freeze_lock:
-            procs = await asyncio.to_thread(find_game_processes, int(appid), None, self.proc_root)
-            if not procs:
-                return {"ok": False, "reason": "no-processes"}
-            try:
-                stopped = await asyncio.to_thread(self.freezer.freeze, procs)
-                await asyncio.sleep(seconds)
-            finally:
-                resumed = await asyncio.to_thread(self.freezer.resume_all, "normal")
-            return {"ok": bool(stopped), "stopped": len(stopped), "resumed": len(resumed), "seconds": seconds}
-
-
-BADGE_LABELS = {
-    "synced": "Saves: in step",
-    "pending": "Saves: waiting to upload",
-    "conflict": "Saves: conflict, open Haversack",
-    "quarantined": "Saves: a suspicious save was kept here",
-    "not-synced": "Saves: not synced yet",
-}
-
-
-def status_word(state: dict[str, Any]) -> str:
-    """One word for a game's sync state, used for list icons and the current game card."""
-    if state.get("conflict"):
-        return "conflict"
-    if state.get("quarantined"):
-        return "quarantined"
-    if state.get("pending"):
-        return "pending"
-    if state.get("base"):
-        return "synced"
-    return "not-synced"
-
-
-def newer_save(state: dict[str, Any]) -> dict[str, Any] | None:
-    """A newer save from another device that this device has not taken in yet (ADR-0049)."""
-    newer = state.get("newer")
-    if not isinstance(newer, dict) or newer.get("snapId") == state.get("base") or state.get("conflict"):
-        return None
-    return {"snapId": newer.get("snapId"), "device": newer.get("device"), "created": newer.get("created")}
-
-
-def _skips(extracted: dict[str, Any]) -> dict[str, Any]:
-    return {"skipped": extracted.get("skipped", [])[:50], "skippedCount": len(extracted.get("skipped", []))}
-
-
-def snap_summary(meta: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "snapId": meta["snapId"],
-        "created": meta["created"],
-        "kind": meta["kind"],
-        "device": meta.get("deviceName"),
-        "files": len(meta["files"]),
-        "bytes": sum(f["size"] for f in meta["files"]),
-    }

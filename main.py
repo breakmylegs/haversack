@@ -40,14 +40,7 @@ class Plugin:
     async def _uninstall(self) -> None:
         # Decky calls this on every update as well as on uninstall (it uninstalls
         # the old version first). It must never delete settings, tokens or state.
-        # The Desktop Mode entries go (ADR-0068, T52); a new version writes its own when it starts.
-        from keepsake.desktop import entries
-        from keepsake.discovery import real_home
-
-        try:
-            entries.remove(real_home())
-        except OSError:
-            pass
+        pass
 
     async def get_status(self) -> dict[str, Any]:
         return await self.app.get_status()
@@ -67,36 +60,6 @@ class Plugin:
     async def remote_copies_report(self, entries: Any) -> dict[str, Any]:
         return await self.app.remote_copies_report(entries)
 
-    async def uninstall_plan(self, key: str) -> dict[str, Any]:
-        return await self.app.uninstall_plan(key)
-
-    async def uninstall_start(self, key: str, skip_backup: bool = False) -> dict[str, Any]:
-        return await self.app.uninstall_start(key, skip_backup)
-
-    async def uninstall_steam(self, key: str, backup: bool = True) -> dict[str, Any]:
-        return await self.app.uninstall_steam(key, backup)
-
-    async def uninstall_status(self) -> dict[str, Any] | None:
-        return await self.app.uninstall_status()
-
-    async def uninstall_cancel(self) -> dict[str, Any] | None:
-        return await self.app.uninstall_cancel()
-
-    async def remote_copies_status(self) -> dict[str, Any]:
-        return await self.app.remote_copies_status()
-
-    async def tidy_copies(self, appids: list[int]) -> dict[str, Any]:
-        return await self.app.tidy_copies(appids)
-
-    async def undo_tidy(self) -> dict[str, Any]:
-        return await self.app.undo_tidy()
-
-    async def unhide_local(self, appid: int) -> dict[str, Any]:
-        return await self.app.unhide_local(appid)
-
-    async def check_running_prefix(self, key: str) -> dict[str, Any]:
-        return await self.app.check_running_prefix(key)
-
     async def manifest_status(self) -> dict[str, Any]:
         return await self.app.manifest_status()
 
@@ -106,50 +69,8 @@ class Plugin:
     async def manifest_progress(self) -> dict[str, Any]:
         return await self.app.manifest_progress()
 
-    async def match_games(self) -> list[dict[str, Any]]:
-        return await self.app.match_games()
-
-    async def search_titles(self, query: str) -> list[str]:
-        return await self.app.search_titles(query)
-
-    async def get_game(self, key: str) -> dict[str, Any]:
-        return await self.app.get_game(key)
-
     async def update_game_config(self, key: str, changes: dict[str, Any]) -> dict[str, Any]:
         return await self.app.update_game_config(key, changes)
-
-    async def add_custom_path(self, key: str, absolute_path: str) -> dict[str, Any]:
-        return await self.app.add_custom_path(key, absolute_path)
-
-    async def preview_game(self, key: str) -> dict[str, Any]:
-        return await self.app.preview_game(key)
-
-    async def cloud_status(self) -> dict[str, Any]:
-        return await self.app.cloud_status()
-
-    async def start_signin(self, backend: str = "onedrive", method: str = "phone") -> dict[str, Any]:
-        return await self.app.start_signin(backend, method)
-
-    async def cancel_signin(self) -> dict[str, Any]:
-        return await self.app.cancel_signin()
-
-    async def sign_out(self, backend: str = "onedrive") -> dict[str, Any]:
-        return await self.app.sign_out(backend)
-
-    async def locations_status(self) -> dict[str, Any]:
-        return await self.app.locations_status()
-
-    async def add_location(self, backend: str) -> dict[str, Any]:
-        return await self.app.add_location(backend)
-
-    async def remove_location(self, backend: str) -> dict[str, Any]:
-        return await self.app.remove_location(backend)
-
-    async def set_game_locations(self, key: str, names: list[str] | None) -> dict[str, Any]:
-        return await self.app.set_game_locations(key, names)
-
-    async def test_cloud(self, backend: str | None = None) -> dict[str, Any]:
-        return await self.app.test_cloud(backend)
 
     async def backend_config(self, backend: str) -> dict[str, Any]:
         return await self.app.backend_config(backend)
@@ -177,27 +98,6 @@ class Plugin:
 
     async def steam_ops_list(self) -> list[dict[str, Any]]:
         return await self.app.steam_ops_list()
-
-    async def advisor_view(self) -> dict[str, Any]:
-        return await self.app.advisor_view()
-
-    async def advisor_select_game(self, appid: int) -> dict[str, Any]:
-        return await self.app.advisor_select_game(appid)
-
-    async def advisor_refresh(self) -> dict[str, Any]:
-        return await self.app.advisor_refresh()
-
-    async def advisor_redetect(self) -> dict[str, Any]:
-        return await self.app.advisor_redetect()
-
-    async def advisor_settings(self, values: dict[str, Any]) -> dict[str, Any]:
-        return await self.app.advisor_settings(values)
-
-    async def advisor_ai_models(self, provider: str) -> list[dict[str, str]]:
-        return await self.app.advisor_ai_models(provider)
-
-    async def advisor_ai_generate(self) -> dict[str, Any]:
-        return await self.app.advisor_ai_generate()
 
     async def replication_status(self) -> dict[str, Any]:
         return await self.app.replication_status()
@@ -271,9 +171,6 @@ class Plugin:
     async def device_checks_export(self) -> dict[str, Any]:
         return await self.app.device_checks_export()
 
-    async def direct_sync_now(self) -> dict[str, Any]:
-        return await self.app.direct_sync_now()
-
     async def replication_games(self) -> list[dict[str, Any]]:
         return await self.app.replication_games()
 
@@ -307,9 +204,6 @@ class Plugin:
     async def run_shortcut(self, shortcut_id: str) -> dict[str, Any]:
         return await self.app.run_shortcut(shortcut_id)
 
-    async def library_badge(self, appid: int) -> dict[str, Any] | None:
-        return await self.app.library_badge(appid)
-
     async def installer_stream_tiles(self) -> list[dict[str, Any]]:
         return await self.app.installer_stream_tiles()
 
@@ -318,84 +212,6 @@ class Plugin:
 
     async def installer_stream_art_apply(self, appid: int, game_id: int) -> dict[str, Any]:
         return await self.app.installer_stream_art_apply(appid, game_id)
-
-    async def take_newest(self, key: str) -> dict[str, Any]:
-        return await self.app.take_newest(key)
-
-    async def newest_choice(self, key: str) -> dict[str, Any] | None:
-        return await self.app.newest_choice(key)
-
-    async def undo_newest(self, key: str) -> dict[str, Any]:
-        return await self.app.undo_newest(key)
-
-    async def snapshot_locations(self, key: str) -> dict[str, list[str]]:
-        return await self.app.snapshot_locations(key)
-
-    async def device_status(self) -> dict[str, Any]:
-        return await self.app.device_status()
-
-    async def device_readings(self) -> dict[str, Any]:
-        return await self.app.device_readings()
-
-    async def device_performance(self) -> dict[str, Any]:
-        return await self.app.device_performance()
-
-    async def device_apply(self, values: dict[str, Any], save_for: int | None = None) -> dict[str, Any]:
-        return await self.app.device_apply(values, save_for)
-
-    async def device_forget(self, appid: int) -> dict[str, Any]:
-        return await self.app.device_forget(appid)
-
-    async def device_extras(self) -> dict[str, Any]:
-        return await self.app.device_extras()
-
-    async def device_set_wifi_power_saving(self, on: bool) -> dict[str, Any]:
-        return await self.app.device_set_wifi_power_saving(on)
-
-    async def device_controllers(self) -> dict[str, Any]:
-        return await self.app.device_controllers()
-
-    async def reconnect_status(self) -> dict[str, Any]:
-        return await self.app.reconnect_status()
-
-    async def reconnect_set_help(self, adapter: str, mac: str, on: bool, label: str = "") -> dict[str, Any]:
-        return await self.app.reconnect_set_help(adapter, mac, on, label)
-
-    async def reconnect_set_option(self, adapter: str, mac: str, option: str, on: bool) -> dict[str, Any]:
-        return await self.app.reconnect_set_option(adapter, mac, option, on)
-
-    async def reconnect_set_dry_run(self, on: bool) -> dict[str, Any]:
-        return await self.app.reconnect_set_dry_run(on)
-
-    async def reconnect_dismiss(self, adapter: str, mac: str) -> dict[str, Any]:
-        return await self.app.reconnect_dismiss(adapter, mac)
-
-    async def reconnect_assist(self, adapter: str, mac: str) -> dict[str, Any]:
-        return await self.app.reconnect_assist(adapter, mac)
-
-    async def reconnect_read_usb(self, adapter: str, mac: str) -> dict[str, Any]:
-        return await self.app.reconnect_read_usb(adapter, mac)
-
-    async def reconnect_diagnose(self, adapter: str, mac: str) -> dict[str, Any]:
-        return await self.app.reconnect_diagnose(adapter, mac)
-
-    async def reconnect_export(self, adapter: str, mac: str, redact_adapter: bool = True) -> dict[str, Any]:
-        return await self.app.reconnect_export(adapter, mac, redact_adapter)
-
-    async def reconnect_cable_pair(self, adapter: str, mac: str, order: str = "same") -> dict[str, Any]:
-        return await self.app.reconnect_cable_pair(adapter, mac, order)
-
-    async def reconnect_cable_restore(self, adapter: str, mac: str) -> dict[str, Any]:
-        return await self.app.reconnect_cable_restore(adapter, mac)
-
-    async def reconnect_set_ssp_gate(self, on: bool, adapter: str = "", confirm: str = "") -> dict[str, Any]:
-        return await self.app.reconnect_set_ssp_gate(on, adapter, confirm)
-
-    async def reconnect_ssp_confirm(self) -> dict[str, Any]:
-        return await self.app.reconnect_ssp_confirm()
-
-    async def helper_prepare(self) -> dict[str, Any]:
-        return await self.app.helper_prepare()
 
     async def emulator_setup(self) -> dict[str, Any]:
         return await self.app.emulator_setup()
@@ -406,83 +222,14 @@ class Plugin:
     async def emulator_send(self, peer_id: str, system: str, unit: str, with_keys: bool = False) -> dict[str, Any]:
         return await self.app.emulator_send(peer_id, system, unit, with_keys)
 
-    async def controller_settings_status(self) -> dict[str, Any]:
-        return await self.app.controller_settings_status()
-
-    async def controller_settings_set(self, values: dict[str, Any], keep: bool = False) -> dict[str, Any]:
-        return await self.app.controller_settings_set(values, keep)
-
-    async def controller_settings_forget(self) -> dict[str, Any]:
-        return await self.app.controller_settings_forget()
-
-    async def fans_status(self) -> dict[str, Any]:
-        return await self.app.fans_status()
-
-    async def fans_set_options(self, options: dict[str, Any]) -> dict[str, Any]:
-        return await self.app.fans_set_options(options)
-
-    async def fans_save_profile(self, name: str, points: list[Any], make_default: bool = False) -> dict[str, Any]:
-        return await self.app.fans_save_profile(name, points, make_default)
-
-    async def fans_delete_profile(self, name: str) -> dict[str, Any]:
-        return await self.app.fans_delete_profile(name)
-
-    async def fans_assign(self, kind: str, key: str, name: str | None) -> dict[str, Any]:
-        return await self.app.fans_assign(kind, key, name)
-
-    async def fans_hand_back(self) -> dict[str, Any]:
-        return await self.app.fans_hand_back()
-
-    async def fans_selftest(self) -> dict[str, Any]:
-        return await self.app.fans_selftest()
-
     async def save_navigation_record(self, record: dict[str, Any]) -> dict[str, Any]:
         return await self.app.save_navigation_record(record)
-
-    async def looks_status(self) -> dict[str, Any]:
-        return await self.app.looks_status()
-
-    async def looks_set_animation(self, kind: str, choice: str) -> dict[str, Any]:
-        return await self.app.looks_set_animation(kind, choice)
-
-    async def looks_reset_animation(self, kind: str) -> dict[str, Any]:
-        return await self.app.looks_reset_animation(kind)
-
-    async def looks_send(self, peer_id: str, parts: list[str]) -> dict[str, Any]:
-        return await self.app.looks_send(peer_id, parts)
 
     async def game_art_status(self, key: str) -> dict[str, Any]:
         return await self.app.game_art_status(key)
 
     async def game_art_apply(self, key: str, game_id: int) -> dict[str, Any]:
         return await self.app.game_art_apply(key, game_id)
-
-    async def game_pause_status(self) -> dict[str, Any]:
-        return await self.app.game_pause_status()
-
-    async def game_pause(self) -> dict[str, Any]:
-        return await self.app.game_pause()
-
-    async def game_resume(self) -> dict[str, Any]:
-        return await self.app.game_resume()
-
-    async def sd_cards(self) -> list[dict[str, Any]]:
-        return await self.app.sd_cards()
-
-    async def launch_presets(self, key: str, current_options: str) -> dict[str, Any]:
-        return await self.app.launch_presets(key, current_options)
-
-    async def launch_apply(self, key: str, current_options: str, presets: list[str]) -> dict[str, Any]:
-        return await self.app.launch_apply(key, current_options, presets)
-
-    async def launch_restore(self, key: str) -> dict[str, Any]:
-        return await self.app.launch_restore(key)
-
-    async def device_battery(self) -> dict[str, Any]:
-        return await self.app.device_battery()
-
-    async def device_set_charge_limit(self, on: bool) -> dict[str, Any]:
-        return await self.app.device_set_charge_limit(on)
 
     async def replication_activity(self) -> list[dict[str, Any]]:
         return await self.app.replication_activity()
@@ -564,161 +311,17 @@ class Plugin:
     async def steam_ops_file(self, op_id: int) -> dict[str, Any]:
         return await self.app.steam_ops_file(op_id)
 
-    async def enable_steam_without_cloud(self) -> dict[str, Any]:
-        return await self.app.enable_steam_without_cloud()
-
-    async def on_suspend(self) -> dict[str, Any]:
-        return await self.app.on_suspend()
-
-    async def on_resume(self) -> dict[str, Any]:
-        return await self.app.on_resume()
-
-    async def advisor_perf_sample(self, diagnostic_b64: str) -> dict[str, Any]:
-        return await self.app.advisor_perf_sample(diagnostic_b64)
-
-    async def ludusavi_scan(self, root: str) -> dict[str, Any]:
-        return await self.app.ludusavi_scan(root)
-
-    async def ludusavi_import(self, root: str, folder: str, backup_ids: list[str], game_key: str) -> dict[str, Any]:
-        return await self.app.ludusavi_import(root, folder, backup_ids, game_key)
-
-    async def ludusavi_import_all(self, root: str, mode: str) -> dict[str, Any]:
-        return await self.app.ludusavi_import_all(root, mode)
-
-    async def ludusavi_import_cancel(self) -> dict[str, Any]:
-        return await self.app.ludusavi_import_cancel()
-
-    async def ludusavi_import_status(self) -> dict[str, Any]:
-        return await self.app.ludusavi_import_status()
-
     async def set_game_key(self, key: str, game_key: str | None, title: str | None = None) -> dict[str, Any]:
         return await self.app.set_game_key(key, game_key, title)
 
-    async def approve_match(self, key: str) -> dict[str, Any]:
-        return await self.app.approve_match(key)
-
-    async def reject_match(self, key: str) -> dict[str, Any]:
-        return await self.app.reject_match(key)
-
-    async def new_game_key(self, key: str) -> dict[str, Any]:
-        return await self.app.new_game_key(key)
-
     async def on_game_event(self, kind: str, raw_id: Any) -> dict[str, Any]:
         return await self.app.on_game_event(kind, raw_id)
-
-    async def strict_wrap(self, key: str, current_options: str) -> dict[str, Any]:
-        return await self.app.strict_wrap(key, current_options)
-
-    async def strict_unwrap(self, key: str, mode: str = "freeze") -> dict[str, Any]:
-        return await self.app.strict_unwrap(key, mode)
-
-    async def sync_pull(self, key: str) -> dict[str, Any]:
-        return await self.app.sync_pull(key)
-
-    async def storage_usage(self, key: str | None = None) -> dict[str, Any]:
-        return await self.app.storage_usage(key)
-
-    async def clear_shader_cache(self, key: str) -> dict[str, Any]:
-        return await self.app.clear_shader_cache(key)
-
-    async def reset_prefix(self, key: str) -> dict[str, Any]:
-        return await self.app.reset_prefix(key)
-
-    async def cancel_prefix_reset(self, key: str) -> dict[str, Any]:
-        return await self.app.cancel_prefix_reset(key)
-
-    async def delete_old_prefix(self, key: str) -> dict[str, Any]:
-        return await self.app.delete_old_prefix(key)
-
-    async def scrub_cloud(self, full: bool = False) -> dict[str, Any]:
-        return await self.app.scrub_cloud(full)
-
-    async def repair_snapshot(self, key: str) -> dict[str, Any]:
-        return await self.app.repair_snapshot(key)
-
-    async def export_snapshots(self, folder: str, scope: str = "latest", key: str | None = None) -> dict[str, Any]:
-        return await self.app.export_snapshots(folder, scope, key)
-
-    async def game_playtime(self, key: str) -> dict[str, Any]:
-        return await self.app.game_playtime(key)
-
-    async def bring_newer(self, key: str) -> dict[str, Any]:
-        return await self.app.bring_newer(key)
-
-    async def sync_push(self, key: str) -> dict[str, Any]:
-        return await self.app.sync_push(key)
-
-    async def resolve_conflict(self, key: str, choice: str, head: str | None = None) -> dict[str, Any]:
-        return await self.app.resolve_conflict(key, choice, head)
-
-    async def sync_status(self, key: str) -> dict[str, Any]:
-        return await self.app.sync_status(key)
-
-    async def idle_pass(self) -> list[dict[str, Any]]:
-        return await self.app.idle_pass()
-
-    async def snapshot_game(self, key: str, label: str | None = None) -> dict[str, Any]:
-        return await self.app.snapshot_game(key, label)
-
-    async def list_snapshots(self, key: str) -> dict[str, Any]:
-        return await self.app.list_snapshots(key)
-
-    async def restore_snapshot(self, key: str, snap_id: str, paths: list[str] | None = None) -> dict[str, Any]:
-        return await self.app.restore_snapshot(key, snap_id, paths)
-
-    async def restore_preview(self, key: str, snap_id: str) -> dict[str, Any]:
-        return await self.app.restore_preview(key, snap_id)
-
-    async def undo_restore(self, key: str, prerestore_id: str) -> dict[str, Any]:
-        return await self.app.undo_restore(key, prerestore_id)
-
-    async def pin_snapshot(self, key: str, snap_id: str) -> dict[str, Any]:
-        return await self.app.pin_snapshot(key, snap_id)
-
-    async def release_quarantine(self, key: str, snap_id: str, confirmed: bool) -> dict[str, Any]:
-        return await self.app.release_quarantine(key, snap_id, confirmed)
-
-    async def run_retention(self, key: str) -> dict[str, Any]:
-        return await self.app.run_retention(key)
-
-    async def qam_summary(self) -> dict[str, Any]:
-        return await self.app.qam_summary()
-
-    async def sync_now(self) -> dict[str, Any]:
-        return await self.app.sync_now()
-
-    async def list_conflicts(self) -> list[dict[str, Any]]:
-        return await self.app.list_conflicts()
-
-    async def conflict_details(self, key: str) -> dict[str, Any]:
-        return await self.app.conflict_details(key)
-
-    async def recent_history(self, limit: int = 50) -> dict[str, Any]:
-        return await self.app.recent_history(limit)
-
-    async def plan_sync(self, keys: list[str]) -> list[dict[str, Any]]:
-        return await self.app.plan_sync(keys)
-
-    async def finish_setup(self, keys: list[str]) -> dict[str, Any]:
-        return await self.app.finish_setup(keys)
-
-    async def health_checks(self, probe: bool = True) -> dict[str, Any]:
-        return await self.app.health_checks(probe)
-
-    async def game_config_sync(self, key: str) -> dict[str, Any]:
-        return await self.app.game_config_sync(key)
-
-    async def simulate_sync_job(self, seconds: int = 30) -> dict[str, Any]:
-        return await self.app.simulate_sync_job(seconds)
 
     async def get_settings(self) -> dict[str, Any]:
         return await self.app.get_settings()
 
     async def set_setting(self, key: str, value: Any) -> dict[str, Any]:
         return await self.app.set_setting(key, value)
-
-    async def activity(self, limit: int = 100) -> list[dict[str, Any]]:
-        return await self.app.activity(limit)
 
     async def get_logs(self, limit: int = 200) -> list[dict[str, Any]]:
         return await self.app.get_logs(limit)
@@ -735,14 +338,5 @@ class Plugin:
     async def https_test(self) -> dict[str, Any]:
         return await self.app.https_test()
 
-    async def signin_probe(self, action: str = "start") -> dict[str, Any]:
-        return await self.app.signin_probe(action)
-
-    async def record_probe_event(self, kind: str, payload: Any) -> int:
-        return await self.app.record_probe_event(kind, payload)
-
     async def export_diagnostics(self, frontend: dict[str, Any]) -> str:
         return await self.app.export_diagnostics(frontend)
-
-    async def freeze_test(self, appid: int, seconds: int = 5) -> dict[str, Any]:
-        return await self.app.freeze_test(appid, seconds)

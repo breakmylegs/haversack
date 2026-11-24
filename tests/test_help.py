@@ -88,7 +88,7 @@ def test_both_copies_are_written_and_checked(tmp_path: Any, monkeypatch: Any, ca
 
 def test_the_repository_help_is_in_step_with_the_guide() -> None:
     names = [os.path.relpath(t, ROOT).replace(os.sep, "/") for t in help_script.TARGETS]
-    assert names == ["src/help.ts", "desktop/src/help.ts"]  # Gaming Mode and the desktop app
+    assert names == ["src/help.ts"]  # Gaming Mode only: the desktop app went in the strip (ADR-0098)
     assert help_script.main(["--check"]) == 0
 
 
@@ -97,13 +97,11 @@ def test_the_gate_runs_the_help_check() -> None:
         assert '"scripts/help.py", "--check"' in handle.read()
 
 
-def test_the_page_is_in_the_sidebar_and_the_desktop_app() -> None:
+def test_the_page_is_in_the_sidebar() -> None:
     with open(os.path.join(ROOT, "src", "routeData.ts"), encoding="utf-8") as handle:
         assert '{ id: "help", title: "Help", about: "The user guide.", parts: [part("help", "core")] }' in handle.read()
     with open(os.path.join(ROOT, "src", "pages", "KeepsakeRoute.tsx"), encoding="utf-8") as handle:
         assert "help: () => <HelpPage />" in handle.read()
-    with open(os.path.join(ROOT, "desktop", "src", "main.ts"), encoding="utf-8") as handle:
-        assert "render: (main) => helpPage(main)" in handle.read()
     with open(os.path.join(ROOT, "src", "pages", "HelpPage.tsx"), encoding="utf-8") as handle:
         page = handle.read()
     assert "autoFocus" not in page and "preferredFocus" not in page  # no page takes focus by itself (v0.41.1)

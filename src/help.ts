@@ -25,7 +25,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "Haversack keeps your PC game saves in step between your devices: SteamOS and Bazzite handhelds, Linux PCs and Windows PCs. It stores them in your own cloud storage. It never overwrites a save without asking, and every save it replaces can be brought back."
+    "t": "Haversack installs Windows games on your SteamOS and Bazzite handhelds, from an ISO, a folder or a network share, each into its own Steam shortcut and Proton prefix. It then sends them between your handhelds when you ask, directly over your home network, and keeps them in step after a patch or a mod. Everything happens in Gaming Mode with the controller."
    },
    {
     "k": "h",
@@ -38,27 +38,11 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "Haversack's page has seven sections in its sidebar. Highlight one to see its pages, then press A to open one. On a section's page, **L1** and **R1** move between its pages, and **B** goes back to the sidebar. Each section opens where you left it."
+    "t": "Version 0.61.0 took Haversack back to installing and moving games. Save sync, Advisor, the desktop app, PC support and the device pages are gone. Your saves in the cloud are still there: install version 0.60.0 to use them (Updates)."
    },
    {
-    "k": "li",
-    "d": 0,
-    "t": "**Play:** Now playing and Advisor."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Saves:** Games, Conflicts, History, Activity, Import and export."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Games and devices:** Moving games, Other devices, Emulators."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Device:** Status, Power and battery, Fans, Controllers (with Reconnect help), Storage, Looks."
+    "k": "p",
+    "t": "Haversack's page has four sections in its sidebar. Highlight one to see its pages, then press A to open one. On a section's page, **L1** and **R1** move between its pages, and **B** goes back to the sidebar. Each section opens where you left it."
    },
    {
     "k": "li",
@@ -68,12 +52,17 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "**Settings:** General (with the quick menu's shortcuts), Cloud, Sync and safety, Modules, Updates, Help."
+    "t": "**Games and devices:** Games, Moving games, Other devices, Emulators."
    },
    {
     "k": "li",
     "d": 0,
-    "t": "**Diagnostics:** Health, Device checks, Tools, Logs."
+    "t": "**Settings:** General (with the quick menu's shortcuts), Modules, Updates, Help."
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "**Diagnostics:** Device checks, Tools, Logs."
    },
    {
     "k": "p",
@@ -81,7 +70,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "The quick access menu shows the game you are playing, games on their way between your devices, and anything that needs you. The desktop app has the same sections and pages down the left, each section opening when you click it."
+    "t": "The quick access menu shows games on their way between your devices, your chosen shortcuts, and anything that needs you."
    },
    {
     "k": "h",
@@ -89,27 +78,9 @@ export const HELP: HelpTopic[] = [
     "t": "Getting started"
    },
    {
-    "k": "p",
-    "t": "Pick the guide for your device:"
-   },
-   {
     "k": "li",
     "d": 0,
-    "t": "Handheld with Decky Loader: Steam Deck, Legion Go, ROG Ally and others, on SteamOS or Bazzite."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Linux PC: a desktop or laptop, with or without Decky."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Windows PC."
-   },
-   {
-    "k": "p",
-    "t": "Set Haversack up on one device, then on the next. Games whose saves already match link up silently. Any that differ ask you which save to keep."
+    "t": "Getting started on a handheld: Steam Deck, Legion Go, ROG Ally and others, on SteamOS or Bazzite."
    },
    {
     "k": "h",
@@ -119,47 +90,12 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "How syncing works: when Haversack checks the cloud and when it saves, on a handheld and on a PC."
+    "t": "Installing games: from an ISO, a folder or a network share, and finding artwork."
    },
    {
     "k": "li",
     "d": 0,
-    "t": "Cloud storage and sign-in: OneDrive, Google Drive, WebDAV and S3."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Conflicts, history and restoring: choosing between two saves, and going back to an older one."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Importing from Ludusavi: bring your existing backups with you."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Storage: disk use per game, clearing a shader cache, and resetting a broken prefix without losing your saves."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Your device: live readings, performance for each game, power limits, fans, battery, controllers, reconnect help, and boot and sleep animations."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Installing games: from an ISO, a folder or a network share, on a handheld."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Advisor: recommended settings for your device. It never changes anything."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Replication: sending a whole game, or an emulator game, from one device to another."
+    "t": "Replication: pairing your handhelds, sending a game or an emulator game, and keeping it in step."
    },
    {
     "k": "li",
@@ -190,16 +126,12 @@ export const HELP: HelpTopic[] = [
     "k": "li",
     "d": 0,
     "t": "What changed in each version."
-   },
-   {
-    "k": "p",
-    "t": "The screenshots show sample data, not anyone's real games or devices."
    }
   ]
  },
  {
   "id": "getting-started-handheld",
-  "title": "Handheld with Decky Loader",
+  "title": "Getting started on a handheld",
   "blocks": [
    {
     "k": "h",
@@ -231,51 +163,41 @@ export const HELP: HelpTopic[] = [
     "t": "3. After that, Haversack updates itself from its own **Settings**, **Updates** tab (Updates)."
    },
    {
-    "k": "h",
-    "l": 2,
-    "t": "2. Set it up"
-   },
-   {
     "k": "p",
-    "t": "Open Haversack from the Quick Access Menu and choose **Set up Haversack**. The wizard has five steps:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "1. **Device name.** It is shown next to this device's saves on your other devices."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "2. **Cloud.** Choose OneDrive, Google Drive, WebDAV or S3, and sign in (Cloud storage and sign-in)."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "3. **Scan games** and **review matches.** Haversack finds your Steam games and non-Steam shortcuts and looks up where each one keeps its saves. Approve any match it is not sure about."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "4. **Choose games** to sync. Steam games are listed too. Played Steam games with no Steam Cloud saves are synced automatically; ones that use Steam Cloud stay off unless you choose them, because Steam already keeps their saves."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "5. **Dry run.** See what the first sync will do for each game. Nothing changes until you confirm."
+    "t": "There is nothing to set up. Open Haversack from the Quick Access Menu and choose **Open Haversack**."
    },
    {
     "k": "h",
     "l": 2,
-    "t": "3. Play"
+    "t": "2. Install a game"
    },
    {
     "k": "p",
-    "t": "That is all. Before a game starts, Haversack checks the cloud for newer saves, pausing the game for a moment. After you quit, it saves to the cloud (How syncing works)."
+    "t": "Open **Install** and choose an ISO, a folder holding an installer, or a network share. Haversack mounts the ISO, adds a shortcut that runs the installer in the game's own Proton prefix, and turns that shortcut into the game when the installer finishes (Installing games)."
+   },
+   {
+    "k": "h",
+    "l": 2,
+    "t": "3. Send it to your other handheld"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "1. On both handhelds, open **Games and devices**, **Other devices**, and switch on **Let other devices reach this one**."
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "2. On one of them, press **Find devices**, choose the other and press **Pair**. Accept on the other handheld and type the code it shows."
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "3. Open **Games and devices**, **Games**, choose the game and press **Send to **."
    },
    {
     "k": "p",
-    "t": "The Quick Access Menu shows the current game's sync state, any conflicts, available updates and **Sync now**. **Open Haversack** opens the full view, with Games, Conflicts, History, Import saves, Install, Advisor, Settings, Updates, Logs and Diagnostics."
+    "t": "The other handheld gets the game, added to Steam with the same name, launch options, Proton version and artwork (Replication). After a patch or a mod, Haversack offers to send the update; your saves on each handheld are never replaced by one."
    },
    {
     "k": "h",
@@ -305,1356 +227,6 @@ export const HELP: HelpTopic[] = [
     "k": "li",
     "d": 0,
     "t": "**Open Haversack** is always there, last."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "In Desktop Mode"
-   },
-   {
-    "k": "p",
-    "t": "Haversack comes with a desktop app, with nothing more to install. When you switch to Desktop Mode, its icon appears in the system tray, with no window. Click it, or choose **Open Haversack** from its menu, to open Haversack in your browser; it covers the same pages as in Gaming Mode. Closing the window leaves the icon in the tray. **Quit** in the icon's menu stops it until you next log in. Haversack is also in the app menu, which brings up the one already running."
-   },
-   {
-    "k": "p",
-    "t": "If the icon's status line says Haversack's plugin cannot be reached, Decky Loader is not running in Desktop Mode: switch back to Gaming Mode once, then try again. To stop the desktop app starting, switch **Desktop** off in Settings, Modules."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Next device"
-   },
-   {
-    "k": "p",
-    "t": "Set up your next device the same way, with the same cloud account. Non-Steam games installed into their own Proton prefixes are recognised as the same game, even though their shortcut IDs and prefix folders differ on each device."
-   },
-   {
-    "k": "p",
-    "t": "Moving from Ludusavi? See Importing from Ludusavi."
-   }
-  ]
- },
- {
-  "id": "getting-started-linux-pc",
-  "title": "Linux PC",
-  "blocks": [
-   {
-    "k": "h",
-    "l": 1,
-    "t": "Getting started on a Linux PC"
-   },
-   {
-    "k": "p",
-    "t": "Haversack runs on Linux desktops and laptops. With Decky Loader in Steam's Big Picture mode, follow the handheld guide instead. Without Decky, Haversack runs as a small background program with a page in your browser, as described here."
-   },
-   {
-    "k": "p",
-    "t": "The PC version is a preview: the main screens are in place, and more follow."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "1. Install"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "1. You need Python 3.11 or newer. Most distributions already have it as python3."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "2. Download Haversack-desktop-v.zip from the latest release (github.com/breakmylegs/haversack/releases/latest) and unzip it anywhere."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "3. In that folder, run:  python3 install.pyw "
-   },
-   {
-    "k": "p",
-    "t": "Haversack installs into ~/.local/share/keepsake/app, adds itself to your app menu, starts when you sign in, and opens in your browser. It needs no administrator rights. The download is covered by the release's signature, which Haversack also checks on every update."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "To install without starting at sign-in, add --no-autostart."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "To remove Haversack, run python3 install.pyw --uninstall. Your settings and saves are kept."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "2. Set it up"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "1. Open **Cloud** and sign in (Cloud storage and sign-in). Then choose **Use... for snapshots**."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "2. Open **Games** and turn on **Sync this game** for each game you want (How syncing works)."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "3. In **Settings**, give this computer a name your other devices will show."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "What is different on a PC"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Haversack does not pause a game when it starts. Instead, it never restores a save while a game is running, and saves to the cloud a few seconds after you quit. Saves from your other devices arrive when Haversack syncs while the game is closed."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "The Installer needs Decky, so it is not available on a PC. Advisor starts switched off, because its advice is built for handhelds."
-   },
-   {
-    "k": "p",
-    "t": "Haversack keeps its settings in ~/.config/keepsake and its state and logs in ~/.local/state/keepsake."
-   }
-  ]
- },
- {
-  "id": "getting-started-windows",
-  "title": "Windows PC",
-  "blocks": [
-   {
-    "k": "h",
-    "l": 1,
-    "t": "Getting started on Windows"
-   },
-   {
-    "k": "p",
-    "t": "Haversack runs on Windows 10 and 11 as a small background program with a page in your browser. It finds Steam for Windows, its libraries and your non-Steam shortcuts. It reads your games' saves from your Windows folders. The same game's saves from a handheld's Proton prefix count as the same files, so they sync between the two."
-   },
-   {
-    "k": "p",
-    "t": "The PC version is a preview: the main screens are in place, and more follow."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "1. Install"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "1. Install Python 3.11 or newer, for example with:  winget install Python.Python.3.13 "
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "2. Download Haversack-desktop-v.zip from the latest release (github.com/breakmylegs/haversack/releases/latest) and unzip it anywhere."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "3. Double-click install.pyw in that folder."
-   },
-   {
-    "k": "p",
-    "t": "Haversack installs into %LOCALAPPDATA%\\Keepsake\\app, starts when you sign in to Windows, and opens in your browser. It needs no administrator rights. To open it later, run keepsake.pyw in that folder. The download is covered by the release's signature, which Haversack also checks on every update."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "To install without starting at sign-in, run python install.pyw --no-autostart."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "To remove Haversack, run python install.pyw --uninstall. Your settings and saves are kept."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "2. Set it up"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "1. Open **Cloud** and choose **Sign in with OneDrive** or **Sign in with Google**. Your browser opens the provider's page: sign in and allow access (Cloud storage and sign-in)."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "2. Open **Games** and turn on **Sync this game** for each game you want."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "3. In **Settings**, give this computer a name your other devices will show."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "What is different on a PC"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Haversack never restores a save while a game is running, and saves to the cloud a few seconds after you quit (How syncing works)."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "The Installer needs Decky, so it is not available on Windows. Advisor starts switched off."
-   },
-   {
-    "k": "p",
-    "t": "Haversack keeps its settings in %APPDATA%\\Keepsake and its state and logs in %LOCALAPPDATA%\\Keepsake. These folders keep Haversack's former name, so an earlier install carries on where it was."
-   }
-  ]
- },
- {
-  "id": "how-sync-works",
-  "title": "How syncing works",
-  "blocks": [
-   {
-    "k": "h",
-    "l": 1,
-    "t": "How syncing works"
-   },
-   {
-    "k": "p",
-    "t": "Haversack works with snapshots. Each time a game's saves change, Haversack records a snapshot: a copy of that game's save files, identified by their content. Snapshots go to your cloud storage and are never changed afterwards. Each snapshot remembers which one it came from, so Haversack always knows whether two devices played on from the same point."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Choosing games"
-   },
-   {
-    "k": "p",
-    "t": "Turn on **Sync this game** for each game whose saves should follow you. Haversack works out where each game keeps its saves from the Ludusavi manifest (github.com/mtkennerly/ludusavi-manifest), a community list of save locations. If a game matches more than one entry, or none, pick its save data from the list or search for it."
-   },
-   {
-    "k": "p",
-    "t": "When another device has already linked a game, Haversack asks whether this is **Same game** or **A different game**. Your answer links the two, even if the shortcuts have different names."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "On a handheld"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Before a game starts:** Haversack pauses it for a moment, checks the cloud, and puts a newer save in place if there is one. A watchdog always resumes a paused game, whatever happens. If the check takes too long or the network is down, the game simply starts with the save it has."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**After you quit:** the new save goes to the cloud."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**While no game runs:** Haversack checks for saves from your other devices every 30 minutes (change it in Settings), and when you press **Sync now**."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "On a PC"
-   },
-   {
-    "k": "p",
-    "t": "A PC cannot pause a game the way Steam on a handheld lets Haversack do, so Haversack never touches a game's saves while it runs."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Heroic, Lutris, Bottles and emulators"
-   },
-   {
-    "k": "p",
-    "t": "On a handheld or a Linux PC, **Games** also lists your Heroic (GOG and Epic), Lutris and Bottles games, and one entry for each emulator whose saves Haversack knows: RetroArch, Dolphin, PCSX2, DuckStation, PPSSPP, RPCS3 and Cemu. Use the filters **Heroic, Lutris, Bottles** and **Emulators** to find them, then turn sync on like any other game."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Haversack cannot see these games start, so it saves after you play and brings in newer saves from your other devices in the background. It only does so while the game or emulator is closed, and only when you have not played on since. Otherwise it asks you."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Emulator entries sync battery and memory-card saves. **Include save states** on the game page adds save states too. They are off by default, because a save state often does not load in another version of the emulator."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Heroic can sync GOG and Epic saves itself. Use either Heroic's sync or Haversack's for a game, not both."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Settings, Show other launchers** turns these entries off."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Newer save from another device"
-   },
-   {
-    "k": "p",
-    "t": "When another device has saved a game since this one last synced it, the game's row, the Quick Access Menu and the PC Overview say so: \"Newer save from Handheld B, 10 minutes ago\". On a handheld it is brought in automatically when you start the game. **Get it now** on the game's row brings it in straight away, on a handheld or a PC. It only does so when you have not played on since; otherwise it tells you there is a conflict, and nothing is replaced."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Playtime"
-   },
-   {
-    "k": "p",
-    "t": "Each game's page shows how long you have played it across your devices, for example \"Played 12 h 30 min on your devices\", with the time on each one. Sessions under a minute and over a day are not counted. Playtime is shown for your information only, and never decides which save is kept."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "A game's launch options"
-   },
-   {
-    "k": "p",
-    "t": "A game's page in **Saves**, **Games** has **Launch options**, with switches for Proton's own settings:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Write a Proton log** (PROTON_LOG=1), saved as steam-.log in your home folder;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Use WineD3D instead of DXVK**, for graphics problems;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Turn off fsync**, and **Turn off esync** on Proton before version 11, for games that hang;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Short OpenGL extension list**, for old games that crash at start."
-   },
-   {
-    "k": "p",
-    "t": "Haversack keeps the rest of the launch options exactly as they were, and changes them only through Steam when you press a switch. The first time, it keeps a copy of the options as they were, so **Put back original** restores them exactly. A game that uses the strict launch gate keeps its launch options for the gate: turn the gate off first."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "What Haversack will never do"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Overwrite a save without asking.** When both devices have new progress, you choose (Conflicts, history and restoring)."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Lose the save it replaces.** Before any save file is replaced, a snapshot of the current one is taken and checked, so every restore can be undone."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Let timestamps pick a winner.** Clocks on different devices disagree. Haversack compares content and history, and shows times only for your information."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Upload a save that looks broken.** If a sync would remove more than half of a game's save files, or shrink them by more than 70 percent, Haversack keeps that snapshot on the device, marks it as held back, and asks you."
-   }
-  ]
- },
- {
-  "id": "cloud",
-  "title": "Cloud storage and sign-in",
-  "blocks": [
-   {
-    "k": "h",
-    "l": 1,
-    "t": "Cloud storage and sign-in"
-   },
-   {
-    "k": "p",
-    "t": "Haversack stores snapshots in your own cloud storage. There is no Haversack server."
-   },
-   {
-    "k": "row",
-    "t": "Service  |  What Haversack can see"
-   },
-   {
-    "k": "row",
-    "t": "OneDrive (personal Microsoft account)  |  Only the Apps/Keepsake folder in your OneDrive, never your other files. It keeps Haversack's former name, so every device, updated or not, uses the same folder."
-   },
-   {
-    "k": "row",
-    "t": "Google Drive  |  Only Haversack's own hidden app folder, never your files"
-   },
-   {
-    "k": "row",
-    "t": "WebDAV, for example Nextcloud  |  The folder you give it"
-   },
-   {
-    "k": "row",
-    "t": "S3 or an S3-compatible service  |  The bucket and folder you give it"
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Signing in to OneDrive or Google Drive"
-   },
-   {
-    "k": "p",
-    "t": "Choose **Sign in with OneDrive** or **Sign in with Google**. A browser opens the provider's own page. Sign in with your normal account and allow access for Haversack. From then on Haversack keeps itself signed in. You are only asked again if you, or the provider, withdraw its access."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**On a PC:** your usual browser opens in a new tab."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**On a handheld in Gaming Mode:** Steam's browser opens where the provider allows it. Google does not allow sign-in inside Steam's browser, so Google shows a code and a QR code instead: scan it with your phone, sign in there and enter the code. A switch lets you choose the browser or your phone for each service. If a browser sign-in does not finish, **Use your phone instead** is one press away."
-   },
-   {
-    "k": "p",
-    "t": "Check that the page is on microsoft.com, live.com or google.com and names Haversack before you sign in."
-   },
-   {
-    "k": "p",
-    "t": "Each device signs in for itself. You can sign one device out, at the provider or with **Sign out** in Haversack, without affecting the others."
-   },
-   {
-    "k": "h",
-    "l": 3,
-    "t": "Using your own app registration"
-   },
-   {
-    "k": "p",
-    "t": "From version 0.26.0, Haversack includes its own sign-in, so most people never need this. Version 0.25.0 and earlier need your own app registration. Under **Advanced: use my own client ID** you can use your own Microsoft or Google app registration instead of Haversack's: see setting up Microsoft Entra and setting up Google."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "WebDAV and S3"
-   },
-   {
-    "k": "p",
-    "t": "Enter the address, user name and password (or access keys) on the Cloud page in Gaming Mode. The server must refuse to overwrite existing files, which Haversack checks before using it. See WebDAV and S3 set-up."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Directly between my devices (no cloud account)"
-   },
-   {
-    "k": "p",
-    "t": "If you would rather not use a cloud account, your devices can keep your saves in step with each other directly."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "1. Switch on **Replication** in Settings, **Modules**, and pair your devices in **Other devices**. See Replication."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "2. On each device, open the Cloud page, choose **Directly between my devices**, and press **Use Directly between my devices for snapshots**."
-   },
-   {
-    "k": "p",
-    "t": "Each device then keeps its own copy of your saves' history. When your devices can reach each other, each one fetches what it is missing:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "before a game starts;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "when the other device has just saved;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "now and then while Haversack is idle;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "whenever you press **Sync now**."
-   },
-   {
-    "k": "p",
-    "t": "If the other device is off or away, you play on with the saves this device has, and they meet the next time both are on. If you played on both in between, Haversack shows a conflict and you choose, as with a cloud store."
-   },
-   {
-    "k": "p",
-    "t": "There is no copy away from your devices. If you lose all of them, the history goes too. A cloud store gives you that off-site copy."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Choosing where snapshots go"
-   },
-   {
-    "k": "p",
-    "t": "After signing in, choose **Add... as a save location**. Haversack tests the connection first. Until you add one, snapshots stay in a test store on the device."
-   },
-   {
-    "k": "p",
-    "t": "You can use several save locations at once, for example OneDrive, directly between your devices, and a NAS over WebDAV. Every snapshot goes to each of them, so you have extra copies:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "If one location cannot be reached, the others still get the snapshot, and that location is caught up later by itself. A location that is down never stops you playing."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "When a game starts, Haversack looks at what all of them hold together."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "The Cloud page lists each location with when it was last reached, how much is still to copy to it, and the space it uses. **Remove** stops using a location; nothing stored there is deleted."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "On a game's page, **Save locations for this game** lets that game use only some of them."
-   }
-  ]
- },
- {
-  "id": "conflicts-and-history",
-  "title": "Conflicts, history and restoring",
-  "blocks": [
-   {
-    "k": "h",
-    "l": 1,
-    "t": "Conflicts, history and restoring"
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Conflicts"
-   },
-   {
-    "k": "p",
-    "t": "A conflict means a game's saves changed on two devices since they last agreed. For example, you played on your handheld on the train while your PC was offline, then played on the PC too. Haversack cannot know which progress you want, so it asks."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "1. Open **Conflicts** and choose **Compare and choose**."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "2. Haversack shows each side: the device, when its save last changed, how many files and the size. It also lists each file that is new, gone or changed on that side since the two devices last agreed. Haversack never picks for you by date, unless you turn on Take the newest (below)."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "3. Choose **Keep this device's save** or **Use the save from...**, then press again to confirm. Or choose **Decide later**."
-   },
-   {
-    "k": "p",
-    "t": "The save you do not choose is kept in History and pinned, so you can always go back to it. Until you choose, Haversack does not sync that game, and the game stays playable with the save it has."
-   },
-   {
-    "k": "h",
-    "l": 3,
-    "t": "Take the newest instead"
-   },
-   {
-    "k": "p",
-    "t": "If you would rather not be asked, set **Settings**, **Sync and safety**, **When saves differ** to **Take the newest**. Haversack then keeps the newer version by itself, but only when it can be sure:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "exactly two versions differ;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "they are at least 2 minutes apart;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "no device's clock looks wrong."
-   },
-   {
-    "k": "p",
-    "t": "If it cannot be sure, it asks you as before and says why. The version it did not keep stays pinned in the game's History, where **Undo** brings it back."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "History"
-   },
-   {
-    "k": "p",
-    "t": "Every snapshot of every game is listed in **History**, newest first, with the device it came from."
-   },
-   {
-    "k": "p",
-    "t": "On a handheld, open a game in **Games** to see its snapshots and:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Restore** an older snapshot. Haversack first takes a snapshot of the current save, so you can undo the restore."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Restore some files**: see what restoring that snapshot would change, file by file, and restore only the files you choose. Every other file stays as it is, and this can be undone too."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Save checkpoint**: keep a named copy of the current save, for example \"Before the final boss\". Checkpoints are pinned, so they are kept until you remove them. While you play, **Save checkpoint** is also in the Quick Access Menu. Save in the game first."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Undo restore** to go back to the save you had before."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Pin** a snapshot so it is never cleaned up."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Release** a held-back snapshot after checking it, so it can be uploaded."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Activity"
-   },
-   {
-    "k": "p",
-    "t": "**Activity** lists what Haversack did, newest first, in plain words: saves sent to the cloud, saves brought in from your other devices, checkpoints, restores and anything that needs your choice. The detailed log stays in **Logs**."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Checking the cloud copies"
-   },
-   {
-    "k": "p",
-    "t": "Once a week, Haversack checks that the cloud copies of each game's important snapshots are intact: the newest ones, the pinned ones, and the ones each device synced from. **Check cloud integrity** in Diagnostics (handheld) or on the Health page (PC) checks every snapshot at once. If a copy is damaged or missing, Health says so and the game's History offers **Repair**, which saves a fresh copy of your current save. Your save on the device is never affected."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Exporting your saves"
-   },
-   {
-    "k": "p",
-    "t": "You can take your saves out of Haversack at any time. In **Saves**, **Import and export**, **Export snapshots** copies them as plain zip files to a folder you choose, such as an SD card or a USB drive: either the latest snapshot of each game, or every snapshot. The export folder also holds a list of what each zip contains, and a short note explaining the folder names inside the zips. Nothing already in that folder is overwritten."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Clean-up"
-   },
-   {
-    "k": "p",
-    "t": "Haversack thins out old snapshots over time. It always keeps:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "the last 10 automatic snapshots;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "one a day for 30 days;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "one a month for 12 months."
-   },
-   {
-    "k": "p",
-    "t": "It never removes:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "a pinned snapshot, including the save you did not choose in a conflict;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "the newest snapshot of each game, and the point each device last synced from;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "anything younger than 7 days;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "snapshots you made by hand, merges, and imported backups."
-   },
-   {
-    "k": "p",
-    "t": "Only the saved files of an old snapshot are removed. A small record of it stays, so Haversack can still follow each save's history."
-   }
-  ]
- },
- {
-  "id": "import-ludusavi",
-  "title": "Importing from Ludusavi",
-  "blocks": [
-   {
-    "k": "h",
-    "l": 1,
-    "t": "Importing from Ludusavi"
-   },
-   {
-    "k": "p",
-    "t": "If you used Ludusavi (github.com/mtkennerly/ludusavi) before, Haversack can bring its backups into Haversack's history, so nothing from before is lost. Your Ludusavi backups are only read, never changed."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "1. Open **Saves**, **Import and export** (handheld) or **Import** (PC)."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "2. Enter the folder of your Ludusavi backups (~/ludusavi-backup by default) and choose **Find backups**."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "3. Haversack lists each game with the number of backups it found."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "4. Choose **Import the latest backup of each game**, or **Import every backup** to bring the whole history."
-   },
-   {
-    "k": "p",
-    "t": "The import runs in the background with progress, and **Stop importing** stops it between games. Importing the same backup twice does nothing the second time."
-   },
-   {
-    "k": "p",
-    "t": "Imported snapshots appear in History like any other. They do not change the saves on your device: Haversack treats them as history to restore from when you want."
-   },
-   {
-    "k": "p",
-    "t": "Moving over from a Ludusavi and rclone setup on two handhelds? The step-by-step plan is in the cutover guide."
-   }
-  ]
- },
- {
-  "id": "storage",
-  "title": "Storage",
-  "blocks": [
-   {
-    "k": "h",
-    "l": 1,
-    "t": "Storage"
-   },
-   {
-    "k": "p",
-    "t": "Haversack's **Storage** page (in **Device**), on a handheld, shows how much space each game uses: the game, its Proton prefix, its shader cache and its saves. **Count disk use** lists the biggest first. Quit a game before changing anything here."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Clear the shader cache"
-   },
-   {
-    "k": "p",
-    "t": "**Clear shader cache** frees the space Steam uses for a game's compiled shaders. Steam builds them again the next time the game runs, so the first minutes may stutter. Your saves are not touched."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Reset a broken prefix and keep your saves"
-   },
-   {
-    "k": "p",
-    "t": "When a game stops starting because its Proton prefix is broken, **Reset prefix, keep saves** gives it a fresh one without losing your progress:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "1. Haversack keeps a checked copy of the game's saves, then moves the prefix aside. Nothing is deleted."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "2. Start the game once and quit at the title screen. Steam builds a fresh prefix."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "3. When you quit, Haversack puts your saves back into the fresh prefix."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "4. Once the game works, **Delete old prefix** frees the space of the old one."
-   },
-   {
-    "k": "p",
-    "t": "Until step 3, **Undo reset** puts the old prefix back exactly as it was. Haversack will not reset a game that is installed inside its own prefix, because that would move the game itself."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "What is on each SD card"
-   },
-   {
-    "k": "p",
-    "t": "Below the games, **SD cards and drives** lists every card and drive Steam knows, and the games on each, even when the card is not in the device. Cards in the device come first. A card that is out shows when Haversack last saw it."
-   },
-   {
-    "k": "p",
-    "t": "Steam games are listed by name. Non-Steam games are listed when their program is on the card. Haversack only reads this, and the card names never leave your device."
-   }
-  ]
- },
- {
-  "id": "device",
-  "title": "Your device",
-  "blocks": [
-   {
-    "k": "h",
-    "l": 1,
-    "t": "Your device"
-   },
-   {
-    "k": "p",
-    "t": "Haversack's **Device** section shows your handheld, and lets you choose its performance for each game. It is built for the Legion Go and Legion Go 2, and works on any SteamOS or Bazzite device where Valve's steamos-manager runs."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Status"
-   },
-   {
-    "k": "p",
-    "t": "**Device**, **Status** shows:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "the model Haversack recognised;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "its power range and screen;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "the battery and charging;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "live readings, every 2 seconds:"
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "temperatures;"
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "fan speed;"
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "power;"
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "Lenovo's performance mode;"
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "the BIOS version;"
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "CPU boost and threads."
-   },
-   {
-    "k": "p",
-    "t": "Haversack only reads these."
-   },
-   {
-    "k": "h",
-    "l": 3,
-    "t": "More device settings"
-   },
-   {
-    "k": "p",
-    "t": "**Device**, **Status** has:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Wi-Fi power saving**, through steamos-manager. Turn it off if streaming or online games stutter."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**A BIOS check**, with what is known about your Legion Go's BIOS version."
-   },
-   {
-    "k": "p",
-    "t": "Refresh rate, frame limit and brightness stay in Steam's own quick access menu."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Power and battery"
-   },
-   {
-    "k": "p",
-    "t": "**Device**, **Power and battery** has:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Mode:** Quiet, Balanced, Performance or Custom. On the Legion Go these are the same modes as Legion L + Y."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**TDP:** the power limit in watts. Setting it switches to Custom, the only mode where the firmware uses it."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**CPU boost:** on or off."
-   },
-   {
-    "k": "p",
-    "t": "While a game runs, what you choose is kept for that game and applied each time you start it. When you quit, Haversack puts back what was there before. The same controls are in the quick access menu, under **Now playing**."
-   },
-   {
-    "k": "p",
-    "t": "Haversack never fights another tool:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "If SimpleDeckyTDP, PowerControl, LegionGo2Companion, Legion Go Toolbox, Legion Center or Handheld Daemon manages performance, Haversack only shows the settings, and says which tool is in charge."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "If Steam's own performance settings change something Haversack set, Haversack leaves Steam's value until you next start the game."
-   },
-   {
-    "k": "p",
-    "t": "Haversack changes these settings through Valve's steamos-manager, and never needs root."
-   },
-   {
-    "k": "h",
-    "l": 3,
-    "t": "Separate power limits"
-   },
-   {
-    "k": "p",
-    "t": "With the Haversack Helper installed, **Device**, **Power and battery** also has **Separate power limits**:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**SPL** is the sustained power;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**SPPT** is the slow boost;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**FPPT** is the fast boost."
-   },
-   {
-    "k": "p",
-    "t": "Move the sliders, then select **Apply**. Haversack switches to Custom mode first, because the firmware ignores the limits in any other mode. With a game running, the limits are kept for that game, like the TDP."
-   },
-   {
-    "k": "h",
-    "l": 3,
-    "t": "Battery"
-   },
-   {
-    "k": "p",
-    "t": "**Device**, **Power and battery** has **Stop charging at 80%**, Lenovo's charge limit. It keeps the battery healthier if the device is plugged in for long spells. The same toggle is in the quick access menu."
-   },
-   {
-    "k": "p",
-    "t": "Haversack changes it through Valve's steamos-manager. Where steamos-manager does not offer it yet, Battery shows whether the limit is on and tells you where to change it: Steam's settings, Power."
-   },
-   {
-    "k": "h",
-    "l": 3,
-    "t": "Pausing a game"
-   },
-   {
-    "k": "p",
-    "t": "While a game runs, the quick access menu's **Now playing** has **Pause game**. The game stops where it is, and the rest of Steam keeps working. **Resume game** lets it carry on."
-   },
-   {
-    "k": "p",
-    "t": "A paused game always carries on by itself:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "after an hour;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "when Haversack stops or you switch off Device in Settings, Modules;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "the next time Haversack starts, if the device was restarted while the game was paused."
-   },
-   {
-    "k": "p",
-    "t": "Haversack never pauses a game while it is checking that game's saves."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Fans"
-   },
-   {
-    "k": "p",
-    "t": "**Device**, **Fans** shows the temperature and fan speed. With the Haversack Helper installed:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Legion Go 2:**"
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "Switch on **Haversack controls the fan**, then edit a curve: each point is a temperature and a fan speed."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "Save it, make it the default, or use it in the current performance mode or for the game you are playing."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "**Smooth curve** blends between points; off, each point's speed holds until the next."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "The fan speeds up at once and slows down gently. At 101 °C it runs at full speed whatever the curve says."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "If Haversack stops, the fan goes back to the firmware within seconds. **Hand back** does it straight away."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "On a BIOS other than RRCN16WW with EC 1.16, run **the fan test** first. It takes about 15 seconds."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "**Unlock wider limits** lets curves reach 5200 RPM. It is off by default, because it is louder and wears the fan more."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Legion Go:**"
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "**Full fan speed** (kernel 7.2 and later)."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "The Legion Go's own fan table needs a kernel module SteamOS does not include, so curves are not offered yet."
-   },
-   {
-    "k": "p",
-    "t": "If another fan tool is installed (or Handheld Daemon is running), Haversack only shows the readings."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Controllers"
-   },
-   {
-    "k": "p",
-    "t": "**Device**, **Controllers** shows each controller's battery, the settings the controllers report, and the stick lights. Remap buttons, set dead zones and use the gyro in Steam's controller settings."
-   },
-   {
-    "k": "p",
-    "t": "With the Haversack Helper installed, you can also change:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**the controllers' own settings:** mode, button chords, rumble and its style, FPS mouse DPI, how soon each controller sleeps, the left gyro, the touchpad and its haptics;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**the stick lights:** on or off, effect, brightness, speed and colour (select **Apply colour**)."
-   },
-   {
-    "k": "p",
-    "t": "Leave **Keep my changes** on, and Haversack applies them again when the controllers reconnect or the device wakes. This needs kernel 7.1 or later; on the Legion Go it also needs Lenovo's 2025 controller firmware. If Handheld Daemon is running, Haversack only shows the settings. If InputPlumber is installed, it keeps the button chords and touchpad haptics."
-   },
-   {
-    "k": "p",
-    "t": "The power LED cannot be changed: every known way needs a kernel module or memory access that Haversack will not use."
-   },
-   {
-    "k": "h",
-    "l": 3,
-    "t": "Reconnect help"
-   },
-   {
-    "k": "p",
-    "t": "**Device**, **Controllers**, **Reconnect help** is for Bluetooth controllers, often clones, that pair once and then will not reconnect when you press their normal button."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "1. Pair the controller in Steam's Bluetooth settings."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "2. Find it in the list and turn on help for it. Help acts only on the controllers you turn it on for."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "3. Select **Help options**:"
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "**Pair and commit** (on by default): the next time you pair this controller, Haversack connects to it at once, so that it saves the pairing. Forget it and pair it again after turning help on."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "**Reconnect**: put the controller in pairing mode (on a DualShock 4, hold Share and PS until the light flashes quickly), then select Reconnect. This is also in the quick menu."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "**Diagnose**: turn the controller off, wait 10 seconds, select **Start** and press the controller's normal button once. Haversack says what went wrong and what to try."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "**Read stored host over USB** (DualShock 4 on a USB data cable): whether the controller will call this handheld."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "**Export report bundle**: the last diagnosis and the Bluetooth journal lines in a zip, to share on an issue. This handheld's address is replaced."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "**Full report mode** (DualShock 4 only): for clones that send reduced reports, such as a missing touchpad or motion."
-   },
-   {
-    "k": "p",
-    "t": "The desktop app has the same page under Device, Controllers, Reconnect help. Install the Haversack Helper from Gaming Mode."
-   },
-   {
-    "k": "p",
-    "t": "The list also shows a note when a controller's address is not from a registered manufacturer. That is only information: Haversack never acts on it."
-   },
-   {
-    "k": "p",
-    "t": "If a controller connects and drops at once, Haversack suggests a diagnosis. It does nothing to the controller unless you choose."
-   },
-   {
-    "k": "h",
-    "l": 4,
-    "t": "The Haversack Helper: cable pairing and the SSP gate"
-   },
-   {
-    "k": "p",
-    "t": "The lasting fixes need root, so they run in a small separate plugin, the **Haversack Helper**. Select **Install helper** at the top of Reconnect help. Haversack checks the helper's signature, and Decky asks you to confirm. After each Haversack update, select **Update helper**."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Cable pairing** (DualShock 4 and clones using its IDs):"
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "1. Connect the controller with a USB data cable."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "2. Open its Help options and select **Cable pair**, then **Confirm**. Bluetooth restarts, so every Bluetooth device drops for a few seconds. It never runs during a game."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "3. Unplug the controller, turn it off, and press PS. If it still fails, try once more with **Reversed key order**. **Restore backup** puts back the pairing from before."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**SSP gate:** offered when the diagnosis says the controller is refused while security starts. It lowers Bluetooth security for the whole adapter, so it asks twice. Secure Simple Pairing comes back on while you pair, when you switch the gate off, and by itself if Haversack stops."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Bluetooth capture:** with the helper, Diagnose also records 40 seconds of Bluetooth traffic, to tell the causes apart."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Storage"
-   },
-   {
-    "k": "p",
-    "t": "**Device**, **Storage** shows the disk space each game uses, clears a shader cache and resets a broken prefix without losing your saves: see Storage."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Looks"
-   },
-   {
-    "k": "p",
-    "t": "**Device**, **Looks** changes the videos Steam plays when the device starts and when it goes to sleep. First switch on **Looks** in **Settings**, **Modules**."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "1. Put WebM videos in your **Videos** or **Downloads** folder. Animation Changer's sets are offered too."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "2. For **Boot**, **Sleep** or **Sleep from the loading screen**, choose a video. It shows the next time the device starts or sleeps."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "3. **Use Steam's own** goes back."
-   },
-   {
-    "k": "p",
-    "t": "Nothing is lost:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "If a video was already there, Haversack keeps a copy first, and **Use Steam's own** puts that one back."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "Haversack never removes a video another tool put there."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "While Animation Changer is installed, Haversack only shows the videos and leaves them to it."
-   },
-   {
-    "k": "p",
-    "t": "The page also lists the themes and sound packs that **CSS Loader** and **Audio Loader** have installed. Haversack does not change themes or sounds itself; install those plugins from Decky's store."
-   },
-   {
-    "k": "h",
-    "l": 3,
-    "t": "Sending looks to your other handheld"
-   },
-   {
-    "k": "p",
-    "t": "With Replication on and your handhelds paired, **Send to your other handheld** at the bottom of Looks sends any of:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "your CSS Loader themes;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "your Audio Loader sound packs;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "the animations you chose above."
-   },
-   {
-    "k": "p",
-    "t": "The other handheld keeps everything it already has. Only themes and packs it lacks are added, where CSS Loader and Audio Loader find them. Videos arrive as choices on its own Looks page, so its screen only changes when someone picks one there. The other handheld needs Looks switched on, and Haversack 0.55.0 or later."
    }
   ]
  },
@@ -1669,7 +241,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "On a handheld, Haversack's **Install** page installs a Windows game into its own Steam shortcut and Proton prefix, all from Gaming Mode. It needs Decky, so it is not available on a PC."
+    "t": "Haversack's **Install** page installs a Windows game into its own Steam shortcut and Proton prefix, all from Gaming Mode."
    },
    {
     "k": "p",
@@ -1708,7 +280,7 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "6. The same shortcut now starts the game, keeps its prefix, and is named after the game. Haversack offers to sync its saves."
+    "t": "6. The same shortcut now starts the game, keeps its prefix, and is named after the game. **Open in Games** takes you to it, to send it to your other handheld or find its artwork."
    },
    {
     "k": "p",
@@ -1793,7 +365,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "Any non-Steam game's page in **Saves**, **Games** has **Artwork** when the game is missing a cover, a wide cover, a background or a logo. Press **Find artwork** and pick the game on SteamGridDB. Haversack adds only the kinds the game has none of, through Steam, so artwork you or another tool set is never replaced. It uses the same SteamGridDB key as installed games."
+    "t": "Any non-Steam game in **Games and devices**, **Games** has **Artwork** when the game is missing a cover, a wide cover, a background or a logo. Press **Find artwork** and pick the game on SteamGridDB. Haversack adds only the kinds the game has none of, through Steam, so artwork you or another tool set is never replaced. It uses the same SteamGridDB key as installed games."
    },
    {
     "k": "h",
@@ -1803,137 +375,6 @@ export const HELP: HelpTopic[] = [
    {
     "k": "p",
     "t": "Steam lists non-Steam games installed on your other devices as streaming tiles, with no artwork. At the bottom of **Install**, **Artwork for streaming tiles** lists them. Press **Find artwork**, pick the game on SteamGridDB (your SteamGridDB key, set up as for installed games), and Haversack sets the tile's artwork through Steam."
-   }
-  ]
- },
- {
-  "id": "advisor",
-  "title": "Advisor",
-  "blocks": [
-   {
-    "k": "h",
-    "l": 1,
-    "t": "Advisor"
-   },
-   {
-    "k": "p",
-    "t": "Advisor recommends settings for the game you are playing or have selected, tuned to your device. **It never changes anything.** It shows advice, says where each piece came from and how sure it is, and lets you copy launch options."
-   },
-   {
-    "k": "p",
-    "t": "It is on by default on a handheld. On a PC it starts switched off, because its advice is built for handhelds. Turn it on under **Modules**."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "What it recommends"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Power:** the TDP to set, in the terms of the tool you use."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Display:** the refresh rate and frame cap, with VRR where your screen has it."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Scaling:** the game's own upscaler first, then the gamescope filter. Frame generation (lsfg-vk) only when the base frame rate is high enough."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**The game's own preset**, plus the Proton version and launch options."
-   },
-   {
-    "k": "p",
-    "t": "On a machine without a battery, such as a Steam Machine or a desktop, Advisor leaves out battery estimates. If it has no profile for the machine, it suggests no TDP, because the machine's power limits are unknown."
-   },
-   {
-    "k": "p",
-    "t": "Advisor recognises your device from its hardware (for example the Legion Go and Legion Go 2) and the tools you have installed, such as TDP tools, lsfg-vk and OptiScaler. It only reads them."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "How your games ran on this device"
-   },
-   {
-    "k": "p",
-    "t": "While you play, Advisor quietly measures how the game runs on this device: frame rate, power use, battery drain, CPU and GPU load, clocks, temperatures and whether it throttled, along with the TDP and Proton version you used. There is nothing to set up, and it only reads what the system already reports; it never changes the game. After you quit, the game's Advisor page shows a **Last session** card and your **Recent sessions**, even when the game is not running."
-   },
-   {
-    "k": "p",
-    "t": "These measurements feed the advice, marked \"Measured on this device\", and they count for more than community reports. For example: the frame rate dropped well under your frame cap, so lower the cap or raise the TDP; the GPU was flat out while the CPU idled, so lower the resolution or use FSR; you got the same frame rate at a lower TDP, so save the battery; or it throttled after 20 minutes."
-   },
-   {
-    "k": "p",
-    "t": "The frame rate comes from Steam's own performance overlay, or from MangoHud's logs if you already log with MangoHud. If neither is available, the card says \"frame rate not available\" and everything else is still measured. Only a summary of each session is kept, the last 20 per game, on this device only. If you ask for an AI explanation, only plain numbers from them are sent, never names, paths or launch options."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Where its advice comes from"
-   },
-   {
-    "k": "p",
-    "t": "Each source can be switched off, and each is contacted only while it is on:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Deck Verified** community reports, from deckverified.games."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**PCGamingWiki**, using your own PCGamingWiki bot password."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**ProtonDB** reports, from Haversack's own monthly index. Games are looked up on your device, so no game is named to anyone. While this source is on, Haversack's badge on a Steam game's page in your library also shows how many ProtonDB reports say the game works."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Are We Anti-Cheat Yet**, to warn about games whose anti-cheat blocks Proton."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Optional AI explanations"
-   },
-   {
-    "k": "p",
-    "t": "If you add your own Anthropic, OpenAI or Google Gemini API key and turn that provider on, Advisor can explain its advice in plain words. A request carries only:"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "the game's title;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "your device's hardware profile;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "your tool versions;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "the settings being discussed."
-   },
-   {
-    "k": "p",
-    "t": "Nothing else is sent, and nothing is sent until you press the button. Without a key, Advisor gives the same advice from its own rules."
    }
   ]
  },
@@ -1948,7 +389,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "Replication links your own devices directly: handhelds, Linux PCs and Windows PCs. It pairs them, then sends non-Steam games between them: a game you set up on one handheld appears on the other, playable, with the same Proton version, artwork and launch options."
+    "t": "Replication links your own handhelds directly. It pairs them, then sends non-Steam games between them: a game you set up on one handheld appears on the other, playable, with the same Proton version, artwork and launch options."
    },
    {
     "k": "h",
@@ -1958,7 +399,7 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "1. Open Haversack, then **Settings**, then **Modules**, and switch on **Replication**. **Games and devices** then has **Moving games** and **Other devices**. On a PC, it is the **Moving games and devices** page."
+    "t": "1. Replication is on from the start. If you switched it off, open **Settings**, **Modules** and switch on **Replication**. **Games and devices** has **Moving games** and **Other devices**."
    },
    {
     "k": "li",
@@ -2009,7 +450,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "Each device you pair is linked to every other one you pair, so a group such as two handhelds and a PC works."
+    "t": "Each device you pair is linked to every other one you pair, so a group of three handhelds works."
    },
    {
     "k": "h",
@@ -2024,7 +465,7 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "**Wake** sends a Wake-on-LAN signal. It usually wakes a PC on a cable. A handheld asleep on Wi-Fi usually cannot be woken this way."
+    "t": "**Wake** sends a Wake-on-LAN signal. A handheld asleep on Wi-Fi usually cannot be woken this way, but one on a dock's cable often can."
    },
    {
     "k": "li",
@@ -2039,7 +480,7 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "1. On the device that has the game, open it in **Saves**, **Games** and press **Send to **."
+    "t": "1. On the device that has the game, open it in **Games and devices**, **Games** and press **Send to **."
    },
    {
     "k": "li",
@@ -2050,11 +491,6 @@ export const HELP: HelpTopic[] = [
     "k": "li",
     "d": 1,
     "t": "It then checks every file, which takes a few minutes for a large game."
-   },
-   {
-    "k": "li",
-    "d": 1,
-    "t": "If Saves syncs the game, the newest saves go first."
    },
    {
     "k": "li",
@@ -2074,7 +510,7 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "3. Haversack copies the game, adds it to Steam with the same name, program, launch options, Proton version and artwork, and says when it is ready. If Saves synced the game, it carries on with the same saves, with no conflict."
+    "t": "3. Haversack copies the game, adds it to Steam with the same name, program, launch options, Proton version and artwork, and says when it is ready. The first copy includes the game's saves, so you carry on where you left off."
    },
    {
     "k": "h",
@@ -2113,12 +549,7 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "as a short line in the quick access menu;"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "in the desktop app's table."
+    "t": "as a short line in the quick access menu."
    },
    {
     "k": "p",
@@ -2227,7 +658,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "Your saves and settings on each device are never replaced by an update, whichever you choose. Saves looks after them."
+    "t": "Your saves and settings on each device are never replaced by an update, whichever you choose. Haversack finds them from the Ludusavi game database and leaves them out of every update."
    },
    {
     "k": "h",
@@ -2236,17 +667,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "Haversack never changes your firewall. **Diagnostics**, **Health** says what to allow, if anything: TCP 47110 and UDP 5353."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "On Windows, allow Python on private networks when Windows asks."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "On Bazzite, the default settings already allow it."
+    "t": "Haversack never changes your firewall. **Diagnostics**, **Device checks** says what to allow, if anything: TCP 47110 and UDP 5353. On Bazzite, the default settings already allow it."
    },
    {
     "k": "h",
@@ -2291,7 +712,7 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "**Saves stay with Saves.** Replication never touches save files. Haversack's save sync looks after them."
+    "t": "**Saves copied once.** The first copy of a game includes its saves. After that, no update ever replaces a save or settings file on either device."
    },
    {
     "k": "h",
@@ -2377,32 +798,31 @@ export const HELP: HelpTopic[] = [
     "t": "After an update, Haversack shows **What's new** once, from that version's release notes."
    },
    {
+    "k": "p",
+    "t": "Updates never change your settings, your games or your saves."
+   },
+   {
     "k": "h",
     "l": 2,
-    "t": "On a PC"
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "1. Open **Updates** and choose **Check for updates**."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "2. Choose **Install** for the new version. It is installed beside the one you are running."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "3. Choose **Restart Haversack now**. Haversack opens again in a new tab, on the new version."
+    "t": "Going back to a version with save sync"
    },
    {
     "k": "p",
-    "t": "The version you had is kept. **Go back to...**, then a restart, returns to it."
+    "t": "Version 0.61.0 removed save sync, Advisor, the desktop app, PC support and the device pages, so Haversack only installs and moves games. Nothing was deleted:"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "your snapshots stay in your cloud storage, in the same folder;"
+   },
+   {
+    "k": "li",
+    "d": 0,
+    "t": "your sign-ins, game list and history stay in Haversack's settings folder on each device."
    },
    {
     "k": "p",
-    "t": "Updates never change your settings, your saves or whether Haversack starts when you sign in."
+    "t": "To use them again, open **Settings**, **Updates**, and install version 0.60.0 from the list of earlier versions. Everything is where you left it. Version 0.60.0 still tells you about later versions; installing one removes save sync again, without deleting anything."
    },
    {
     "k": "h",
@@ -2424,11 +844,6 @@ export const HELP: HelpTopic[] = [
     "t": "2. Press **Remove the old Keepsake** and confirm. Haversack removes Keepsake (and Keepsake Helper, if you had it), copies your settings, sign-ins, games and history across, checks every file, and starts."
    },
    {
-    "k": "li",
-    "d": 0,
-    "t": "3. If you use the helper, install Haversack Helper from **Device**, **Controllers**, **Reconnect help**."
-   },
-   {
     "k": "p",
     "t": "Nothing is lost:"
    },
@@ -2443,17 +858,8 @@ export const HELP: HelpTopic[] = [
     "t": "Your cloud folder keeps its name, so your other devices carry on before they update."
    },
    {
-    "k": "li",
-    "d": 0,
-    "t": "Microsoft's and Google's sign-in pages still show the registered name, Keepsake."
-   },
-   {
     "k": "p",
     "t": "To go back, remove Haversack in Decky's settings and install an earlier Keepsake from the Releases page. If you later update again, Haversack brings in what Keepsake did meanwhile, and keeps its own earlier copy aside."
-   },
-   {
-    "k": "p",
-    "t": "On a PC, the update installs Haversack in place of Keepsake, in the same folders."
    }
   ]
  },
@@ -2481,19 +887,23 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "row",
-    "t": "Your cloud storage  |  Snapshots of the save files of the games you sync. Each snapshot also records the device name you chose, the time, a name for the game taken from its title, Haversack's version, and each file's name within its save location. A small record per device holds that device's name and Haversack version. Each play session is recorded with its start, end and length, and which of your devices it was on, for the combined playtime."
+    "t": "Each handheld  |  Settings, your SteamGridDB key and network-location passwords (readable only by your user), the list of games, the devices you paired and their keys, logs, and the record of each install and transfer."
    },
    {
     "k": "row",
-    "t": "Each device  |  Settings, sign-in tokens (readable only by your user), the list of games, logs, the copies taken before each restore, and any snapshot held back for checking."
+    "t": "Your other handheld  |  The games you send it, and what it needs to keep them in step: each game's name, its file list and checksums, and which device sent it."
    },
    {
     "k": "p",
-    "t": "Cloud data never contains paths from your devices, your user name, Proton prefix numbers or SD card labels. Save files are stored under neutral names such as \"Documents\" or \"AppData\", so one device's paths never leak to another."
+    "t": "Haversack stores nothing in the cloud. Versions before 0.61.0 kept save snapshots in your cloud storage; they are still there, untouched (Updates)."
    },
    {
     "k": "p",
-    "t": "Logs and diagnostics stay on the device. Tokens, passwords and codes are removed from them. A diagnostics export goes only where you copy it."
+    "t": "What goes between your devices never contains paths from the sending device, your user name, Proton prefix numbers or SD card labels. Each device puts the game in its own folders."
+   },
+   {
+    "k": "p",
+    "t": "Logs and diagnostics stay on the device. Keys, passwords and codes are removed from them. A diagnostics export goes only where you copy it."
    },
    {
     "k": "h",
@@ -2510,23 +920,11 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "row",
-    "t": "Microsoft (login.microsoftonline.com, graph.microsoft.com) or Google (oauth2.googleapis.com, www.googleapis.com)  |  Sign-in and your snapshots, if you use OneDrive or Google Drive"
+    "t": "GitHub (api.github.com, release downloads)  |  Checking for updates and downloading them"
    },
    {
     "k": "row",
-    "t": "Your WebDAV or S3 server  |  Your snapshots, if you use one"
-   },
-   {
-    "k": "row",
-    "t": "GitHub (api.github.com, release downloads, raw.githubusercontent.com)  |  Checking for updates, downloading them, and the Ludusavi save database"
-   },
-   {
-    "k": "row",
-    "t": "Advisor's sources (deckverified.games, PCGamingWiki, Haversack's ProtonDB index on GitHub)  |  Only while Advisor and that source are on"
-   },
-   {
-    "k": "row",
-    "t": "An AI provider (Anthropic, OpenAI or Google Gemini)  |  Only with your own key, when you press the button, with only the game title, hardware profile, tool versions and the settings discussed"
+    "t": "GitHub (raw.githubusercontent.com)  |  The Ludusavi game database, which tells Haversack where each game keeps its saves, so an update to a game never replaces them"
    },
    {
     "k": "row",
@@ -2534,15 +932,11 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "row",
-    "t": "A network location you type in the Installer  |  Only that address, after you choose it"
+    "t": "A network location you type in Install  |  Only that address, after you choose it"
    },
    {
     "k": "row",
-    "t": "Your other devices  |  Only for Replication, once it exists and you turn it on and pair them"
-   },
-   {
-    "k": "p",
-    "t": "Sign-in uses the provider's own page. Haversack never sees your password. It asks only for access to its own folder: Apps/Keepsake in OneDrive, or Haversack's hidden app folder in Google Drive."
+    "t": "Your other handhelds  |  Only for Moving games, once you let other devices reach this one and pair them"
    },
    {
     "k": "h",
@@ -2552,17 +946,12 @@ export const HELP: HelpTopic[] = [
    {
     "k": "li",
     "d": 0,
-    "t": "**Your cloud:** delete the Apps/Keepsake folder in OneDrive. In Google Drive, open Settings, then **Manage apps**, and choose **Delete hidden app data** for Haversack. For WebDAV and S3, delete the folder you gave Haversack."
+    "t": "**Each device:** uninstall Haversack in Decky, then delete its settings folder, ~/homebrew/settings/Haversack."
    },
    {
     "k": "li",
     "d": 0,
-    "t": "**Each device:** uninstall Haversack (in Decky, or with install.pyw --uninstall on a PC), then delete its settings folder: ~/homebrew/settings/Haversack on a handheld, ~/.config/keepsake and ~/.local/state/keepsake on Linux, and %APPDATA%\\Keepsake and %LOCALAPPDATA%\\Keepsake on Windows."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**Its access:** withdraw it at Microsoft's app permissions page (account.live.com/consent/Manage) or Google's third-party access page (myaccount.google.com/connections)."
+    "t": "**Your cloud, from earlier versions:** delete the Apps/Keepsake folder in OneDrive. In Google Drive, open Settings, then **Manage apps**, and choose **Delete hidden app data** for Haversack. For WebDAV and S3, delete the folder you gave Haversack. Withdraw its access at Microsoft's app permissions page (account.live.com/consent/Manage) or Google's third-party access page (myaccount.google.com/connections)."
    }
   ]
  },
@@ -2577,81 +966,35 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "**Does Haversack work with emulators, Heroic, Lutris or Bottles?** Yes, on a handheld or a Linux PC. See How syncing works."
+    "t": "**What happened to save sync?** Version 0.61.0 took Haversack back to installing games and moving them between your handhelds. Save sync, Advisor, the desktop app, PC support and the device pages were removed. Your saves in the cloud were not deleted: install version 0.60.0 from **Settings**, **Updates** to use them again (Updates)."
    },
    {
     "k": "p",
-    "t": "**Does Haversack replace Steam Cloud?** No, it works beside it. Steam games are listed with your non-Steam games, and their saves are snapshotted, synced, restored and kept in History in exactly the same way. A Steam game you have played that has no Steam Cloud saves starts syncing on its own, and Haversack tells you when it does. Games that use Steam Cloud stay off unless you turn them on, because Steam already keeps their saves. Turn any game on or off on its page; one you turn off stays off. Settings has **Sync Steam games that Steam Cloud does not back up** to stop the automatic part."
+    "t": "**What happens to my saves when I send a game?** The first time you send a game, the whole game goes, with its Proton prefix and the saves in it, so the other handheld can carry on where you left off. After that, updates never replace saves or settings on either handheld. Haversack finds where each game keeps them from the Ludusavi game database."
    },
    {
     "k": "p",
-    "t": "**My non-Steam game has a different shortcut ID on each device. Will it still sync?** Yes. That is what Haversack is built for. Saves are stored under neutral locations rather than prefix numbers. The same game is recognised on each device by its save data and title, and by your confirmation when Haversack is not sure."
+    "t": "**My non-Steam game has a different shortcut ID on each device. Does that matter?** No. Haversack recognises the game on each handheld, and puts it in that handheld's own prefix and folders."
    },
    {
     "k": "p",
-    "t": "**What happens if I play on two devices without syncing in between?** Haversack notices that both changed and asks you which save to keep. The other one stays in History, pinned. See Conflicts, history and restoring."
+    "t": "**Do my games go through the cloud?** No. They go straight between your own handhelds, on your home network or over your own VPN, encrypted with a key only your two devices know."
    },
    {
     "k": "p",
-    "t": "**Can a sync ever wipe my save?** Haversack takes and checks a snapshot of your current save before replacing any file, so every restore can be undone. A save that suddenly loses most of its files is held back on the device instead of being uploaded."
+    "t": "**Does Haversack need root, Desktop Mode or a terminal?** No. Everything happens in Gaming Mode with the controller. Nothing runs as root, and Haversack installs no extra programs."
    },
    {
     "k": "p",
-    "t": "**What if I am offline?** Games always start. Haversack syncs the next time it can reach your cloud."
+    "t": "**Where do I report a problem?** Open an issue on GitHub (github.com/breakmylegs/haversack/issues). For a security problem, use **Report a vulnerability** on the repository's Security tab instead, so it stays private. **Diagnostics**, **Tools**, **Export diagnostics** makes a file you can attach. Keys and passwords are removed from it, but read it first."
    },
    {
     "k": "p",
-    "t": "**Why does my game pause for a moment when it starts?** On a handheld, Haversack pauses the game briefly while it checks for a newer save, so it can put that save in place before the game reads it. A watchdog always resumes the game, whatever happens. You can switch this off per game."
+    "t": "**Why does my library show my other handheld's games with Stream instead of Play?** That is Steam Remote Play. When your other device is on with Steam running, Steam lists the games installed there in this device's library, so you can stream them. A non-Steam game installed on the other device shows as a tile with **Stream**. Haversack never treats these as games on this device: they are left out of its Games list and are never sent. **Install** can find artwork for those tiles (Installing games)."
    },
    {
     "k": "p",
-    "t": "**Why does a PC not pause the game?** On a PC, Haversack does not start your games, so it cannot pause one safely at launch. It never touches saves while a game runs. Press **Sync now** before playing to be sure you have the newest save."
-   },
-   {
-    "k": "p",
-    "t": "**Does Haversack need root, Desktop Mode or a terminal?** No. On a handheld everything happens in Gaming Mode with the controller. Nothing runs as root, and Haversack installs no extra programs."
-   },
-   {
-    "k": "p",
-    "t": "**Is my health page showing a warning?**"
-   },
-   {
-    "k": "p",
-    "t": "Each check says what is wrong and what to do. Most warnings are a game waiting for your choice in Conflicts, or a sign-in that needs renewing. See Troubleshooting."
-   },
-   {
-    "k": "p",
-    "t": "**Can I leave Haversack and keep my saves?** Yes. Settings, **Export snapshots** copies them out as plain zip files with a list of their contents. See Conflicts, history and restoring."
-   },
-   {
-    "k": "p",
-    "t": "**Where do I report a problem?** Open an issue on GitHub (github.com/breakmylegs/haversack/issues). For a security problem, use **Report a vulnerability** on the repository's Security tab instead, so it stays private. Diagnostics, then **Export diagnostics**, makes a file you can attach. Tokens and passwords are removed from it, but read it first."
-   },
-   {
-    "k": "p",
-    "t": "**Why does my library show my other handheld's games with Stream instead of Play?** That is Steam Remote Play. When your other device is on with Steam running, Steam lists the games installed there in this device's library, so you can stream them. A non-Steam game installed on the other device shows as a tile with **Stream**. If you have the same game on both, you may see it twice. Haversack never treats these as games on this device: they are left out of the Games list, save sync, Send to, Replication, Advisor and Uninstall. Haversack's Games page says how many there are, and **Show games you can stream from another device** lists them."
-   },
-   {
-    "k": "p",
-    "t": "To see only the games installed on this device, use the **Installed** tab in Steam's library, or switch off Remote Play in Steam's settings. Haversack does not hide them for you yet: Steam may share hidden games between your devices, so hiding one here could hide the real game on your other handheld. If a game on this device ever becomes hidden, Haversack tells you and offers **Show it again**."
-   },
-   {
-    "k": "p",
-    "t": "**How do I uninstall a game?** Open the game in Haversack's Games page and press **Uninstall**."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**A Steam game:** if it syncs, Haversack first offers a final backup of its saves, then opens Steam's own uninstall. Steam removes the game, as it always does."
-   },
-   {
-    "k": "li",
-    "d": 0,
-    "t": "**A non-Steam game:** Haversack shows exactly which folders it will delete (the game's Proton prefix and its game folder), how big they are and how much space you will have after. Cancel is selected first; nothing happens until you press **Uninstall**. If the game syncs, a final backup of its saves goes to your cloud or your other devices first, and Haversack tells you where to restore it from: the game's History on any of your devices. Then the shortcut and its artwork leave Steam, the folders are deleted with progress and a **Stop** button, and Haversack forgets the game on this device."
-   },
-   {
-    "k": "p",
-    "t": "Haversack never deletes your home folder, a Steam library, a folder another game uses, a link or a drive, and it will not uninstall a game while it is running or one you can only stream from another device. Anything it will not delete is listed with the reason."
+    "t": "To see only the games installed on this device, use the **Installed** tab in Steam's library, or switch off Remote Play in Steam's settings."
    }
   ]
  },
@@ -2666,7 +1009,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "Start with Haversack, Diagnostics, Health, **Run checks**. Each check says what is wrong and what to do. The Quick Access Menu badge shows the worst result."
+    "t": "Start with Haversack, **Diagnostics**, **Device checks**, **Run all**. Each check says what is wrong and what to do."
    },
    {
     "k": "row",
@@ -2674,43 +1017,23 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "row",
-    "t": "\"Test store on this device\" in the Quick Access Menu  |  Snapshots are not leaving the device  |  Settings, Cloud: choose OneDrive, Google Drive, WebDAV or S3 and finish its setup"
+    "t": "Find devices lists nothing  |  The other handheld is not letting devices reach it, or your network blocks the search  |  On the other handheld, Games and devices, Other devices: switch on Let other devices reach this one. Or type its address under Pair by address"
    },
    {
     "k": "row",
-    "t": "Cloud check fails: \"not signed in or set up\"  |  No sign-in, or settings incomplete  |  Settings, Cloud, the backend in use: sign in or fill in the settings, then Test connection"
+    "t": "\"doesn't have enough space\" when sending  |  The other handheld has too little free space for the game  |  Free some space there, or send the game to a different drive"
    },
    {
     "k": "row",
-    "t": "\"Sign-in needs attention\"  |  The cloud stopped accepting the saved sign-in (password change, revoked access, or Google's 7-day limit for apps in testing mode)  |  Settings, Cloud: Sign out, then Sign in again. Waiting saves are uploaded afterwards"
+    "t": "A transfer says the link looks slow  |  A VPN may be relaying the connection  |  Use your home network, or check your VPN's direct connection settings"
    },
    {
     "k": "row",
-    "t": "WebDAV or S3: \"ignores create-only writes\"  |  The server would overwrite files, which could lose saves  |  Use a server that supports If-None-Match (Nextcloud, ownCloud, AWS S3), see docs/setup-backends.md"
+    "t": "Install cannot open an ISO on a share  |  The share does not let the system mount the ISO there  |  Nothing: Haversack copies it to the device first and installs from the copy"
    },
    {
     "k": "row",
-    "t": "A game says \"Conflict: your choice needed\"  |  Both devices have new progress, or the cloud and this device differ  |  Conflicts tab, Choose. Whichever save you do not choose is kept and pinned"
-   },
-   {
-    "k": "row",
-    "t": "\"A suspicious save was kept on this device\"  |  A save lost many files or much of its size, so it was not uploaded  |  History: if the game really did drop those files, Release quarantine; otherwise play on and the next good save replaces it"
-   },
-   {
-    "k": "row",
-    "t": "\"Prefix mismatch, sync blocked\"  |  The running game used a different Proton prefix from the one Haversack found  |  Check the shortcut's compatibility settings; Rescan on the Games page; the block clears when the prefixes agree"
-   },
-   {
-    "k": "row",
-    "t": "\"Played while Haversack was not running\"  |  Steam saw a play Haversack missed  |  Nothing: the idle pass saved it. Make sure Decky starts with the device"
-   },
-   {
-    "k": "row",
-    "t": "A game is not matched  |  The manifest does not know it, or the name differs  |  Game page: Change match, approve a suggested match, or \"Give it its own game key\" and add custom folders"
-   },
-   {
-    "k": "row",
-    "t": "Saves restored but \"registry keys were left unchanged\"  |  user.reg could not be read safely or the game was running  |  Quit the game and restore again from History; the save files are already in place"
+    "t": "Find shares lists nothing  |  Your network blocks the search (some mesh and guest Wi-Fi do)  |  Type the address, for example smb://nas.local/Games/"
    },
    {
     "k": "row",
@@ -2718,7 +1041,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "row",
-    "t": "Update refused while syncing  |  Updates wait for sync jobs and open game sessions  |  Use \"Update when idle\", or quit the game"
+    "t": "Update refused while busy  |  Updates wait for installs, transfers and open game sessions  |  Wait for them to finish, or quit the game"
    },
    {
     "k": "row",
@@ -2726,11 +1049,11 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "row",
-    "t": "Updates stuck on \"Checking\", no installed version shown, and Games, the manifest update or shortcuts never load  |  Haversack's backend did not start, so the page waits for answers that never come. The usual cause is a Python module missing from this Decky build  |  Read Decky's journal (below). If it names a missing module, install the latest Haversack from the install link and report the module name on the repository's Issues page"
+    "t": "Updates stuck on \"Checking\", no installed version shown, and Games or shortcuts never load  |  Haversack's backend did not start, so the page waits for answers that never come. The usual cause is a Python module missing from this Decky build  |  Read Decky's journal (below). If it names a missing module, install the latest Haversack from the install link and report the module name on the repository's Issues page"
    },
    {
     "k": "row",
-    "t": "Diagnostics, \"Python modules in this Decky build\" warns about xml  |  Decky's Python on this device has no XML module  |  Save sync is fine with OneDrive, Google Drive or the local store. WebDAV and S3 need it, so choose another cloud"
+    "t": "My saves from before 0.61.0 are missing  |  Version 0.61.0 removed save sync; nothing was deleted  |  Install version 0.60.0 from Settings, Updates (Updates)"
    },
    {
     "k": "h",
@@ -2767,16 +1090,7 @@ export const HELP: HelpTopic[] = [
    },
    {
     "k": "p",
-    "t": "Diagnostics, Tools, **Export diagnostics** writes one JSON file in ~/homebrew/settings/Haversack/. It is redacted (no tokens, passwords or account names) but lists your games. Logs are in ~/homebrew/logs/Keepsake/. Over SSH: scp deck@:homebrew/settings/Keepsake/diagnostics-*.json."
-   },
-   {
-    "k": "h",
-    "l": 2,
-    "t": "Starting again on one device"
-   },
-   {
-    "k": "p",
-    "t": "Settings, General, Run setup again walks through every step. Your cloud history is never deleted by setup."
+    "t": "Diagnostics, Tools, **Export diagnostics** writes one JSON file in ~/homebrew/settings/Haversack/. It is redacted (no keys, passwords or account names) but lists your games. Logs are in ~/homebrew/logs/Haversack/. Over SSH: scp deck@:homebrew/settings/Haversack/diagnostics-*.json."
    }
   ]
  }

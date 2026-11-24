@@ -26,7 +26,7 @@ from typing import Any
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GUIDE = os.path.join(ROOT, "docs", "user")
 # The Gaming Mode page and the desktop app each get the same file (the desktop build sees only desktop/src).
-TARGETS = (os.path.join(ROOT, "src", "help.ts"), os.path.join(ROOT, "desktop", "src", "help.ts"))
+TARGETS = (os.path.join(ROOT, "src", "help.ts"),)
 
 INDEX_LINK = re.compile(r"^\s*-\s+\[([^\]]+)\]\(((?:\.\./)?[a-z0-9-]+\.md)\)")
 LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")

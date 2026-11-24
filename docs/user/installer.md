@@ -1,6 +1,6 @@
 # Installing games
 
-On a handheld, Haversack's **Install** page installs a Windows game into its own Steam shortcut and Proton prefix, all from Gaming Mode. It needs Decky, so it is not available on a PC.
+Haversack's **Install** page installs a Windows game into its own Steam shortcut and Proton prefix, all from Gaming Mode.
 
 **An installer is a Windows program that runs with your user's rights. A Proton prefix is not a sandbox.** Only install software you trust.
 
@@ -11,7 +11,7 @@ On a handheld, Haversack's **Install** page installs a Windows game into its own
 3. Start that shortcut. When the installer asks where to install, type the folder Haversack shows, for example `Z:\home\deck\Games\<Title>`.
 4. Finish the installer and quit.
 5. Back in Haversack, choose the game's program from the list. Haversack ranks the new programs, leaving out uninstallers and setup tools. Then confirm.
-6. The same shortcut now starts the game, keeps its prefix, and is named after the game. Haversack offers to sync its saves.
+6. The same shortcut now starts the game, keeps its prefix, and is named after the game. **Open in Games** takes you to it, to send it to your other handheld or find its artwork.
 
 If an installer asks for the disc, press **Installer wants a disc drive** and start the installer again. Haversack gives the prefix a CD drive pointing at the mounted ISO.
 
@@ -47,7 +47,7 @@ With your own [SteamGridDB](https://www.steamgriddb.com) API key in Settings, Ha
 
 ## Artwork for any non-Steam game
 
-Any non-Steam game's page in **Saves**, **Games** has **Artwork** when the game is missing a cover, a wide cover, a background or a logo. Press **Find artwork** and pick the game on SteamGridDB. Haversack adds only the kinds the game has none of, through Steam, so artwork you or another tool set is never replaced. It uses the same SteamGridDB key as installed games.
+Any non-Steam game in **Games and devices**, **Games** has **Artwork** when the game is missing a cover, a wide cover, a background or a logo. Press **Find artwork** and pick the game on SteamGridDB. Haversack adds only the kinds the game has none of, through Steam, so artwork you or another tool set is never replaced. It uses the same SteamGridDB key as installed games.
 
 ## Artwork for streaming tiles
 

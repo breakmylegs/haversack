@@ -1,6 +1,8 @@
 # Haversack (formerly Keepsake)
 
-Decky Loader plugin that syncs PC game saves between SteamOS and Bazzite handhelds through cloud storage, operated entirely from Gaming Mode.
+Decky Loader plugin that installs non-Steam games on SteamOS and Bazzite handhelds (from ISO, folders and network locations) and moves them between the user's own handhelds on request, operated entirely from Gaming Mode.
+
+**The strip (v0.61.0, ADR-0098).** Only Core, Installer and Replication remain. Save sync, Advisor, Desktop, the PC host, Device, Looks and the root helper were deleted; the `full` branch keeps v0.60.0 with all of them. Replication copies a game's saves on its first send and leaves every manifest-listed save and config file out of later updates. Where this file or the build prompts describe removed features, ADR-0098 wins; their principles stay for the `full` branch and any later save plugin.
 
 This file holds the objective, principles, escalation rules and conventions from sections 1 to 6 of the build prompt. The full detail (architecture, canonical model, sync model, lifecycle, auth, updates, UX, slices) is in [docs/build-prompt.md](docs/build-prompt.md). Read the relevant section there before working on a slice.
 
@@ -14,12 +16,12 @@ This file holds the objective, principles, escalation rules and conventions from
 ## 1. Objective
 
 Outcomes:
-- Saves follow the player between devices with no Desktop Mode step at any point, including setup and cloud sign-in.
-- Non-Steam shortcuts installed into their own Proton prefixes sync correctly, even though their compatdata IDs differ on each device.
-- No save version is ever silently overwritten or lost.
+- A Windows game installs from an ISO, a folder or a network location into its own shortcut and Proton prefix, with no Desktop Mode step.
+- A non-Steam game set up on one handheld appears on the other on request, playable, even though shortcut app IDs and compatdata folders differ on each device.
+- Saves travel with a game's first send, and no later update ever replaces a save or settings file.
 - The plugin updates itself from its own menus in a few clicks.
 - Source lives in the owner's public GitHub repository. Releases are built locally by `pnpm release` and published with `gh` (ADR-0004: no GitHub Actions).
-- v2: a non-Steam game configured on one device appears on the other, playable, with the same compatibility tool, artwork and launch options; Advisor shows device-specific recommendations without changing anything; Desktop Mode offers every feature as an extra surface.
+- A sent game keeps its compatibility tool, artwork and launch options.
 
 ## 2. Context
 
@@ -27,7 +29,7 @@ Outcomes:
 - SD card labels differ between devices. The two devices have different screens.
 - Many non-Steam games are installed from ISO into the shortcut's own Proton prefix, so the game folder usually sits inside the prefix.
 - Non-Steam shortcut app IDs, and therefore `compatdata/<appid>` folders, differ per device. Ludusavi, rclone plugins, decky-ludusavi and Spool all fail this case or need manual redirects.
-- An interim Ludusavi plus rclone setup to OneDrive must coexist with Keepsake during cutover, then be replaced (build prompt section 19).
+- Save sync is outside this plugin since the strip (ADR-0098); the Ludusavi cutover in build prompt section 19 applies to the `full` branch only.
 - Design basis: snapshot DAG with canonical logical roots, native cloud APIs, device code sign-in, pull before launch and push after exit.
 
 ## 3. Non-negotiable principles
@@ -89,7 +91,7 @@ v2 additions (build prompt v2 section 5, ADR-0014):
 - Adding a network endpoint outside build prompt v2 section 6.2, or sending AI providers more than principle 18 allows.
 - Any write outside the amended write allowlist (build prompt v2 section 6.3), or any Replication write against a path Saves manages.
 - Network share mounting that needs root or a bundled binary.
-- Porting any code from the owner's `decky-plugins` repository before the licence audit (ADR-0013, `docs/advisor-port-audit.md`) is signed off. That repository and the v2 input folder are read-only: never modify them.
+- Porting any code from the owner's `decky-plugins` repository before the licence audit (ADR-0013; the audit document is on the `full` branch) is signed off. That repository and the v2 input folder are read-only: never modify them.
 - Copying code from CapyDeploy (AGPL-3.0) or any GPL project.
 
 ## 5. Working conventions
@@ -122,14 +124,11 @@ v2 additions (build prompt v2 section 5, ADR-0014):
 - Stdlib first (`asyncio`, `sqlite3`, `hashlib`, `hmac`, `zipfile`, `json`, `urllib`, `ssl`), JSON fallback if `sqlite3` is missing. Vendored pure-Python libraries only, pinned with hashes.
 - HTTP via stdlib in worker threads unless slice 1 proves `aiohttp` is importable from plugin processes.
 
-**Network allowlist**
-- `login.microsoftonline.com`, `graph.microsoft.com`
-- `oauth2.googleapis.com`, `www.googleapis.com`
+**Network allowlist** (in use since the strip, ADR-0098)
 - `raw.githubusercontent.com` (Ludusavi manifest)
 - `api.github.com` and GitHub release asset downloads (update checks)
-- User-configured WebDAV and S3 endpoints
-- OneDrive content hosts `*.1drv.com` and `*.microsoftpersonalcontent.com` (ADR-0008)
-- v2, each only while its module and feature are on (build prompt v2 section 6.2): LAN peer port (default TCP 47110) and mDNS for Replication; Advisor data sources (`deckverified.games`, Steam store hosts to verify, `www.pcgamingwiki.com`; `www.protondb.com` pending a decision); AI providers `api.anthropic.com`, `api.openai.com`, `generativelanguage.googleapis.com` when configured; `www.steamgriddb.com` with the user's key, and its image host `cdn2.steamgriddb.com` (approved 16 November 2026, ADR-0027; never sent the key); `127.0.0.1` loopback for Desktop; user-entered Installer network locations, only the typed host after a user action, on the terms in ADR-0033 (approved 16 November 2026). Avoid ports 8080, 8384, 27040 and 1714 to 1764
+- Only while their module and feature are on: LAN peer port (default TCP 47110) and mDNS for Replication; `www.steamgriddb.com` with the user's key, and its image host `cdn2.steamgriddb.com` (ADR-0027; never sent the key); user-entered Installer network locations, only the typed host after a user action, on the terms in ADR-0033. Avoid ports 8080, 8384, 27040 and 1714 to 1764
+- The cloud, Advisor, AI and loopback endpoints approved earlier (ADR-0008, build prompt v2 section 6.2) are no longer used; they stay approved for the `full` branch only. Using any of them again here is an escalation item.
 
 **Development environment**
 - The owner develops on Windows. WSL does not start on this laptop (policy) and Docker is not installed, so backend tests run locally on Windows Python where possible; Linux-only tests are marked `posix`, skipped there, and run on a device over SSH with `pnpm run test:device`. See `docs/dev-setup.md`.

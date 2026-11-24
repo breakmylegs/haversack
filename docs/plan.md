@@ -2,6 +2,10 @@
 
 The full queue after the v2 consolidation (slice C0). v1 slices come from `docs/build-prompt.md` section 16, amended by `docs/build-prompt-v2.md` section 10. v2 slices come from `docs/build-prompt-v2.md` section 12. Every slice follows the working conventions in `CLAUDE.md`: its own branch, a pull request, a slice report, threat model and assumptions updated, and a stop for Peter's on-device checks.
 
+## The strip, 24 November 2026
+
+Peter's direction: Haversack installs non-Steam games and moves them between handhelds when the user asks, with every feature built for those two jobs, and nothing else (ADR-0098). It ships as 0.61.0. Everything below this section that belongs to Saves, Advisor, Desktop, the PC host, Device or Looks is history: that code lives on the `full` branch (v0.60.0) and is not in the queue. The queue now holds only Installer and Replication work, device runs, and the remaining release items (signing, v1.0.0).
+
 ## Status on 18 November 2026
 
 Released up to v0.24.0. Merged since, not yet released: network install (#38 to #41), the ProtonDB index source, P1 to P5, S1, S2, D1, R0, R1 to R6, slice 17a and the built-in sign-in clients (ADR-0055). The next release now needs only the device checks.

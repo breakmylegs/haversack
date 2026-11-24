@@ -61,7 +61,7 @@ export function ModulesSection({ locked }: { locked: boolean }) {
         );
       })}
       {status && !status.stateDatabase && (
-        <Field label="State database unavailable" description="Modules that need it stay off. Saves is not affected." />
+        <Field label="State database unavailable" description="Modules that need it stay off." />
       )}
       {status && status.steamOpsPending > 0 && (
         <Field label={`${status.steamOpsPending} Steam changes waiting`} description="They are applied while Haversack runs in Gaming Mode." />

@@ -6,11 +6,10 @@ import os
 
 import pytest
 
+from helpers import Device
 from keepsake.backends import CredentialStore
 from keepsake.installer import remote
 from keepsake.installer.service import InstallerError
-from keepsake.store import LocalFolderStore
-from test_app_ux import Device
 from test_installer import FakeUdisks, env  # noqa: F401 (the fixture)
 from test_installer_remote import Reply, Script
 
@@ -83,7 +82,7 @@ def test_locations_keep_passwords_in_the_credential_store_and_never_return_them(
 @pytest.fixture
 def device(env, tmp_path):  # noqa: F811
     installer, *_ = env
-    a = Device(tmp_path / "dev", "a", 4171510507, LocalFolderStore(str(tmp_path / "cloud")))
+    a = Device(tmp_path / "dev", "a", 4171510507)
     a.app.installer = installer
     disc = (tmp_path / "DISC").as_posix()
     os.makedirs(disc, exist_ok=True)
@@ -163,6 +162,6 @@ def test_app_cancel_stops_the_download(device):
 
 
 def test_the_installer_must_be_on(tmp_path):
-    a = Device(tmp_path, "a", 4171510507, LocalFolderStore(str(tmp_path / "cloud")))
+    a = Device(tmp_path, "a", 4171510507)
     with pytest.raises(ValueError, match="Installer module is off"):
         asyncio.run(a.app.installer_net_browse({"url": "https://nas.example/"}))

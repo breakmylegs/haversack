@@ -35,7 +35,6 @@ HEADER = "WINE REGISTRY Version 2"
 FRAGMENT_COMMENT = ";; Keepsake registry fragment"
 _SECTION = re.compile(r"^\[(.*)\](?: (\d+))?$")
 _VALUE_START = ('"', "@", "#")
-HIVES = {"hkey_current_user": "user.reg", "hkcu": "user.reg", "hkey_local_machine": "system.reg", "hklm": "system.reg"}
 MAX_REG_BYTES = 256 * 1024 * 1024
 KEEP_BACKUPS = 5
 
@@ -116,15 +115,6 @@ def parse(text: str) -> RegFile:
     return RegFile(tuple(preamble), tuple(sections))
 
 
-def hive_and_key(manifest_path: str) -> tuple[str, str] | None:
-    """``("user.reg", "software\\x")`` for a manifest registry path, or None if unsupported."""
-    parts = [p for p in manifest_path.replace("\\", "/").split("/") if p]
-    if len(parts) < 2:
-        return None
-    hive = HIVES.get(parts[0].lower())
-    return (hive, normalise_key("\\".join(parts[1:]))) if hive else None
-
-
 def export(text: str, managed: Iterable[str]) -> str | None:
     """The canonical fragment holding only ``managed`` keys and their subkeys, or None if there are none."""
     managed = [normalise_key(m) for m in managed]
@@ -185,11 +175,6 @@ def _read(path: str) -> str:
         raise RegistryError("the registry file is not text Haversack can read") from exc
 
 
-def read_text(path: str) -> str:
-    """Read a registry file as text, refusing oversized or undecodable files."""
-    return _read(path)
-
-
 def _write_synced(path: str, text: str) -> None:
     with open(path, "w", encoding="utf-8", newline="") as handle:
         handle.write(text)
@@ -235,32 +220,6 @@ def _prune(backup_dir: str, name: str) -> None:
     backups = sorted(f for f in os.listdir(backup_dir) if f.endswith("-" + name))
     for old in backups[:-KEEP_BACKUPS]:
         os.unlink(os.path.join(backup_dir, old))
-
-
-def merge_file(
-    reg_path: str, fragment: str | None, managed: Iterable[str], backup_dir: str, now: float | None = None
-) -> dict[str, str]:
-    """Merge a snapshot's fragment into ``reg_path`` with every guard of :func:`apply_text`."""
-    managed = list(managed)
-    original = _read(reg_path)
-    if export(original, managed) == (fragment or None):
-        return {"status": "unchanged"}  # the managed keys already hold the snapshot's values
-    merged = merge(original, fragment, managed, now if now is not None else time.time())
-    verify_merge(original, merged, fragment, managed)
-    return apply_text(reg_path, merged, original, backup_dir, now)
-
-
-def verify_merge(original: str, merged: str, fragment: str | None, managed: Iterable[str]) -> None:
-    """Refuse unless ``merged`` parses, keeps every other key unchanged and holds exactly the fragment's keys."""
-    managed = [normalise_key(m) for m in managed]
-    before, after = parse(original), parse(merged)
-    if after.preamble[: len(before.preamble)] != before.preamble:
-        raise RegistryError("the merge changed the registry file header")
-    if _others(before, managed) != _others(after, managed):
-        raise RegistryError("the merge would change keys Haversack does not manage")
-    wanted = [s.canonical() for s in parse(fragment).sections] if fragment else []
-    if wanted != [s.canonical() for s in after.sections if _under(s.key, managed)]:
-        raise RegistryError("the merged keys do not match the snapshot")
 
 
 def _quote(name: str) -> str:

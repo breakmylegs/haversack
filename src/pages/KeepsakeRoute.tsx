@@ -1,39 +1,21 @@
 import { ButtonItem, DialogButton, Field, PanelSection, PanelSectionRow, SidebarNavigation, SidebarNavigationPage, Tabs } from "@decky/ui";
 import { ReactElement, ReactNode, useEffect, useRef, useState } from "react";
-import { FaCog, FaCompactDisc, FaExchangeAlt, FaMicrochip, FaPlay, FaSave, FaStethoscope } from "react-icons/fa";
+import { FaCog, FaCompactDisc, FaExchangeAlt, FaStethoscope } from "react-icons/fa";
 import { ModuleStatus, modulesStatus } from "../backend";
 import { navlog, setNavRoot } from "../navlog";
 import { LAYOUT, ModuleName, section as sectionSpec } from "../routeData";
 import { lastPageOf, openPage, openSection, rememberPage, ROUTE_PATH, SectionId } from "../routes";
 import { sidebarEntries } from "../sidebar";
-import { ActivityPage } from "./ActivityPage";
-import { AdvisorPage } from "./AdvisorPage";
-import { BatteryPanel } from "./BatteryPanel";
-import { ConflictsPage } from "./ConflictsPage";
-import { ControllersPanel } from "./ControllersPanel";
 import { DeviceChecks } from "./DeviceChecks";
-import { DeviceStatusPage } from "./DeviceStatusPage";
 import { EmulatorsPanel } from "./EmulatorsPanel";
 import { DiagnosticsPage } from "./DiagnosticsPage";
-import { ExportSection } from "./ExportSection";
-import { ExtrasPanel } from "./ExtrasPanel";
-import { FansPanel } from "./FansPanel";
-import { GamesPage } from "./GamesPage";
-import { HealthSection } from "./HealthSection";
-import { HistoryPage } from "./HistoryPage";
-import { ImportPage } from "./ImportPage";
+import { GamesList } from "./GamesList";
 import { HelpPage } from "./HelpPage";
 import { InstallerPage } from "./InstallerPage";
 import { LogsPage } from "./LogsPage";
-import { LooksPage } from "./LooksPage";
-import { NowPlaying } from "./NowPlaying";
-import { PowerPanel } from "./PowerPanel";
-import { ReconnectPanel } from "./ReconnectPanel";
 import { ReplicationPage } from "./ReplicationPage";
-import { SdCardsPanel } from "./SdCardsPanel";
 import { SettingsPage } from "./SettingsPage";
 import { ShortcutsEditor } from "./ShortcutsEditor";
-import { StoragePage } from "./StoragePage";
 
 export { ROUTE_PATH };
 
@@ -46,51 +28,24 @@ export { ROUTE_PATH };
 
 // Okabe-Ito colours (ADR-0088), one per section, so each section is easy to find.
 const ICONS: Record<SectionId, ReactElement> = {
-  play: <FaPlay style={{ color: "#009E73" }} />,
-  saves: <FaSave style={{ color: "#56B4E9" }} />,
-  "games-devices": <FaExchangeAlt style={{ color: "#E69F00" }} />,
-  device: <FaMicrochip style={{ color: "#CC79A7" }} />,
   install: <FaCompactDisc style={{ color: "#F0E442" }} />,
+  "games-devices": <FaExchangeAlt style={{ color: "#E69F00" }} />,
   settings: <FaCog style={{ color: "#8a8fa3" }} />,
   diagnostics: <FaStethoscope style={{ color: "#D55E00" }} />,
 };
 
 // Each panel a sub-page is made of (routeData's parts).
 const PARTS: Record<string, () => ReactElement> = {
-  now: () => <NowPlaying />,
-  advisor: () => <AdvisorPage />,
-  games: () => <GamesPage />,
-  conflicts: () => <ConflictsPage />,
-  history: () => <HistoryPage />,
-  activity: () => <ActivityPage />,
-  import: () => (
-    <div>
-      <ImportPage />
-      <ExportSection />
-    </div>
-  ),
+  install: () => <InstallerPage />,
+  games: () => <GamesList />,
   moving: () => <ReplicationPage part="moving" />,
   devices: () => <ReplicationPage part="devices" />,
   emulators: () => <EmulatorsPanel />,
-  status: () => <DeviceStatusPage />,
-  other: () => <ExtrasPanel />,
-  power: () => <PowerPanel />,
-  battery: () => <BatteryPanel />,
-  fans: () => <FansPanel />,
-  controllers: () => <ControllersPanel />,
-  reconnect: () => <ReconnectPanel />,
-  storage: () => <StoragePage />,
-  cards: () => <SdCardsPanel />,
-  looks: () => <LooksPage />,
-  install: () => <InstallerPage />,
   general: () => <SettingsPage part="general" />,
   "quick-menu": () => <ShortcutsEditor />,
-  cloud: () => <SettingsPage part="cloud" />,
-  sync: () => <SettingsPage part="sync" />,
   modules: () => <SettingsPage part="modules" />,
   updates: () => <SettingsPage part="updates" />,
   help: () => <HelpPage />,
-  health: () => <HealthSection />,
   checks: () => <DeviceChecks />,
   tools: () => <DiagnosticsPage />,
   logs: () => <LogsPage />,

@@ -35,7 +35,6 @@ STEPS: list[tuple[str, list[str]]] = [
     ("eslint", [*pnpm(), "run", "lint"]),
     ("tsc", [*pnpm(), "run", "typecheck"]),
     ("build", [*pnpm(), "run", "build"]),
-    ("desktop", [*pnpm(), "run", "build:desktop"]),  # the PC desktop interface (ADR-0040)
     ("versions", [sys.executable, "scripts/check_versions.py"]),
     ("package", [sys.executable, "scripts/package.py"]),
     ("ruff", [*venv_tool("ruff"), "check", "."]),
@@ -44,7 +43,6 @@ STEPS: list[tuple[str, list[str]]] = [
     ("secret scan", [sys.executable, "scripts/secret_scan.py"]),
     ("docs", [sys.executable, "scripts/check_docs.py"]),  # the user guide's links, images and sample data (ADR-0046)
     ("help", [sys.executable, "scripts/help.py", "--check"]),  # the in-app Help is the user guide (ADR-0090)
-    ("perf", [sys.executable, "scripts/perf_budget.py"]),  # hot paths at 500 games and 10,000 snapshots (ADR-0050)
 ]
 
 

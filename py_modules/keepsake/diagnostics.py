@@ -8,7 +8,6 @@ folders: write access to ``compatdata`` is checked with ``os.access`` only.
 from __future__ import annotations
 
 import importlib
-import json
 import os
 import platform
 import ssl
@@ -34,7 +33,6 @@ from .redact import redact
 from .vdf import VdfError
 
 PROBE_FILE = "probe-events.json"
-PROBE_LIMIT = 200
 ENV_NAMES = (
     "HOME",
     "USER",
@@ -206,21 +204,6 @@ def https_test(url: str = HTTPS_TEST_URL, timeout: float = 10.0) -> dict[str, An
 
 
 # Frontend probe events (lifetime notifications, game actions, suspend and resume)
-
-
-def record_probe_event(runtime_dir: str, kind: str, payload: Any) -> int:
-    path = os.path.join(runtime_dir, PROBE_FILE)
-    events = read_json(path, default=[])
-    if not isinstance(events, list):
-        events = []
-    text = json.dumps(payload, default=str)
-    if len(text) > 8000:
-        payload = {"truncated": text[:8000]}
-    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    events.append({"ts": now, "kind": str(kind)[:64], "payload": payload})
-    events = events[-PROBE_LIMIT:]
-    atomic_write_json(path, events)
-    return len(events)
 
 
 def probe_events(runtime_dir: str) -> list[Any]:

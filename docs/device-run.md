@@ -1,315 +1,50 @@
-# Device run for v0.60.0
+# Device run for v0.61.0
 
-No SSH, terminal or laptop is needed. Do the first two parts on each handheld, then the rest with both. "Go" is the Legion Go and "Go 2" the Legion Go 2.
+No SSH, terminal or laptop is needed. Do the first two parts on each handheld, then the rest with both. "Go" is the Legion Go and "Go 2" the Legion Go 2. The device run for v0.60.0 and earlier, with the steps for removed features, is in the git history and on the `full` branch.
 
-## 1. Install v0.60.0 (each handheld)
+## 1. Update to v0.61.0 (each handheld)
 
-Keepsake is now called Haversack. This first update moves it across.
-
-1. Open the Quick Access Menu, then Decky, then Keepsake, then the full Keepsake page.
-2. Open **Updates**, press **Check for updates**, then **Update now**. Confirm Decky's prompt, which still says Keepsake. Haversack appears at the top of Decky's list, and Keepsake is still there.
-3. Do step 50 below now, then carry on here in Haversack.
-4. In **Settings**, then **Modules**, switch on **Replication** if it is off. On **Devices**, switch on **Let other devices reach this one**.
+1. Open Haversack, **Settings**, **Updates**, press **Check for updates**, then install 0.61.0. If the device is still on Keepsake, update it first as before: Haversack appears and asks to remove the old Keepsake.
+2. After the update, **What's new** should say save sync and the other features were removed, and that nothing was deleted.
+3. The sidebar should have four sections: **Install**, **Games and devices**, **Settings**, **Diagnostics**.
+4. In **Settings**, **Modules**, Installer and Replication should both be on.
+5. In **Settings**, **General**, **Game database** should show a number of games and when it was updated, with the Ludusavi credit.
+6. Switch to Desktop Mode once: no Haversack tray icon should appear, and Haversack should not be in the app menu. Switch back.
 
 ## 2. Device checks (each handheld)
 
 1. Put the SD card in.
-2. In Haversack's sidebar, open **Diagnostics** and scroll to **Device checks**. Press **Run all**. It takes about a minute. Checks marked "(both)" say Skipped until part 3.
+2. Open **Diagnostics**, **Device checks** and press **Run all**. It takes about a minute. Checks marked "(both)" say Skipped until part 3.
 3. Press **Export results**, and photograph the QR code or the summary.
 
-## 3. Both handhelds
+## 3. Install
 
-1. **Pair** (both with **Let other devices reach this one** on). First run the Device check **The other handheld can be seen** on each.
-   - On the Go 2, press **Find devices**, choose the Go and press **Pair**. The Go 2 should say "Waiting for Legion Go to accept".
-   - The Go should show "Legion Go 2 wants to pair" with its address. Press **Accept**. The Go 2 should say "Legion Go accepted. Enter the code shown on it."
-   - Type the Go's 6-digit code on the Go 2's number pad with the controller and press **OK**. Both should show **Paired**.
-   - Also try once: a wrong code (both should say it was wrong), **Decline** on the Go, and a request while a game runs on the Go (only a notification; answer it afterwards under Devices).
-2. **Two-device checks.** On the Go 2, run **Link speed to the other handheld** and **Finding the other handheld**, then **Export results** again. Photograph it.
-3. **Reconnect.** Restart the Go. On the Go 2, go to Devices and press **Check** on the Go: it should say reachable.
-4. **Send a game.** On the Go 2, open an ISO-installed non-Steam game in Haversack's Games and press **Send to Legion Go**. On the Go, go to Devices and press **Accept**. If it offers to copy the compatibility tool, say yes.
-   - While it copies, press the power button once. The Go should sleep within a few seconds, and the transfer should carry on after you wake it.
-   - When it says "ready", start the game on the Go. Check the Proton version, artwork and launch options, that your saves are there, and that Saves shows no conflict.
-   - If you copied the tool, restart Steam first if asked.
-5. **Game hold.** Send a second game. While it copies, start any game on the Go: the transfer should wait, then carry on when you quit.
-6. **Keep in step.**
-   1. On the Go 2, change the game (a patch, or a mod file in its folder), play, and quit. Its Haversack page should say "Changed on this device". Press **Send update**. On the Go, go to Devices and press **Apply update**. The change should be there, and the Go's saves unchanged.
-   2. Set **Updates** to **Take them by themselves** on both, change the game again on the Go 2, and check the Go takes it without asking.
-   3. Change the game on both, then send an update. The Go should ask. Choose **Keep mine**: nothing should change on the Go.
-7. **Stop and remove.** Send a game again, and press **Stop and remove** part way. The game should not be in the Go's library, and its folder should be gone.
-8. **Saves with no cloud.**
-   1. On both, go to the Cloud page and choose **Directly between my devices**.
-   2. Play a game with Saves on the Go 2 and quit. On the Go, press **Sync now**. History should show the new save, and starting the game should load it.
-   3. Turn the Go 2 off. Play and quit on the Go: it should not block, and should say the Go 2 was not reachable.
-   4. Play on both while apart, then bring them together. A conflict should appear and resolve as usual.
-9. **Remove.** On the Go, go to Devices and press **Remove** on the Go 2. On the Go 2, **Check** should say to pair again.
+1. **From an ISO.** On the Go 2, open **Install**, choose an ISO, and follow it through to the game's program. At the end, **Open in Games** should open **Games and devices**, **Games** with the game listed.
+2. **From a network share.** Install another game from **From a network location**, with **Find shares** or a typed `smb://` address.
+3. **Artwork.** With a SteamGridDB key, open the new game in **Games**, press **Find artwork** and pick it: the missing artwork should appear in the library.
+4. **Update waits for a game.** Start any game, then open **Settings**, **Updates**: installing a version should be refused until you quit.
 
-## 4. New in 0.27.0
+## 4. Both handhelds
 
-1. **Steam games.** Open Haversack's Games page on the Go.
-   - It should open on **All**, show Steam games, and have a note saying how many sync automatically.
-   - A Steam game you have played that has no Steam Cloud saves should say "no Steam Cloud, synced automatically". One that uses Steam Cloud should say "off until you turn it on".
-   - Turn one of the automatic ones off, rescan, and check it stays off.
-   - Play an automatic one on the Go and quit. Start it on the Go 2: it should load the save, and History should show it on both.
+1. **Pair.** On both, open **Games and devices**, **Other devices**, and switch on **Let other devices reach this one**.
+   - On the Go 2, press **Find devices**, choose the Go and press **Pair**. Accept on the Go and type its code on the Go 2. Both should show **Paired**.
+   - Run the Device checks **Link speed to the other handheld** and **Finding the other handheld** on the Go 2, then **Export results** again. Photograph it.
+2. **Send a game with its saves.** Play the game from part 3 on the Go 2 until it has a save, and quit. Open it in **Games** and press **Send to Legion Go**.
+   - The Go should start copying by itself, with a bar under **Moving games** and a line in the quick access menu.
+   - When it says ready, start the game on the Go. Check the Proton version, artwork and launch options, and that **your save is there**.
+3. **Keep in step, saves kept.**
+   1. On the Go, play on and save, so the Go's save is newer. Quit.
+   2. On the Go 2, change the game (a patch, or a mod file in its folder) and quit. Its page should say it changed. Press **Send update**; on the Go, **Apply update** under Moving games.
+   3. The change should be on the Go, and **the Go's own newer save should still be there**, not the Go 2's.
+4. **Stop and remove.** Send another game and press **Stop and remove** part way: it should leave the Go's library, and its folder should be gone.
+5. **Emulators.** Open **Games and devices**, **Emulators** on the Go 2 and send one emulator game; accept it on the Go.
+6. **Get a game.** On the Go, **Other devices**, **Games on Legion Go 2**, choose one and press **Get this game**.
 
-2. **Games you can stream from another device.** With Steam running on both handhelds:
-   - On the Go, run the Device check **Games you can stream from another device**. It should count the Go 2's non-Steam games, and list "Split Fiction" as also installed here.
-   - On the Games page, every non-Steam game installed on the Go should be listed, Split Fiction once, and none of the Go 2's games. **Show games you can stream from another device** should list them.
-   - **Hidden test (A201).** In Steam on the Go, open the menu of one streaming tile and choose Hide (Manage, Hide this game). On the Go 2, check that the same game is still in the library and shows **Play**. Tell me the result. Then on the Go, show it again from Steam's Hidden collection.
+## 5. Going back
 
-3. **Uninstall** (use games you do not mind losing, ideally small test installs).
-   - **Non-Steam:** on the Go, open a synced non-Steam game in Haversack and press **Uninstall**.
-     - The screen should list the Proton prefix and the game folder with sizes and free space after.
-     - **Cancel** should be selected first. Press **Uninstall**.
-     - Watch the progress. The tile and its artwork should leave Steam, the folders should be gone, and the job should say where to restore the saves.
-     - On the Go 2, the game's History should show the final backup.
-   - **Stop:** start an uninstall of a bigger game and press **Stop** part way. It should stop and say what was kept.
-   - **Refusals:** try it while the game runs (refused), and on a game you can stream from the Go 2 (it should not offer Uninstall, or refuse).
-   - **Steam game:** on a synced Steam game, press **Uninstall**. Take the final backup, then Steam's uninstall should open. Confirm it there.
+On one handheld only, open **Settings**, **Updates** and install **0.60.0**. Saves, Conflicts and History should be back as they were, with your cloud sign-in. Then update to 0.61.0 again.
 
-4. **Find shares.** With a NAS or a Windows PC sharing a folder on the same network:
-   - Run the Device check **Find shares on my network**. It should find at least one server and say which ways answered.
-   - In Install, then From a network location, then Windows share (SMB), press **Find shares**. Pick your server: its shares should be listed. Open one and browse to an ISO, as before.
+## 6. Send back
 
-5. **Network ISO in place.** In Desktop Mode, open your NAS share in the file manager so it is mounted, with an ISO on it. Switch back to Gaming Mode, run the Device check **Network ISO in place**, and photograph it. It should say whether an ISO on that share opens in place, and whether fusermount3 and /dev/fuse are there.
-
-6. **Desktop app.** On the Go, run the Device check **Desktop app ready** once in Gaming Mode (it says to run it in Desktop Mode for the session bus). Then switch to Desktop Mode:
-   - The Haversack icon should appear in the system tray, with no window.
-   - Click it: Haversack should open in the browser. Close the window: the icon should still be there.
-   - Open Haversack from the app menu: the same Haversack should come up, not a second icon.
-   - Right-click the icon and press **Quit**: the icon goes. Log out and back in: it comes back.
-   - In Diagnostics (in the browser page), run **Desktop app ready** again: it should pass.
-
-7. **Advisor sessions.** Run the Device check **Session stats sources** and photograph it. Then play any game for 5 minutes on battery and quit. Open Haversack's Advisor page for that game: it should show a **Last session** card with watts, temperatures and battery, and a frame rate or "frame rate not available". Run **Session stats sources** again: it should now say whether a frame rate was seen.
-
-8. **Two save locations.** On the Go, open the Cloud page and add a second save location (for example **Directly between my devices** next to OneDrive). Play and quit a synced game. Both locations should list it as reached, with nothing left to copy. Turn the Wi-Fi off, play and quit again (it should not block), turn it back on, and after a few minutes the Cloud page should show nothing left to copy.
-
-9. **Desktop tray responsive.** With the USB disk attached (and the EmuDeck folders on it), switch to Desktop Mode. Open the Haversack tray menu repeatedly and use the taskbar and start menu for a minute: nothing should freeze. Run the Device check **Desktop tray responsive** from the desktop page's Diagnostics: it should pass, with both times under 200 ms.
-
-10. **Sending a game, both sides (v0.30.2).**
-    - Send Factorio (or any non-Steam game) from the Go to the Go 2 and accept it on the Go 2.
-    - The Go's Devices page should change from "offered" to "copying", then "adding to Steam", then "arrived".
-    - Send another game, and on the Go 2 choose a library folder without enough space, or pull the SD card while it copies. The Go 2 should show it as failed with the reason. The Go should show "did not arrive" with the same reason, and a toast.
-    - On the Go 2, run **Device checks** and press **Export results**. The file should have a "replication" part with the states, and no game titles.
-
-11. **OneDrive sign-in (v0.31.0).**
-    - On the Cloud page, press **Sign in with OneDrive** and finish in Steam's browser. It should end on "You're signed in", never a "cannot connect" page.
-    - Reload that page within 2 minutes: it should still say "You're signed in".
-    - Start again. While the browser is open, press **Use your phone instead** and finish on your phone. The toast should say "Signed in with your phone". If you go back to the browser tab, it should say you signed in on your phone.
-
-12. **Windows share, Windows-style (v0.30.2).**
-    - In Install, then From a network location, then Windows share (SMB), press **Find shares** and pick your server. Its shares should be listed, or a plain sentence should say why (for example that it needs a user name and password). There should be no "Python" or error-type text.
-    - Type the address the Windows way, `\\yourserver\yourshare`, with your user name (try `YOURPC\yourname` if the PC is not on a domain) and password, and turn on **Remember this location**. Press **Browse**: its folders should be listed.
-    - Come back later, pick the remembered location and press **Browse** again: it should list the same folders.
-
-13. **Pairing both ways (v0.31.0).** If the Go and the Go 2 are already paired, remove each from the other first. On the Go, switch off **Let other devices reach this one**. Pair from the Go to the Go 2. When it finishes, the Go should show "Games can now go both ways between you", and its toggle should be on.
-
-14. **No Accept, and bars on both devices (v0.31.0).**
-    - Send a non-Steam game from the Go to the Go 2. The Go 2 should start copying by itself, with the toast "<game> is coming from Legion Go". There should be no Accept button.
-    - Both devices should show a bar on Devices: percentage, GiB done of the total, speed, time left, and the stage (Copying, then Verifying, then Adding to Steam, then Done).
-    - Open the quick access menu on each device: a compact line should show the same progress.
-    - Close the Haversack page and open it again: the bar should carry on from where it was.
-
-15. **Space check (v0.31.0).** On the Go 2, choose an SD card or folder with too little space as the library. Send a large game from the Go. The Go should stop at once with "Legion Go 2 doesn't have enough space: needs ... GiB, has ... GiB free", before it reads the game's files.
-
-16. **Get this game (v0.31.0).** On the Go 2, on Devices, press **Games on Legion Go**, pick a game and press **Get this game**.
-    - The Go should toast "<game> is being copied to Legion Go 2".
-    - The Go 2's bar should go from Checking space to Preparing to Copying.
-    - The game should end up in the Go 2's library with its artwork, launch options and compatibility tool.
-
-17. **Stop and remove from each side (v0.31.0).**
-    - Start a copy and press **Stop and remove** on the sending device. The receiving device should stop and delete what it made, and both bars should go.
-    - Start another and press **Stop and remove** on the receiving device. The sending device should toast "<device> stopped and removed <game>".
-
-18. **Desktop app (v0.31.0).** In Desktop Mode, open Haversack's Devices page during a copy. The table should show the game, device, stage, a moving progress bar, GiB, speed and time left, with **Stop and remove**.
-
-19. **New layout (v0.32.0).**
-    - Open Haversack. The sidebar should show Play, Saves, Games and devices, Device, Install, Settings and Diagnostics, with lines between the groups.
-    - In each, the tabs along the top should move with the D-pad and open their page.
-    - Open the quick access menu while a game runs. Now playing, then Haversack, should fit on one screen without scrolling.
-    - From the quick access menu, press a conflict or update line: it should open the right tab.
-
-20. **Device, Status (v0.32.0).** It should name the Legion Go or Legion Go 2 (not "generic"), its power range, its screen and the battery level and charging state.
-
-21. **Desktop app (v0.32.0).** In Desktop Mode, open Haversack:
-    - The sidebar should have the same groups.
-    - Type "Background" in Search settings and press Enter: the setting should be highlighted.
-    - In Games, sort by each column and filter by state.
-    - Advisor should show charts of your last sessions.
-    - Diagnostics, Device checks, Run all should work, and **Desktop tray responsive** (step 9) can be run here.
-
-22. **Device readings (v0.33.0).**
-    - Open Device, Status. The temperatures, fan speed, power, performance mode and BIOS lines should fill in and change every couple of seconds.
-    - Run the Device check **Device readings** and photograph it: it lists what each device exposes, including fan speed, the firmware modes and the charge limit.
-    - On the Legion Go and the Legion Go 2, open Legion Space's mode (Legion L plus Y) or Steam's performance overlay and change the mode. Status should follow it.
-
-23. **Performance profiles (v0.34.0).**
-    - Run the Device check **Performance control** and photograph it.
-    - Start a game. In the quick access menu, set the mode to Performance and the TDP to 15 W.
-    - Quit. Steam's performance overlay should show the previous values again.
-    - Start the game again: the mode and TDP should come back by themselves.
-    - Sleep and wake the device during the game: the profile should still be applied.
-
-24. **Never fight (v0.34.0).**
-    - In Steam's own performance settings, turn on a per-game TDP limit for that game, then start it. Within a few seconds Haversack should say another app changed it, and leave Steam's value.
-    - If SimpleDeckyTDP or another tool is installed, Device, Power and battery should name it and show the settings read-only.
-
-25. **Battery charge limit (v0.35.0).**
-    - Run the Device check **Battery charge limit** and photograph it.
-    - Open Device, Power and battery. Either turn on **Stop charging at 80%**, or note where it tells you to change it.
-    - If you changed it in Steam's settings, Battery should show the new state.
-
-26. **Controllers (v0.36.0).**
-    - Run the Device check **Controllers** and photograph it.
-    - Open Device, Controllers. It should show both controllers' batteries, and their settings and lights if the kernel shows them.
-    - Detach one controller. Its battery should go, and come back when you attach it.
-
-27. **Other (v0.37.0).**
-    - Run the Device check **BIOS check** and photograph it.
-    - Open Device, Other. Turn Wi-Fi power saving off and on: it should follow, or say it is not offered.
-
-28. **Take the newest (v0.38.0).**
-    - On the Go 2, set Settings, Sync and safety, **When saves differ** to **Take the newest**.
-    - Turn the Wi-Fi off on the Go 2, play a synced game for a minute and quit.
-    - Wait at least 2 minutes. Play the same game on the Go and quit.
-    - Turn the Go 2's Wi-Fi back on and start the game there. Haversack should keep the Go's newer save, say so in a toast, and show **Undo** in the game's History.
-    - Press **Undo**: the Go 2's version should come back.
-
-29. **Badges and streaming artwork (v0.39.0).**
-    - Open a synced game's page in Steam's library. A "Haversack · Saves: in step" label should show near the top right, and the page should otherwise work as before.
-    - Open a game that streams from the other device: it should say where it streams from.
-    - On Install, under **Artwork for streaming tiles**, press **Find artwork** for one, pick the game, and check the tile gets its artwork.
-
-30. **Sidebar (v0.39.1).** Open Haversack's full page.
-    - Move with the D-pad from **Play** down to **Diagnostics** and back up again, through every entry.
-    - Press each one in turn: the page that opens should match the entry pressed.
-    - In a section, move right along its tabs and down into a tab, then press B: focus should go back to the sidebar.
-
-31. **Reconnect help: the list (v0.40.0).** Open Device, Controllers, Reconnect help.
-    - Every paired Bluetooth device should be listed, with its class, modalias and adapter, and the clone should show the "not from a registered manufacturer" note.
-    - Run the Device check "Controller reconnect help": it should pass, with the journal readable.
-32. **Reconnect help: pair and commit.** Turn help on for the clone DualShock 4 only.
-    - Forget it in Steam's Bluetooth settings and pair it again.
-    - Then turn it off and on with PS alone, ten times: it should reconnect ten of ten.
-    - Both genuine DualShock 4 pads, and any other controller, should still reconnect ten of ten, and Bluetooth audio should keep playing.
-33. **Reconnect help: diagnose, USB and export.**
-    - Run Diagnose on the clone: power off, wait 10 seconds, Start, press PS once. Note the outcome.
-    - Connect the clone by USB and select Read stored host over USB. Note the answer.
-    - Export the report bundle: this handheld's address should not appear in it.
-34. **Reconnect help: Reconnect, and lasting state.**
-    - With the clone off, open the quick menu, hold Share and PS, and select Reconnect: it should connect within 15 seconds.
-    - Reboot, then update SteamOS when one is offered: help should still be on and step 32 should still pass.
-    - Desktop Mode should stay responsive throughout.
-
-35. **Haversack Helper (v0.41.0).** In Device, Controllers, Reconnect help, select Install helper.
-    - Decky should ask to install "Haversack Helper", and the card should then say Ready.
-    - Run the Device check "Controller reconnect help": the helper should be ready.
-36. **Cable pairing.** With the clone DualShock 4 on a USB cable and help on for it, select Cable pair, then Confirm.
-    - Bluetooth should restart, with the genuine pads dropping and coming back.
-    - Unplug the clone, turn it off and press PS, ten times: it should reconnect ten of ten. Both genuine pads should still reconnect ten of ten.
-    - Restore backup should put the old pairing back.
-37. **SSP gate.** Only if a diagnosis says O3: turn the SSP gate on through both warnings.
-    - Note whether it said "Restart Bluetooth" (SSP off needs the adapter off).
-    - The clone should reconnect with PS ten of ten, and pairing a new device from Steam should still work.
-    - Switch the gate off: SSP should be on again. Turn it on again and disable Haversack in Decky: SSP should come back on within about 2 minutes.
-38. **Capture.** Run Diagnose with the helper ready: the result should say the capture was read. Export the bundle without redaction: it should contain `hci.btsnoop`.
-
-39. **Navigation (v0.41.1).** Open Haversack's full page.
-    1. With the D-pad, go down every sidebar entry slowly, then up again. The highlight must stay on the entry you moved to, and nothing should open or move by itself.
-    2. Enter every page with right or A, and come back with B.
-    3. Do it once straight after opening Haversack, and once after a minute.
-    4. If anything jumps, open Diagnostics, Tools, select Record navigation, repeat the moves for 60 seconds, then export the Device checks results.
-
-40. **Reconnect help in the desktop app (v0.42.0).** In Desktop Mode, open Haversack's desktop app, Device, Controllers, Reconnect help.
-    - The paired devices and their help switches should match Gaming Mode.
-    - Run Diagnose on the clone from there.
-    - The app should stay responsive throughout.
-
-41. **Separate power limits (v0.43.0).** With the helper installed, open Device, Power and battery.
-    - Set SPL 20, SPPT 25, FPPT 30 W and select Apply: the mode should switch to Custom, and the values should stay after reopening the page.
-    - Start a game, set different limits, quit: the earlier values should come back.
-    - Press Legion L plus Y during a game: Haversack should say it paused the profile, and not set the limits again.
-
-42. **Fans on the Legion Go 2 (v0.44.0).** With the helper installed, open Device, Fans. Run the Device check "Fan control" first and note the model, BIOS, EC and fan speed.
-    - If the BIOS and EC are not RRCN16WW with EC 1.16, run the fan test: it should pass, with the fan audibly changing speed.
-    - Switch on Haversack controls the fan with the Cool profile: the speed should follow the temperature.
-    - Select Hand back: the fan should return to its normal behaviour.
-43. **Fan lease, sleep and reboot.** With fan control on:
-    - disable Haversack in Decky: within about 10 seconds the fan should return to the firmware;
-    - re-enable Haversack, sleep the device for a minute, then wake it: control should resume;
-    - reboot: control should resume on its own.
-44. **Full fan speed on the Legion Go.** Switch on Full fan speed: the fan should run flat out. Disable Haversack in Decky: it should stop within about 10 seconds.
-
-45. **Network ISO in place (v0.45.0).** In Install, pick an ISO on a Windows share that is not mounted.
-    - It should install without copying the ISO first.
-    - Run the Device check "Network ISO in place": it should report in place available.
-
-46. **Quick menu shortcuts (v0.46.0).** Open Settings, General, Quick menu.
-    - Tick Fans and move it to the top with Up: the quick access menu should show it first straight away.
-    - Untick Sync now: it should disappear from the menu.
-    - Select Use the defaults.
-    - Switch the Device module off: its shortcuts should no longer be offered.
-
-47. **Controller settings and lights (v0.47.0).** With the helper installed, open Device, Controllers.
-    - Set rumble to High and the stick lights to Breathe in blue: both should change on the controllers.
-    - Note whether each controller sleeps after the minutes chosen.
-    - Detach and reattach a controller: with Keep my changes on, the settings should come back within about 10 seconds.
-
-48. **Emulators (v0.48.0).** Open Games and devices, Emulators on each handheld.
-    - The setup (EmuDeck or RetroDECK), the emulators and the games per system should match what is installed.
-    - A multi-disc game should show once.
-    - Run the Device check "Emulator setup": it should show counts only.
-
-49. **Sending an emulator game (v0.49.0).** On the handheld with the game, open Games and devices, Emulators, and select Send to on a small game.
-    - Accept it on the other handheld.
-    - It should appear in its ROM folder and in Steam, and play.
-    - Send it again: it should say the other handheld already has it.
-    - Send a Switch game with Also send firmware and keys ticked: the keys should arrive, readable only by your user.
-
-50. **Keepsake becomes Haversack (v0.51.0).** Before step 1.3, note on the Go: the number of games with sync on, the cloud account shown on Cloud, and one game's History.
-    - Haversack's quick menu should show only the card "Keepsake is now called Haversack" and the button **Remove the old Keepsake**. Keepsake's own panel should still work. Start and quit a synced game: only Keepsake should act (one entry in Keepsake's Activity).
-    - Press **Remove the old Keepsake**, then **Not now**: nothing should change.
-    - Press it again and confirm. Keepsake (and Keepsake Helper, if installed) should disappear from Decky's list. A toast should say how many files were moved and checked.
-    - Haversack's panel should now show the usual status. The games, the cloud account (still signed in, no new sign-in) and History should match your notes. Sync now should work, and the other handheld should still see this one's saves.
-    - Open Decky's settings, then Plugins: only Haversack should be listed (plus Haversack Helper once installed from Device, Controllers, Reconnect help).
-    - **The way back (Go only, optional).** Remove Haversack in Decky's settings. Install Keepsake v0.50.0 from the Releases page with Decky's "Install plugin from URL". It should start with everything as it was before step 1.3. Then update again from Keepsake's Updates to return to Haversack (step 1 again).
-51. **Help (v0.52.0).** Open Settings, Help.
-    - Choose a few topics with the dropdown: each should show the guide's text, with bold words and numbered steps.
-    - Move down with the D-pad: focus should go from section to section, and the page should scroll to follow. Use the right stick to scroll within a long section.
-    - On opening the page, nothing should take focus by itself, and the sidebar should not move.
-    - In Desktop Mode, the desktop app's Settings, Help should show the same text.
-52. **Looks (v0.53.0).** Put two WebM videos in the Go's Videos folder. Switch on Looks in Settings, Modules, then open Device, Looks.
-    - Both videos should be listed. Choose one for Boot and the other for Sleep.
-    - Put the device to sleep and wake it: the Sleep video should play. Restart: the Boot video should play.
-    - Select Use Steam's own on both: Steam's own videos should play again.
-    - With CSS Loader or Audio Loader installed, their themes or sound packs should be listed by name.
-53. **Sending looks (v0.55.0).** With both handhelds paired and Looks on, and a theme or sound pack installed on the Go 2 only, open Device, Looks on the Go 2 and select Send to Legion Go.
-    - On the Go, the theme and pack should appear in CSS Loader and Audio Loader. The Go's own themes should be unchanged.
-    - The Go 2's chosen boot video should appear as a choice on the Go's Looks page, "From Legion Go 2". The Go's own boot video should not change until you choose it.
-    - Send again: the Go should report everything already there.
-54. **Library extras (v0.56.0).**
-    - Open a non-Steam game with no artwork in Saves, Games: Artwork should list what it lacks. Find artwork, pick the game: only those kinds should appear in Steam's library, and any artwork it had should stay.
-    - With Advisor's ProtonDB source on, open a Steam game's page in the library: the badge should show the ProtonDB line.
-55. **The new menu (v0.57.0), with the navigation recorder.** In Diagnostics, Tools, start the navigation recorder, then:
-    1. Open the full page from the quick menu (Open Haversack).
-    2. Move down the sidebar slowly to Diagnostics, then back up to Play. The highlight should stay where you put it; each section should show its list of sub-pages, and nothing should open by itself.
-    3. In each section, press A on Open <section>. Use R1 through every sub-page to the last, then L1 back to the first; the D-pad on the tab bar should do the same. Press B: you should be back on the sidebar, on that section.
-    4. Open Device again: it should open on the sub-page you used last.
-    5. From the quick menu, open a shortcut to a sub-page (for example Fans, or Reconnect help): it should open that sub-page directly (Device, Controllers for Reconnect help). Press B: the sidebar should be on that section.
-    6. Do steps 1 to 5 straight after opening Haversack, and again after a minute.
-    7. Stop the recorder and select Export results in Diagnostics, Device checks. The record should show section-open and tab events, and no focus-left-sidebar-unprompted.
-56. **Pausing a game (v0.58.0).** Start a game, open the quick access menu and select Pause game.
-    - The game should stop (no sound, no movement), and Steam's menus should keep working. Resume game should let it carry on where it was.
-    - Pause it again and quit the game from Steam: the game should close normally.
-    - Pause it again, then disable Haversack in Decky's settings: the game should carry on within a few seconds.
-    - Note how Steam's overlay shows a paused game.
-57. **SD cards (v0.59.0).** With the SD card in, open Device, Storage: SD cards and drives should list the card with its games, including a non-Steam game installed on it.
-    - Take the card out, open the page again: the card should still be listed with its games, "last seen" and not in the device.
-58. **Launch option presets (v0.60.0).** Open a Proton game's page in Saves, Games, Launch options.
-    - Switch on Write a Proton log: Steam's own launch options for the game (its Properties) should show `PROTON_LOG=1 %command%` plus anything it had before. Start the game: `steam-<appid>.log` should appear in your home folder.
-    - Switch it off, then select Put back original: the launch options should be exactly as before.
-    - With the strict launch gate on, the presets should say to turn the gate off first.
-
-## 5. Send back
-
-- The photos or files from parts 2 and 3.
-- Any written step above that did not behave as described, with its number.
+- The photos or files from parts 2 and 4.
+- Any step above that did not behave as described, with its number.

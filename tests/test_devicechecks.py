@@ -286,14 +286,14 @@ def test_the_app_exports_one_redacted_file(make_app, monkeypatch):  # noqa: F811
                 await app.device_checks_export()
             listed = await app.device_checks()
             assert [c["id"] for c in listed["checks"]] == [c.id for c in dc.CHECKS] and listed["results"] == []
-            outcome = await app.device_check_run("battery")
-            assert outcome["id"] == "battery" and outcome["status"] in dc.STATUSES
+            outcome = await app.device_check_run("filesystems")
+            assert outcome["id"] == "filesystems" and outcome["status"] in dc.STATUSES
             exported = await app.device_checks_export()
             assert exported["summary"].startswith("Haversack 0.9.0 device checks")
             path = os.path.join(app.paths.settings_dir, exported["file"])
             text = open(path, encoding="utf-8").read()
             assert "Secret Test Name" not in text and "Secret Test Name" not in exported["summary"]
-            assert json.loads(text)["results"][0]["id"] == "battery"
+            assert json.loads(text)["results"][0]["id"] == "filesystems"
         finally:
             await app.stop()
 

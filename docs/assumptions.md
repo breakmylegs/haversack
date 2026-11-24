@@ -443,3 +443,10 @@ Every claim in `docs/build-prompt-v2.md` and `docs/research/replication-research
 | # | Fact | Status | Source |
 |---|---|---|---|
 | A250 | Steam keeps a removed SD card's entry in `libraryfolders.vdf`, with its `label`, `contentid` and `apps`, until the library is removed in Steam | unverified until device run step 57; if Steam drops the entry, a card that is out is simply not listed | Steam's file format, observed on desktop installs |
+
+## The strip (ADR-0098)
+
+| # | Fact | Status | Source |
+|---|---|---|---|
+| A251 | Steam's `GameSessions.RegisterForAppLifetimeNotifications` reports start and exit for every app, Steam or non-Steam, with `unAppID` and `bRunning`, so Replication and Install can rely on it without Saves | verified for the types (`@decky/ui` definitions, used since slice 1); unverified for every game kind until the device run step for the strip | `node_modules`, `src/lifecycle.ts` |
+| A252 | Decky keeps a plugin's settings folder when the plugin is updated to a version that no longer reads some of its files, so reinstalling v0.60.0 finds them | unverified until the device run step for the strip; Decky's update path replaces the plugin folder, and updates since v0.1 have kept settings | ADR-0002, ADR-0089, past updates |

@@ -35,27 +35,14 @@ def test_shortcut_facts_library_index_and_exe_inside(tmp_path):
     assert missing["compatdataFound"] is False and missing["compatdataLibraryIndex"] is None
 
 
-def test_probe_events_capped(tmp_path):
-    for i in range(diagnostics.PROBE_LIMIT + 5):
-        diagnostics.record_probe_event(str(tmp_path), "lifetime", {"unAppID": i})
-    events = diagnostics.probe_events(str(tmp_path))
-    assert len(events) == diagnostics.PROBE_LIMIT
-    assert events[-1]["payload"]["unAppID"] == diagnostics.PROBE_LIMIT + 4
-
-
-def test_large_probe_payload_truncated(tmp_path):
-    diagnostics.record_probe_event(str(tmp_path), "big", {"x": "y" * 20000})
-    payload = diagnostics.probe_events(str(tmp_path))[0]["payload"]
-    assert len(payload["truncated"]) == 8000
-
-
 def test_export_is_redacted(tmp_path, monkeypatch):
     settings, runtime, logs = (tmp_path / n for n in ("s", "r", "l"))
     for folder in (settings, runtime, logs):
         folder.mkdir()
     monkeypatch.setattr(diagnostics, "steam", lambda: {"roots": [{"path": "/home/alice/.local/share/Steam"}]})
-    diagnostics.record_probe_event(str(runtime), "x", {"access_token": "SECRET"})
-    path = diagnostics.export(str(settings), str(runtime), str(logs), {"note": "me@example.com"})
+    path = diagnostics.export(
+        str(settings), str(runtime), str(logs), {"note": "me@example.com", "access_token": "SECRET"}
+    )
     text = open(path, encoding="utf-8").read()
     assert "SECRET" not in text and "alice" not in text and "me@example.com" not in text
     data = json.loads(text)

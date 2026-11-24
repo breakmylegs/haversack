@@ -11,21 +11,19 @@ For SteamOS and Bazzite handhelds with [Decky Loader](https://github.com/SteamDe
    ```
 3. After that, Haversack updates itself from its own **Settings**, **Updates** tab ([Updates](updates.md)).
 
-## 2. Set it up
+There is nothing to set up. Open Haversack from the Quick Access Menu and choose **Open Haversack**.
 
-Open Haversack from the Quick Access Menu and choose **Set up Haversack**. The wizard has five steps:
+## 2. Install a game
 
-1. **Device name.** It is shown next to this device's saves on your other devices.
-2. **Cloud.** Choose OneDrive, Google Drive, WebDAV or S3, and sign in ([Cloud storage and sign-in](cloud.md)).
-3. **Scan games** and **review matches.** Haversack finds your Steam games and non-Steam shortcuts and looks up where each one keeps its saves. Approve any match it is not sure about.
-4. **Choose games** to sync. Steam games are listed too. Played Steam games with no Steam Cloud saves are synced automatically; ones that use Steam Cloud stay off unless you choose them, because Steam already keeps their saves.
-5. **Dry run.** See what the first sync will do for each game. Nothing changes until you confirm.
+Open **Install** and choose an ISO, a folder holding an installer, or a network share. Haversack mounts the ISO, adds a shortcut that runs the installer in the game's own Proton prefix, and turns that shortcut into the game when the installer finishes ([Installing games](installer.md)).
 
-## 3. Play
+## 3. Send it to your other handheld
 
-That is all. Before a game starts, Haversack checks the cloud for newer saves, pausing the game for a moment. After you quit, it saves to the cloud ([How syncing works](how-sync-works.md)).
+1. On both handhelds, open **Games and devices**, **Other devices**, and switch on **Let other devices reach this one**.
+2. On one of them, press **Find devices**, choose the other and press **Pair**. Accept on the other handheld and type the code it shows.
+3. Open **Games and devices**, **Games**, choose the game and press **Send to <device>**.
 
-The Quick Access Menu shows the current game's sync state, any conflicts, available updates and **Sync now**. **Open Haversack** opens the full view, with Games, Conflicts, History, Import saves, Install, Advisor, Settings, Updates, Logs and Diagnostics.
+The other handheld gets the game, added to Steam with the same name, launch options, Proton version and artwork ([Replication](replication.md)). After a patch or a mod, Haversack offers to send the update; your saves on each handheld are never replaced by one.
 
 ## Your quick menu
 
@@ -34,15 +32,3 @@ Haversack's panel in the quick access menu can show what you use most. Open **Se
 - they can be pages to open, actions that run straight from the menu, or status lines;
 - shortcuts for modules you have switched off are not offered;
 - **Open Haversack** is always there, last.
-
-## In Desktop Mode
-
-Haversack comes with a desktop app, with nothing more to install. When you switch to Desktop Mode, its icon appears in the system tray, with no window. Click it, or choose **Open Haversack** from its menu, to open Haversack in your browser; it covers the same pages as in Gaming Mode. Closing the window leaves the icon in the tray. **Quit** in the icon's menu stops it until you next log in. Haversack is also in the app menu, which brings up the one already running.
-
-If the icon's status line says Haversack's plugin cannot be reached, Decky Loader is not running in Desktop Mode: switch back to Gaming Mode once, then try again. To stop the desktop app starting, switch **Desktop** off in Settings, Modules.
-
-## Next device
-
-Set up your next device the same way, with the same cloud account. Non-Steam games installed into their own Proton prefixes are recognised as the same game, even though their shortcut IDs and prefix folders differ on each device.
-
-Moving from Ludusavi? See [Importing from Ludusavi](import-ludusavi.md).

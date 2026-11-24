@@ -1,7 +1,0 @@
-{
-  "name": "haversack-helper",
-  "version": "0.0.0",
-  "private": true,
-  "description": "Haversack's root helper. The version is set by scripts/package.py to Haversack's own.",
-  "license": "BSD-3-Clause"
-}

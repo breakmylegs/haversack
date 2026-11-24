@@ -298,7 +298,6 @@ export const deviceChecks = callable<[], { checks: DeviceCheck[]; results: Devic
 export const deviceCheckRun = callable<[id: string], DeviceCheckResult>("device_check_run");
 export const deviceChecksRunAll = callable<[], { checks: DeviceCheck[]; results: DeviceCheckResult[] }>("device_checks_run_all");
 export const deviceChecksExport = callable<[], { file: string; where: string; summary: string }>("device_checks_export");
-export const directSyncNow = callable<[], { peers: number; copied: number; removed: number; unreachable: string[] }>("direct_sync_now");
 export const replicationSetPolicy = callable<[linkId: string, policy: string], GameLink[]>("replication_set_policy");
 export const replicationCheckGame = callable<[linkId: string], GameLink>("replication_check_game");
 export const replicationSendUpdate = callable<[linkId: string], GameLink[]>("replication_send_update");
@@ -336,7 +335,6 @@ export interface NewestChoice {
   at: number;
 }
 // R18 (ADR-0081): the badge in Steam's library, and artwork for streaming tiles.
-export const libraryBadge = callable<[appid: number], { state: string; label: string; detail?: string } | null>("library_badge");
 
 // Artwork for any non-Steam game (R29 stage 2, ADR-0093): only the kinds it has none of.
 export const gameArtStatus = callable<[key: string], { nonSteam: boolean; missing: string[]; available: boolean }>("game_art_status");
@@ -345,10 +343,6 @@ export const installerStreamTiles = callable<[], { appid: number; name: string; 
 export const installerStreamArtSearch = callable<[title: string], { id: number; name: string; verified: boolean }[]>("installer_stream_art_search");
 export const installerStreamArtApply = callable<[appid: number, gameId: number], { queued: number }>("installer_stream_art_apply");
 
-export const takeNewest = callable<[key: string], Record<string, unknown>>("take_newest");
-export const newestChoice = callable<[key: string], NewestChoice | null>("newest_choice");
-export const undoNewest = callable<[key: string], Record<string, unknown>>("undo_newest");
-export const snapshotLocations = callable<[key: string], Record<string, string[]>>("snapshot_locations");
 
 // This handheld, for Device's Status tab (layout v3, ADR-0073).
 export interface DeviceStatus {
@@ -362,7 +356,6 @@ export interface DeviceStatus {
   facts: Record<string, string>;
   battery: { percent: number | null; mains: boolean | null; present: boolean };
 }
-export const deviceStatus = callable<[], DeviceStatus>("device_status");
 
 // Live readings (R21 stage 1, ADR-0074): every world-readable sensor, read-only.
 export interface Sensor {
@@ -377,7 +370,6 @@ export interface DeviceReadings {
   profile: { current: string; choices: string[]; words: string } | null;
   cpu: { boost: boolean | null; smt: string | null; online: number | null };
 }
-export const deviceReadings = callable<[], DeviceReadings>("device_readings");
 
 // Performance profiles (R21 stage 2, ADR-0076): through steamos-manager only, per game.
 export interface PowerLimitValues {
@@ -414,9 +406,6 @@ export interface PerformanceStatus {
     ranges: Record<keyof PowerLimitValues, { current: number; min: number; max: number; step: number }> | null;
   };
 }
-export const devicePerformance = callable<[], PerformanceStatus>("device_performance");
-export const deviceApply = callable<[values: PerformanceValues, saveFor: number | null], PerformanceStatus>("device_apply");
-export const deviceForget = callable<[appid: number], PerformanceStatus>("device_forget");
 
 // The 80 percent charge limit (R21 stage 4, ADR-0077).
 export interface ChargeLimitStatus {
@@ -427,7 +416,6 @@ export interface ChargeLimitStatus {
   problem?: string | null;
   where?: string;
 }
-export const deviceBattery = callable<[], ChargeLimitStatus>("device_battery");
 
 // The controllers, read-only (R21 stage 5, ADR-0078).
 export interface ControllersStatus {
@@ -436,7 +424,6 @@ export interface ControllersStatus {
   rings: Record<string, string> | null;
   tools: string[];
 }
-export const deviceControllers = callable<[], ControllersStatus>("device_controllers");
 
 // Changing the controllers and the stick lights (R24, ADR-0086), through the Haversack Helper.
 export interface ControllerSettingsStatus {
@@ -449,9 +436,6 @@ export interface ControllerSettingsStatus {
   tools: { hhd?: boolean; inputplumber?: boolean };
   helper: { installed?: boolean; ready?: boolean; problem?: string };
 }
-export const controllerSettingsStatus = callable<[], ControllerSettingsStatus>("controller_settings_status");
-export const controllerSettingsSet = callable<[values: Record<string, unknown>, keep: boolean], ControllerSettingsStatus>("controller_settings_set");
-export const controllerSettingsForget = callable<[], ControllerSettingsStatus>("controller_settings_forget");
 
 // Controller reconnect help (R22, ADR-0082): every paired device, help per device by adapter and address.
 export const RECONNECT_EVENT = "keepsake_reconnect";
@@ -505,34 +489,15 @@ export interface ReconnectResult {
   state: string;
   message: string;
 }
-export const reconnectStatus = callable<[], ReconnectStatus>("reconnect_status");
-export const reconnectSetHelp = callable<[adapter: string, mac: string, on: boolean, label: string], ReconnectStatus>("reconnect_set_help");
-export const reconnectSetOption = callable<[adapter: string, mac: string, option: "commit" | "fullMode", on: boolean], ReconnectStatus>("reconnect_set_option");
-export const reconnectSetDryRun = callable<[on: boolean], ReconnectStatus>("reconnect_set_dry_run");
-export const reconnectDismiss = callable<[adapter: string, mac: string], ReconnectStatus>("reconnect_dismiss");
-export const reconnectAssist = callable<[adapter: string, mac: string], ReconnectResult>("reconnect_assist");
-export const reconnectReadUsb = callable<
-  [adapter: string, mac: string],
-  { read: { ok: boolean; state?: string; message?: string; family?: string; storesThisHandheld?: boolean }; diagnosis: ReconnectDiagnosis | null }
->("reconnect_read_usb");
-export const reconnectDiagnose = callable<[adapter: string, mac: string], ReconnectDiagnosis>("reconnect_diagnose");
 export const reconnectCablePair = callable<[adapter: string, mac: string, order: "same" | "reversed"], ReconnectResult & { backup?: string; sixaxis?: boolean }>(
   "reconnect_cable_pair",
 );
-export const reconnectCableRestore = callable<[adapter: string, mac: string], { ok: boolean; restored: string }>("reconnect_cable_restore");
-export const reconnectSetSspGate = callable<[on: boolean, adapter: string, confirm: string], ReconnectStatus>("reconnect_set_ssp_gate");
-export const reconnectSspConfirm = callable<[], ReconnectStatus>("reconnect_ssp_confirm");
-export const helperPrepare = callable<[], PreparedUpdate>("helper_prepare");
-export const reconnectExport = callable<[adapter: string, mac: string, redactAdapter: boolean], { file: string; where: string }>("reconnect_export");
 
 // Stage 6 (ADR-0079): Wi-Fi power saving and the BIOS check.
 export interface DeviceExtras {
   wifiPowerSaving: boolean | null;
   bios: { version: string | null; date: string | null; known?: boolean; model?: string; notes: string[]; level: "ok" | "warn" | "fail" };
 }
-export const deviceExtras = callable<[], DeviceExtras>("device_extras");
-export const deviceSetWifiPowerSaving = callable<[on: boolean], DeviceExtras>("device_set_wifi_power_saving");
-export const deviceSetChargeLimit = callable<[on: boolean], ChargeLimitStatus>("device_set_charge_limit");
 export const replicationStopGame = callable<[entryId: string], GameTransfer[]>("replication_stop_game");
 export const replicationClearGame = callable<[entryId: string], GameTransfer[]>("replication_clear_game");
 export const replicationPeerGames = callable<[peerId: string], { id: string; title: string }[]>("replication_peer_games");
@@ -629,16 +594,6 @@ export interface FansStatus {
   target: number | null;
   limits: { min: number; max: number; failsafe: number };
 }
-export const fansStatus = callable<[], FansStatus>("fans_status");
-export const fansSetOptions = callable<
-  [options: { enabled?: boolean; fullSpeed?: boolean; smooth?: boolean; unlocked?: boolean; confirm?: string }],
-  FansStatus
->("fans_set_options");
-export const fansSaveProfile = callable<[name: string, points: FanPoint[], makeDefault: boolean], FansStatus>("fans_save_profile");
-export const fansDeleteProfile = callable<[name: string], FansStatus>("fans_delete_profile");
-export const fansAssign = callable<[kind: "default" | "mode" | "game", key: string, name: string | null], FansStatus>("fans_assign");
-export const fansHandBack = callable<[], FansStatus>("fans_hand_back");
-export const fansSelftest = callable<[], { passed: boolean; status: FansStatus }>("fans_selftest");
 
 // The navigation recorder (v0.41.1): one file in the settings folder, also in the Device checks export.
 export const saveNavigationRecord = callable<
@@ -656,8 +611,6 @@ export const steamOpsList = callable<[], (SteamOp & { state: string; result: Rec
   "steam_ops_list",
 );
 
-export const onSuspend = callable<[], { started: number }>("on_suspend");
-export const enableSteamWithoutCloud = callable<[], { enabled: string[] }>("enable_steam_without_cloud");
 
 export type Backend = "local" | "onedrive" | "gdrive" | "webdav" | "s3" | "direct";
 
@@ -697,11 +650,6 @@ export const backendConfig = callable<[backend: Backend], BackendConfig>("backen
 export const setBackendConfig = callable<[backend: Backend, values: Record<string, string | boolean>], BackendConfig>(
   "set_backend_config",
 );
-export const ludusaviScan = callable<[root: string], { root: string; games: LudusaviGame[] }>("ludusavi_scan");
-export const ludusaviImport = callable<
-  [root: string, folder: string, backupIds: string[], gameKey: string],
-  { gameKey: string; results: ImportResult[] }
->("ludusavi_import");
 
 // Import every game at once: runs in the backend, sends "keepsake_import_progress" after each game.
 export type ImportVerdict = "imported" | "already-imported" | "nothing-to-import" | "failed";
@@ -715,9 +663,6 @@ export interface ImportAllStatus {
   games: Record<string, { name: string; status: ImportVerdict; error: string | null; results: ImportResult[] }>;
   summary: Partial<Record<ImportVerdict, number>>;
 }
-export const ludusaviImportAll = callable<[root: string, mode: "latest" | "all"], ImportAllStatus>("ludusavi_import_all");
-export const ludusaviImportCancel = callable<[], ImportAllStatus>("ludusavi_import_cancel");
-export const ludusaviImportStatus = callable<[], ImportAllStatus>("ludusavi_import_status");
 
 export type SyncWord ="off" | "not-synced" | "synced" | "pending" | "conflict" | "quarantined";
 export type HealthStatus = "ok" | "info" | "warn" | "fail";
@@ -796,17 +741,9 @@ export interface ConfigSyncInfo {
   concurrent: string[];
 }
 
-export const qamSummary = callable<[], QamSummary>("qam_summary");
 export const syncNow = callable<[], { ok: boolean; reason?: string; games?: number; counts?: Record<string, number> }>(
   "sync_now",
 );
-export const listConflicts = callable<[], ConflictEntry[]>("list_conflicts");
-export const conflictDetails = callable<[key: string], ConflictDetails>("conflict_details");
-export const recentHistory = callable<[limit: number], { snapshots: HistoryItem[]; errors: string[] }>("recent_history");
-export const planSync = callable<[keys: string[]], PlanEntry[]>("plan_sync");
-export const finishSetup = callable<[keys: string[]], { ok: boolean; enabled: number }>("finish_setup");
-export const healthChecks = callable<[probe: boolean], { checks: HealthCheck[]; summary: HealthStatus }>("health_checks");
-export const gameConfigSync = callable<[key: string], ConfigSyncInfo>("game_config_sync");
 
 export interface Status {
   version: string;
@@ -991,12 +928,9 @@ export interface MatchProposal {
   raised: number;
 }
 
-export const approveMatch = callable<[key: string], GameConfig>("approve_match");
-export const rejectMatch = callable<[key: string], { ok: boolean }>("reject_match");
 export const setGameKey = callable<[key: string, gameKey: string | null, title: string | null], GameConfig>(
   "set_game_key",
 );
-export const newGameKey = callable<[key: string], GameConfig>("new_game_key");
 
 export interface PreviewEntry {
   source: "manifest" | "custom";
@@ -1096,10 +1030,6 @@ export type SignInCode =
   | { method?: undefined; userCode: string; verificationUri: string; expiresIn: number }
   | { method: "browser"; authUrl: string; expiresIn: number };
 
-export const cloudStatus = callable<[], CloudStatus>("cloud_status");
-export const startSignin = callable<[backend: "onedrive" | "gdrive", method: SigninMethod], SignInCode>("start_signin");
-export const cancelSignin = callable<[], { ok: boolean }>("cancel_signin");
-export const signOut = callable<[backend?: "onedrive" | "gdrive"], { ok: boolean }>("sign_out");
 export const testCloud = callable<[backend?: Backend], { ok: boolean; folder?: string; error?: string; registered?: boolean }>(
   "test_cloud",
 );
@@ -1138,16 +1068,9 @@ export const onGameEvent = callable<[kind: "start" | "exit", rawId: number | str
 export const strictWrap = callable<[key: string, currentOptions: string], { appid: number; options: string }>(
   "strict_wrap",
 );
-export const strictUnwrap = callable<[key: string, mode: string], { appid: number; options: string }>("strict_unwrap");
-export const syncPull = callable<[key: string], Record<string, unknown>>("sync_pull");
-export const syncPush = callable<[key: string], Record<string, unknown>>("sync_push");
 export const resolveConflict = callable<[key: string, choice: string, head: string | null], Record<string, unknown>>(
   "resolve_conflict",
 );
-export const syncStatus = callable<[key: string], SyncStatus>("sync_status");
-export const snapshotGame = callable<[key: string, label?: string], SnapshotResult>("snapshot_game");
-export const listSnapshots = callable<[key: string], SnapshotListing>("list_snapshots");
-export const restoreSnapshot = callable<[key: string, snapId: string, paths?: string[]], SnapshotResult>("restore_snapshot");
 export interface Playtime {
   totalSeconds: number;
   sessions: number;
@@ -1178,23 +1101,6 @@ export interface StorageRow {
   canResetPrefix: boolean;
   reset?: { stage: "waiting" | "restored"; started: number } | null;
 }
-export const storageUsage = callable<[key: string | null], { games: StorageRow[]; notMeasured: number }>("storage_usage");
-export const clearShaderCache = callable<[key: string], { ok: boolean; freed: number }>("clear_shader_cache");
-export const resetPrefix = callable<[key: string], { ok: boolean; stage: string }>("reset_prefix");
-export const cancelPrefixReset = callable<[key: string], { ok: boolean }>("cancel_prefix_reset");
-export const deleteOldPrefix = callable<[key: string], { ok: boolean; freed: number }>("delete_old_prefix");
-export const scrubCloud = callable<[full: boolean], ScrubReport>("scrub_cloud");
-export const repairSnapshot = callable<[key: string], SnapshotResult>("repair_snapshot");
-export const exportSnapshots = callable<
-  [folder: string, scope: "latest" | "all", key?: string | null],
-  { ok: boolean; folder: string; games: number; snapshots: number }
->("export_snapshots");
-export const gamePlaytime = callable<[key: string], Playtime>("game_playtime");
-export const bringNewer = callable<[key: string], { action: string; reason?: string; pending?: boolean }>("bring_newer");
-export const restorePreview = callable<[key: string, snapId: string], { snapId: string; changes: RestoreChange[] }>("restore_preview");
-export const activity = callable<[limit: number], ActivityEntry[]>("activity");
-export const undoRestore = callable<[key: string, prerestoreId: string], SnapshotResult>("undo_restore");
-export const pinSnapshot = callable<[key: string, snapId: string], { ok: boolean }>("pin_snapshot");
 export const releaseQuarantine = callable<[key: string, snapId: string, confirmed: boolean], SnapshotResult>(
   "release_quarantine",
 );
@@ -1217,8 +1123,6 @@ export const manifestProgress = callable<[], ManifestProgress>("manifest_progres
 export const refreshManifest = callable<[force: boolean], { ok: boolean; reason?: string; games?: number }>(
   "refresh_manifest",
 );
-export const matchGames = callable<[], GameMatch[]>("match_games");
-export const searchTitles = callable<[query: string], string[]>("search_titles");
 export const getGame = callable<
   [key: string],
   {
@@ -1234,8 +1138,6 @@ export const getGame = callable<
 export const updateGameConfig = callable<[key: string, changes: Partial<GameConfig>], GameConfig>(
   "update_game_config",
 );
-export const addCustomPath = callable<[key: string, absolutePath: string], GameConfig>("add_custom_path");
-export const previewGame = callable<[key: string], Preview>("preview_game");
 export const discoverGames = callable<[refresh: boolean], DiscoveryResult>("discover_games");
 
 // Games you can stream from another device: Steam Remote Play's entries (ADR-0064).
@@ -1265,16 +1167,10 @@ export interface RemoteCopiesStatus {
 export const remoteCopiesReport = callable<[entries: RemoteCopyReport[]], { newlyHidden: { appid: number; name: string }[]; tidied: number }>(
   "remote_copies_report",
 );
-export const remoteCopiesStatus = callable<[], RemoteCopiesStatus>("remote_copies_status");
-export const tidyCopies = callable<[appids: number[]], { queued: number }>("tidy_copies");
-export const undoTidy = callable<[], { queued: number }>("undo_tidy");
-export const unhideLocal = callable<[appid: number], { id: number }>("unhide_local");
-export const checkRunningPrefix = callable<[key: string], CrossCheck>("check_running_prefix");
 export const getStatus = callable<[], Status>("get_status");
 export const takeStartupNotice = callable<[], StartupNotice | null>("take_startup_notice");
 export const checkForUpdates = callable<[force: boolean], UpdateStatus>("check_for_updates");
 export const prepareUpdate = callable<[tag: string], PreparedUpdate>("prepare_update");
-export const simulateSyncJob = callable<[seconds: number], { ok: boolean; seconds: number }>("simulate_sync_job");
 export const getSettings = callable<[], Settings>("get_settings");
 export const setSetting = callable<[key: string, value: unknown], Settings>("set_setting");
 export const getLogs = callable<[limit: number], LogRecord[]>("get_logs");
@@ -1282,13 +1178,11 @@ export const getEnvironment = callable<[], Record<string, unknown>>("get_environ
 export const getSteamProbe = callable<[], Record<string, unknown>>("get_steam_probe");
 export const getGameProcesses = callable<[appid: number], Record<string, unknown>[]>("get_game_processes");
 export const httpsTest = callable<[], HttpsTestResult>("https_test");
-export const recordProbeEvent = callable<[kind: string, payload: unknown], number>("record_probe_event");
 /** ADR-0044: the Gaming Mode sign-in probe's loopback step. */
 export const signinProbe = callable<[action: "start" | "result"], { url?: string; arrived?: boolean; ipv6?: boolean; address?: string; userAgent?: string; listening?: string[]; error?: string }>(
   "signin_probe",
 );
 export const exportDiagnostics = callable<[frontend: Record<string, unknown>], string>("export_diagnostics");
-export const freezeTest = callable<[appid: number, seconds: number], FreezeTestResult>("freeze_test");
 
 // Advisor (slice 14, ADR-0028). Read-only: nothing here changes a setting anywhere (P16).
 export interface AdvisorRecommendation {
@@ -1400,14 +1294,7 @@ export interface AdvisorView {
   attribution?: string[];
 }
 
-export const advisorView = callable<[], AdvisorView>("advisor_view");
-export const advisorSelectGame = callable<[appid: number], AdvisorView>("advisor_select_game");
-export const advisorRefresh = callable<[], AdvisorView>("advisor_refresh");
-export const advisorRedetect = callable<[], AdvisorView>("advisor_redetect");
-export const advisorSettings = callable<[values: Record<string, unknown>], AdvisorView>("advisor_settings");
 
-export const advisorAiModels = callable<[provider: string], { id: string; label: string }[]>("advisor_ai_models");
-export const advisorAiGenerate = callable<[], AdvisorView>("advisor_ai_generate");
 // AI keys are kept with the backend secrets; only whether one is set comes back.
 export const saveAiKey = callable<[kind: "anthropic" | "openai" | "gemini", values: { apiKey: string }], { configured: boolean }>(
   "set_backend_config",
@@ -1445,11 +1332,6 @@ export interface UninstallJob {
   backup: string | null;
   restoreFrom: string | null;
 }
-export const uninstallPlan = callable<[key: string], UninstallPlan>("uninstall_plan");
-export const uninstallStart = callable<[key: string, skipBackup: boolean], UninstallJob>("uninstall_start");
-export const uninstallSteam = callable<[key: string, backup: boolean], { op: number; backup: unknown }>("uninstall_steam");
-export const uninstallStatus = callable<[], UninstallJob | null>("uninstall_status");
-export const uninstallCancel = callable<[], UninstallJob | null>("uninstall_cancel");
 
 // How each game ran on this device (ADR-0069).
 export interface AdvisorSession {
@@ -1472,8 +1354,6 @@ export interface AdvisorSessions {
   total: { sessions: number; seconds: number; fpsAvg?: number } | null;
   advice: { id: string; text: string; source: string; measured: boolean }[];
 }
-export const advisorPerfSample = callable<[diagnosticB64: string], { ok: boolean; fps?: number | null }>("advisor_perf_sample");
-export const onResume = callable<[], { ok: boolean }>("on_resume");
 
 // Several save locations (ADR-0071).
 export interface SaveLocation {
@@ -1487,10 +1367,6 @@ export interface LocationsStatus {
   locations: SaveLocation[];
   available: Backend[];
 }
-export const locationsStatus = callable<[], LocationsStatus>("locations_status");
-export const addLocation = callable<[backend: Backend], LocationsStatus>("add_location");
-export const removeLocation = callable<[backend: Backend], LocationsStatus>("remove_location");
-export const setGameLocations = callable<[key: string, names: Backend[] | null], GameConfig>("set_game_locations");
 
 // Haversack becomes Haversack (ADR-0089): held while the old plugin is installed, then its data moves across.
 export interface RenameStatus {
@@ -1519,11 +1395,7 @@ export interface LooksStatus {
   themes: { name: string; author: string; version: string; preset: boolean }[];
   sounds: { name: string; author: string; music: boolean }[];
 }
-export const looksStatus = callable<[], LooksStatus>("looks_status");
-export const looksSetAnimation = callable<[kind: AnimationKind, choice: string], LooksStatus["animations"]>("looks_set_animation");
-export const looksResetAnimation = callable<[kind: AnimationKind], LooksStatus["animations"]>("looks_reset_animation");
 export type LooksPart = "themes" | "sounds" | "animations";
-export const looksSend = callable<[peerId: string, parts: LooksPart[]], { sending: string }>("looks_send");
 
 // Pause the running game (R29 stage 3, ADR-0094): until Resume, at most an hour.
 export interface PauseStatus {
@@ -1533,9 +1405,6 @@ export interface PauseStatus {
   since: number | null;
   limitMinutes: number;
 }
-export const gamePauseStatus = callable<[], PauseStatus>("game_pause_status");
-export const gamePause = callable<[], PauseStatus>("game_pause");
-export const gameResume = callable<[], PauseStatus>("game_resume");
 
 // Which games are on which SD card or drive, including cards not inserted (R29 stage 4, ADR-0096).
 export interface SdCard {
@@ -1545,7 +1414,6 @@ export interface SdCard {
   games: string[];
   shortcuts: string[];
 }
-export const sdCards = callable<[], SdCard[]>("sd_cards");
 
 // Launch option presets (R29 stage 5, ADR-0097): Proton's own settings, set through Steam.
 export interface LaunchPresets {
@@ -1556,6 +1424,3 @@ export interface LaunchPresets {
   appid: number;
   strict: boolean;
 }
-export const launchPresets = callable<[key: string, currentOptions: string], LaunchPresets>("launch_presets");
-export const launchApply = callable<[key: string, currentOptions: string, presets: string[]], { appid: number; options: string }>("launch_apply");
-export const launchRestore = callable<[key: string], { appid: number; options: string }>("launch_restore");

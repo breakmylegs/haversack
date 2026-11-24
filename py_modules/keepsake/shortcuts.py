@@ -15,38 +15,27 @@ from typing import Any
 
 ID = re.compile(r"^[a-z][a-z0-9-]{1,39}$")
 MAX_CHOSEN = 30
-# With Open Keepsake, always last. The reconnect line keeps the Reconnect buttons helped controllers
-# have had in the quick menu since v0.40.0 (ADR-0082).
-DEFAULT = ["sync-now", "status-transfers", "status-conflicts", "status-reconnect"]
+# With Open Haversack, always last.
+DEFAULT = ["status-transfers", "send-current", "page-install"]
 
-# id, kind, label, module, feature (None: none needed), page target (section, tab) for pages
+# id, kind, label, module, feature (None: none needed), page target (section, tab) for pages.
+# The strip (ADR-0098): installing games and moving them between devices, and the core around them.
 REGISTRY: list[dict[str, Any]] = [
     # Pages: open one page of the full interface
-    {"id": "page-games", "kind": "page", "label": "Games", "module": "saves", "open": ["saves", "games"]},
-    {"id": "page-conflicts", "kind": "page", "label": "Conflicts", "module": "saves", "open": ["saves", "conflicts"]},
-    {"id": "page-history", "kind": "page", "label": "History", "module": "saves", "open": ["saves", "history"]},
+    {"id": "page-install", "kind": "page", "label": "Install", "module": "installer", "open": ["install", "install"]},
+    {
+        "id": "page-moving",
+        "kind": "page",
+        "label": "Moving games",
+        "module": "replication",
+        "open": ["games-devices", "moving"],
+    },
     {
         "id": "page-devices",
         "kind": "page",
         "label": "Other devices",
         "module": "replication",
         "open": ["games-devices", "devices"],
-    },
-    {
-        "id": "page-advisor",
-        "kind": "page",
-        "label": "Advisor for this game",
-        "module": "advisor",
-        "open": ["play", "advisor"],
-    },
-    {"id": "page-install", "kind": "page", "label": "Install", "module": "installer", "open": ["install", "install"]},
-    {"id": "page-storage", "kind": "page", "label": "Storage", "module": "core", "open": ["device", "storage"]},
-    {
-        "id": "page-diagnostics",
-        "kind": "page",
-        "label": "Diagnostics",
-        "module": "core",
-        "open": ["diagnostics", "health"],
     },
     {
         "id": "page-device-checks",
@@ -56,57 +45,13 @@ REGISTRY: list[dict[str, Any]] = [
         "open": ["diagnostics", "checks"],
     },
     {"id": "page-settings", "kind": "page", "label": "Settings", "module": "core", "open": ["settings", "general"]},
-    {"id": "page-device", "kind": "page", "label": "Device status", "module": "core", "open": ["device", "status"]},
-    {"id": "page-power", "kind": "page", "label": "Power", "module": "device", "open": ["device", "power"]},
-    {"id": "page-battery", "kind": "page", "label": "Battery", "module": "device", "open": ["device", "power"]},
-    {
-        "id": "page-controllers",
-        "kind": "page",
-        "label": "Controllers",
-        "module": "core",
-        "open": ["device", "controllers"],
-    },
-    {
-        "id": "page-reconnect",
-        "kind": "page",
-        "label": "Reconnect help",
-        "module": "device",
-        "open": ["device", "controllers"],
-    },
-    {"id": "page-fans", "kind": "page", "label": "Fans", "module": "device", "open": ["device", "fans"]},
-    {
-        "id": "page-more-device",
-        "kind": "page",
-        "label": "More device settings",
-        "module": "device",
-        "open": ["device", "status"],
-    },
     # Actions: run straight from the quick access menu, with a toast
-    {"id": "sync-now", "kind": "action", "label": "Sync now", "module": "saves"},
-    {"id": "sync-current", "kind": "action", "label": "Sync this game now", "module": "saves"},
-    {"id": "backup-current", "kind": "action", "label": "Back up this game now", "module": "saves"},
-    {"id": "check-updates", "kind": "action", "label": "Check for updates", "module": "core", "feature": "updates"},
     {"id": "send-current", "kind": "action", "label": "Send this game to another device", "module": "replication"},
     {"id": "get-game", "kind": "action", "label": "Get a game from another device", "module": "replication"},
+    {"id": "check-updates", "kind": "action", "label": "Check for updates", "module": "core", "feature": "updates"},
     {"id": "run-device-checks", "kind": "action", "label": "Run all device checks", "module": "core"},
-    {
-        "id": "next-mode",
-        "kind": "action",
-        "label": "Next performance mode",
-        "module": "device",
-        "feature": "performance",
-    },
-    {
-        "id": "charge-limit",
-        "kind": "action",
-        "label": "Charge limit on or off",
-        "module": "device",
-        "feature": "charge-limit",
-    },
     # Status lines
-    {"id": "status-conflicts", "kind": "status", "label": "Open conflicts", "module": "saves"},
     {"id": "status-transfers", "kind": "status", "label": "Games moving between devices", "module": "replication"},
-    {"id": "status-reconnect", "kind": "status", "label": "Controller reconnect buttons", "module": "device"},
 ]
 
 

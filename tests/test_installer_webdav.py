@@ -9,11 +9,10 @@ from typing import ClassVar
 
 import pytest
 
+from helpers import Device
 from keepsake.backends import CredentialStore
 from keepsake.installer import remote, webdav
 from keepsake.installer.remote import RemoteError
-from keepsake.store import LocalFolderStore
-from test_app_ux import Device
 from test_installer import FakeUdisks, env  # noqa: F401 (the fixture)
 from test_installer_remote import Reply, Script
 
@@ -167,7 +166,7 @@ def test_locations_keep_the_dav_form_and_refuse_a_password_over_dav(tmp_path):
 @pytest.fixture
 def device(env, tmp_path):  # noqa: F811
     installer, *_ = env
-    a = Device(tmp_path / "dev", "a", 4171510507, LocalFolderStore(str(tmp_path / "cloud")))
+    a = Device(tmp_path / "dev", "a", 4171510507)
     a.app.installer = installer
     disc = (tmp_path / "DISC").as_posix()
     os.makedirs(disc, exist_ok=True)
